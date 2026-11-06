@@ -60,6 +60,7 @@ def criar_lifespan(
             context=context,
             webhook=WebhookClient(http, settings),
             settings=settings,
+            checkpointer=checkpointer,
         )
         app.state.agent_service = service
         app.state.http = http
