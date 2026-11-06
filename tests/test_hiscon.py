@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import json
+import socket
 from datetime import date
 
 import httpx
@@ -225,8 +226,16 @@ def test_anexo_acima_do_limite():
         )
 
 
-def test_anexo_url_baixa_e_valida():
+def test_anexo_url_baixa_e_valida(monkeypatch):
     chamadas: dict = {}
+
+    monkeypatch.setattr(
+        anexos_service.socket,
+        "getaddrinfo",
+        lambda *args, **kwargs: [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443))
+        ],
+    )
 
     def handler(request: httpx.Request) -> httpx.Response:
         chamadas["url"] = str(request.url)
@@ -234,7 +243,7 @@ def test_anexo_url_baixa_e_valida():
         return httpx.Response(200, content=b"imagem")
 
     with httpx.Client(transport=httpx.MockTransport(handler)) as http:
-        avec = AnexosClient(http, _settings())
+        avec = AnexosClient(http, _settings(anexo_dominios=["arquivo.test"]))
         anexo = avec.carregar_anexo(
             {"url": "https://arquivo.test/extrato.jpg", "mime_type": "image/jpeg"}
         )

@@ -8,13 +8,20 @@ from fastapi import APIRouter, BackgroundTasks, Depends
 from fastapi.responses import JSONResponse
 
 from saturday.agent.service import AgentService
-from saturday.schemas import AgentReply, ChatRequest
-from saturday.web.dependencies import get_agent_service
+from saturday.schemas import AcceptedReply, AgentReply, ChatRequest
+from saturday.web.dependencies import get_agent_service, verificar_api_key
 
-router = APIRouter(tags=["chat"])
+router = APIRouter(tags=["chat"], dependencies=[Depends(verificar_api_key)])
 
 
-@router.post("/chat", response_model=None)
+@router.post(
+    "/chat",
+    response_model=AgentReply,
+    responses={
+        202: {"model": AcceptedReply},
+        401: {"description": "não autorizado"},
+    },
+)
 def chat(
     payload: ChatRequest,
     background_tasks: BackgroundTasks,

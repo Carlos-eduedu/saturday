@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import base64
 import binascii
+import ipaddress
+import socket
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 
@@ -75,17 +78,79 @@ class AnexosClient:
         self._http = http
         self._settings = settings
 
-    def _baixar(self, url: str) -> bytes:
+    def _validar_host(self, host: str) -> None:
+        host = host.strip().lower().rstrip(".")
+        dominios = [
+            dominio.strip().lower().lstrip(".")
+            for dominio in self._settings.anexo_dominios
+            if dominio.strip()
+        ]
+        if not dominios or not any(
+            host == dominio or host.endswith("." + dominio) for dominio in dominios
+        ):
+            raise AnexoInvalido("domínio de anexo não permitido")
+
         try:
-            response = self._http.get(
+            infos = socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)
+        except OSError as exc:
+            raise AnexoInvalido("host do anexo não resolve") from exc
+
+        for info in infos:
+            endereco = info[4][0]
+            try:
+                ip = ipaddress.ip_address(endereco)
+            except ValueError as exc:
+                raise AnexoInvalido("endereço de anexo inválido") from exc
+            if (
+                ip.is_private
+                or ip.is_loopback
+                or ip.is_link_local
+                or ip.is_multicast
+                or ip.is_reserved
+                or ip.is_unspecified
+                or not ip.is_global
+            ):
+                raise AnexoInvalido("endereço de anexo não permitido")
+
+    def _validar_url(self, url: str) -> None:
+        parsed = urlparse(url)
+        if parsed.scheme.lower() != "https" or not parsed.hostname:
+            raise AnexoInvalido("anexo por URL exige HTTPS")
+        self._validar_host(parsed.hostname)
+
+    def _baixar(self, url: str) -> bytes:
+        self._validar_url(url)
+        try:
+            with self._http.stream(
+                "GET",
                 url,
                 timeout=ANEXO_TIMEOUT_S,
-                follow_redirects=True,
-            )
-            response.raise_for_status()
+                follow_redirects=False,
+            ) as response:
+                if 300 <= response.status_code < 400:
+                    raise AnexoInvalido("redirecionamento de anexo não permitido")
+                response.raise_for_status()
+
+                content_length = response.headers.get("content-length")
+                if content_length is not None:
+                    try:
+                        tamanho = int(content_length)
+                    except ValueError:
+                        tamanho = 0
+                    if tamanho > LIMITE_BYTES:
+                        raise AnexoInvalido("anexo acima do limite")
+
+                dados = bytearray()
+                for parte in response.iter_bytes():
+                    dados.extend(parte)
+                    if len(dados) > LIMITE_BYTES:
+                        raise AnexoInvalido("anexo acima do limite")
+        except AnexoInvalido:
+            raise
         except Exception as exc:
             raise AnexoInvalido("falha ao baixar anexo") from exc
-        return _validar_tamanho(response.content)
+
+        return _validar_tamanho(bytes(dados))
 
     def carregar_anexo(self, item: dict[str, Any]) -> Anexo:
         mime = _normalizar_mime(item.get("mime_type"))

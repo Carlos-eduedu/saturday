@@ -18,10 +18,14 @@ def get_app(settings: Settings | None = None) -> FastAPI:
     """Monta a aplicação. Usada como factory pelo uvicorn."""
 
     settings = settings or get_settings()
+    producao = settings.environment == "prod"
     app = FastAPI(
         title="Saturday",
         version="0.1.0",
         lifespan=criar_lifespan(settings),
+        docs_url=None if producao else "/docs",
+        redoc_url=None if producao else "/redoc",
+        openapi_url=None if producao else "/openapi.json",
     )
     app.state.settings = settings
     app.include_router(monitoring.router)

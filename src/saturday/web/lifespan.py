@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 
@@ -19,6 +20,8 @@ from saturday.services.llm import LLMClient
 from saturday.services.webhook import WebhookClient
 from saturday.settings import Settings
 
+logger = logging.getLogger(__name__)
+
 
 def criar_lifespan(
     settings: Settings,
@@ -28,6 +31,8 @@ def criar_lifespan(
         configurar_logging(settings.log_level)
         settings.validar_para_subir()
         app.state.settings = settings
+        if not settings.api_key.get_secret_value() and settings.environment in ("dev", "pytest"):
+            logger.warning("api_key_desligada ambiente=%s", settings.environment)
         settings.checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
         http = httpx.Client(

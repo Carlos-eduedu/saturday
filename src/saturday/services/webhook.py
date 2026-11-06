@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 import logging
+import time
 from typing import Any
 
 import httpx
@@ -32,9 +36,26 @@ class WebhookClient:
         conversation_id = payload.get("conversation_id")
         status = payload.get("status")
         try:
+            corpo = json.dumps(
+                payload,
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ).encode("utf-8")
+            timestamp = str(int(time.time()))
+            segredo = self._settings.webhook_secret.get_secret_value()
+            assinatura = hmac.new(
+                segredo.encode("utf-8"),
+                f"{timestamp}.".encode() + corpo,
+                hashlib.sha256,
+            ).hexdigest()
             response = self._http.post(
                 self._settings.webhook_url,
-                json=payload,
+                content=corpo,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Saturday-Timestamp": timestamp,
+                    "X-Saturday-Signature": f"sha256={assinatura}",
+                },
                 timeout=WEBHOOK_TIMEOUT_S,
             )
             response.raise_for_status()

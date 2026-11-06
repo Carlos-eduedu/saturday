@@ -98,7 +98,7 @@ class AgentService:
         cliente = self._cliente_mesclado(estado, payload)
         entrada = turno_inicial(
             user_message=payload.message,
-            attachments=[a.model_dump(exclude_none=True) for a in payload.attachments],
+            attachments=[a.model_dump(mode="json", exclude_none=True) for a in payload.attachments],
         )
         if cliente:
             entrada["cliente"] = cliente
