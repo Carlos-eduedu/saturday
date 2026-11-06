@@ -42,7 +42,7 @@ class AgentReply(BaseModel):
     event: Literal["agent.reply"] = "agent.reply"
     conversation_id: str
     answer: str
-    status: Literal["answered", "handoff"]
+    status: Literal["answered", "handoff", "with_human", "duplicate"]
     intent: str | None = None
     publico: str | None = None
     handoff_reason: str | None = None

@@ -26,7 +26,23 @@ def resultado_jev(
     publico: str = "inss",
     resposta_oferta: str | None = None,
     resposta_conf: float = 0.0,
+    probabilities: dict[str, dict[str, float]] | None = None,
 ) -> JevResult:
+    if probabilities is None:
+        probabilities = {
+            "intent": {
+                "duvida": 0.9 if intent == "duvida" else 0.0,
+                "suporte": 0.0,
+                "humano": 0.9 if intent == "humano" else 0.0,
+            },
+            "publico": {publico: 0.9},
+        }
+        if resposta_oferta is not None:
+            probabilities["resposta_oferta"] = {
+                "aceita": 0.9 if resposta_oferta == "aceita" else 0.0,
+                "recusa": 0.9 if resposta_oferta == "recusa" else 0.0,
+                "duvida": 0.9 if resposta_oferta == "duvida" else 0.0,
+            }
     return JevResult(
         intent=intent,
         intent_confidence=conf,
@@ -34,6 +50,7 @@ def resultado_jev(
         publico_confidence=0.9,
         resposta_oferta=resposta_oferta,
         resposta_oferta_confidence=resposta_conf,
+        probabilities=probabilities,
     )
 
 
@@ -49,9 +66,16 @@ class FakeJev:
         self.resultado = resultado_jev()
         self.erro: Exception | None = None
         self.chamadas: list[tuple[str, bool]] = []
+        self.ofertas: list[str | None] = []
 
-    def classify(self, message: str, oferta_pendente: bool = False) -> JevResult:
+    def classify(
+        self,
+        message: str,
+        oferta_pendente: bool = False,
+        oferta: str | None = None,
+    ) -> JevResult:
         self.chamadas.append((message, oferta_pendente))
+        self.ofertas.append(oferta)
         if self.erro is not None:
             raise self.erro
         return self.resultado
@@ -159,3 +183,43 @@ def app(settings: Settings, service: AgentService):
 @pytest.fixture
 def client(app) -> TestClient:  # type: ignore[no-untyped-def]
     return TestClient(app)
+
+
+def extrato_fake() -> dict[str, Any]:
+    from datetime import date, datetime
+    from zoneinfo import ZoneInfo
+
+    hoje = datetime.now(ZoneInfo("America/Sao_Paulo")).date()
+    ano_ref, mes_ref = (hoje.year, hoje.month - 1) if hoje.month > 1 else (hoje.year - 1, 12)
+    indice = ano_ref * 12 + (mes_ref - 1) - 22
+    inicio = f"{indice % 12 + 1:02d}/{indice // 12}"
+    return {
+        "ehHiscon": True,
+        "especie": "32",
+        "liberadoParaEmprestimo": True,
+        "dataEmissao": date(hoje.year, hoje.month, 1).strftime("%d/%m/%Y"),
+        "margemUtilizada": 295.24,
+        "margemDisponivel": 100.0,
+        "margemReservada": 0.0,
+        "margemExtrapolada": 0.0,
+        "contratos": [
+            {
+                "banco": "643 - PINE",
+                "situacao": "Ativo",
+                "parcela": 295.24,
+                "taxaMensal": 1.66,
+                "qtdParcelas": 84,
+                "inicioDesconto": inicio,
+                "dataInclusao": "01/01/2020",
+            }
+        ],
+    }
+
+
+def anexo_fake() -> dict[str, str]:
+    import base64
+
+    return {
+        "base64": base64.b64encode(b"%PDF-1.7 extrato").decode(),
+        "mime_type": "application/pdf",
+    }

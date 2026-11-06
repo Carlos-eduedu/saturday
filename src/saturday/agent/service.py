@@ -5,13 +5,14 @@ from __future__ import annotations
 import logging
 import threading
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal, cast
 from zoneinfo import ZoneInfo
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 
 from saturday.agent.context import AgentContext
 from saturday.agent.state import turno_inicial
+from saturday.agent.textos import mensagem_handoff
 from saturday.schemas import AgentReply, ChatRequest
 from saturday.services.webhook import WebhookClient
 from saturday.settings import TZ_OPERACAO, Settings
@@ -51,12 +52,15 @@ class AgentService:
         answer: str | None = None,
     ) -> AgentReply:
         status_estado = status or estado.get("status")
-        if status_estado not in ("answered", "handoff"):
+        if status_estado not in ("answered", "handoff", "with_human", "duplicate"):
             status_estado = "answered"
         return AgentReply(
             conversation_id=conversation_id,
             answer=answer if answer is not None else (estado.get("answer") or ""),
-            status=status_estado,  # type: ignore[arg-type]  # validado acima
+            status=cast(
+                Literal["answered", "handoff", "with_human", "duplicate"],
+                status_estado,
+            ),
             intent=estado.get("intent"),
             publico=estado.get("publico"),
             handoff_reason=estado.get("handoff_reason"),
@@ -76,15 +80,20 @@ class AgentService:
                 cliente[campo] = valor
         return cliente
 
-    def process_message(self, payload: ChatRequest) -> AgentReply | None:
-        """Roda um turno. Devolve ``None`` se a conversa já está com um humano."""
+    def process_message(self, payload: ChatRequest) -> AgentReply:
+        """Roda um turno da conversa."""
 
         config = self.config(payload.conversation_id)
         estado = self.estado_atual(config)
 
         # Conversa em handoff fica congelada até um humano assumir.
         if estado.get("status") == "handoff":
-            return None
+            return self.evento(
+                payload.conversation_id,
+                estado,
+                status="with_human",
+                answer="",
+            )
 
         cliente = self._cliente_mesclado(estado, payload)
         entrada = turno_inicial(
@@ -96,7 +105,12 @@ class AgentService:
         if payload.message.strip():
             entrada["messages"] = [HumanMessage(content=payload.message)]
 
-        final = self.graph.invoke(entrada, config, context=self.context)
+        try:
+            final = self.graph.invoke(entrada, config, context=self.context)
+        except Exception:
+            logger.exception("erro_interno conversation_id=%s", payload.conversation_id)
+            return self._fallback_erro_interno(payload.conversation_id, config)
+
         resultado = final.get("portability_result") or {}
         logger.info(
             "turno conversation_id=%s status=%s motivo=%s calculo_ok=%s",
@@ -106,6 +120,31 @@ class AgentService:
             resultado.get("ok"),
         )
         return self.evento(payload.conversation_id, final)
+
+    def _fallback_erro_interno(
+        self,
+        conversation_id: str,
+        config: dict[str, Any],
+    ) -> AgentReply:
+        resposta = mensagem_handoff("erro_interno")
+        atualizacao = {
+            "status": "handoff",
+            "handoff_reason": "erro_interno",
+            "answer": resposta,
+            "messages": [AIMessage(content=resposta)],
+        }
+        try:
+            self.graph.update_state(config, atualizacao)
+        except Exception:
+            logger.exception(
+                "falha_ao_gravar_erro_interno conversation_id=%s",
+                conversation_id,
+            )
+        return self.evento(
+            conversation_id,
+            atualizacao,
+            status="handoff",
+        )
 
     def processar_e_enviar(self, payload: ChatRequest) -> None:
         try:
@@ -117,7 +156,7 @@ class AgentService:
                 type(exc).__name__,
             )
             return
-        if resposta is None:
+        if resposta.status == "with_human":
             # Não envia nada: a conversa está com um atendente humano.
             return
         self.webhook.enviar(resposta.model_dump(mode="json"))

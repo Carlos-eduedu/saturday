@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -140,11 +141,28 @@ class LLMClient:
         )
 
     def _post_json(self, payload: dict[str, Any]) -> dict[str, Any]:
-        return self._openrouter.post_json(
-            OPENROUTER_CHAT_URL,
-            payload,
-            LLM_TIMEOUT_S,
-        )
+        """Uma nova tentativa para falhas transitórias, dentro do prazo total."""
+
+        inicio = time.monotonic()
+        ultimo_erro: OpenRouterError | None = None
+        for tentativa in range(2):
+            restante = LLM_TIMEOUT_S - (time.monotonic() - inicio)
+            if restante <= 0:
+                break
+            try:
+                return self._openrouter.post_json(
+                    OPENROUTER_CHAT_URL,
+                    payload,
+                    restante,
+                )
+            except OpenRouterError as exc:
+                ultimo_erro = exc
+                if not exc.retryable or tentativa == 1:
+                    raise
+                time.sleep(min(1.0, max(0.0, restante)))
+        if ultimo_erro is not None:
+            raise ultimo_erro
+        raise OpenRouterError("tempo esgotado antes da chamada ao OpenRouter")
 
     def ler_extrato(self, anexos: list[Anexo]) -> dict[str, Any]:
         """Lê todos os anexos numa única chamada ao modelo de visão."""

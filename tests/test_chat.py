@@ -98,7 +98,9 @@ def test_5_apos_handoff_proxima_mensagem_nao_roda_grafo(client, fakes: Fakes):
     )
 
     assert segunda.status_code == 200
-    assert segunda.json()["status"] == "handoff"
+    assert segunda.json()["status"] == "with_human"
+    assert segunda.json()["answer"] == ""
+    assert segunda.json()["handoff_reason"] == "pediu_humano"
     assert len(fakes.jev.chamadas) == 1
 
 

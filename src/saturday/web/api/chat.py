@@ -30,8 +30,4 @@ def chat(
             },
         )
 
-    resposta = service.process_message(payload)
-    if resposta is None:
-        # Sem webhook não há como "não responder": devolve o estado congelado.
-        return service.evento_atual(payload.conversation_id)
-    return resposta
+    return service.process_message(payload)

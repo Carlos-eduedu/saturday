@@ -2,171 +2,32 @@
 
 from __future__ import annotations
 
-import re
-import unicodedata
-from datetime import date, datetime
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from langchain_core.messages import AIMessage
 from langgraph.runtime import Runtime
 
+from saturday.agent.coleta import hoje_operacao, normalizar_uf, parse_data_nascimento
 from saturday.agent.context import AgentContext
 from saturday.agent.state import AgentState
+from saturday.agent.textos import (
+    MENSAGEM_EXTRATO_ILEGIVEL,
+    MENSAGEM_EXTRATO_INCORRETO,
+    MENSAGEM_EXTRATO_MES_ERRADO,
+    MENSAGEM_RECUSA,
+    MENSAGEM_SEM_TEXTO,
+    MENSAGENS_FALHA_CALCULO,
+    PERGUNTA_DATA,
+    PERGUNTA_DATA_INVALIDA,
+    PERGUNTA_UF,
+    PERGUNTA_UF_INVALIDA,
+    mensagem_handoff,
+)
 from saturday.portabilidade import calculo, mensagem
 from saturday.portabilidade import hiscon as hiscon_mod
-from saturday.portabilidade.regras import (
-    IDADE_COLETA_MAX,
-    IDADE_COLETA_MIN,
-    IDADE_WEBPLUS,
-    PRAZO_C6,
-)
+from saturday.portabilidade.regras import IDADE_WEBPLUS, PRAZO_C6
 from saturday.services.anexos import AnexoInvalido
-from saturday.settings import (
-    HISTORY_MAX_MESSAGES,
-    HORARIO_EQUIPE,
-    JEV_INTENT_THRESHOLD,
-    TZ_EQUIPE,
-    TZ_OPERACAO,
-)
-
-MENSAGENS_HANDOFF = {
-    "pediu_humano": "Claro! Vou te transferir para um atendente da MEX.",
-    "sem_resposta": (
-        "Não consegui esclarecer isso por aqui. Vou te transferir para um atendente da MEX."
-    ),
-    "hiscon_nao_conferiu": (
-        "Não consegui conferir os valores do seu extrato. Vou te transferir "
-        "para um atendente da MEX."
-    ),
-    "extrato_ilegivel_repetido": (
-        "Ainda não consegui ler o seu extrato. Vou te transferir para um atendente da MEX."
-    ),
-    "idade_fora_regra": (
-        "No momento não atendemos essa faixa de idade. Vou te transferir para um atendente da MEX."
-    ),
-    "idade_prazo_96": (
-        "Para a sua idade, o prazo disponível ainda não está nesta versão do "
-        "atendimento. Vou te transferir para um atendente da MEX."
-    ),
-    "especie_nao_atendida": (
-        "Esse tipo de benefício não é atendido por esta portabilidade. Vou te "
-        "transferir para um atendente da MEX."
-    ),
-    "sem_portabilidade": (
-        "No momento não encontrei um contrato com portabilidade para o C6. Vou "
-        "te transferir para um atendente da MEX."
-    ),
-    "aceitou_portabilidade": (
-        "Combinado! Um atendente da MEX vai seguir com a digitação da proposta."
-    ),
-    "dados_cliente_nao_informados": (
-        "Não consegui confirmar os seus dados. Vou te transferir para um atendente da MEX."
-    ),
-}
-
-MENSAGEM_FORA_HORARIO = (
-    "O nosso atendimento humano funciona de segunda a sexta, das 8h às 17h. "
-    "Um atendente responde no próximo dia útil, a partir das 8h."
-)
-
-MENSAGEM_RECUSA = "Tudo bem! Se mudar de ideia, é só me chamar. Obrigado pelo contato."
-
-PERGUNTA_DATA = "Para continuar, me informe a sua data de nascimento (dd/mm/aaaa)."
-PERGUNTA_DATA_INVALIDA = (
-    "Não consegui entender a data. Me envie a data de nascimento no formato dd/mm/aaaa."
-)
-PERGUNTA_UF = "Como você tem 60 anos ou mais, preciso também da sua UF (estado). Qual é a sua UF?"
-PERGUNTA_UF_INVALIDA = "Não consegui identificar a UF. Me envie a sigla do estado, por exemplo: MS."
-
-MENSAGEM_EXTRATO_INCORRETO = (
-    "O arquivo recebido não é o extrato de empréstimos do Meu INSS. No app ou "
-    'site Meu INSS, escolha a opção "Extrato de Empréstimos" e envie o PDF ou '
-    "uma foto."
-)
-MENSAGEM_EXTRATO_ILEGIVEL = (
-    "Não consegui ler o extrato. Envie o extrato de empréstimos do Meu INSS em "
-    "PDF ou uma foto nítida, com todas as páginas."
-)
-MENSAGEM_EXTRATO_MES_ERRADO = (
-    "O extrato precisa ser do mês atual. Emita o extrato de empréstimos do Meu "
-    "INSS hoje e envie novamente."
-)
-
-UFS_POR_NOME = {
-    "acre": "AC",
-    "alagoas": "AL",
-    "amapa": "AP",
-    "amazonas": "AM",
-    "bahia": "BA",
-    "ceara": "CE",
-    "distrito federal": "DF",
-    "espirito santo": "ES",
-    "goias": "GO",
-    "maranhao": "MA",
-    "mato grosso": "MT",
-    "mato grosso do sul": "MS",
-    "minas gerais": "MG",
-    "para": "PA",
-    "paraiba": "PB",
-    "parana": "PR",
-    "pernambuco": "PE",
-    "piaui": "PI",
-    "rio de janeiro": "RJ",
-    "rio grande do norte": "RN",
-    "rio grande do sul": "RS",
-    "rondonia": "RO",
-    "roraima": "RR",
-    "santa catarina": "SC",
-    "sao paulo": "SP",
-    "sergipe": "SE",
-    "tocantins": "TO",
-}
-SIGLAS_UF = frozenset(UFS_POR_NOME.values())
-PADRAO_DATA_NASCIMENTO = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{2}|\d{4})$")
-
-
-def _hoje_operacao() -> date:
-    return datetime.now(ZoneInfo(TZ_OPERACAO)).date()
-
-
-def _sem_acento(texto: str) -> str:
-    decomposto = unicodedata.normalize("NFKD", texto)
-    return "".join(c for c in decomposto if not unicodedata.combining(c)).lower().strip()
-
-
-def _normalizar_uf(valor: object) -> str | None:
-    if not isinstance(valor, str):
-        return None
-    texto = valor.strip()
-    if not texto:
-        return None
-    sigla = texto.upper()
-    if sigla in SIGLAS_UF:
-        return sigla
-    return UFS_POR_NOME.get(_sem_acento(texto))
-
-
-def _data_nascimento(texto: str, hoje: date) -> tuple[str, int] | None:
-    match = PADRAO_DATA_NASCIMENTO.fullmatch(texto.strip())
-    if not match:
-        return None
-    dia, mes, ano_texto = match.groups()
-    ano = int(ano_texto)
-    if len(ano_texto) == 2:
-        seculo = hoje.year - hoje.year % 100
-        ano = seculo + ano
-        if ano > hoje.year:
-            ano -= 100
-    try:
-        nascimento = date(ano, int(mes), int(dia))
-    except ValueError:
-        return None
-
-    idade = calculo.idade_em_anos(nascimento, hoje)
-    if idade is None or idade < IDADE_COLETA_MIN or idade > IDADE_COLETA_MAX:
-        return None
-    return nascimento.isoformat(), idade
+from saturday.settings import HISTORY_MAX_MESSAGES
 
 
 def _historico(state: AgentState) -> list[dict[str, str]]:
@@ -180,6 +41,15 @@ def _historico(state: AgentState) -> list[dict[str, str]]:
         if conteudo.strip():
             historico.append({"role": role, "content": conteudo})
     return historico
+
+
+def _ultima_mensagem_agente(state: AgentState) -> str | None:
+    for mensagem_atual in reversed(state.get("messages") or []):
+        if not isinstance(mensagem_atual, AIMessage):
+            continue
+        conteudo = mensagem_atual.content
+        return conteudo if isinstance(conteudo, str) else str(conteudo)
+    return None
 
 
 def _resumo_portabilidade(state: AgentState) -> str | None:
@@ -207,15 +77,6 @@ def _resumo_portabilidade(state: AgentState) -> str | None:
     return "\n".join(linhas)
 
 
-def _dentro_horario_equipe(agora: datetime | None = None) -> bool:
-    tz = ZoneInfo(TZ_EQUIPE)
-    agora = agora.astimezone(tz) if agora else datetime.now(tz)
-    return (
-        agora.weekday() in HORARIO_EQUIPE.dias
-        and HORARIO_EQUIPE.inicio <= agora.hour < HORARIO_EQUIPE.fim
-    )
-
-
 def _pedido(pergunta: str, aguardando: str) -> dict[str, Any]:
     return {
         "status": "answered",
@@ -239,19 +100,31 @@ def _resultado_falha(extrato: dict[str, Any], motivo: str, prazo: int = PRAZO_C6
     }
 
 
+def pedir_texto(state: AgentState) -> dict[str, Any]:
+    return {
+        "status": "answered",
+        "answer": MENSAGEM_SEM_TEXTO,
+        "needs_human": False,
+        "messages": [AIMessage(content=MENSAGEM_SEM_TEXTO)],
+    }
+
+
 def classify_intent(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
     try:
         resultado = runtime.context.jev.classify(
             state.get("user_message", ""),
             bool(state.get("oferta_pendente")),
+            oferta=_ultima_mensagem_agente(state),
         )
     except Exception:
         # Erro do Jev não interrompe o atendimento: segue para o LLM.
         return {}
 
     intent = resultado.intent
-    pediu_humano = intent == "humano" and resultado.intent_confidence >= JEV_INTENT_THRESHOLD
-    if intent == "humano" and not pediu_humano:
+    pediu_humano = resultado.pediu_humano
+    if pediu_humano:
+        intent = "humano"
+    elif intent == "humano":
         intent = "duvida"
 
     publico = resultado.publico
@@ -260,15 +133,16 @@ def classify_intent(state: AgentState, runtime: Runtime[AgentContext]) -> dict[s
 
     resposta_oferta = None
     if state.get("oferta_pendente"):
-        resposta_oferta = resultado.resposta_oferta or "duvida"
-        if (
-            resposta_oferta not in {"aceita", "recusa"}
-            or resultado.resposta_oferta_confidence < JEV_INTENT_THRESHOLD
-        ):
+        if resultado.aceitou_oferta:
+            resposta_oferta = "aceita"
+        elif resultado.recusou_oferta:
+            resposta_oferta = "recusa"
+        else:
             resposta_oferta = "duvida"
 
-    atualizacao = {
+    atualizacao: dict[str, Any] = {
         "intent": intent,
+        # A confiança fica só para diagnóstico; a decisão usa as probabilidades.
         "intent_confidence": resultado.intent_confidence,
         "publico": publico,
         "resposta_oferta": resposta_oferta,
@@ -309,11 +183,7 @@ def generate_answer(state: AgentState, runtime: Runtime[AgentContext]) -> dict[s
 
 def handoff(state: AgentState) -> dict[str, Any]:
     motivo = state.get("handoff_reason") or "sem_resposta"
-    resposta = state.get("answer") or MENSAGENS_HANDOFF.get(
-        motivo, MENSAGENS_HANDOFF["sem_resposta"]
-    )
-    if not _dentro_horario_equipe():
-        resposta = f"{resposta} {MENSAGEM_FORA_HORARIO}"
+    resposta = mensagem_handoff(motivo, state.get("answer"))
     return {
         "status": "handoff",
         "needs_human": True,
@@ -363,7 +233,7 @@ def read_statement(state: AgentState, runtime: Runtime[AgentContext]) -> dict[st
     except Exception:
         return _perguntar_extrato(state, MENSAGEM_EXTRATO_ILEGIVEL)
 
-    status = hiscon_mod.validar_extrato(extrato, _hoje_operacao())
+    status = hiscon_mod.validar_extrato(extrato, hoje_operacao())
     if status == hiscon_mod.STATUS_NAO_HISCON:
         return _perguntar_extrato(state, MENSAGEM_EXTRATO_INCORRETO)
     if status == hiscon_mod.STATUS_ILEGIVEL:
@@ -397,13 +267,13 @@ def read_statement(state: AgentState, runtime: Runtime[AgentContext]) -> dict[st
 
 def check_customer_data(state: AgentState) -> dict[str, Any]:
     cliente: dict[str, Any] = dict(state.get("cliente") or {})
-    hoje = _hoje_operacao()
+    hoje = hoje_operacao()
     idade = calculo.idade_em_anos(cliente.get("data_nascimento"), hoje)
 
     if idade is None:
         return _pedido(PERGUNTA_DATA, "data_nascimento")
 
-    uf = _normalizar_uf(cliente.get("uf"))
+    uf = normalizar_uf(cliente.get("uf"))
     if uf is not None:
         cliente["uf"] = uf
 
@@ -441,7 +311,7 @@ def collect_customer_data(state: AgentState) -> dict[str, Any]:
     texto = state.get("user_message", "")
 
     if aguardando == "data_nascimento":
-        dados = _data_nascimento(texto, _hoje_operacao())
+        dados = parse_data_nascimento(texto, hoje_operacao())
         if dados is None:
             return _falha_coleta(state, PERGUNTA_DATA_INVALIDA)
         data_iso, _ = dados
@@ -453,7 +323,7 @@ def collect_customer_data(state: AgentState) -> dict[str, Any]:
         }
 
     if aguardando == "uf":
-        uf = _normalizar_uf(texto)
+        uf = normalizar_uf(texto)
         if uf is None:
             return _falha_coleta(state, PERGUNTA_UF_INVALIDA)
         cliente["uf"] = uf
@@ -464,13 +334,6 @@ def collect_customer_data(state: AgentState) -> dict[str, Any]:
         }
 
     return {}
-
-
-MENSAGENS_FALHA_CALCULO = {
-    "idade_fora_regra": mensagem.MENSAGEM_IDADE_FORA,
-    "idade_prazo_96": mensagem.MENSAGEM_IDADE_96,
-    "especie_nao_atendida": mensagem.MENSAGEM_ESPECIE_NAO_ATENDIDA,
-}
 
 
 def calculate_portability(state: AgentState) -> dict[str, Any]:
@@ -485,7 +348,7 @@ def calculate_portability(state: AgentState) -> dict[str, Any]:
         resultado = calculo.calcular_portabilidade(
             dados_hiscon,
             state.get("cliente") or {},
-            _hoje_operacao(),
+            hoje_operacao(),
         )
     except Exception:
         return {
@@ -495,7 +358,7 @@ def calculate_portability(state: AgentState) -> dict[str, Any]:
 
     if not resultado.get("ok"):
         motivo = resultado.get("motivo") or "sem_resposta"
-        atualizacao = {
+        atualizacao: dict[str, Any] = {
             "portability_result": resultado,
             "needs_human": True,
             "handoff_reason": motivo,

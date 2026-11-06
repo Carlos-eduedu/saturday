@@ -15,6 +15,7 @@ from saturday.agent.nodes import (
     decline_offer,
     generate_answer,
     handoff,
+    pedir_texto,
     present_offer,
     read_statement,
 )
@@ -35,6 +36,7 @@ def build_graph(checkpointer: Any = None) -> Any:
 
     builder = StateGraph(AgentState, context_schema=AgentContext)
 
+    builder.add_node("pedir_texto", pedir_texto)
     builder.add_node("classify_intent", classify_intent)
     builder.add_node("generate_answer", generate_answer)
     builder.add_node("handoff", handoff)
@@ -50,6 +52,7 @@ def build_graph(checkpointer: Any = None) -> Any:
         route_start,
         {
             "read_statement": "read_statement",
+            "pedir_texto": "pedir_texto",
             "collect_customer_data": "collect_customer_data",
             "classify_intent": "classify_intent",
         },
@@ -60,6 +63,7 @@ def build_graph(checkpointer: Any = None) -> Any:
         {
             "handoff": "handoff",
             "decline_offer": "decline_offer",
+            "collect_customer_data": "collect_customer_data",
             "generate_answer": "generate_answer",
         },
     )
@@ -105,6 +109,7 @@ def build_graph(checkpointer: Any = None) -> Any:
             "handoff": "handoff",
         },
     )
+    builder.add_edge("pedir_texto", END)
     builder.add_edge("present_offer", END)
     builder.add_edge("decline_offer", END)
     builder.add_edge("handoff", END)

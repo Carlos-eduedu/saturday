@@ -4,24 +4,27 @@ from __future__ import annotations
 
 from langgraph.graph import END
 
+from saturday.agent.coleta import hoje_operacao, texto_valido_para
 from saturday.agent.state import AgentState
-from saturday.settings import JEV_INTENT_THRESHOLD
 
 
 def route_start(state: AgentState) -> str:
     if state.get("attachments"):
         return "read_statement"
-    if state.get("aguardando"):
+    texto = state.get("user_message", "")
+    if not texto.strip():
+        return "pedir_texto"
+    aguardando = state.get("aguardando")
+    if aguardando and texto_valido_para(aguardando, texto, hoje_operacao()):
         return "collect_customer_data"
     return "classify_intent"
 
 
 def after_classify(state: AgentState) -> str:
-    if (
-        state.get("intent") == "humano"
-        and (state.get("intent_confidence") or 0.0) >= JEV_INTENT_THRESHOLD
-    ):
+    if state.get("handoff_reason") == "pediu_humano":
         return "handoff"
+    if state.get("aguardando"):
+        return "collect_customer_data"
     if state.get("oferta_pendente"):
         if state.get("resposta_oferta") == "aceita":
             return "handoff"
