@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
+from typing import Any, Literal, cast
 from zoneinfo import ZoneInfo
 
 from fastapi import BackgroundTasks, FastAPI
@@ -21,23 +22,23 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="Saturday", version="0.1.0")
 
 
-def _config(conversa_id: str) -> dict:
+def _config(conversa_id: str) -> dict[str, Any]:
     return {"configurable": {"thread_id": conversa_id}}
 
 
-def _estado_atual(config: dict) -> dict:
+def _estado_atual(config: dict[str, Any]) -> dict[str, Any]:
     snapshot = graph.get_state(config)
     return snapshot.values or {}
 
 
-def _evento(conversa_id: str, estado: dict) -> AgentReply:
+def _evento(conversa_id: str, estado: dict[str, Any]) -> AgentReply:
     status = estado.get("status")
     if status not in ("answered", "handoff"):
         status = "answered"
     return AgentReply(
         conversation_id=conversa_id,
         answer=estado.get("answer") or "",
-        status=status,
+        status=cast(Literal["answered", "handoff"], status),
         intent=estado.get("intent"),
         publico=estado.get("publico"),
         handoff_reason=estado.get("handoff_reason"),
@@ -46,7 +47,7 @@ def _evento(conversa_id: str, estado: dict) -> AgentReply:
     )
 
 
-def _cliente_mesclado(estado: dict, payload: ChatRequest) -> dict:
+def _cliente_mesclado(estado: dict[str, Any], payload: ChatRequest) -> dict[str, Any]:
     cliente = dict(estado.get("cliente") or {})
     if payload.cliente is not None:
         for campo, valor in payload.cliente.model_dump(exclude_none=True).items():
@@ -107,8 +108,8 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.post("/chat")
-def chat(payload: ChatRequest, background_tasks: BackgroundTasks):
+@app.post("/chat", response_model=None)
+def chat(payload: ChatRequest, background_tasks: BackgroundTasks) -> JSONResponse | AgentReply:
     if get_settings().webhook_url:
         background_tasks.add_task(_processar_e_enviar, payload)
         return JSONResponse(

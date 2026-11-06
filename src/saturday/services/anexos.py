@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import binascii
 from dataclasses import dataclass
+from typing import Any
 
 import httpx
 
@@ -72,7 +73,7 @@ def _decodificar_base64(valor: str) -> bytes:
     return _validar_tamanho(data)
 
 
-def carregar_anexo(item: dict) -> Anexo:
+def carregar_anexo(item: dict[str, Any]) -> Anexo:
     mime = _normalizar_mime(item.get("mime_type"))
     url = item.get("url")
     base64_valor = item.get("base64")
@@ -83,7 +84,7 @@ def carregar_anexo(item: dict) -> Anexo:
     return Anexo(mime_type=mime, data=data)
 
 
-def carregar_anexos(itens: list[dict]) -> list[Anexo]:
+def carregar_anexos(itens: list[dict[str, Any]]) -> list[Anexo]:
     if not itens:
         raise AnexoInvalido("nenhum anexo")
     return [carregar_anexo(item) for item in itens]

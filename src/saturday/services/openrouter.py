@@ -23,7 +23,7 @@ def post_json(
     api_key: str,
     payload: dict[str, Any],
     timeout_s: float,
-) -> dict:
+) -> dict[str, Any]:
     inicio = time.monotonic()
     partes: list[bytes] = []
     try:
@@ -46,6 +46,6 @@ def post_json(
         raise OpenRouterError("Falha na chamada ao OpenRouter") from exc
 
     try:
-        return json.loads(b"".join(partes))
+        return json.loads(b"".join(partes))  # type: ignore[no-any-return]  # json.loads devolve Any
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise OpenRouterError("OpenRouter devolveu uma resposta inválida") from exc

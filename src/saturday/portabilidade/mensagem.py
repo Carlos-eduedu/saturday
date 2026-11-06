@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import math
 from collections import Counter
+from typing import Any
 
 MENSAGEM_IDADE_FORA = (
     "No momento não atendemos clientes com idade abaixo de 21 ou acima de 73 "
@@ -55,12 +56,12 @@ def nome_banco_curto(banco: str | None) -> str:
     return especiais.get(nome.upper(), nome.title())
 
 
-def _faixa(contrato: dict) -> tuple[float, float]:
+def _faixa(contrato: dict[str, Any]) -> tuple[float, float]:
     faixa = contrato.get("troco_faixa") or {}
     return faixa.get("min", 0.0), faixa.get("max", 0.0)
 
 
-def mensagem_oferta(resultado: dict, uf: str | None = None) -> str:
+def mensagem_oferta(resultado: dict[str, Any], uf: str | None = None) -> str:
     contratos = [c for c in resultado.get("contratos", []) if c.get("elegivel")]
     faixa_total = resultado.get("troco_faixa") or {}
     linhas = [
@@ -132,21 +133,23 @@ PRIORIDADE_MOTIVOS = (
 )
 
 
-def _motivo_principal(resultado: dict) -> str | None:
+def _motivo_principal(resultado: dict[str, Any]) -> str | None:
     contratos = [c for c in resultado.get("contratos", []) if not c.get("elegivel")]
     if not contratos:
         return None
 
     contagem = Counter(c.get("motivo") for c in contratos)
     ordem = {motivo: indice for indice, motivo in enumerate(PRIORIDADE_MOTIVOS)}
-    return min(
-        contagem,
-        key=lambda motivo: (-contagem[motivo], ordem.get(motivo, 99)),
+    return str(
+        min(
+            contagem,
+            key=lambda motivo: (-contagem[motivo], ordem.get(motivo, 99)),
+        )
     )
 
 
 
-def mensagem_sem_portabilidade(resultado: dict) -> str:
+def mensagem_sem_portabilidade(resultado: dict[str, Any]) -> str:
     motivo = _motivo_principal(resultado)
     if motivo is None:
         return (

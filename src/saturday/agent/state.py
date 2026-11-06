@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from langgraph.graph import MessagesState
 
@@ -10,7 +10,7 @@ from langgraph.graph import MessagesState
 class AgentState(MessagesState, total=False):
     # Campos do turno corrente. O serviço que invoca o grafo zera todos eles.
     user_message: str
-    attachments: list[dict]
+    attachments: list[dict[str, Any]]
     intent: str | None
     intent_confidence: float | None
     needs_human: bool
@@ -21,12 +21,12 @@ class AgentState(MessagesState, total=False):
 
     # Campos persistentes da conversa.
     publico: str | None
-    cliente: dict
-    hiscon: dict | None
+    cliente: dict[str, Any]
+    hiscon: dict[str, Any] | None
     aguardando: Literal["data_nascimento", "uf"] | None
     tentativas_coleta: int
     tentativas_extrato: int
-    portability_result: dict | None
+    portability_result: dict[str, Any] | None
     oferta_pendente: bool
 
 
@@ -43,12 +43,12 @@ CAMPOS_DO_TURNO = (
 def turno_inicial(
     *,
     user_message: str,
-    attachments: list[dict],
-    cliente: dict | None = None,
-) -> dict:
+    attachments: list[dict[str, Any]],
+    cliente: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Campos que precisam ser reiniciados a cada turno."""
 
-    estado = {
+    estado: dict[str, Any] = {
         "user_message": user_message,
         "attachments": attachments,
         "intent": None,

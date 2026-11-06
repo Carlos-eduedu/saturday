@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from datetime import date, datetime
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from langchain_core.messages import AIMessage
@@ -191,10 +192,7 @@ def _historico(state: AgentState) -> list[dict[str, str]]:
     mensagens = state.get("messages") or []
     historico = []
     for mensagem_atual in mensagens[-HISTORY_MAX_MESSAGES:]:
-        if isinstance(mensagem_atual, AIMessage):
-            role = "assistant"
-        else:
-            role = "user"
+        role = "assistant" if isinstance(mensagem_atual, AIMessage) else "user"
         conteudo = mensagem_atual.content
         if not isinstance(conteudo, str):
             conteudo = str(conteudo)
@@ -237,7 +235,7 @@ def _dentro_horario_equipe(agora: datetime | None = None) -> bool:
     )
 
 
-def _pedido(pergunta: str, aguardando: str) -> dict:
+def _pedido(pergunta: str, aguardando: str) -> dict[str, Any]:
     return {
         "status": "answered",
         "answer": pergunta,
@@ -248,8 +246,8 @@ def _pedido(pergunta: str, aguardando: str) -> dict:
 
 
 def _resultado_falha(
-    extrato: dict, motivo: str, prazo: int = PRAZO_C6
-) -> dict:
+    extrato: dict[str, Any], motivo: str, prazo: int = PRAZO_C6
+) -> dict[str, Any]:
     return {
         "ok": False,
         "motivo": motivo,
@@ -262,7 +260,7 @@ def _resultado_falha(
     }
 
 
-def classify_intent(state: AgentState) -> dict:
+def classify_intent(state: AgentState) -> dict[str, Any]:
     try:
         resultado = jev.classify(
             state.get("user_message", ""),
@@ -286,9 +284,10 @@ def classify_intent(state: AgentState) -> dict:
     resposta_oferta = None
     if state.get("oferta_pendente"):
         resposta_oferta = resultado.resposta_oferta or "duvida"
-        if resposta_oferta not in {"aceita", "recusa"}:
-            resposta_oferta = "duvida"
-        elif resultado.resposta_oferta_confidence < JEV_INTENT_THRESHOLD:
+        if (
+            resposta_oferta not in {"aceita", "recusa"}
+            or resultado.resposta_oferta_confidence < JEV_INTENT_THRESHOLD
+        ):
             resposta_oferta = "duvida"
 
     atualizacao = {
@@ -308,7 +307,7 @@ def classify_intent(state: AgentState) -> dict:
     return atualizacao
 
 
-def generate_answer(state: AgentState) -> dict:
+def generate_answer(state: AgentState) -> dict[str, Any]:
     try:
         resposta = llm.responder(
             _historico(state),
@@ -335,7 +334,7 @@ def generate_answer(state: AgentState) -> dict:
     }
 
 
-def handoff(state: AgentState) -> dict:
+def handoff(state: AgentState) -> dict[str, Any]:
     motivo = state.get("handoff_reason") or "sem_resposta"
     resposta = state.get("answer") or MENSAGENS_HANDOFF.get(
         motivo, MENSAGENS_HANDOFF["sem_resposta"]
@@ -351,7 +350,7 @@ def handoff(state: AgentState) -> dict:
     }
 
 
-def decline_offer(state: AgentState) -> dict:
+def decline_offer(state: AgentState) -> dict[str, Any]:
     return {
         "status": "answered",
         "answer": MENSAGEM_RECUSA,
@@ -362,7 +361,7 @@ def decline_offer(state: AgentState) -> dict:
     }
 
 
-def _perguntar_extrato(state: AgentState, pergunta: str) -> dict:
+def _perguntar_extrato(state: AgentState, pergunta: str) -> dict[str, Any]:
     tentativas = int(state.get("tentativas_extrato") or 0) + 1
     if tentativas >= 2:
         return {
@@ -379,7 +378,7 @@ def _perguntar_extrato(state: AgentState, pergunta: str) -> dict:
     }
 
 
-def read_statement(state: AgentState) -> dict:
+def read_statement(state: AgentState) -> dict[str, Any]:
     try:
         anexos = anexos_service.carregar_anexos(state.get("attachments") or [])
     except anexos_service.AnexoInvalido:
@@ -427,8 +426,8 @@ def read_statement(state: AgentState) -> dict:
     }
 
 
-def check_customer_data(state: AgentState) -> dict:
-    cliente = dict(state.get("cliente") or {})
+def check_customer_data(state: AgentState) -> dict[str, Any]:
+    cliente: dict[str, Any] = dict(state.get("cliente") or {})
     hoje = _hoje_operacao()
     idade = calculo.idade_em_anos(cliente.get("data_nascimento"), hoje)
 
@@ -450,7 +449,7 @@ def check_customer_data(state: AgentState) -> dict:
     }
 
 
-def _falha_coleta(state: AgentState, pergunta: str) -> dict:
+def _falha_coleta(state: AgentState, pergunta: str) -> dict[str, Any]:
     tentativas = int(state.get("tentativas_coleta") or 0) + 1
     if tentativas >= 2:
         return {
@@ -467,9 +466,9 @@ def _falha_coleta(state: AgentState, pergunta: str) -> dict:
     }
 
 
-def collect_customer_data(state: AgentState) -> dict:
+def collect_customer_data(state: AgentState) -> dict[str, Any]:
     aguardando = state.get("aguardando")
-    cliente = dict(state.get("cliente") or {})
+    cliente: dict[str, Any] = dict(state.get("cliente") or {})
     texto = state.get("user_message", "")
 
     if aguardando == "data_nascimento":
@@ -505,7 +504,7 @@ MENSAGENS_FALHA_CALCULO = {
 }
 
 
-def calculate_portability(state: AgentState) -> dict:
+def calculate_portability(state: AgentState) -> dict[str, Any]:
     dados_hiscon = state.get("hiscon")
     if not dados_hiscon:
         return {
@@ -550,7 +549,7 @@ def calculate_portability(state: AgentState) -> dict:
     return {"portability_result": resultado}
 
 
-def present_offer(state: AgentState) -> dict:
+def present_offer(state: AgentState) -> dict[str, Any]:
     resultado = state.get("portability_result") or {}
     uf = (state.get("cliente") or {}).get("uf")
     resposta = mensagem.mensagem_oferta(resultado, uf)

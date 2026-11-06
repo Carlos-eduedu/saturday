@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, StateGraph
 
@@ -28,7 +30,7 @@ from saturday.agent.routing import (
 from saturday.agent.state import AgentState
 
 
-def build_graph():
+def build_graph() -> Any:
     builder = StateGraph(AgentState)
 
     builder.add_node("classify_intent", classify_intent)

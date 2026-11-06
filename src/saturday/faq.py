@@ -1,5 +1,8 @@
 """FAQ usada pelo nó de resposta. Conteúdo fixo, revisável pelo time."""
 
+# A FAQ é um texto corrido; as quebras não podem ser alteradas sem revisão.
+# ruff: noqa: E501
+
 FAQ = """\
 ATENDIMENTO HUMANO
 - Horário: segunda a sexta, das 8h às 17h. Não há atendimento no fim de semana.

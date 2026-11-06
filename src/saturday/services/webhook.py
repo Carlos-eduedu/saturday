@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 import httpx
 
@@ -11,7 +12,7 @@ from saturday.config import WEBHOOK_TIMEOUT_S, get_settings
 logger = logging.getLogger(__name__)
 
 
-def send(payload: dict) -> bool:
+def send(payload: dict[str, Any]) -> bool:
     """Uma única tentativa. Nunca levanta exceção para o chamador."""
 
     webhook_url = get_settings().webhook_url

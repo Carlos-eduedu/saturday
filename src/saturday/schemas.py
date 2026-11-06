@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -16,7 +16,7 @@ class Attachment(BaseModel):
     mime_type: str
 
     @model_validator(mode="after")
-    def exatamente_uma_origem(self) -> "Attachment":
+    def exatamente_uma_origem(self) -> Attachment:
         if (self.url is None) == (self.base64 is None):
             raise ValueError("attachment deve ter url ou base64, nunca os dois")
         return self
@@ -46,5 +46,5 @@ class AgentReply(BaseModel):
     intent: str | None = None
     publico: str | None = None
     handoff_reason: str | None = None
-    portability_result: dict | None = None
+    portability_result: dict[str, Any] | None = None
     timestamp: datetime

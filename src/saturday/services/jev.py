@@ -36,7 +36,7 @@ class JevResult:
     resposta_oferta_confidence: float = 0.0
 
 
-def _perguntas(oferta_pendente: bool) -> dict:
+def _perguntas(oferta_pendente: bool) -> dict[str, Any]:
     perguntas = {
         "intent": {
             "type": "choice",
@@ -93,7 +93,7 @@ def _choice(raw: Any, default: str) -> tuple[str, float]:
     if not isinstance(raw, dict):
         return default, 0.0
     choice = raw.get("choice", raw.get("escolha", raw.get("value", default)))
-    confidence = raw.get(
+    confidence: Any = raw.get(
         "confidence",
         raw.get("confianca", raw.get("probability", raw.get("probabilidade", 0.0))),
     )

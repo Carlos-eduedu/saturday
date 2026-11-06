@@ -72,7 +72,7 @@ def _parse(content: str) -> LLMAnswer:
     return LLMAnswer(resposta=resposta.strip(), resolvido=resolvido)
 
 
-def _json_do_conteudo(content: str) -> dict:
+def _json_do_conteudo(content: str) -> dict[str, Any]:
     try:
         data = json.loads(content)
     except json.JSONDecodeError:
@@ -137,7 +137,7 @@ def _parte_anexo(anexo: Anexo) -> dict[str, Any]:
     return {"type": "image_url", "image_url": {"url": anexo.data_url}}
 
 
-def ler_extrato(anexos: list[Anexo]) -> dict:
+def ler_extrato(anexos: list[Anexo]) -> dict[str, Any]:
     """Lê todos os anexos numa única chamada ao modelo de visão."""
 
     if not anexos:

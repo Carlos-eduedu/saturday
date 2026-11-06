@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import math
 from datetime import date, datetime
-from typing import Any
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 from saturday.config import TZ_OPERACAO
@@ -76,18 +76,18 @@ def _inteiro(valor: Any) -> int | None:
     return int(numero)
 
 
-def _campo(dicionario: dict, *nomes: str) -> Any:
+def _campo(dicionario: dict[str, Any], *nomes: str) -> Any:
     for nome in nomes:
         if nome in dicionario and dicionario[nome] is not None:
             return dicionario[nome]
     return None
 
 
-def _como_dict(valor: Any) -> dict:
+def _como_dict(valor: Any) -> dict[str, Any]:
     if isinstance(valor, dict):
         return valor
     if hasattr(valor, "model_dump"):
-        return valor.model_dump()
+        return cast(dict[str, Any], valor.model_dump())
     return {}
 
 
@@ -162,7 +162,7 @@ def parcelas_pagas(data_emissao: Any, inicio_desconto: Any) -> int:
     return max(0, (ano_ref - ano_inicio) * 12 + (mes_ref - mes_inicio) + 1)
 
 
-def _banco_codigo(contrato: dict) -> str:
+def _banco_codigo(contrato: dict[str, Any]) -> str:
     explicito = _campo(contrato, "banco_codigo", "codigo_banco", "codigo")
     if explicito not in (None, ""):
         digitos = "".join(ch for ch in str(explicito) if ch.isdigit())
@@ -173,7 +173,7 @@ def _banco_codigo(contrato: dict) -> str:
     return digitos.zfill(3) if digitos else ""
 
 
-def _texto_banco(contrato: dict, codigo: str) -> str:
+def _texto_banco(contrato: dict[str, Any], codigo: str) -> str:
     banco = _campo(contrato, "banco")
     if banco:
         return str(banco)
@@ -183,14 +183,14 @@ def _texto_banco(contrato: dict, codigo: str) -> str:
     return codigo
 
 
-def _tabela_para(teto_seguro_pct: float):
+def _tabela_para(teto_seguro_pct: float) -> tuple[str, str, float, float] | None:
     for tabela in TABELAS_REFIN:
         if tabela[2] <= teto_seguro_pct + 1e-9:
             return tabela
     return None
 
 
-def _preparar_contrato(contrato: dict) -> dict:
+def _preparar_contrato(contrato: dict[str, Any]) -> dict[str, Any]:
     banco = _texto_banco(contrato, _banco_codigo(contrato))
     codigo = _banco_codigo(contrato)
     situacao = _campo(contrato, "situacao", "status")
@@ -224,13 +224,13 @@ def _preparar_contrato(contrato: dict) -> dict:
     }
 
 
-def _ativo(base: dict) -> bool:
-    return base["situacao"].strip().lower().startswith("ativo")
+def _ativo(base: dict[str, Any]) -> bool:
+    return str(base["situacao"]).strip().lower().startswith("ativo")
 
 
-def _carencia_cumprida(base: dict, pagas: int, emissao: date) -> bool:
-    qtd = base["qtd"] or 0
-    codigo = base["banco_codigo"]
+def _carencia_cumprida(base: dict[str, Any], pagas: int, emissao: date) -> bool:
+    qtd = int(base["qtd"] or 0)
+    codigo = str(base["banco_codigo"])
 
     if qtd < PRAZO_ORIGINAL_EXIGE_CARENCIA:
         return True
@@ -241,9 +241,10 @@ def _carencia_cumprida(base: dict, pagas: int, emissao: date) -> bool:
 
     if pagas >= PAGAS_MIN_DEMAIS:
         return True
-    if base["inclusao"] is None:
+    inclusao = base["inclusao"]
+    if not isinstance(inclusao, date):
         return False
-    return (emissao - base["inclusao"]).days >= DIAS_INCLUSAO_ALTERNATIVA
+    return (emissao - inclusao).days >= DIAS_INCLUSAO_ALTERNATIVA
 
 
 def _desconto_margem(extrapolada: float | None) -> float:
@@ -252,9 +253,9 @@ def _desconto_margem(extrapolada: float | None) -> float:
     return math.ceil(r2(extrapolada * 10)) / 10
 
 
-def _calcular_saldo(base: dict, restantes: int) -> tuple[float, float]:
-    taxa = base["taxa_pct"] / 100
-    parcela = base["parcela"]
+def _calcular_saldo(base: dict[str, Any], restantes: int) -> tuple[float, float]:
+    taxa = float(base["taxa_pct"]) / 100
+    parcela = float(base["parcela"])
     fator = (1 - (1 + taxa) ** -restantes) / taxa
     saldo = parcela * fator
     saldo *= AJUSTE_SALDO_POR_BANCO.get(base["banco_codigo"], 1.0)
@@ -267,10 +268,10 @@ def _calcular_saldo(base: dict, restantes: int) -> tuple[float, float]:
 
 
 def _avaliar(
-    base: dict,
+    base: dict[str, Any],
     data_emissao: date,
     desconto: float = 0.0,
-) -> dict:
+) -> dict[str, Any]:
     """Avalia um contrato já preparado. ``desconto`` só é usado neste contrato."""
 
     codigo = base["banco_codigo"]
@@ -359,7 +360,7 @@ def _avaliar(
     return resultado
 
 
-def _contrato_para_desconto(bases: list[dict], desconto: float) -> int | None:
+def _contrato_para_desconto(bases: list[dict[str, Any]], desconto: float) -> int | None:
     candidatos = [
         (indice, base["parcela"])
         for indice, base in enumerate(bases)
@@ -371,10 +372,10 @@ def _contrato_para_desconto(bases: list[dict], desconto: float) -> int | None:
 
 
 def avaliar_contrato(
-    contrato: dict,
+    contrato: dict[str, Any],
     data_emissao: Any,
     desconto: float = 0.0,
-) -> dict:
+) -> dict[str, Any]:
     """Avalia um único contrato. Útil para testes e diagnóstico."""
 
     emissao = _parse_data(data_emissao)
@@ -388,7 +389,7 @@ def calcular_portabilidade(
     hiscon: Any,
     cliente: Any = None,
     hoje: date | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Calcula o resultado de portabilidade a partir do extrato normalizado."""
 
     hiscon = _como_dict(hiscon)
@@ -420,7 +421,7 @@ def calcular_portabilidade(
         and uf in UFS_WEBPLUS
     )
 
-    resultado = {
+    resultado: dict[str, Any] = {
         "ok": True,
         "motivo": None,
         "prazo": PRAZO_C6,

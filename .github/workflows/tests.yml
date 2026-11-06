@@ -1,0 +1,29 @@
+name: testes
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  qualidade:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.14"
+
+      - name: Instalar dependências
+        run: uv sync --locked
+
+      - name: Formatação
+        run: uv run ruff format --check
+
+      - name: Lint
+        run: uv run ruff check
+
+      - name: Tipos
+        run: uv run mypy src
+
+      - name: Testes
+        run: uv run pytest

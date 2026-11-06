@@ -159,32 +159,32 @@ class ContratoHiscon(BaseModel):
 
     @field_validator("banco", mode="before")
     @classmethod
-    def _banco(cls, valor):
+    def _banco(cls, valor: Any) -> str:
         return _normalizar_banco(valor)[0]
 
     @field_validator("situacao", mode="before")
     @classmethod
-    def _situacao(cls, valor):
+    def _situacao(cls, valor: Any) -> str:
         return str(valor) if valor is not None else ""
 
     @field_validator("parcela", "taxaMensal", mode="before")
     @classmethod
-    def _numero(cls, valor):
+    def _numero(cls, valor: Any) -> float | None:
         return numero_brasileiro(valor)
 
     @field_validator("qtdParcelas", mode="before")
     @classmethod
-    def _qtd(cls, valor):
+    def _qtd(cls, valor: Any) -> int | None:
         return _inteiro(valor)
 
     @field_validator("inicioDesconto", mode="before")
     @classmethod
-    def _inicio(cls, valor):
+    def _inicio(cls, valor: Any) -> str | None:
         return _normalizar_inicio(valor)
 
     @field_validator("dataInclusao", mode="before")
     @classmethod
-    def _inclusao(cls, valor):
+    def _inclusao(cls, valor: Any) -> str | None:
         return _normalizar_data_br(valor)
 
 
@@ -203,12 +203,12 @@ class Extrato(BaseModel):
 
     @field_validator("ehHiscon", "liberadoParaEmprestimo", mode="before")
     @classmethod
-    def _bool(cls, valor):
+    def _bool(cls, valor: Any) -> bool:
         return _booleano(valor)
 
     @field_validator("especie", mode="before")
     @classmethod
-    def _especie(cls, valor):
+    def _especie(cls, valor: Any) -> str | None:
         if valor is None:
             return None
         if (
@@ -222,7 +222,7 @@ class Extrato(BaseModel):
 
     @field_validator("dataEmissao", mode="before")
     @classmethod
-    def _emissao(cls, valor):
+    def _emissao(cls, valor: Any) -> str | None:
         return _normalizar_data_br(valor)
 
     @field_validator(
@@ -233,7 +233,7 @@ class Extrato(BaseModel):
         mode="before",
     )
     @classmethod
-    def _margem(cls, valor):
+    def _margem(cls, valor: Any) -> float | None:
         return numero_brasileiro(valor)
 
     def tem_contrato_legivel(self) -> bool:
@@ -285,7 +285,7 @@ def _garantir_extrato(valor: Any) -> Extrato:
     return valor if isinstance(valor, Extrato) else normalizar_extrato(valor)
 
 
-def conferir_margem(extrato: Extrato | dict) -> bool:
+def conferir_margem(extrato: Extrato | dict[str, Any]) -> bool:
     extrato = _garantir_extrato(extrato)
     if extrato.margemUtilizada is None or extrato.margemReservada is None:
         return False
@@ -303,7 +303,7 @@ def conferir_margem(extrato: Extrato | dict) -> bool:
     )
 
 
-def extrato_do_mes(extrato: Extrato | dict, hoje: date | None = None) -> bool:
+def extrato_do_mes(extrato: Extrato | dict[str, Any], hoje: date | None = None) -> bool:
     extrato = _garantir_extrato(extrato)
     emissao = _parse_data(extrato.dataEmissao)
     if emissao is None:
@@ -312,7 +312,7 @@ def extrato_do_mes(extrato: Extrato | dict, hoje: date | None = None) -> bool:
     return (emissao.year, emissao.month) == (hoje.year, hoje.month)
 
 
-def validar_extrato(extrato: Extrato | dict, hoje: date | None = None) -> str:
+def validar_extrato(extrato: Extrato | dict[str, Any], hoje: date | None = None) -> str:
     """Aplica a seção 8.2, na ordem, e devolve um status."""
 
     extrato = _garantir_extrato(extrato)
