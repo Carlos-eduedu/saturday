@@ -71,6 +71,30 @@ HandoffReason = Literal[
     "erro_interno",
 ]
 
+MotivoContrato = Literal[
+    "ok",
+    "ilegivel",
+    "nao_ativo",
+    "ja_c6",
+    "banco_nao_porta",
+    "pagas_insuficientes",
+    "taxa_abaixo_c6",
+    "sem_tabela",
+    "abaixo_minimo_c6",
+    "troco_baixo",
+]
+
+MotivoPortabilidade = Literal[
+    "idade_fora_regra",
+    "idade_prazo_96",
+    "especie_nao_atendida",
+    "hiscon_nao_conferiu",
+    "dados_cliente_nao_informados",
+]
+
+ConversationStatus = Literal["in_progress", "answered", "handoff"]
+AguardandoColeta = Literal["data_nascimento", "uf"]
+
 
 class Attachment(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -144,7 +168,7 @@ class ContratoResultado(BaseModel):
     troco: float | None = None
     desconto_margem: float | None = None
     elegivel: bool = False
-    motivo: str = ""
+    motivo: MotivoContrato = "ilegivel"
     alerta: str | None = None
     troco_faixa: FaixaResultado = Field(default_factory=FaixaResultado)
 
@@ -153,7 +177,7 @@ class PortabilityResult(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     ok: bool = False
-    motivo: str | None = None
+    motivo: MotivoPortabilidade | None = None
     prazo: int = 0
     beneficio_bloqueado: bool = False
     alerta_webplus: bool = False
@@ -181,11 +205,11 @@ class AcceptedReply(BaseModel):
 
 class ConversationState(BaseModel):
     conversation_id: str
-    status: str
+    status: ConversationStatus
     handoff_reason: str | None = None
     handoff_em: str | None = None
     oferta_pendente: bool = False
-    aguardando: str | None = None
+    aguardando: AguardandoColeta | None = None
 
 
 class ReleaseReply(BaseModel):

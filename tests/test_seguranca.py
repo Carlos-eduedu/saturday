@@ -19,7 +19,7 @@ from pydantic import SecretStr, ValidationError
 
 from saturday.portabilidade.calculo import DadosCliente, calcular_portabilidade
 from saturday.portabilidade.hiscon import normalizar_extrato
-from saturday.schemas import AgentReply, Cliente
+from saturday.schemas import AgentReply, Cliente, ConversationState, PortabilityResult
 from saturday.services import anexos as anexos_service
 from saturday.services.anexos import AnexoInvalido, AnexosClient
 from saturday.services.webhook import WebhookClient
@@ -321,3 +321,77 @@ def test_openapi_documenta_401_e_404_nas_rotas_de_conversa():
 
 def test_delete_inexistente_retorna_404(client):
     assert client.delete("/conversations/nao-existe").status_code == 404
+
+
+def test_cliente_uf_xx_retorna_422(client):
+    resposta = client.post(
+        "/chat",
+        json={
+            "conversation_id": cid(),
+            "message": "",
+            "cliente": {"uf": "XX"},
+        },
+    )
+    assert resposta.status_code == 422
+
+
+def test_cliente_uf_minuscula_aceita_e_normalizada(client, service):
+    conversa = cid()
+    resposta = client.post(
+        "/chat",
+        json={
+            "conversation_id": conversa,
+            "message": "",
+            "cliente": {"uf": "ms"},
+        },
+    )
+    assert resposta.status_code == 200
+    estado = service.graph.get_state(service.config(conversa)).values
+    assert estado["cliente"]["uf"] == "MS"
+
+
+def test_conversation_state_serializa_igual():
+    dados = {
+        "conversation_id": "json-conversa",
+        "status": "handoff",
+        "handoff_reason": "pediu_humano",
+        "handoff_em": "2026-11-06T12:00:00-03:00",
+        "oferta_pendente": False,
+        "aguardando": "uf",
+    }
+    assert ConversationState.model_validate(dados).model_dump(mode="json") == dados
+
+
+def test_portability_result_literais_serializam_igual():
+    dados = {
+        "ok": False,
+        "motivo": "idade_prazo_96",
+        "prazo": 96,
+        "beneficio_bloqueado": True,
+        "alerta_webplus": False,
+        "troco_total": 0.0,
+        "troco_faixa": {"min": 0.0, "max": 0.0},
+        "contratos": [
+            {
+                "banco_codigo": "033",
+                "banco": "033 - SANTANDER",
+                "situacao": "Ativo",
+                "parcela": 100.0,
+                "taxa_origem": 1.5,
+                "qtd_parcelas": 84,
+                "pagas": 10,
+                "restantes": 74,
+                "saldo_estimado": 5000.0,
+                "tabela_refin": None,
+                "taxa_refin": None,
+                "valor_liberado": None,
+                "troco": None,
+                "desconto_margem": None,
+                "elegivel": False,
+                "motivo": "nao_ativo",
+                "alerta": "Sem portabilidade no C6 — oferecer refinanciamento",
+                "troco_faixa": {"min": 0.0, "max": 0.0},
+            }
+        ],
+    }
+    assert PortabilityResult.model_validate(dados).model_dump(mode="json") == dados
