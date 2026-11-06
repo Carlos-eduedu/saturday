@@ -5,7 +5,7 @@ from __future__ import annotations
 from langgraph.graph import END
 
 from saturday.agent.state import AgentState
-from saturday.config import JEV_INTENT_THRESHOLD
+from saturday.settings import JEV_INTENT_THRESHOLD
 
 
 def route_start(state: AgentState) -> str:

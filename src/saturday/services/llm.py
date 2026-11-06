@@ -7,10 +7,10 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from saturday.config import LLM_TEMPERATURE, LLM_TIMEOUT_S, get_settings
 from saturday.faq import FAQ
 from saturday.services import openrouter
 from saturday.services.anexos import Anexo
+from saturday.settings import LLM_TEMPERATURE, LLM_TIMEOUT_S, get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -157,7 +157,7 @@ def ler_extrato(anexos: list[Anexo]) -> dict[str, Any]:
     try:
         dados = openrouter.post_json(
             OPENROUTER_CHAT_URL,
-            settings.openrouter_api_key,
+            settings.openrouter_api_key.get_secret_value(),
             payload,
             LLM_TIMEOUT_S,
         )
@@ -193,7 +193,7 @@ def responder(
     try:
         dados = openrouter.post_json(
             OPENROUTER_CHAT_URL,
-            settings.openrouter_api_key,
+            settings.openrouter_api_key.get_secret_value(),
             payload,
             LLM_TIMEOUT_S,
         )

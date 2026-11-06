@@ -12,6 +12,7 @@ from saturday.services import jev as jev_service
 from saturday.services import llm as llm_service
 from saturday.services import openrouter as openrouter_service
 from saturday.services import webhook as webhook_service
+from saturday.settings import get_settings
 
 client = TestClient(app)
 
@@ -22,10 +23,13 @@ def cid() -> str:
 
 @pytest.fixture(autouse=True)
 def ambiente_limpo(monkeypatch):
-    monkeypatch.setenv("WEBHOOK_URL", "")
-    monkeypatch.setenv("OPENROUTER_API_KEY", "")
-    monkeypatch.setenv("LLM_MODEL", "")
-    monkeypatch.setenv("VISION_MODEL", "")
+    monkeypatch.setenv("SATURDAY_WEBHOOK_URL", "")
+    monkeypatch.setenv("SATURDAY_OPENROUTER_API_KEY", "")
+    monkeypatch.setenv("SATURDAY_LLM_MODEL", "")
+    monkeypatch.setenv("SATURDAY_VISION_MODEL", "")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 def classificar(intent="duvida", conf=0.9, publico="inss"):
@@ -132,7 +136,8 @@ def test_5_apos_handoff_proxima_mensagem_nao_roda_grafo(monkeypatch):
 
 
 def test_6_webhook_recebe_payload(monkeypatch):
-    monkeypatch.setenv("WEBHOOK_URL", "https://webhook.test/agent")
+    monkeypatch.setenv("SATURDAY_WEBHOOK_URL", "https://webhook.test/agent")
+    get_settings.cache_clear()
     enviados = []
 
     class Resposta:
@@ -167,7 +172,8 @@ def test_6_webhook_recebe_payload(monkeypatch):
 
 
 def test_webhook_falha_nao_levanta(monkeypatch):
-    monkeypatch.setenv("WEBHOOK_URL", "https://webhook.test/agent")
+    monkeypatch.setenv("SATURDAY_WEBHOOK_URL", "https://webhook.test/agent")
+    get_settings.cache_clear()
 
     def fake_post(*args, **kwargs):
         raise webhook_service.httpx.ConnectError("fora do ar")
@@ -178,8 +184,9 @@ def test_webhook_falha_nao_levanta(monkeypatch):
 
 
 def test_jev_usa_decisions_api_e_pergunta_aceite(monkeypatch):
-    monkeypatch.setenv("OPENROUTER_API_KEY", "chave")
-    monkeypatch.setenv("JEV_MODEL", "typesafe/jev-1.13")
+    monkeypatch.setenv("SATURDAY_OPENROUTER_API_KEY", "chave")
+    monkeypatch.setenv("SATURDAY_JEV_MODEL", "typesafe/jev-1.13")
+    get_settings.cache_clear()
     chamadas = []
 
     def fake_post(url, api_key, payload, timeout):

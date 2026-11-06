@@ -11,13 +11,6 @@ from zoneinfo import ZoneInfo
 from langchain_core.messages import AIMessage
 
 from saturday.agent.state import AgentState
-from saturday.config import (
-    HISTORY_MAX_MESSAGES,
-    HORARIO_EQUIPE,
-    JEV_INTENT_THRESHOLD,
-    TZ_EQUIPE,
-    TZ_OPERACAO,
-)
 from saturday.portabilidade import calculo, mensagem
 from saturday.portabilidade import hiscon as hiscon_mod
 from saturday.portabilidade.regras import (
@@ -28,6 +21,13 @@ from saturday.portabilidade.regras import (
 )
 from saturday.services import anexos as anexos_service
 from saturday.services import jev, llm
+from saturday.settings import (
+    HISTORY_MAX_MESSAGES,
+    HORARIO_EQUIPE,
+    JEV_INTENT_THRESHOLD,
+    TZ_EQUIPE,
+    TZ_OPERACAO,
+)
 
 MENSAGENS_HANDOFF = {
     "pediu_humano": "Claro! Vou te transferir para um atendente da MEX.",

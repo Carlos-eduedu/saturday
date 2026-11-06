@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 
-from saturday.config import WEBHOOK_TIMEOUT_S, get_settings
+from saturday.settings import WEBHOOK_TIMEOUT_S, get_settings
 
 logger = logging.getLogger(__name__)
 

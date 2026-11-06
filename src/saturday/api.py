@@ -13,9 +13,9 @@ from langchain_core.messages import HumanMessage
 
 from saturday.agent.graph import graph
 from saturday.agent.state import turno_inicial
-from saturday.config import TZ_OPERACAO, get_settings
 from saturday.schemas import AgentReply, ChatRequest
 from saturday.services import webhook
+from saturday.settings import TZ_OPERACAO, get_settings
 
 logger = logging.getLogger(__name__)
 

@@ -23,6 +23,7 @@ from saturday.portabilidade.hiscon import (
 from saturday.services import anexos as anexos_service
 from saturday.services import llm as llm_service
 from saturday.services import openrouter as openrouter_service
+from saturday.settings import get_settings
 
 HOJE = date(2026, 10, 8)
 
@@ -228,8 +229,9 @@ def test_anexo_url_baixa_e_valida(monkeypatch):
 
 
 def test_ler_extrato_manda_todos_anexos_numa_chamada(monkeypatch):
-    monkeypatch.setenv("OPENROUTER_API_KEY", "chave")
-    monkeypatch.setenv("VISION_MODEL", "modelo-visao")
+    monkeypatch.setenv("SATURDAY_OPENROUTER_API_KEY", "chave")
+    monkeypatch.setenv("SATURDAY_VISION_MODEL", "modelo-visao")
+    get_settings.cache_clear()
 
     capturado = {}
 

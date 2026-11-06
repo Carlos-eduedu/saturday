@@ -9,7 +9,7 @@ from typing import Any
 
 import httpx
 
-from saturday.config import ANEXO_MAX_MB, ANEXO_TIMEOUT_S, MIME_ACEITOS
+from saturday.settings import ANEXO_MAX_MB, ANEXO_TIMEOUT_S, MIME_ACEITOS
 
 LIMITE_BYTES = ANEXO_MAX_MB * 1024 * 1024
 

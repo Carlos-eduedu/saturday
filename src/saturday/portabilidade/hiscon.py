@@ -10,8 +10,8 @@ from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from saturday.config import TZ_OPERACAO
 from saturday.portabilidade.regras import TOLERANCIA_CONFERENCIA
+from saturday.settings import TZ_OPERACAO
 
 STATUS_OK = "ok"
 STATUS_NAO_HISCON = "nao_hiscon"

@@ -11,7 +11,6 @@ from datetime import date, datetime
 from typing import Any, cast
 from zoneinfo import ZoneInfo
 
-from saturday.config import TZ_OPERACAO
 from saturday.portabilidade.regras import (
     AJUSTE_SALDO_POR_BANCO,
     BANCOS_ALERTA_REFIN,
@@ -41,6 +40,7 @@ from saturday.portabilidade.regras import (
     UFS_WEBPLUS,
     fora_da_cip,
 )
+from saturday.settings import TZ_OPERACAO
 
 ALERTA_REFIN = "Sem portabilidade no C6 — oferecer refinanciamento"
 

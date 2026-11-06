@@ -15,6 +15,7 @@ from saturday.portabilidade.mensagem import formatar_valor
 from saturday.services import jev as jev_service
 from saturday.services import llm as llm_service
 from saturday.services import webhook as webhook_service
+from saturday.settings import get_settings
 
 client = TestClient(app)
 TZ = ZoneInfo("America/Sao_Paulo")
@@ -26,10 +27,13 @@ def cid() -> str:
 
 @pytest.fixture(autouse=True)
 def ambiente(monkeypatch):
-    monkeypatch.setenv("WEBHOOK_URL", "")
-    monkeypatch.setenv("OPENROUTER_API_KEY", "")
-    monkeypatch.setenv("LLM_MODEL", "")
-    monkeypatch.setenv("VISION_MODEL", "")
+    monkeypatch.setenv("SATURDAY_WEBHOOK_URL", "")
+    monkeypatch.setenv("SATURDAY_OPENROUTER_API_KEY", "")
+    monkeypatch.setenv("SATURDAY_LLM_MODEL", "")
+    monkeypatch.setenv("SATURDAY_VISION_MODEL", "")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 def hoje() -> date:
@@ -318,7 +322,8 @@ def test_data_invalida_duas_vezes_vai_para_handoff(monkeypatch):
 
 
 def test_webhook_contem_portability_result(monkeypatch):
-    monkeypatch.setenv("WEBHOOK_URL", "https://webhook.test/agent")
+    monkeypatch.setenv("SATURDAY_WEBHOOK_URL", "https://webhook.test/agent")
+    get_settings.cache_clear()
     monkeypatch.setattr(llm_service, "ler_extrato", lambda anexos: dados_extrato())
     monkeypatch.setattr(jev_service, "classify", sem_jev)
 

@@ -10,8 +10,8 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from saturday.config import JEV_TIMEOUT_S, get_settings
 from saturday.services import openrouter
+from saturday.settings import JEV_TIMEOUT_S, get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -155,7 +155,7 @@ def classify(message: str, oferta_pendente: bool = False) -> JevResult:
     try:
         dados = openrouter.post_json(
             OPENROUTER_DECISIONS_URL,
-            settings.openrouter_api_key,
+            settings.openrouter_api_key.get_secret_value(),
             payload,
             JEV_TIMEOUT_S,
         )
