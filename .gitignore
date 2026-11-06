@@ -8,3 +8,12 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Variáveis locais (nunca versionar chaves)
+.env
+.env.*
+!.env.example
+.pytest_cache/
+
+# Extratos locais (dados pessoais)
+*.pdf
