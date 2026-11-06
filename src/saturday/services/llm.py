@@ -181,9 +181,7 @@ def responder(
     if not settings.openrouter_api_key or not settings.llm_model:
         raise LLMError("LLM não configurado")
 
-    mensagens: list[dict[str, Any]] = [
-        {"role": "system", "content": _system_prompt(resumo)}
-    ]
+    mensagens: list[dict[str, Any]] = [{"role": "system", "content": _system_prompt(resumo)}]
     mensagens.extend(historico)
 
     payload = {

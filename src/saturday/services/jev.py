@@ -40,9 +40,7 @@ def _perguntas(oferta_pendente: bool) -> dict[str, Any]:
     perguntas = {
         "intent": {
             "type": "choice",
-            "instructions": (
-                "Qual é a intenção da última mensagem do cliente?"
-            ),
+            "instructions": ("Qual é a intenção da última mensagem do cliente?"),
             "criteria": {
                 "duvida": (
                     "Pergunta sobre produtos, portabilidade, documentos, prazos, "
@@ -52,16 +50,12 @@ def _perguntas(oferta_pendente: bool) -> dict[str, Any]:
                     "Relata dificuldade operacional para enviar um documento ou "
                     "seguir com o atendimento."
                 ),
-                "humano": (
-                    "Pede explicitamente para falar com uma pessoa ou atendente."
-                ),
+                "humano": ("Pede explicitamente para falar com uma pessoa ou atendente."),
             },
         },
         "publico": {
             "type": "choice",
-            "instructions": (
-                "A que público pertence o cliente, segundo a mensagem?"
-            ),
+            "instructions": ("A que público pertence o cliente, segundo a mensagem?"),
             "criteria": {
                 "clt": "Trabalhador com carteira assinada.",
                 "inss": "Aposentado ou pensionista do INSS.",
@@ -101,7 +95,7 @@ def _choice(raw: Any, default: str) -> tuple[str, float]:
         choice = default
     try:
         confidence = float(confidence)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         confidence = 0.0
     return choice, max(0.0, min(1.0, confidence))
 

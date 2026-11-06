@@ -91,8 +91,7 @@ def mensagem_oferta(resultado: dict[str, Any], uf: str | None = None) -> str:
     )
     if resultado.get("beneficio_bloqueado"):
         linhas.append(
-            "Antes de seguir, é preciso desbloquear o benefício para empréstimo "
-            "no app Meu INSS."
+            "Antes de seguir, é preciso desbloquear o benefício para empréstimo no app Meu INSS."
         )
     if resultado.get("alerta_webplus"):
         linhas.append(
@@ -110,12 +109,8 @@ MOTIVOS = {
     "nao_ativo": "o contrato do {banco} não está ativo",
     "pagas_insuficientes": "ainda faltam parcelas pagas no contrato do {banco}",
     "taxa_abaixo_c6": "a taxa do contrato do {banco} está abaixo da mínima do C6",
-    "sem_tabela": (
-        "não há uma tabela de refinanciamento disponível para o contrato do {banco}"
-    ),
-    "abaixo_minimo_c6": (
-        "o contrato do {banco} está abaixo do valor mínimo de portabilidade"
-    ),
+    "sem_tabela": ("não há uma tabela de refinanciamento disponível para o contrato do {banco}"),
+    "abaixo_minimo_c6": ("o contrato do {banco} está abaixo do valor mínimo de portabilidade"),
     "troco_baixo": "a sobra do contrato do {banco} ficaria abaixo do mínimo",
     "ilegivel": "não consegui ler os dados do contrato do {banco}",
 }
@@ -146,7 +141,6 @@ def _motivo_principal(resultado: dict[str, Any]) -> str | None:
             key=lambda motivo: (-contagem[motivo], ordem.get(motivo, 99)),
         )
     )
-
 
 
 def mensagem_sem_portabilidade(resultado: dict[str, Any]) -> str:

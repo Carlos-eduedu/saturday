@@ -187,9 +187,7 @@ def test_anexo_mime_invalido():
 
 def test_anexo_base64_invalido():
     with pytest.raises(anexos_service.AnexoInvalido):
-        anexos_service.carregar_anexo(
-            {"base64": "***", "mime_type": "image/jpeg"}
-        )
+        anexos_service.carregar_anexo({"base64": "***", "mime_type": "image/jpeg"})
 
 
 def test_anexo_acima_do_limite(monkeypatch):
@@ -237,9 +235,7 @@ def test_ler_extrato_manda_todos_anexos_numa_chamada(monkeypatch):
 
     def fake_post(url, api_key, payload, timeout):
         capturado.update(url=url, api_key=api_key, payload=payload, timeout=timeout)
-        return {
-            "choices": [{"message": {"content": json.dumps(json_extrato())}}]
-        }
+        return {"choices": [{"message": {"content": json.dumps(json_extrato())}}]}
 
     monkeypatch.setattr(openrouter_service, "post_json", fake_post)
     anexos = [

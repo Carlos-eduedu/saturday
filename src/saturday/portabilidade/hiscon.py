@@ -35,13 +35,7 @@ def numero_brasileiro(valor: Any) -> float | None:
     if not isinstance(valor, str):
         return None
 
-    texto = (
-        valor.strip()
-        .replace("R$", "")
-        .replace("%", "")
-        .replace("\u00a0", "")
-        .replace(" ", "")
-    )
+    texto = valor.strip().replace("R$", "").replace("%", "").replace("\u00a0", "").replace(" ", "")
     if not texto:
         return None
     if "," in texto:

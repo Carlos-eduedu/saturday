@@ -43,9 +43,7 @@ def responder(resposta="Sim, atendemos INSS.", resolvido=True):
 
 def test_1_pergunta_faq_answered(monkeypatch):
     monkeypatch.setattr(jev_service, "classify", lambda *a, **k: classificar())
-    monkeypatch.setattr(
-        llm_service, "responder", lambda *a, **k: responder()
-    )
+    monkeypatch.setattr(llm_service, "responder", lambda *a, **k: responder())
 
     r = client.post("/chat", json={"conversation_id": cid(), "message": "Vocês atendem INSS?"})
 
@@ -58,9 +56,7 @@ def test_1_pergunta_faq_answered(monkeypatch):
 
 
 def test_2_pedido_humano_vai_para_handoff(monkeypatch):
-    monkeypatch.setattr(
-        jev_service, "classify", lambda *a, **k: classificar("humano", 0.95)
-    )
+    monkeypatch.setattr(jev_service, "classify", lambda *a, **k: classificar("humano", 0.95))
     monkeypatch.setattr(
         llm_service,
         "responder",
@@ -79,9 +75,7 @@ def test_2_pedido_humano_vai_para_handoff(monkeypatch):
 
 def test_3_llm_sem_resposta_vai_para_handoff(monkeypatch):
     monkeypatch.setattr(jev_service, "classify", lambda *a, **k: classificar())
-    monkeypatch.setattr(
-        llm_service, "responder", lambda *a, **k: responder("", False)
-    )
+    monkeypatch.setattr(llm_service, "responder", lambda *a, **k: responder("", False))
 
     r = client.post(
         "/chat",
@@ -98,9 +92,7 @@ def test_4_erro_do_jev_segue_para_llm(monkeypatch):
         raise jev_service.JevError("indisponível")
 
     monkeypatch.setattr(jev_service, "classify", falhar)
-    monkeypatch.setattr(
-        llm_service, "responder", lambda *a, **k: responder("Resposta da FAQ")
-    )
+    monkeypatch.setattr(llm_service, "responder", lambda *a, **k: responder("Resposta da FAQ"))
 
     r = client.post(
         "/chat",
@@ -153,9 +145,7 @@ def test_6_webhook_recebe_payload(monkeypatch):
 
     monkeypatch.setattr(webhook_service.httpx, "post", fake_post)
     monkeypatch.setattr(jev_service, "classify", lambda *a, **k: classificar())
-    monkeypatch.setattr(
-        llm_service, "responder", lambda *a, **k: responder("Resposta ao cliente")
-    )
+    monkeypatch.setattr(llm_service, "responder", lambda *a, **k: responder("Resposta ao cliente"))
 
     conversa = cid()
     r = client.post(

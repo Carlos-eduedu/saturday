@@ -32,20 +32,17 @@ from saturday.services import jev, llm
 MENSAGENS_HANDOFF = {
     "pediu_humano": "Claro! Vou te transferir para um atendente da MEX.",
     "sem_resposta": (
-        "Não consegui esclarecer isso por aqui. Vou te transferir para um "
-        "atendente da MEX."
+        "Não consegui esclarecer isso por aqui. Vou te transferir para um atendente da MEX."
     ),
     "hiscon_nao_conferiu": (
         "Não consegui conferir os valores do seu extrato. Vou te transferir "
         "para um atendente da MEX."
     ),
     "extrato_ilegivel_repetido": (
-        "Ainda não consegui ler o seu extrato. Vou te transferir para um "
-        "atendente da MEX."
+        "Ainda não consegui ler o seu extrato. Vou te transferir para um atendente da MEX."
     ),
     "idade_fora_regra": (
-        "No momento não atendemos essa faixa de idade. Vou te transferir para "
-        "um atendente da MEX."
+        "No momento não atendemos essa faixa de idade. Vou te transferir para um atendente da MEX."
     ),
     "idade_prazo_96": (
         "Para a sua idade, o prazo disponível ainda não está nesta versão do "
@@ -63,8 +60,7 @@ MENSAGENS_HANDOFF = {
         "Combinado! Um atendente da MEX vai seguir com a digitação da proposta."
     ),
     "dados_cliente_nao_informados": (
-        "Não consegui confirmar os seus dados. Vou te transferir para um "
-        "atendente da MEX."
+        "Não consegui confirmar os seus dados. Vou te transferir para um atendente da MEX."
     ),
 }
 
@@ -73,28 +69,18 @@ MENSAGEM_FORA_HORARIO = (
     "Um atendente responde no próximo dia útil, a partir das 8h."
 )
 
-MENSAGEM_RECUSA = (
-    "Tudo bem! Se mudar de ideia, é só me chamar. Obrigado pelo contato."
-)
+MENSAGEM_RECUSA = "Tudo bem! Se mudar de ideia, é só me chamar. Obrigado pelo contato."
 
-PERGUNTA_DATA = (
-    "Para continuar, me informe a sua data de nascimento (dd/mm/aaaa)."
-)
+PERGUNTA_DATA = "Para continuar, me informe a sua data de nascimento (dd/mm/aaaa)."
 PERGUNTA_DATA_INVALIDA = (
-    "Não consegui entender a data. Me envie a data de nascimento no formato "
-    "dd/mm/aaaa."
+    "Não consegui entender a data. Me envie a data de nascimento no formato dd/mm/aaaa."
 )
-PERGUNTA_UF = (
-    "Como você tem 60 anos ou mais, preciso também da sua UF (estado). "
-    "Qual é a sua UF?"
-)
-PERGUNTA_UF_INVALIDA = (
-    "Não consegui identificar a UF. Me envie a sigla do estado, por exemplo: MS."
-)
+PERGUNTA_UF = "Como você tem 60 anos ou mais, preciso também da sua UF (estado). Qual é a sua UF?"
+PERGUNTA_UF_INVALIDA = "Não consegui identificar a UF. Me envie a sigla do estado, por exemplo: MS."
 
 MENSAGEM_EXTRATO_INCORRETO = (
     "O arquivo recebido não é o extrato de empréstimos do Meu INSS. No app ou "
-    "site Meu INSS, escolha a opção \"Extrato de Empréstimos\" e envie o PDF ou "
+    'site Meu INSS, escolha a opção "Extrato de Empréstimos" e envie o PDF ou '
     "uma foto."
 )
 MENSAGEM_EXTRATO_ILEGIVEL = (
@@ -160,9 +146,7 @@ def _normalizar_uf(valor: object) -> str | None:
     return UFS_POR_NOME.get(_sem_acento(texto))
 
 
-def _data_nascimento(
-    texto: str, hoje: date
-) -> tuple[str, int] | None:
+def _data_nascimento(texto: str, hoje: date) -> tuple[str, int] | None:
     match = PADRAO_DATA_NASCIMENTO.fullmatch(texto.strip())
     if not match:
         return None
@@ -179,11 +163,7 @@ def _data_nascimento(
         return None
 
     idade = calculo.idade_em_anos(nascimento, hoje)
-    if (
-        idade is None
-        or idade < IDADE_COLETA_MIN
-        or idade > IDADE_COLETA_MAX
-    ):
+    if idade is None or idade < IDADE_COLETA_MIN or idade > IDADE_COLETA_MAX:
         return None
     return nascimento.isoformat(), idade
 
@@ -245,9 +225,7 @@ def _pedido(pergunta: str, aguardando: str) -> dict[str, Any]:
     }
 
 
-def _resultado_falha(
-    extrato: dict[str, Any], motivo: str, prazo: int = PRAZO_C6
-) -> dict[str, Any]:
+def _resultado_falha(extrato: dict[str, Any], motivo: str, prazo: int = PRAZO_C6) -> dict[str, Any]:
     return {
         "ok": False,
         "motivo": motivo,
@@ -271,9 +249,7 @@ def classify_intent(state: AgentState) -> dict[str, Any]:
         return {}
 
     intent = resultado.intent
-    pediu_humano = (
-        intent == "humano" and resultado.intent_confidence >= JEV_INTENT_THRESHOLD
-    )
+    pediu_humano = intent == "humano" and resultado.intent_confidence >= JEV_INTENT_THRESHOLD
     if intent == "humano" and not pediu_humano:
         intent = "duvida"
 
@@ -297,13 +273,9 @@ def classify_intent(state: AgentState) -> dict[str, Any]:
         "resposta_oferta": resposta_oferta,
     }
     if pediu_humano:
-        atualizacao.update(
-            {"needs_human": True, "handoff_reason": "pediu_humano"}
-        )
+        atualizacao.update({"needs_human": True, "handoff_reason": "pediu_humano"})
     elif resposta_oferta == "aceita":
-        atualizacao.update(
-            {"needs_human": True, "handoff_reason": "aceitou_portabilidade"}
-        )
+        atualizacao.update({"needs_human": True, "handoff_reason": "aceitou_portabilidade"})
     return atualizacao
 
 
@@ -401,17 +373,13 @@ def read_statement(state: AgentState) -> dict[str, Any]:
     dados_extrato = extrato.model_dump()
     if status == hiscon_mod.STATUS_CONFERENCIA_FALHOU:
         return {
-            "portability_result": _resultado_falha(
-                dados_extrato, "hiscon_nao_conferiu"
-            ),
+            "portability_result": _resultado_falha(dados_extrato, "hiscon_nao_conferiu"),
             "needs_human": True,
             "handoff_reason": "hiscon_nao_conferiu",
         }
     if status == hiscon_mod.STATUS_ESPECIE_NAO_ATENDIDA:
         return {
-            "portability_result": _resultado_falha(
-                dados_extrato, "especie_nao_atendida"
-            ),
+            "portability_result": _resultado_falha(dados_extrato, "especie_nao_atendida"),
             "answer": mensagem.MENSAGEM_ESPECIE_NAO_ATENDIDA,
             "needs_human": True,
             "handoff_reason": "especie_nao_atendida",
@@ -535,9 +503,7 @@ def calculate_portability(state: AgentState) -> dict[str, Any]:
             atualizacao["answer"] = MENSAGENS_FALHA_CALCULO[motivo]
         return atualizacao
 
-    elegiveis = [
-        c for c in resultado.get("contratos", []) if c.get("elegivel")
-    ]
+    elegiveis = [c for c in resultado.get("contratos", []) if c.get("elegivel")]
     if not elegiveis:
         return {
             "portability_result": resultado,

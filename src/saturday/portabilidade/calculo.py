@@ -312,8 +312,7 @@ def _avaliar(
 
     teto = (taxa * restantes + TAXA_TETO_C6 * (PRAZO_C6 - restantes)) / PRAZO_C6
     teto_seguro = (
-        (taxa - MARGEM_SEGURANCA_PP / 100) * restantes
-        + TAXA_TETO_C6 * (PRAZO_C6 - restantes)
+        (taxa - MARGEM_SEGURANCA_PP / 100) * restantes + TAXA_TETO_C6 * (PRAZO_C6 - restantes)
     ) / PRAZO_C6
     tabela = _tabela_para(teto_seguro * 100)
     if tabela is not None:
@@ -415,11 +414,7 @@ def calcular_portabilidade(
     nascimento = _parse_data(_campo(cliente, "data_nascimento", "dataNascimento"))
     idade = _idade_em_anos(nascimento, hoje) if nascimento else None
     uf = str(_campo(cliente, "uf") or "").strip().upper()
-    alerta_webplus = bool(
-        idade is not None
-        and idade >= IDADE_WEBPLUS
-        and uf in UFS_WEBPLUS
-    )
+    alerta_webplus = bool(idade is not None and idade >= IDADE_WEBPLUS and uf in UFS_WEBPLUS)
 
     resultado: dict[str, Any] = {
         "ok": True,
@@ -454,13 +449,9 @@ def calcular_portabilidade(
         raise ValueError("data de emissão inválida")
 
     bases = [_preparar_contrato(_como_dict(c)) for c in contratos]
-    extrapolada = _numero(
-        _campo(hiscon, "margemExtrapolada", "margem_extrapolada")
-    )
+    extrapolada = _numero(_campo(hiscon, "margemExtrapolada", "margem_extrapolada"))
     desconto = _desconto_margem(extrapolada)
-    indice_desconto = (
-        _contrato_para_desconto(bases, desconto) if desconto > 0 else None
-    )
+    indice_desconto = _contrato_para_desconto(bases, desconto) if desconto > 0 else None
 
     avaliados = []
     for indice, base in enumerate(bases):

@@ -30,6 +30,8 @@ MIME_ACEITOS = frozenset(
 # Fuso e horário de operação.
 TZ_OPERACAO = "America/Sao_Paulo"
 TZ_EQUIPE = "America/Campo_Grande"
+
+
 # Segunda a sexta, das 8h às 17h.
 @dataclass(frozen=True)
 class HorarioEquipe:
