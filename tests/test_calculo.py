@@ -7,17 +7,19 @@ from datetime import date
 import pytest
 
 from saturday.portabilidade.calculo import (
+    DadosCliente,
     avaliar_contrato,
     calcular_portabilidade,
     competencia_referencia,
     parcelas_pagas,
     r2,
 )
+from saturday.portabilidade.hiscon import ContratoHiscon, Extrato
 from saturday.portabilidade.regras import fora_da_cip
 
 HOJE = date(2026, 10, 8)
 EMISSAO = "08/10/2026"
-CLIENTE = {"data_nascimento": "1962-03-12", "uf": "MS"}
+CLIENTE = DadosCliente(data_nascimento=date(1962, 3, 12), uf="MS")
 
 
 def inicio_para(pagas: int) -> str:
@@ -36,19 +38,19 @@ def contrato(
     taxa: float,
     inclusao: str = "01/01/2020",
     situacao: str = "Ativo",
-) -> dict:
-    return {
-        "banco": banco,
-        "situacao": situacao,
-        "parcela": parcela,
-        "taxaMensal": taxa,
-        "qtdParcelas": qtd,
-        "inicioDesconto": inicio_para(pagas),
-        "dataInclusao": inclusao,
-    }
+) -> ContratoHiscon:
+    return ContratoHiscon(
+        banco=banco,
+        situacao=situacao,
+        parcela=parcela,
+        taxaMensal=taxa,
+        qtdParcelas=qtd,
+        inicioDesconto=inicio_para(pagas),
+        dataInclusao=inclusao,
+    )
 
 
-def extrato(*contratos: dict, **extras) -> dict:
+def extrato(*contratos: ContratoHiscon, **extras) -> Extrato:
     dados = {
         "ehHiscon": True,
         "especie": "32",
@@ -61,7 +63,7 @@ def extrato(*contratos: dict, **extras) -> dict:
         "contratos": list(contratos),
     }
     dados.update(extras)
-    return dados
+    return Extrato.model_validate(dados)
 
 
 CASOS_REFERENCIA = [

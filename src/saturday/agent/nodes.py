@@ -28,6 +28,7 @@ from saturday.agent.textos import (
 from saturday.portabilidade import calculo, mensagem
 from saturday.portabilidade import hiscon as hiscon_mod
 from saturday.portabilidade.regras import IDADE_WEBPLUS, PRAZO_C6
+from saturday.portabilidade.util import parse_data
 from saturday.services.anexos import AnexoInvalido
 from saturday.settings import HISTORY_MAX_MESSAGES, TZ_OPERACAO
 
@@ -340,6 +341,19 @@ def collect_customer_data(state: AgentState) -> dict[str, Any]:
     return {}
 
 
+def _dados_cliente(cliente: Any) -> calculo.DadosCliente | None:
+    if not isinstance(cliente, dict):
+        return None
+    nascimento = parse_data(cliente.get("data_nascimento"))
+    if nascimento is None:
+        return None
+    uf = cliente.get("uf")
+    return calculo.DadosCliente(
+        data_nascimento=nascimento,
+        uf=str(uf).strip().upper() if uf else None,
+    )
+
+
 def calculate_portability(state: AgentState) -> dict[str, Any]:
     dados_hiscon = state.get("hiscon")
     if not dados_hiscon:
@@ -349,9 +363,11 @@ def calculate_portability(state: AgentState) -> dict[str, Any]:
         }
 
     try:
+        extrato = hiscon_mod.normalizar_extrato(dados_hiscon)
+        dados_cliente = _dados_cliente(state.get("cliente"))
         resultado = calculo.calcular_portabilidade(
-            dados_hiscon,
-            state.get("cliente") or {},
+            extrato,
+            dados_cliente,
             hoje_operacao(),
         )
     except Exception:

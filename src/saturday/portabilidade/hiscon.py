@@ -8,9 +8,10 @@ from datetime import date, datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from saturday.portabilidade.regras import TOLERANCIA_CONFERENCIA
+from saturday.portabilidade.util import contrato_ativo, numero_brasileiro, parse_data
 from saturday.settings import TZ_OPERACAO
 
 STATUS_OK = "ok"
@@ -23,27 +24,6 @@ STATUS_ESPECIE_NAO_ATENDIDA = "especie_nao_atendida"
 
 class ExtratoInvalido(ValueError):
     """JSON que não pôde ser interpretado como extrato."""
-
-
-def numero_brasileiro(valor: Any) -> float | None:
-    """Converte "1.234,56" em 1234.56. Inválido vira None, nunca zero."""
-
-    if valor is None or isinstance(valor, bool):
-        return None
-    if isinstance(valor, (int, float)):
-        return float(valor)
-    if not isinstance(valor, str):
-        return None
-
-    texto = valor.strip().replace("R$", "").replace("%", "").replace("\u00a0", "").replace(" ", "")
-    if not texto:
-        return None
-    if "," in texto:
-        texto = texto.replace(".", "").replace(",", ".")
-    try:
-        return float(texto)
-    except ValueError:
-        return None
 
 
 def _inteiro(valor: Any) -> int | None:
@@ -113,17 +93,6 @@ def _normalizar_banco(valor: Any) -> tuple[str, str]:
     return banco, codigo
 
 
-def _parse_data(valor: Any) -> date | None:
-    if not isinstance(valor, str):
-        return None
-    for formato in ("%d/%m/%Y", "%d/%m/%y", "%Y-%m-%d"):
-        try:
-            return datetime.strptime(valor.strip(), formato).date()
-        except ValueError:
-            continue
-    return None
-
-
 def _inicio_valido(valor: Any) -> bool:
     if not isinstance(valor, str):
         return False
@@ -132,10 +101,6 @@ def _inicio_valido(valor: Any) -> bool:
         return True
     except ValueError:
         return False
-
-
-def _ativo(situacao: Any) -> bool:
-    return isinstance(situacao, str) and situacao.strip().lower().startswith("ativo")
 
 
 class ContratoHiscon(BaseModel):
@@ -180,6 +145,21 @@ class ContratoHiscon(BaseModel):
     @classmethod
     def _inclusao(cls, valor: Any) -> str | None:
         return _normalizar_data_br(valor)
+
+    @model_validator(mode="after")
+    def _legivel_e_codigo(self) -> ContratoHiscon:
+        self.legivel = bool(
+            self.parcela is not None
+            and self.parcela > 0
+            and self.qtdParcelas is not None
+            and self.qtdParcelas > 0
+            and self.taxaMensal is not None
+            and self.taxaMensal > 0
+            and _inicio_valido(self.inicioDesconto)
+        )
+        _, codigo = _normalizar_banco(self.banco)
+        self.banco_codigo = codigo
+        return self
 
 
 class Extrato(BaseModel):
@@ -234,22 +214,6 @@ class Extrato(BaseModel):
         return any(c.legivel for c in self.contratos)
 
 
-def _marcar_legibilidade(extrato: Extrato) -> Extrato:
-    for contrato in extrato.contratos:
-        contrato.legivel = bool(
-            contrato.parcela is not None
-            and contrato.parcela > 0
-            and contrato.qtdParcelas is not None
-            and contrato.qtdParcelas > 0
-            and contrato.taxaMensal is not None
-            and contrato.taxaMensal > 0
-            and _inicio_valido(contrato.inicioDesconto)
-        )
-        _, codigo = _normalizar_banco(contrato.banco)
-        contrato.banco_codigo = codigo
-    return extrato
-
-
 def normalizar_extrato(dados: Any) -> Extrato:
     """Normaliza o JSON cru do modelo para o schema do serviço."""
 
@@ -271,8 +235,7 @@ def normalizar_extrato(dados: Any) -> Extrato:
             if isinstance(bruto, dict):
                 contratos.append(ContratoHiscon.model_validate(bruto))
     base["contratos"] = contratos
-    extrato = Extrato.model_validate(base)
-    return _marcar_legibilidade(extrato)
+    return Extrato.model_validate(base)
 
 
 def _garantir_extrato(valor: Any) -> Extrato:
@@ -286,7 +249,7 @@ def conferir_margem(extrato: Extrato | dict[str, Any]) -> bool:
 
     soma = 0.0
     for contrato in extrato.contratos:
-        if not _ativo(contrato.situacao):
+        if not contrato_ativo(contrato.situacao):
             continue
         if contrato.parcela is None:
             return False
@@ -299,7 +262,7 @@ def conferir_margem(extrato: Extrato | dict[str, Any]) -> bool:
 
 def extrato_do_mes(extrato: Extrato | dict[str, Any], hoje: date | None = None) -> bool:
     extrato = _garantir_extrato(extrato)
-    emissao = _parse_data(extrato.dataEmissao)
+    emissao = parse_data(extrato.dataEmissao)
     if emissao is None:
         return False
     hoje = hoje or datetime.now(ZoneInfo(TZ_OPERACAO)).date()
@@ -312,7 +275,7 @@ def validar_extrato(extrato: Extrato | dict[str, Any], hoje: date | None = None)
     extrato = _garantir_extrato(extrato)
     if not extrato.ehHiscon:
         return STATUS_NAO_HISCON
-    if _parse_data(extrato.dataEmissao) is None or not extrato.tem_contrato_legivel():
+    if parse_data(extrato.dataEmissao) is None or not extrato.tem_contrato_legivel():
         return STATUS_ILEGIVEL
     if not extrato_do_mes(extrato, hoje):
         return STATUS_MES_ERRADO
@@ -321,7 +284,3 @@ def validar_extrato(extrato: Extrato | dict[str, Any], hoje: date | None = None)
     if extrato.especie in {"87", "88"}:
         return STATUS_ESPECIE_NAO_ATENDIDA
     return STATUS_OK
-
-
-# Nome alternativo, conforme a terminologia do plano.
-normalizar_numero = numero_brasileiro
