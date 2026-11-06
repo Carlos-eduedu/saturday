@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from langchain_core.messages import AIMessage
 from langgraph.runtime import Runtime
@@ -27,7 +29,7 @@ from saturday.portabilidade import calculo, mensagem
 from saturday.portabilidade import hiscon as hiscon_mod
 from saturday.portabilidade.regras import IDADE_WEBPLUS, PRAZO_C6
 from saturday.services.anexos import AnexoInvalido
-from saturday.settings import HISTORY_MAX_MESSAGES
+from saturday.settings import HISTORY_MAX_MESSAGES, TZ_OPERACAO
 
 
 def _historico(state: AgentState) -> list[dict[str, str]]:
@@ -189,6 +191,7 @@ def handoff(state: AgentState) -> dict[str, Any]:
         "needs_human": True,
         "handoff_reason": motivo,
         "answer": resposta,
+        "handoff_em": datetime.now(ZoneInfo(TZ_OPERACAO)).isoformat(),
         "messages": [AIMessage(content=resposta)],
     }
 
@@ -258,6 +261,7 @@ def read_statement(state: AgentState, runtime: Runtime[AgentContext]) -> dict[st
 
     return {
         "hiscon": dados_extrato,
+        "hiscon_recebido_em": datetime.now(ZoneInfo(TZ_OPERACAO)).isoformat(),
         "tentativas_extrato": 0,
         "portability_result": None,
         "oferta_pendente": False,

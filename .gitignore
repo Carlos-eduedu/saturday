@@ -17,3 +17,8 @@ wheels/
 
 # Extratos locais (dados pessoais)
 *.pdf
+
+# Checkpoints locais das conversas
+data/
+*.sqlite
+*.sqlite3

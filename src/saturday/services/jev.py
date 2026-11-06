@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
 import httpx
 
+from saturday.metrics import custo_do_payload, registrar_chamada
 from saturday.services.openrouter import OpenRouterClient, OpenRouterError
 from saturday.settings import JEV_INTENT_THRESHOLD, JEV_TIMEOUT_S, Settings
 
@@ -225,6 +227,7 @@ class JevClient:
             "state": state,
             "questions": _perguntas(oferta_pendente),
         }
+        inicio = time.monotonic()
         try:
             dados = self._openrouter.post_json(
                 OPENROUTER_DECISIONS_URL,
@@ -232,7 +235,13 @@ class JevClient:
                 JEV_TIMEOUT_S,
             )
         except OpenRouterError as exc:
+            registrar_chamada("jev", (time.monotonic() - inicio) * 1000)
             logger.warning("jev_falhou: %s", type(exc).__name__)
             raise JevError("Falha ao consultar o Jev") from exc
 
+        registrar_chamada(
+            "jev",
+            (time.monotonic() - inicio) * 1000,
+            custo_do_payload(dados),
+        )
         return _parse(dados, oferta_pendente)

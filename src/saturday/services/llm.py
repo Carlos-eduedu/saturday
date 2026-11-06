@@ -11,6 +11,7 @@ from typing import Any
 import httpx
 
 from saturday.faq import FAQ
+from saturday.metrics import custo_do_payload, registrar_chamada
 from saturday.services.anexos import Anexo
 from saturday.services.openrouter import OpenRouterClient, OpenRouterError
 from saturday.settings import LLM_TEMPERATURE, LLM_TIMEOUT_S, Settings
@@ -140,29 +141,39 @@ class LLMClient:
             settings.openrouter_api_key.get_secret_value(),
         )
 
-    def _post_json(self, payload: dict[str, Any]) -> dict[str, Any]:
+    def _post_json(
+        self,
+        payload: dict[str, Any],
+        nome: str,
+    ) -> dict[str, Any]:
         """Uma nova tentativa para falhas transitórias, dentro do prazo total."""
 
         inicio = time.monotonic()
-        ultimo_erro: OpenRouterError | None = None
-        for tentativa in range(2):
-            restante = LLM_TIMEOUT_S - (time.monotonic() - inicio)
-            if restante <= 0:
-                break
-            try:
-                return self._openrouter.post_json(
-                    OPENROUTER_CHAT_URL,
-                    payload,
-                    restante,
-                )
-            except OpenRouterError as exc:
-                ultimo_erro = exc
-                if not exc.retryable or tentativa == 1:
-                    raise
-                time.sleep(min(1.0, max(0.0, restante)))
-        if ultimo_erro is not None:
-            raise ultimo_erro
-        raise OpenRouterError("tempo esgotado antes da chamada ao OpenRouter")
+        custo: float | None = None
+        try:
+            ultimo_erro: OpenRouterError | None = None
+            for tentativa in range(2):
+                restante = LLM_TIMEOUT_S - (time.monotonic() - inicio)
+                if restante <= 0:
+                    break
+                try:
+                    dados = self._openrouter.post_json(
+                        OPENROUTER_CHAT_URL,
+                        payload,
+                        restante,
+                    )
+                    custo = custo_do_payload(dados)
+                    return dados
+                except OpenRouterError as exc:
+                    ultimo_erro = exc
+                    if not exc.retryable or tentativa == 1:
+                        raise
+                    time.sleep(min(1.0, max(0.0, restante)))
+            if ultimo_erro is not None:
+                raise ultimo_erro
+            raise OpenRouterError("tempo esgotado antes da chamada ao OpenRouter")
+        finally:
+            registrar_chamada(nome, (time.monotonic() - inicio) * 1000, custo)
 
     def ler_extrato(self, anexos: list[Anexo]) -> dict[str, Any]:
         """Lê todos os anexos numa única chamada ao modelo de visão."""
@@ -181,9 +192,10 @@ class LLMClient:
             "temperature": 0,
             "messages": [{"role": "user", "content": conteudo}],
             "response_format": {"type": "json_object"},
+            "usage": {"include": True},
         }
         try:
-            dados = self._post_json(payload)
+            dados = self._post_json(payload, "visao")
             content = dados["choices"][0]["message"]["content"]
         except Exception as exc:
             logger.warning("leitura_extrato_falhou: %s", type(exc).__name__)
@@ -213,9 +225,10 @@ class LLMClient:
             "temperature": LLM_TEMPERATURE,
             "messages": mensagens,
             "response_format": {"type": "json_object"},
+            "usage": {"include": True},
         }
         try:
-            dados = self._post_json(payload)
+            dados = self._post_json(payload, "llm")
             content = dados["choices"][0]["message"]["content"]
         except Exception as exc:
             logger.warning("llm_falhou: %s", type(exc).__name__)

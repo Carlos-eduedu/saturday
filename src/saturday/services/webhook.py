@@ -11,6 +11,7 @@ from typing import Any
 
 import httpx
 
+from saturday.metrics import registrar_chamada
 from saturday.settings import WEBHOOK_TIMEOUT_S, Settings
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,7 @@ class WebhookClient:
 
         conversation_id = payload.get("conversation_id")
         status = payload.get("status")
+        inicio = time.monotonic()
         try:
             corpo = json.dumps(
                 payload,
@@ -69,3 +71,5 @@ class WebhookClient:
                 type(exc).__name__,
             )
             return False
+        finally:
+            registrar_chamada("webhook", (time.monotonic() - inicio) * 1000)

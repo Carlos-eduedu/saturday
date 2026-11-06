@@ -167,8 +167,8 @@ def service(settings: Settings, fakes: Fakes) -> AgentService:
         context=context,
         webhook=fakes.webhook,
         settings=settings,
+        checkpointer=checkpointer,
     )
-    agent_service.checkpointer = checkpointer  # type: ignore[attr-defined]  # usado nos testes
     return agent_service
 
 

@@ -23,11 +23,15 @@ class AgentState(MessagesState, total=False):
     publico: str | None
     cliente: dict[str, Any]
     hiscon: dict[str, Any] | None
+    hiscon_recebido_em: str | None
     aguardando: Literal["data_nascimento", "uf"] | None
     tentativas_coleta: int
     tentativas_extrato: int
     portability_result: dict[str, Any] | None
     oferta_pendente: bool
+    handoff_em: str | None
+    # Sem reducer de propósito: a lista é substituída a cada gravação.
+    message_ids_recentes: list[str]
 
 
 CAMPOS_DO_TURNO = (

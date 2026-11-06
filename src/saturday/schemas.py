@@ -109,3 +109,17 @@ class AgentReply(BaseModel):
 class AcceptedReply(BaseModel):
     conversation_id: str
     status: Literal["accepted"] = "accepted"
+
+
+class ConversationState(BaseModel):
+    conversation_id: str
+    status: str
+    handoff_reason: str | None = None
+    handoff_em: str | None = None
+    oferta_pendente: bool = False
+    aguardando: str | None = None
+
+
+class ReleaseReply(BaseModel):
+    conversation_id: str
+    status: Literal["in_progress"] = "in_progress"

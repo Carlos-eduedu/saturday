@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import logging
+import sqlite3
 from collections.abc import AsyncIterator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 
 import httpx
 from fastapi import FastAPI
-from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.sqlite import SqliteSaver
 
 from saturday.agent.context import AgentContext
 from saturday.agent.graph import build_graph
@@ -47,7 +48,12 @@ def criar_lifespan(
             llm=LLMClient(http, settings),
             anexos=AnexosClient(http, settings),
         )
-        checkpointer = InMemorySaver()
+        sqlite_conn = sqlite3.connect(
+            settings.checkpoint_path,
+            check_same_thread=False,
+        )
+        checkpointer = SqliteSaver(sqlite_conn)
+        checkpointer.setup()
         graph = build_graph(checkpointer)
         service = AgentService(
             graph=graph,
@@ -58,10 +64,12 @@ def criar_lifespan(
         app.state.agent_service = service
         app.state.http = http
         app.state.checkpointer = checkpointer
+        app.state.sqlite_conn = sqlite_conn
 
         try:
             yield
         finally:
             http.close()
+            sqlite_conn.close()
 
     return lifespan

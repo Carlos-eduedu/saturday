@@ -6,12 +6,14 @@ import base64
 import binascii
 import ipaddress
 import socket
+import time
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
 
 import httpx
 
+from saturday.metrics import registrar_chamada
 from saturday.settings import ANEXO_MAX_MB, ANEXO_TIMEOUT_S, MIME_ACEITOS, Settings
 
 LIMITE_BYTES = ANEXO_MAX_MB * 1024 * 1024
@@ -119,8 +121,9 @@ class AnexosClient:
         self._validar_host(parsed.hostname)
 
     def _baixar(self, url: str) -> bytes:
-        self._validar_url(url)
+        inicio = time.monotonic()
         try:
+            self._validar_url(url)
             with self._http.stream(
                 "GET",
                 url,
@@ -149,6 +152,8 @@ class AnexosClient:
             raise
         except Exception as exc:
             raise AnexoInvalido("falha ao baixar anexo") from exc
+        finally:
+            registrar_chamada("anexo", (time.monotonic() - inicio) * 1000)
 
         return _validar_tamanho(bytes(dados))
 
