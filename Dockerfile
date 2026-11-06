@@ -26,6 +26,11 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # ---------- Etapa 2: runtime ----------
 FROM python:3.14-slim AS runtime
 
+# gosu permite ajustar o volume como root e executar a app sem privilégios.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends gosu \
+    && rm -rf /var/lib/apt/lists/*
+
 # Usuário sem privilégios.
 RUN groupadd --system --gid 1000 saturday \
     && useradd --system --uid 1000 --gid saturday --create-home saturday
@@ -42,11 +47,17 @@ COPY src ./src
 # Volume para o SQLite dos checkpoints.
 RUN mkdir -p /app/data && chown -R saturday:saturday /app
 
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 ENV PATH="/app/.venv/bin:$PATH" \
     SATURDAY_CHECKPOINT_PATH=/app/data/checkpoints.sqlite \
     PYTHONUNBUFFERED=1
 
-USER saturday
+# O entrypoint roda como root apenas para ajustar /app/data e então
+# executa a aplicação como o usuário saturday.
+USER root
+ENTRYPOINT ["docker-entrypoint.sh"]
 
 EXPOSE 8000
 

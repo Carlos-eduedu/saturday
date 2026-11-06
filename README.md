@@ -23,6 +23,13 @@ O serviço `saturday` lê o `.env`, expõe a porta `8000` e persiste os checkpoi
 em `./data`. O volume `./data:/app/data` mantém as conversas mesmo depois de
 `docker compose restart` (ou `down`, desde que o volume não seja removido).
 
+> **Permissão do volume:** em Linux, o Docker pode criar `./data` como root.
+> O entrypoint do container ajusta a permissão de `/app/data` e depois executa
+> a aplicação como `saturday` (UID 1000). Se o seu ambiente bloquear `chown` no
+> volume, crie o diretório antes (`mkdir -p data`) com escrita para o UID 1000
+> ou aponte `SATURDAY_CHECKPOINT_PATH` para um caminho gravável. O erro
+> `unable to open database file` indica exatamente esse problema.
+
 > **Atenção:** a aplicação roda com **1 worker** porque o estado das conversas
 > vive no SQLite local (`SATURDAY_CHECKPOINT_PATH`). Não aumente o número de
 > workers sem migrar a persistência para um backend compartilhado.

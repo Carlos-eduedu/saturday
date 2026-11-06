@@ -34,7 +34,25 @@ def criar_lifespan(
         app.state.settings = settings
         if not settings.api_key.get_secret_value() and settings.environment in ("dev", "pytest"):
             logger.warning("api_key_desligada ambiente=%s", settings.environment)
-        settings.checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+
+        caminho_checkpoint = settings.checkpoint_path
+        sqlite_conn: sqlite3.Connection | None = None
+        try:
+            caminho_checkpoint.parent.mkdir(parents=True, exist_ok=True)
+            sqlite_conn = sqlite3.connect(
+                caminho_checkpoint,
+                check_same_thread=False,
+            )
+            checkpointer = SqliteSaver(sqlite_conn)
+            checkpointer.setup()
+        except (OSError, sqlite3.Error) as exc:
+            if sqlite_conn is not None:
+                sqlite_conn.close()
+            raise RuntimeError(
+                "Não foi possível abrir o SQLite de checkpoints em "
+                f"{caminho_checkpoint.absolute()}. Verifique se o diretório "
+                "existe e é gravável pelo usuário que executa a aplicação."
+            ) from exc
 
         http = httpx.Client(
             timeout=httpx.Timeout(30.0),
@@ -48,12 +66,6 @@ def criar_lifespan(
             llm=LLMClient(http, settings),
             anexos=AnexosClient(http, settings),
         )
-        sqlite_conn = sqlite3.connect(
-            settings.checkpoint_path,
-            check_same_thread=False,
-        )
-        checkpointer = SqliteSaver(sqlite_conn)
-        checkpointer.setup()
         graph = build_graph(checkpointer)
         service = AgentService(
             graph=graph,
