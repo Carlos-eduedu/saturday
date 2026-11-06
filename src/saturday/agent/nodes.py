@@ -9,7 +9,9 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from langchain_core.messages import AIMessage
+from langgraph.runtime import Runtime
 
+from saturday.agent.context import AgentContext
 from saturday.agent.state import AgentState
 from saturday.portabilidade import calculo, mensagem
 from saturday.portabilidade import hiscon as hiscon_mod
@@ -19,8 +21,7 @@ from saturday.portabilidade.regras import (
     IDADE_WEBPLUS,
     PRAZO_C6,
 )
-from saturday.services import anexos as anexos_service
-from saturday.services import jev, llm
+from saturday.services.anexos import AnexoInvalido
 from saturday.settings import (
     HISTORY_MAX_MESSAGES,
     HORARIO_EQUIPE,
@@ -238,9 +239,9 @@ def _resultado_falha(extrato: dict[str, Any], motivo: str, prazo: int = PRAZO_C6
     }
 
 
-def classify_intent(state: AgentState) -> dict[str, Any]:
+def classify_intent(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
     try:
-        resultado = jev.classify(
+        resultado = runtime.context.jev.classify(
             state.get("user_message", ""),
             bool(state.get("oferta_pendente")),
         )
@@ -279,9 +280,9 @@ def classify_intent(state: AgentState) -> dict[str, Any]:
     return atualizacao
 
 
-def generate_answer(state: AgentState) -> dict[str, Any]:
+def generate_answer(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
     try:
-        resposta = llm.responder(
+        resposta = runtime.context.llm.responder(
             _historico(state),
             _resumo_portabilidade(state),
         )
@@ -350,14 +351,14 @@ def _perguntar_extrato(state: AgentState, pergunta: str) -> dict[str, Any]:
     }
 
 
-def read_statement(state: AgentState) -> dict[str, Any]:
+def read_statement(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
     try:
-        anexos = anexos_service.carregar_anexos(state.get("attachments") or [])
-    except anexos_service.AnexoInvalido:
-        return _perguntar_extrato(state, anexos_service.mensagem_anexo_invalido())
+        anexos = runtime.context.anexos.carregar_anexos(state.get("attachments") or [])
+    except AnexoInvalido:
+        return _perguntar_extrato(state, runtime.context.anexos.mensagem_anexo_invalido())
 
     try:
-        dados = llm.ler_extrato(anexos)
+        dados = runtime.context.llm.ler_extrato(anexos)
         extrato = hiscon_mod.normalizar_extrato(dados)
     except Exception:
         return _perguntar_extrato(state, MENSAGEM_EXTRATO_ILEGIVEL)

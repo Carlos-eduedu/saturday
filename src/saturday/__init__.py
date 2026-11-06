@@ -10,4 +10,11 @@ def main() -> None:
 
     # Um único worker: o estado das conversas vive no SQLite local.
     # Escuta em todas as interfaces; a autenticação fica na aplicação.
-    uvicorn.run("saturday.api:app", host="0.0.0.0", port=8000, log_config=None)  # noqa: S104
+    uvicorn.run(
+        "saturday.web.application:get_app",
+        factory=True,
+        host="0.0.0.0",  # noqa: S104
+        port=8000,
+        workers=1,
+        log_config=None,
+    )

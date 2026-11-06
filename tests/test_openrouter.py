@@ -2,57 +2,53 @@
 
 from __future__ import annotations
 
+import httpx
 import pytest
 
 from saturday.services import openrouter
+from saturday.services.openrouter import OpenRouterClient, OpenRouterError
 
 
-class Resposta:
-    def __init__(self, partes):
-        self.partes = partes
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        return False
-
-    def raise_for_status(self):
-        return None
-
-    def iter_bytes(self):
-        yield from self.partes
-
-
-def test_post_json_retorna_json(monkeypatch):
-    monkeypatch.setattr(
-        openrouter.httpx,
-        "stream",
-        lambda *a, **k: Resposta([b'{"answers": {', b'"ok": true}}']),
+def _client(handler) -> OpenRouterClient:  # type: ignore[no-untyped-def]
+    return OpenRouterClient(
+        httpx.Client(transport=httpx.MockTransport(handler)),
+        "chave",
     )
-    assert openrouter.post_json("https://exemplo", "chave", {"x": 1}, 5) == {
-        "answers": {"ok": True}
-    }
+
+
+def test_post_json_retorna_json():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"answers": {"ok": True}})
+
+    client = _client(handler)
+    try:
+        assert client.post_json("https://exemplo", {"x": 1}, 5) == {"answers": {"ok": True}}
+    finally:
+        client._http.close()  # type: ignore[attr-defined]  # fecha o cliente do teste
 
 
 def test_post_json_respeita_timeout_total(monkeypatch):
     relogio = iter([0.0, 100.0])
     monkeypatch.setattr(openrouter.time, "monotonic", lambda: next(relogio))
-    monkeypatch.setattr(
-        openrouter.httpx,
-        "stream",
-        lambda *a, **k: Resposta([b'{"ok": true}']),
-    )
 
-    with pytest.raises(openrouter.OpenRouterError):
-        openrouter.post_json("https://exemplo", "chave", {"x": 1}, 30)
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=b'{"ok": true}')
+
+    client = _client(handler)
+    try:
+        with pytest.raises(OpenRouterError):
+            client.post_json("https://exemplo", {"x": 1}, 30)
+    finally:
+        client._http.close()  # type: ignore[attr-defined]
 
 
-def test_post_json_json_invalido(monkeypatch):
-    monkeypatch.setattr(
-        openrouter.httpx,
-        "stream",
-        lambda *a, **k: Resposta([b"nao e json"]),
-    )
-    with pytest.raises(openrouter.OpenRouterError):
-        openrouter.post_json("https://exemplo", "chave", {"x": 1}, 5)
+def test_post_json_json_invalido():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=b"nao e json")
+
+    client = _client(handler)
+    try:
+        with pytest.raises(OpenRouterError):
+            client.post_json("https://exemplo", {"x": 1}, 5)
+    finally:
+        client._http.close()  # type: ignore[attr-defined]

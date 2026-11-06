@@ -1,8 +1,4 @@
-"""Classificação de intenção pelo Jev, via OpenRouter Decisions API.
-
-Este é o único módulo que fala com o Jev. Os nós recebem o resultado já
-normalizado e nunca montam requisições HTTP.
-"""
+"""Classificação de intenção pelo Jev, via OpenRouter Decisions API."""
 
 from __future__ import annotations
 
@@ -10,8 +6,10 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from saturday.services import openrouter
-from saturday.settings import JEV_TIMEOUT_S, get_settings
+import httpx
+
+from saturday.services.openrouter import OpenRouterClient, OpenRouterError
+from saturday.settings import JEV_TIMEOUT_S, Settings
 
 logger = logging.getLogger(__name__)
 
@@ -37,10 +35,10 @@ class JevResult:
 
 
 def _perguntas(oferta_pendente: bool) -> dict[str, Any]:
-    perguntas = {
+    perguntas: dict[str, Any] = {
         "intent": {
             "type": "choice",
-            "instructions": ("Qual é a intenção da última mensagem do cliente?"),
+            "instructions": "Qual é a intenção da última mensagem do cliente?",
             "criteria": {
                 "duvida": (
                     "Pergunta sobre produtos, portabilidade, documentos, prazos, "
@@ -50,12 +48,12 @@ def _perguntas(oferta_pendente: bool) -> dict[str, Any]:
                     "Relata dificuldade operacional para enviar um documento ou "
                     "seguir com o atendimento."
                 ),
-                "humano": ("Pede explicitamente para falar com uma pessoa ou atendente."),
+                "humano": "Pede explicitamente para falar com uma pessoa ou atendente.",
             },
         },
         "publico": {
             "type": "choice",
-            "instructions": ("A que público pertence o cliente, segundo a mensagem?"),
+            "instructions": "A que público pertence o cliente, segundo a mensagem?",
             "criteria": {
                 "clt": "Trabalhador com carteira assinada.",
                 "inss": "Aposentado ou pensionista do INSS.",
@@ -140,27 +138,37 @@ def _parse(data: Any, oferta_pendente: bool) -> JevResult:
     )
 
 
-def classify(message: str, oferta_pendente: bool = False) -> JevResult:
-    """Classifica uma mensagem. Levanta ``JevError`` em qualquer falha."""
+class JevClient:
+    """Cliente do Jev para uma instância da aplicação."""
 
-    settings = get_settings()
-    if not settings.openrouter_api_key or not settings.jev_model:
-        raise JevError("Jev não configurado")
-
-    payload = {
-        "model": settings.jev_model,
-        "state": {"ultima_mensagem": message},
-        "questions": _perguntas(oferta_pendente),
-    }
-    try:
-        dados = openrouter.post_json(
-            OPENROUTER_DECISIONS_URL,
+    def __init__(self, http: httpx.Client, settings: Settings) -> None:
+        self._settings = settings
+        self._openrouter = OpenRouterClient(
+            http,
             settings.openrouter_api_key.get_secret_value(),
-            payload,
-            JEV_TIMEOUT_S,
         )
-    except Exception as exc:
-        logger.warning("jev_falhou: %s", type(exc).__name__)
-        raise JevError("Falha ao consultar o Jev") from exc
 
-    return _parse(dados, oferta_pendente)
+    def classify(self, message: str, oferta_pendente: bool = False) -> JevResult:
+        """Classifica uma mensagem. Levanta ``JevError`` em qualquer falha."""
+
+        if not self._settings.openrouter_api_key.get_secret_value():
+            raise JevError("Jev não configurado")
+        if not self._settings.jev_model:
+            raise JevError("Jev não configurado")
+
+        payload = {
+            "model": self._settings.jev_model,
+            "state": {"ultima_mensagem": message},
+            "questions": _perguntas(oferta_pendente),
+        }
+        try:
+            dados = self._openrouter.post_json(
+                OPENROUTER_DECISIONS_URL,
+                payload,
+                JEV_TIMEOUT_S,
+            )
+        except OpenRouterError as exc:
+            logger.warning("jev_falhou: %s", type(exc).__name__)
+            raise JevError("Falha ao consultar o Jev") from exc
+
+        return _parse(dados, oferta_pendente)

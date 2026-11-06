@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, StateGraph
 
+from saturday.agent.context import AgentContext
 from saturday.agent.nodes import (
     calculate_portability,
     check_customer_data,
@@ -30,8 +30,10 @@ from saturday.agent.routing import (
 from saturday.agent.state import AgentState
 
 
-def build_graph() -> Any:
-    builder = StateGraph(AgentState)
+def build_graph(checkpointer: Any = None) -> Any:
+    """Monta e compila o grafo com o checkpointer recebido."""
+
+    builder = StateGraph(AgentState, context_schema=AgentContext)
 
     builder.add_node("classify_intent", classify_intent)
     builder.add_node("generate_answer", generate_answer)
@@ -107,7 +109,4 @@ def build_graph() -> Any:
     builder.add_edge("decline_offer", END)
     builder.add_edge("handoff", END)
 
-    return builder.compile(checkpointer=InMemorySaver())
-
-
-graph = build_graph()
+    return builder.compile(checkpointer=checkpointer)

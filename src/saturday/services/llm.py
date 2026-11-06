@@ -7,10 +7,12 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
+import httpx
+
 from saturday.faq import FAQ
-from saturday.services import openrouter
 from saturday.services.anexos import Anexo
-from saturday.settings import LLM_TEMPERATURE, LLM_TIMEOUT_S, get_settings
+from saturday.services.openrouter import OpenRouterClient, OpenRouterError
+from saturday.settings import LLM_TEMPERATURE, LLM_TIMEOUT_S, Settings
 
 logger = logging.getLogger(__name__)
 
@@ -46,33 +48,9 @@ def _system_prompt(resumo: str | None) -> str:
     return "\n\n".join(partes)
 
 
-def _parse(content: str) -> LLMAnswer:
-    try:
-        data = json.loads(content)
-    except json.JSONDecodeError:
-        inicio, fim = content.find("{"), content.rfind("}")
-        if inicio < 0 or fim <= inicio:
-            raise LLMError("LLM não devolveu JSON") from None
-        try:
-            data = json.loads(content[inicio : fim + 1])
-        except json.JSONDecodeError as exc:
-            raise LLMError("LLM não devolveu JSON válido") from exc
+def _extrair_json(content: str) -> dict[str, Any]:
+    """Extrai o primeiro objeto JSON do texto, aceitando blocos markdown."""
 
-    if not isinstance(data, dict):
-        raise LLMError("LLM devolveu um JSON inesperado")
-    resposta = data.get("resposta")
-    if not isinstance(resposta, str) or not resposta.strip():
-        return LLMAnswer(resposta="", resolvido=False)
-
-    resolvido_raw = data.get("resolvido", False)
-    if isinstance(resolvido_raw, str):
-        resolvido = resolvido_raw.strip().lower() in {"true", "sim", "1", "yes"}
-    else:
-        resolvido = bool(resolvido_raw)
-    return LLMAnswer(resposta=resposta.strip(), resolvido=resolvido)
-
-
-def _json_do_conteudo(content: str) -> dict[str, Any]:
     try:
         data = json.loads(content)
     except json.JSONDecodeError:
@@ -86,6 +64,20 @@ def _json_do_conteudo(content: str) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise LLMError("modelo devolveu um JSON inesperado")
     return data
+
+
+def _parse(content: str) -> LLMAnswer:
+    data = _extrair_json(content)
+    resposta = data.get("resposta")
+    if not isinstance(resposta, str) or not resposta.strip():
+        return LLMAnswer(resposta="", resolvido=False)
+
+    resolvido_raw = data.get("resolvido", False)
+    if isinstance(resolvido_raw, str):
+        resolvido = resolvido_raw.strip().lower() in {"true", "sim", "1", "yes"}
+    else:
+        resolvido = bool(resolvido_raw)
+    return LLMAnswer(resposta=resposta.strip(), resolvido=resolvido)
 
 
 PROMPT_EXTRATO = """\
@@ -137,71 +129,83 @@ def _parte_anexo(anexo: Anexo) -> dict[str, Any]:
     return {"type": "image_url", "image_url": {"url": anexo.data_url}}
 
 
-def ler_extrato(anexos: list[Anexo]) -> dict[str, Any]:
-    """Lê todos os anexos numa única chamada ao modelo de visão."""
+class LLMClient:
+    """Cliente de texto e visão do OpenRouter."""
 
-    if not anexos:
-        raise LLMError("nenhum anexo")
-    settings = get_settings()
-    if not settings.openrouter_api_key or not settings.vision_model:
-        raise LLMError("modelo de visão não configurado")
-
-    conteudo: list[dict[str, Any]] = [{"type": "text", "text": PROMPT_EXTRATO}]
-    conteudo.extend(_parte_anexo(anexo) for anexo in anexos)
-    payload = {
-        "model": settings.vision_model,
-        "temperature": 0,
-        "messages": [{"role": "user", "content": conteudo}],
-        "response_format": {"type": "json_object"},
-    }
-    try:
-        dados = openrouter.post_json(
-            OPENROUTER_CHAT_URL,
+    def __init__(self, http: httpx.Client, settings: Settings) -> None:
+        self._settings = settings
+        self._openrouter = OpenRouterClient(
+            http,
             settings.openrouter_api_key.get_secret_value(),
+        )
+
+    def _post_json(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._openrouter.post_json(
+            OPENROUTER_CHAT_URL,
             payload,
             LLM_TIMEOUT_S,
         )
-        content = dados["choices"][0]["message"]["content"]
-    except Exception as exc:
-        logger.warning("leitura_extrato_falhou: %s", type(exc).__name__)
-        raise LLMError("Falha ao ler o extrato") from exc
 
-    if not isinstance(content, str):
-        raise LLMError("modelo devolveu conteúdo vazio")
-    return _json_do_conteudo(content)
+    def ler_extrato(self, anexos: list[Anexo]) -> dict[str, Any]:
+        """Lê todos os anexos numa única chamada ao modelo de visão."""
+
+        if not anexos:
+            raise LLMError("nenhum anexo")
+        if not self._settings.openrouter_api_key.get_secret_value():
+            raise LLMError("modelo de visão não configurado")
+        if not self._settings.vision_model:
+            raise LLMError("modelo de visão não configurado")
+
+        conteudo: list[dict[str, Any]] = [{"type": "text", "text": PROMPT_EXTRATO}]
+        conteudo.extend(_parte_anexo(anexo) for anexo in anexos)
+        payload = {
+            "model": self._settings.vision_model,
+            "temperature": 0,
+            "messages": [{"role": "user", "content": conteudo}],
+            "response_format": {"type": "json_object"},
+        }
+        try:
+            dados = self._post_json(payload)
+            content = dados["choices"][0]["message"]["content"]
+        except Exception as exc:
+            logger.warning("leitura_extrato_falhou: %s", type(exc).__name__)
+            raise LLMError("Falha ao ler o extrato") from exc
+
+        if not isinstance(content, str):
+            raise LLMError("modelo devolveu conteúdo vazio")
+        return _extrair_json(content)
+
+    def responder(
+        self,
+        historico: list[dict[str, str]],
+        resumo: str | None = None,
+    ) -> LLMAnswer:
+        """Responde a dúvida do cliente. Levanta ``LLMError`` em qualquer falha."""
+
+        if not self._settings.openrouter_api_key.get_secret_value():
+            raise LLMError("LLM não configurado")
+        if not self._settings.llm_model:
+            raise LLMError("LLM não configurado")
+
+        mensagens: list[dict[str, Any]] = [{"role": "system", "content": _system_prompt(resumo)}]
+        mensagens.extend(historico)
+
+        payload = {
+            "model": self._settings.llm_model,
+            "temperature": LLM_TEMPERATURE,
+            "messages": mensagens,
+            "response_format": {"type": "json_object"},
+        }
+        try:
+            dados = self._post_json(payload)
+            content = dados["choices"][0]["message"]["content"]
+        except Exception as exc:
+            logger.warning("llm_falhou: %s", type(exc).__name__)
+            raise LLMError("Falha ao consultar o LLM") from exc
+
+        if not isinstance(content, str):
+            raise LLMError("LLM devolveu conteúdo vazio")
+        return _parse(content)
 
 
-def responder(
-    historico: list[dict[str, str]],
-    resumo: str | None = None,
-) -> LLMAnswer:
-    """Responde a dúvida do cliente. Levanta ``LLMError`` em qualquer falha."""
-
-    settings = get_settings()
-    if not settings.openrouter_api_key or not settings.llm_model:
-        raise LLMError("LLM não configurado")
-
-    mensagens: list[dict[str, Any]] = [{"role": "system", "content": _system_prompt(resumo)}]
-    mensagens.extend(historico)
-
-    payload = {
-        "model": settings.llm_model,
-        "temperature": LLM_TEMPERATURE,
-        "messages": mensagens,
-        "response_format": {"type": "json_object"},
-    }
-    try:
-        dados = openrouter.post_json(
-            OPENROUTER_CHAT_URL,
-            settings.openrouter_api_key.get_secret_value(),
-            payload,
-            LLM_TIMEOUT_S,
-        )
-        content = dados["choices"][0]["message"]["content"]
-    except Exception as exc:
-        logger.warning("llm_falhou: %s", type(exc).__name__)
-        raise LLMError("Falha ao consultar o LLM") from exc
-
-    if not isinstance(content, str):
-        raise LLMError("LLM devolveu conteúdo vazio")
-    return _parse(content)
+__all__ = ["LLMAnswer", "LLMClient", "LLMError", "OpenRouterError"]

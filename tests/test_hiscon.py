@@ -6,6 +6,7 @@ import base64
 import json
 from datetime import date
 
+import httpx
 import pytest
 
 from saturday.portabilidade.hiscon import (
@@ -21,9 +22,9 @@ from saturday.portabilidade.hiscon import (
     validar_extrato,
 )
 from saturday.services import anexos as anexos_service
-from saturday.services import llm as llm_service
-from saturday.services import openrouter as openrouter_service
-from saturday.settings import get_settings
+from saturday.services.anexos import Anexo, AnexoInvalido, AnexosClient
+from saturday.services.llm import LLMClient
+from saturday.settings import Settings
 
 HOJE = date(2026, 10, 8)
 
@@ -167,9 +168,21 @@ def test_soma_apenas_contratos_ativos():
     assert conferir_margem(extrato) is True
 
 
+def _settings(**extras) -> Settings:
+    return Settings(environment="pytest", **extras)
+
+
+def _sem_rede(request: httpx.Request) -> httpx.Response:
+    raise AssertionError(f"chamada inesperada: {request.method} {request.url}")
+
+
 def test_anexo_base64():
     conteudo = b"%PDF-1.7 teste"
-    anexo = anexos_service.carregar_anexo(
+    avec = AnexosClient(
+        httpx.Client(transport=httpx.MockTransport(_sem_rede)),
+        _settings(),
+    )
+    anexo = avec.carregar_anexo(
         {
             "base64": base64.b64encode(conteudo).decode(),
             "mime_type": "application/pdf",
@@ -180,76 +193,84 @@ def test_anexo_base64():
 
 
 def test_anexo_mime_invalido():
-    with pytest.raises(anexos_service.AnexoInvalido):
-        anexos_service.carregar_anexo(
-            {"base64": base64.b64encode(b"x").decode(), "mime_type": "text/plain"}
-        )
+    avec = AnexosClient(
+        httpx.Client(transport=httpx.MockTransport(_sem_rede)),
+        _settings(),
+    )
+    with pytest.raises(AnexoInvalido):
+        avec.carregar_anexo({"base64": base64.b64encode(b"x").decode(), "mime_type": "text/plain"})
 
 
 def test_anexo_base64_invalido():
-    with pytest.raises(anexos_service.AnexoInvalido):
-        anexos_service.carregar_anexo({"base64": "***", "mime_type": "image/jpeg"})
+    avec = AnexosClient(
+        httpx.Client(transport=httpx.MockTransport(_sem_rede)),
+        _settings(),
+    )
+    with pytest.raises(AnexoInvalido):
+        avec.carregar_anexo({"base64": "***", "mime_type": "image/jpeg"})
 
 
-def test_anexo_acima_do_limite(monkeypatch):
-    monkeypatch.setattr(anexos_service, "LIMITE_BYTES", 3)
-    with pytest.raises(anexos_service.AnexoInvalido):
-        anexos_service.carregar_anexo(
+def test_anexo_acima_do_limite():
+    avec = AnexosClient(
+        httpx.Client(transport=httpx.MockTransport(_sem_rede)),
+        _settings(),
+    )
+    grande = b"x" * (anexos_service.LIMITE_BYTES + 1)
+    with pytest.raises(AnexoInvalido):
+        avec.carregar_anexo(
             {
-                "base64": base64.b64encode(b"1234").decode(),
+                "base64": base64.b64encode(grande).decode(),
                 "mime_type": "image/png",
             }
         )
 
 
-def test_anexo_url_baixa_e_valida(monkeypatch):
-    class Resposta:
-        content = b"imagem"
+def test_anexo_url_baixa_e_valida():
+    chamadas: dict = {}
 
-        def raise_for_status(self):
-            return None
+    def handler(request: httpx.Request) -> httpx.Response:
+        chamadas["url"] = str(request.url)
+        chamadas["metodo"] = request.method
+        return httpx.Response(200, content=b"imagem")
 
-    chamadas = {}
-
-    def fake_get(url, timeout, follow_redirects):
-        chamadas.update(url=url, timeout=timeout, follow_redirects=follow_redirects)
-        return Resposta()
-
-    monkeypatch.setattr(anexos_service.httpx, "get", fake_get)
-    anexo = anexos_service.carregar_anexo(
-        {"url": "https://arquivo.test/extrato.jpg", "mime_type": "image/jpeg"}
-    )
+    with httpx.Client(transport=httpx.MockTransport(handler)) as http:
+        avec = AnexosClient(http, _settings())
+        anexo = avec.carregar_anexo(
+            {"url": "https://arquivo.test/extrato.jpg", "mime_type": "image/jpeg"}
+        )
 
     assert anexo.data == b"imagem"
     assert chamadas == {
         "url": "https://arquivo.test/extrato.jpg",
-        "timeout": 15,
-        "follow_redirects": True,
+        "metodo": "GET",
     }
 
 
-def test_ler_extrato_manda_todos_anexos_numa_chamada(monkeypatch):
-    monkeypatch.setenv("SATURDAY_OPENROUTER_API_KEY", "chave")
-    monkeypatch.setenv("SATURDAY_VISION_MODEL", "modelo-visao")
-    get_settings.cache_clear()
+def test_ler_extrato_manda_todos_anexos_numa_chamada():
+    capturado: dict = {}
 
-    capturado = {}
+    def handler(request: httpx.Request) -> httpx.Response:
+        capturado.update(json.loads(request.content))
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": json.dumps(json_extrato())}}]},
+        )
 
-    def fake_post(url, api_key, payload, timeout):
-        capturado.update(url=url, api_key=api_key, payload=payload, timeout=timeout)
-        return {"choices": [{"message": {"content": json.dumps(json_extrato())}}]}
-
-    monkeypatch.setattr(openrouter_service, "post_json", fake_post)
+    settings = _settings(
+        openrouter_api_key="chave",
+        vision_model="modelo-visao",
+    )
     anexos = [
-        anexos_service.Anexo(mime_type="application/pdf", data=b"pdf"),
-        anexos_service.Anexo(mime_type="image/jpeg", data=b"foto"),
+        Anexo(mime_type="application/pdf", data=b"pdf"),
+        Anexo(mime_type="image/jpeg", data=b"foto"),
     ]
 
-    dados = llm_service.ler_extrato(anexos)
+    with httpx.Client(transport=httpx.MockTransport(handler)) as http:
+        dados = LLMClient(http, settings).ler_extrato(anexos)
 
     assert dados["ehHiscon"] is True
-    assert capturado["payload"]["model"] == "modelo-visao"
-    conteudo = capturado["payload"]["messages"][0]["content"]
+    assert capturado["model"] == "modelo-visao"
+    conteudo = capturado["messages"][0]["content"]
     tipos = [parte["type"] for parte in conteudo if parte["type"] != "text"]
     assert tipos == ["file", "image_url"]
 

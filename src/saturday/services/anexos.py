@@ -9,7 +9,7 @@ from typing import Any
 
 import httpx
 
-from saturday.settings import ANEXO_MAX_MB, ANEXO_TIMEOUT_S, MIME_ACEITOS
+from saturday.settings import ANEXO_MAX_MB, ANEXO_TIMEOUT_S, MIME_ACEITOS, Settings
 
 LIMITE_BYTES = ANEXO_MAX_MB * 1024 * 1024
 
@@ -49,19 +49,6 @@ def _validar_tamanho(data: bytes) -> bytes:
     return data
 
 
-def _baixar(url: str) -> bytes:
-    try:
-        response = httpx.get(
-            url,
-            timeout=ANEXO_TIMEOUT_S,
-            follow_redirects=True,
-        )
-        response.raise_for_status()
-    except Exception as exc:
-        raise AnexoInvalido("falha ao baixar anexo") from exc
-    return _validar_tamanho(response.content)
-
-
 def _decodificar_base64(valor: str) -> bytes:
     texto = "".join(valor.split())
     if texto.startswith("data:"):
@@ -73,26 +60,47 @@ def _decodificar_base64(valor: str) -> bytes:
     return _validar_tamanho(data)
 
 
-def carregar_anexo(item: dict[str, Any]) -> Anexo:
-    mime = _normalizar_mime(item.get("mime_type"))
-    url = item.get("url")
-    base64_valor = item.get("base64")
-
-    if bool(url) == bool(base64_valor):
-        raise AnexoInvalido("anexo deve ter url ou base64")
-    data = _baixar(str(url)) if url else _decodificar_base64(str(base64_valor))
-    return Anexo(mime_type=mime, data=data)
-
-
-def carregar_anexos(itens: list[dict[str, Any]]) -> list[Anexo]:
-    if not itens:
-        raise AnexoInvalido("nenhum anexo")
-    return [carregar_anexo(item) for item in itens]
-
-
 def mensagem_anexo_invalido() -> str:
     return (
         "Não consegui abrir esse arquivo. Envie o extrato de empréstimos do "
         "Meu INSS em PDF ou como foto (JPG, PNG ou WEBP), com até "
         f"{ANEXO_MAX_MB} MB."
     )
+
+
+class AnexosClient:
+    """Baixa/decodifica anexos usando o cliente HTTP compartilhado."""
+
+    def __init__(self, http: httpx.Client, settings: Settings) -> None:
+        self._http = http
+        self._settings = settings
+
+    def _baixar(self, url: str) -> bytes:
+        try:
+            response = self._http.get(
+                url,
+                timeout=ANEXO_TIMEOUT_S,
+                follow_redirects=True,
+            )
+            response.raise_for_status()
+        except Exception as exc:
+            raise AnexoInvalido("falha ao baixar anexo") from exc
+        return _validar_tamanho(response.content)
+
+    def carregar_anexo(self, item: dict[str, Any]) -> Anexo:
+        mime = _normalizar_mime(item.get("mime_type"))
+        url = item.get("url")
+        base64_valor = item.get("base64")
+
+        if bool(url) == bool(base64_valor):
+            raise AnexoInvalido("anexo deve ter url ou base64")
+        data = self._baixar(str(url)) if url else _decodificar_base64(str(base64_valor))
+        return Anexo(mime_type=mime, data=data)
+
+    def carregar_anexos(self, itens: list[dict[str, Any]]) -> list[Anexo]:
+        if not itens:
+            raise AnexoInvalido("nenhum anexo")
+        return [self.carregar_anexo(item) for item in itens]
+
+    def mensagem_anexo_invalido(self) -> str:
+        return mensagem_anexo_invalido()

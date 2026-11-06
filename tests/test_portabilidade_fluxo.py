@@ -1,4 +1,4 @@
-"""Testes do fluxo completo de portabilidade (etapa 5)."""
+"""Testes do fluxo completo de portabilidade."""
 
 from __future__ import annotations
 
@@ -8,32 +8,15 @@ from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 import pytest
-from fastapi.testclient import TestClient
+from conftest import Fakes, resultado_jev
 
-from saturday.api import app
 from saturday.portabilidade.mensagem import formatar_valor
-from saturday.services import jev as jev_service
-from saturday.services import llm as llm_service
-from saturday.services import webhook as webhook_service
-from saturday.settings import get_settings
 
-client = TestClient(app)
 TZ = ZoneInfo("America/Sao_Paulo")
 
 
 def cid() -> str:
     return f"fluxo-{uuid.uuid4()}"
-
-
-@pytest.fixture(autouse=True)
-def ambiente(monkeypatch):
-    monkeypatch.setenv("SATURDAY_WEBHOOK_URL", "")
-    monkeypatch.setenv("SATURDAY_OPENROUTER_API_KEY", "")
-    monkeypatch.setenv("SATURDAY_LLM_MODEL", "")
-    monkeypatch.setenv("SATURDAY_VISION_MODEL", "")
-    get_settings.cache_clear()
-    yield
-    get_settings.cache_clear()
 
 
 def hoje() -> date:
@@ -89,13 +72,8 @@ def anexo_pdf() -> dict:
     }
 
 
-def sem_jev(*args, **kwargs):
-    raise AssertionError("Jev não deveria ser chamado")
-
-
-def test_anexo_sem_cliente_pergunta_data_e_depois_calcula(monkeypatch):
-    monkeypatch.setattr(llm_service, "ler_extrato", lambda anexos: dados_extrato())
-    monkeypatch.setattr(jev_service, "classify", sem_jev)
+def test_anexo_sem_cliente_pergunta_data_e_depois_calcula(client, fakes: Fakes):
+    fakes.llm.extrato = dados_extrato()
     conversa = cid()
 
     primeira = client.post(
@@ -122,11 +100,11 @@ def test_anexo_sem_cliente_pergunta_data_e_depois_calcula(monkeypatch):
     assert body["answer"].startswith("Analisei o seu extrato.")
     assert body["portability_result"]["ok"] is True
     assert any(c["elegivel"] for c in body["portability_result"]["contratos"])
+    assert fakes.jev.chamadas == []
 
 
-def test_cliente_completo_calcula_direto(monkeypatch):
-    monkeypatch.setattr(llm_service, "ler_extrato", lambda anexos: dados_extrato())
-    monkeypatch.setattr(jev_service, "classify", sem_jev)
+def test_cliente_completo_calcula_direto(client, fakes: Fakes):
+    fakes.llm.extrato = dados_extrato()
 
     r = client.post(
         "/chat",
@@ -143,9 +121,8 @@ def test_cliente_completo_calcula_direto(monkeypatch):
     assert "Quer seguir com a portabilidade?" in body["answer"]
 
 
-def test_idade_65_sem_uf_pergunta_uf_e_alerta_webplus(monkeypatch):
-    monkeypatch.setattr(llm_service, "ler_extrato", lambda anexos: dados_extrato())
-    monkeypatch.setattr(jev_service, "classify", sem_jev)
+def test_idade_65_sem_uf_pergunta_uf_e_alerta_webplus(client, fakes: Fakes):
+    fakes.llm.extrato = dados_extrato()
     conversa = cid()
 
     primeira = client.post(
@@ -175,9 +152,8 @@ def test_idade_65_sem_uf_pergunta_uf_e_alerta_webplus(monkeypatch):
     "idade,motivo",
     [(72, "idade_prazo_96"), (74, "idade_fora_regra")],
 )
-def test_idades_limite_vão_para_handoff(monkeypatch, idade, motivo):
-    monkeypatch.setattr(llm_service, "ler_extrato", lambda anexos: dados_extrato())
-    monkeypatch.setattr(jev_service, "classify", sem_jev)
+def test_idades_limite_vao_para_handoff(client, fakes: Fakes, idade, motivo):
+    fakes.llm.extrato = dados_extrato()
 
     r = client.post(
         "/chat",
@@ -194,9 +170,8 @@ def test_idades_limite_vão_para_handoff(monkeypatch, idade, motivo):
     assert body["portability_result"]["motivo"] == motivo
 
 
-def test_valores_da_mensagem_vem_do_result(monkeypatch):
-    monkeypatch.setattr(llm_service, "ler_extrato", lambda anexos: dados_extrato())
-    monkeypatch.setattr(jev_service, "classify", sem_jev)
+def test_valores_da_mensagem_vem_do_result(client, fakes: Fakes):
+    fakes.llm.extrato = dados_extrato()
 
     body = client.post(
         "/chat",
@@ -218,13 +193,8 @@ def test_valores_da_mensagem_vem_do_result(monkeypatch):
     assert f"R$ {formatar_valor(elegivel['troco_faixa']['max'])}" in body["answer"]
 
 
-def test_oferta_pendente_aceita_vai_para_handoff(monkeypatch):
-    monkeypatch.setattr(llm_service, "ler_extrato", lambda anexos: dados_extrato())
-    monkeypatch.setattr(
-        llm_service,
-        "responder",
-        lambda *a, **k: pytest.fail("LLM não deveria ser chamado"),
-    )
+def test_oferta_pendente_aceita_vai_para_handoff(client, fakes: Fakes):
+    fakes.llm.extrato = dados_extrato()
     conversa = cid()
 
     oferta = client.post(
@@ -238,17 +208,9 @@ def test_oferta_pendente_aceita_vai_para_handoff(monkeypatch):
     )
     assert oferta.json()["status"] == "answered"
 
-    monkeypatch.setattr(
-        jev_service,
-        "classify",
-        lambda *a, **k: jev_service.JevResult(
-            intent="duvida",
-            intent_confidence=0.9,
-            publico="inss",
-            publico_confidence=0.9,
-            resposta_oferta="aceita",
-            resposta_oferta_confidence=0.9,
-        ),
+    fakes.jev.resultado = resultado_jev(
+        resposta_oferta="aceita",
+        resposta_conf=0.9,
     )
     aceite = client.post(
         "/chat",
@@ -259,8 +221,8 @@ def test_oferta_pendente_aceita_vai_para_handoff(monkeypatch):
     assert body["handoff_reason"] == "aceitou_portabilidade"
 
 
-def test_recusa_da_oferta_encerra_sem_handoff(monkeypatch):
-    monkeypatch.setattr(llm_service, "ler_extrato", lambda anexos: dados_extrato())
+def test_recusa_da_oferta_encerra_sem_handoff(client, fakes: Fakes):
+    fakes.llm.extrato = dados_extrato()
     conversa = cid()
 
     client.post(
@@ -273,17 +235,9 @@ def test_recusa_da_oferta_encerra_sem_handoff(monkeypatch):
         },
     )
 
-    monkeypatch.setattr(
-        jev_service,
-        "classify",
-        lambda *a, **k: jev_service.JevResult(
-            intent="duvida",
-            intent_confidence=0.9,
-            publico="inss",
-            publico_confidence=0.9,
-            resposta_oferta="recusa",
-            resposta_oferta_confidence=0.9,
-        ),
+    fakes.jev.resultado = resultado_jev(
+        resposta_oferta="recusa",
+        resposta_conf=0.9,
     )
     body = client.post(
         "/chat",
@@ -293,9 +247,8 @@ def test_recusa_da_oferta_encerra_sem_handoff(monkeypatch):
     assert body["handoff_reason"] is None
 
 
-def test_data_invalida_duas_vezes_vai_para_handoff(monkeypatch):
-    monkeypatch.setattr(llm_service, "ler_extrato", lambda anexos: dados_extrato())
-    monkeypatch.setattr(jev_service, "classify", sem_jev)
+def test_data_invalida_duas_vezes_vai_para_handoff(client, fakes: Fakes):
+    fakes.llm.extrato = dados_extrato()
     conversa = cid()
 
     client.post(
@@ -321,23 +274,9 @@ def test_data_invalida_duas_vezes_vai_para_handoff(monkeypatch):
     assert body["handoff_reason"] == "dados_cliente_nao_informados"
 
 
-def test_webhook_contem_portability_result(monkeypatch):
-    monkeypatch.setenv("SATURDAY_WEBHOOK_URL", "https://webhook.test/agent")
-    get_settings.cache_clear()
-    monkeypatch.setattr(llm_service, "ler_extrato", lambda anexos: dados_extrato())
-    monkeypatch.setattr(jev_service, "classify", sem_jev)
-
-    enviados = []
-
-    class Resposta:
-        def raise_for_status(self):
-            return None
-
-    def fake_post(url, json, timeout):
-        enviados.append((url, json, timeout))
-        return Resposta()
-
-    monkeypatch.setattr(webhook_service.httpx, "post", fake_post)
+def test_webhook_contem_portability_result(client, fakes: Fakes):
+    fakes.webhook.configurado = True
+    fakes.llm.extrato = dados_extrato()
 
     conversa = cid()
     r = client.post(
@@ -351,7 +290,7 @@ def test_webhook_contem_portability_result(monkeypatch):
     )
 
     assert r.status_code == 202
-    assert len(enviados) == 1
-    payload = enviados[0][1]
+    assert len(fakes.webhook.enviados) == 1
+    payload = fakes.webhook.enviados[0]
     assert payload["portability_result"]["ok"] is True
     assert payload["portability_result"]["contratos"]
