@@ -3,9 +3,16 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any, Literal
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    HttpUrl,
+    field_validator,
+    model_validator,
+)
 
 MIME_TYPES = Literal[
     "application/pdf",
@@ -13,6 +20,8 @@ MIME_TYPES = Literal[
     "image/png",
     "image/webp",
 ]
+
+CONVERSATION_ID_PATTERN = r"^[A-Za-z0-9_.:@+\-]+$"
 
 UFS = frozenset(
     {
@@ -45,6 +54,22 @@ UFS = frozenset(
         "TO",
     }
 )
+
+Intent = Literal["duvida", "suporte", "humano"]
+Publico = Literal["clt", "inss", "servidor_publico", "autonomo", "indefinido"]
+HandoffReason = Literal[
+    "pediu_humano",
+    "sem_resposta",
+    "hiscon_nao_conferiu",
+    "extrato_ilegivel_repetido",
+    "idade_fora_regra",
+    "idade_prazo_96",
+    "especie_nao_atendida",
+    "sem_portabilidade",
+    "aceitou_portabilidade",
+    "dados_cliente_nao_informados",
+    "erro_interno",
+]
 
 
 class Attachment(BaseModel):
@@ -86,7 +111,7 @@ class ChatRequest(BaseModel):
     conversation_id: str = Field(
         min_length=1,
         max_length=128,
-        pattern=r"^[A-Za-z0-9_.:@+\-]+$",
+        pattern=CONVERSATION_ID_PATTERN,
     )
     message_id: str | None = Field(default=None, min_length=1, max_length=128)
     message: str = Field(default="", max_length=4000)
@@ -94,15 +119,58 @@ class ChatRequest(BaseModel):
     cliente: Cliente | None = None
 
 
+class FaixaResultado(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    min: float = 0.0
+    max: float = 0.0
+
+
+class ContratoResultado(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    banco_codigo: str = ""
+    banco: str = ""
+    situacao: str = ""
+    parcela: float | None = None
+    taxa_origem: float | None = None
+    qtd_parcelas: int | None = None
+    pagas: int | None = None
+    restantes: int | None = None
+    saldo_estimado: float | None = None
+    tabela_refin: str | None = None
+    taxa_refin: float | None = None
+    valor_liberado: float | None = None
+    troco: float | None = None
+    desconto_margem: float | None = None
+    elegivel: bool = False
+    motivo: str = ""
+    alerta: str | None = None
+    troco_faixa: FaixaResultado = Field(default_factory=FaixaResultado)
+
+
+class PortabilityResult(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    ok: bool = False
+    motivo: str | None = None
+    prazo: int = 0
+    beneficio_bloqueado: bool = False
+    alerta_webplus: bool = False
+    troco_total: float = 0.0
+    troco_faixa: FaixaResultado = Field(default_factory=FaixaResultado)
+    contratos: list[ContratoResultado] = Field(default_factory=list)
+
+
 class AgentReply(BaseModel):
     event: Literal["agent.reply"] = "agent.reply"
     conversation_id: str
     answer: str
     status: Literal["answered", "handoff", "with_human", "duplicate"]
-    intent: str | None = None
-    publico: str | None = None
-    handoff_reason: str | None = None
-    portability_result: dict[str, Any] | None = None
+    intent: Intent | None = None
+    publico: Publico | None = None
+    handoff_reason: HandoffReason | None = None
+    portability_result: PortabilityResult | None = None
     timestamp: datetime
 
 

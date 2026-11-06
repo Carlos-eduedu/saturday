@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from saturday.settings import Settings, get_settings
-from saturday.web.api import chat, conversas, monitoring
+from saturday.web.api import chat, conversas, monitoring, webhooks
 from saturday.web.lifespan import criar_lifespan
 
 logger = logging.getLogger(__name__)
@@ -31,6 +31,7 @@ def get_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(monitoring.router)
     app.include_router(chat.router)
     app.include_router(conversas.router)
+    webhooks.documentar_webhook(app)
 
     @app.exception_handler(Exception)
     async def erro_nao_tratado(request: Request, exc: Exception) -> JSONResponse:

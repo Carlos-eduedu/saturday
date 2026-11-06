@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import secrets
-from typing import cast
+from typing import Annotated, cast
 
-from fastapi import HTTPException, Request
+from fastapi import HTTPException, Request, Security
+from fastapi.security import APIKeyHeader
 
 from saturday.agent.service import AgentService
 from saturday.settings import Settings
+
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
 def get_agent_service(request: Request) -> AgentService:
@@ -17,7 +20,10 @@ def get_agent_service(request: Request) -> AgentService:
     return cast(AgentService, request.app.state.agent_service)
 
 
-def verificar_api_key(request: Request) -> None:
+def verificar_api_key(
+    request: Request,
+    recebida: Annotated[str | None, Security(api_key_header)] = None,
+) -> None:
     """Valida o header ``X-API-Key`` quando a chave está configurada."""
 
     settings = cast(Settings, request.app.state.settings)
@@ -27,6 +33,5 @@ def verificar_api_key(request: Request) -> None:
             raise HTTPException(status_code=401, detail="não autorizado")
         return
 
-    recebida = request.headers.get("X-API-Key", "")
-    if not secrets.compare_digest(recebida.encode(), esperada.encode()):
+    if recebida is None or not secrets.compare_digest(recebida.encode(), esperada.encode()):
         raise HTTPException(status_code=401, detail="não autorizado")

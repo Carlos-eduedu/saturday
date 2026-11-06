@@ -7,13 +7,19 @@ import hmac
 import json
 import socket
 import uuid
+from datetime import UTC, date, datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import httpx
 import pytest
+from conftest import extrato_fake
 from fastapi.testclient import TestClient
-from pydantic import SecretStr
+from pydantic import SecretStr, ValidationError
 
+from saturday.portabilidade.calculo import DadosCliente, calcular_portabilidade
+from saturday.portabilidade.hiscon import normalizar_extrato
+from saturday.schemas import AgentReply, Cliente
 from saturday.services import anexos as anexos_service
 from saturday.services.anexos import AnexoInvalido, AnexosClient
 from saturday.services.webhook import WebhookClient
@@ -216,3 +222,102 @@ def test_prod_sem_docs():
     with TestClient(app) as client:
         assert client.get("/docs").status_code == 404
         assert client.get("/openapi.json").status_code == 404
+
+
+@pytest.mark.parametrize(
+    "metodo,caminho",
+    [
+        ("get", "/conversations/alguma"),
+        ("delete", "/conversations/alguma"),
+        ("post", "/conversations/alguma/release"),
+    ],
+)
+def test_conversas_sem_chave_401(client, settings, metodo, caminho):
+    settings.api_key = SecretStr("segredo")
+    resposta = getattr(client, metodo)(caminho)
+    assert resposta.status_code == 401
+    assert resposta.json() == {"detail": "não autorizado"}
+
+
+@pytest.mark.parametrize(
+    "metodo,caminho",
+    [
+        ("get", "/conversations/com%20espaco"),
+        ("delete", "/conversations/com%20espaco"),
+        ("post", "/conversations/com%20espaco/release"),
+    ],
+)
+def test_conversation_id_invalido_no_caminho_422(client, metodo, caminho):
+    assert getattr(client, metodo)(caminho).status_code == 422
+
+
+def test_cliente_uf_minuscula_normaliza():
+    assert Cliente(uf="ms").uf == "MS"
+    with pytest.raises(ValidationError):
+        Cliente(uf="XX")
+
+
+def test_agent_reply_serializa_portability_result_sem_mudanca():
+    hoje = datetime.now(ZoneInfo("America/Sao_Paulo")).date()
+    resultado = calcular_portabilidade(
+        normalizar_extrato(extrato_fake()),
+        DadosCliente(data_nascimento=date(1962, 3, 12), uf="MS"),
+        hoje,
+    )
+    reply = AgentReply(
+        conversation_id="json-igual",
+        answer="ok",
+        status="answered",
+        portability_result=resultado,
+        timestamp=datetime.now(UTC),
+    )
+    assert reply.model_dump(mode="json")["portability_result"] == resultado
+
+
+def test_openapi_tem_security_scheme_e_webhook():
+    schema = get_app(Settings(environment="pytest")).openapi()
+
+    schemes = schema["components"]["securitySchemes"]
+    assert any(
+        scheme.get("type") == "apiKey"
+        and scheme.get("in") == "header"
+        and scheme.get("name") == "X-API-Key"
+        for scheme in schemes.values()
+    )
+
+    operacao = schema["webhooks"]["agent.reply"]["post"]
+    assert operacao["requestBody"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/AgentReply"
+    }
+    cabecalhos = {
+        parametro["name"]: parametro
+        for parametro in operacao["parameters"]
+        if parametro["in"] == "header"
+    }
+    assert "X-Saturday-Timestamp" in cabecalhos
+    assert "X-Saturday-Signature" in cabecalhos
+    assert cabecalhos["X-Saturday-Timestamp"]["description"]
+    assert cabecalhos["X-Saturday-Signature"]["description"]
+    assert "hmac.compare_digest" in operacao["description"]
+
+    for caminho, metodo in [
+        ("/chat", "post"),
+        ("/conversations/{conversation_id}", "get"),
+        ("/conversations/{conversation_id}", "delete"),
+        ("/conversations/{conversation_id}/release", "post"),
+    ]:
+        assert schema["paths"][caminho][metodo].get("security")
+
+
+def test_openapi_documenta_401_e_404_nas_rotas_de_conversa():
+    schema = get_app(Settings(environment="pytest")).openapi()
+    conversa = schema["paths"]["/conversations/{conversation_id}"]
+    release = schema["paths"]["/conversations/{conversation_id}/release"]
+
+    for operacao in (conversa["get"], conversa["delete"], release["post"]):
+        assert "401" in operacao["responses"]
+        assert "404" in operacao["responses"]
+
+
+def test_delete_inexistente_retorna_404(client):
+    assert client.delete("/conversations/nao-existe").status_code == 404
