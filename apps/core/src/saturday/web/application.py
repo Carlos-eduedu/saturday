@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from saturday.settings import Settings, get_settings
 from saturday.web.api import chat, conversas, monitoring, webhooks
 from saturday.web.lifespan import criar_lifespan
+from saturday.web.limites import LimiteDeCorpo
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,8 @@ def get_app(settings: Settings | None = None) -> FastAPI:
         openapi_url=None if producao else "/openapi.json",
     )
     app.state.settings = settings
+    # Recusa corpo acima de 20 MB antes de qualquer leitura de schema.
+    app.add_middleware(LimiteDeCorpo)
     app.include_router(monitoring.router)
     app.include_router(chat.router)
     app.include_router(conversas.router)

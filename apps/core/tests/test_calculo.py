@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import Any
 
 import pytest
 
@@ -50,7 +51,7 @@ def contrato(
     )
 
 
-def extrato(*contratos: ContratoHiscon, **extras) -> Extrato:
+def extrato(*contratos: ContratoHiscon, **extras: Any) -> Extrato:
     dados = {
         "ehHiscon": True,
         "especie": "32",
@@ -83,8 +84,17 @@ CASOS_REFERENCIA = [
     CASOS_REFERENCIA,
 )
 def test_casos_referencia_ao_centavo(
-    banco, parcela, qtd, pagas, taxa, saldo, tabela, taxa_ref, liberado, troco
-):
+    banco: str,
+    parcela: float,
+    qtd: int,
+    pagas: int,
+    taxa: float,
+    saldo: float,
+    tabela: str | None,
+    taxa_ref: float,
+    liberado: float,
+    troco: float,
+) -> None:
     resultado = calcular_portabilidade(
         extrato(contrato(banco, parcela, qtd, pagas, taxa)),
         CLIENTE,
@@ -101,30 +111,30 @@ def test_casos_referencia_ao_centavo(
     assert c["troco"] == troco
 
 
-def test_competencia_e_parcelas_pagas():
+def test_competencia_e_parcelas_pagas() -> None:
     assert competencia_referencia(EMISSAO) == (2026, 9)
     assert parcelas_pagas(EMISSAO, "01/2023") == 45
     assert parcelas_pagas("08/01/2026", "01/2023") == 36  # referência 12/2025
     assert parcelas_pagas(EMISSAO, "01/2030") == 0
 
 
-def test_r2_arredonda_como_javascript():
+def test_r2_arredonda_como_javascript() -> None:
     assert r2(0.125) == 0.13
     assert r2(1.005) == 1.0  # floor(100.999...) — mesmo comportamento do JS
     assert r2(2082.483) == 2082.48
 
 
-def test_daycoval_nao_porta():
+def test_daycoval_nao_porta() -> None:
     c = avaliar_contrato(contrato("707 - DAYCOVAL", 500, 84, 20, 2.0), EMISSAO)
     assert c["motivo"] == "banco_nao_porta"
 
 
-def test_c6_ja_c6():
+def test_c6_ja_c6() -> None:
     c = avaliar_contrato(contrato("626 - C6", 500, 84, 20, 2.0), EMISSAO)
     assert c["motivo"] == "ja_c6"
 
 
-def test_regras_de_cip():
+def test_regras_de_cip() -> None:
     assert fora_da_cip("935") is False
     assert fora_da_cip("999") is False
     assert fora_da_cip("888") is True
@@ -132,23 +142,23 @@ def test_regras_de_cip():
     assert fora_da_cip("033") is False
 
 
-def test_codigo_fora_da_cip_barra_contrato():
+def test_codigo_fora_da_cip_barra_contrato() -> None:
     c = avaliar_contrato(contrato("888 - FINANCEIRA", 500, 84, 20, 2.0), EMISSAO)
     assert c["motivo"] == "banco_nao_porta"
 
 
-def test_facta_935_nao_e_barrada_pela_cip():
+def test_facta_935_nao_e_barrada_pela_cip() -> None:
     _, parcela, qtd, pagas, taxa, *_ = CASOS_REFERENCIA[3]
     c = avaliar_contrato(contrato("935 - FACTA", parcela, qtd, pagas, taxa), EMISSAO)
     assert c["motivo"] == "ok"
 
 
-def test_pan_108x_30_pagas_insuficientes():
+def test_pan_108x_30_pagas_insuficientes() -> None:
     c = avaliar_contrato(contrato("623 - PAN", 100, 108, 30, 1.8), EMISSAO)
     assert c["motivo"] == "pagas_insuficientes"
 
 
-def test_corban_108x_5_pagas_com_400_dias_e_elegivel():
+def test_corban_108x_5_pagas_com_400_dias_e_elegivel() -> None:
     c = avaliar_contrato(
         contrato("391 - CORBAN", 100, 108, 5, 2.0, inclusao="01/06/2025"),
         EMISSAO,
@@ -156,22 +166,22 @@ def test_corban_108x_5_pagas_com_400_dias_e_elegivel():
     assert c["motivo"] == "ok"
 
 
-def test_contrato_96x_com_uma_paga_e_elegivel():
+def test_contrato_96x_com_uma_paga_e_elegivel() -> None:
     c = avaliar_contrato(contrato("318 - BMG", 50, 96, 1, 1.7), EMISSAO)
     assert c["motivo"] == "ok"
 
 
-def test_santander_108x_zero_pagas_e_elegivel():
+def test_santander_108x_zero_pagas_e_elegivel() -> None:
     c = avaliar_contrato(contrato("033 - SANTANDER", 50, 108, 0, 2.1), EMISSAO)
     assert c["motivo"] == "ok"
 
 
-def test_taxa_abaixo_do_c6():
+def test_taxa_abaixo_do_c6() -> None:
     c = avaliar_contrato(contrato("033 - SANTANDER", 100, 84, 10, 1.30), EMISSAO)
     assert c["motivo"] == "taxa_abaixo_c6"
 
 
-def test_taxa_entre_135_e_140_aplica_redutor_de_90_por_cento():
+def test_taxa_entre_135_e_140_aplica_redutor_de_90_por_cento() -> None:
     c = avaliar_contrato(contrato("033 - SANTANDER", 100, 84, 10, 1.38), EMISSAO)
     restantes = 84 - 10
     taxa = 0.0138
@@ -179,14 +189,14 @@ def test_taxa_entre_135_e_140_aplica_redutor_de_90_por_cento():
     assert c["saldo_estimado"] == r2(saldo_sem_redutor * 0.90)
 
 
-def test_troco_abaixo_do_minimo():
+def test_troco_abaixo_do_minimo() -> None:
     c = avaliar_contrato(contrato("643 - PINE", 1000, 96, 0, 1.9), EMISSAO)
     assert c["valor_liberado"] >= 2000
     assert c["troco"] < 50
     assert c["motivo"] == "troco_baixo"
 
 
-def test_margem_extrapolada_aplica_desconto_no_maior_contrato():
+def test_margem_extrapolada_aplica_desconto_no_maior_contrato() -> None:
     resultado = calcular_portabilidade(
         extrato(
             contrato("643 - PINE", 295.24, 84, 23, 1.66),
@@ -202,7 +212,7 @@ def test_margem_extrapolada_aplica_desconto_no_maior_contrato():
     assert santander["desconto_margem"] is None
 
 
-def test_alerta_de_refin_em_contrato_nao_elegivel():
+def test_alerta_de_refin_em_contrato_nao_elegivel() -> None:
     resultado = calcular_portabilidade(
         extrato(contrato("623 - PAN", 100, 108, 30, 1.8)),
         CLIENTE,
@@ -213,7 +223,7 @@ def test_alerta_de_refin_em_contrato_nao_elegivel():
     assert c["alerta"] == "Sem portabilidade no C6 — oferecer refinanciamento"
 
 
-def test_desconto_nao_e_aplicado_quando_nenhuma_parcela_supera_o_valor():
+def test_desconto_nao_e_aplicado_quando_nenhuma_parcela_supera_o_valor() -> None:
     resultado = calcular_portabilidade(
         extrato(
             contrato("643 - PINE", 295.24, 84, 23, 1.66),
@@ -225,7 +235,7 @@ def test_desconto_nao_e_aplicado_quando_nenhuma_parcela_supera_o_valor():
     assert resultado["contratos"][0]["desconto_margem"] is None
 
 
-def test_alerta_de_refin_tambem_em_contrato_ilegivel_do_pan():
+def test_alerta_de_refin_tambem_em_contrato_ilegivel_do_pan() -> None:
     resultado = calcular_portabilidade(
         extrato(contrato("623 - PAN", 100, 84, 10, 0)),
         CLIENTE,
@@ -234,3 +244,27 @@ def test_alerta_de_refin_tambem_em_contrato_ilegivel_do_pan():
     c = resultado["contratos"][0]
     assert c["motivo"] == "ilegivel"
     assert c["alerta"] == "Sem portabilidade no C6 — oferecer refinanciamento"
+
+
+def test_desconto_ignora_contrato_nao_portavel_de_parcela_maior() -> None:
+    """O desconto só pode ir para quem já seria elegível sem ele.
+
+    Antes, o contrato de maior parcela levava o desconto mesmo quando não
+    portava — e como ele não vira troco, o desconto simplesmente desaparecia.
+    """
+
+    resultado = calcular_portabilidade(
+        extrato(
+            contrato("707 - NAO PORTA", 800.00, 84, 23, 1.66),
+            contrato("643 - PINE", 600.00, 84, 23, 1.66),
+            margemExtrapolada=81.05,
+        ),
+        CLIENTE,
+        HOJE,
+    )
+
+    nao_porta, pine = resultado["contratos"]
+    assert nao_porta["elegivel"] is False
+    assert nao_porta["desconto_margem"] is None
+    assert pine["elegivel"] is True
+    assert pine["desconto_margem"] == 81.10

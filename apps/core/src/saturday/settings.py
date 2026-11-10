@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
-from pathlib import Path
 from typing import Annotated, Literal
 
 from pydantic import Field, SecretStr, field_validator
@@ -36,9 +35,23 @@ class Settings(BaseSettings):
     webhook_url: str = ""
     webhook_secret: SecretStr = SecretStr("")
     anexo_dominios: Annotated[list[str], NoDecode] = Field(default_factory=list)
-    checkpoint_path: Path = Path("data/checkpoints.sqlite")
     retencao_extrato_dias: int = 30
     handoff_auto_release_horas: int = 0
+
+    # Postgres: estado das conversas, outbox e travas. Vazio em `pytest`.
+    database_url: SecretStr = SecretStr("")
+
+    # Storage S3 (MinIO interno ou externo) para os anexos dos clientes.
+    s3_endpoint: str = ""
+    s3_bucket: str = ""
+    s3_access_key: SecretStr = SecretStr("")
+    s3_secret_key: SecretStr = SecretStr("")
+    s3_regiao: str = "us-east-1"
+
+    # Outbox: quantas vezes reentregar antes de desistir e quanto esperar.
+    outbox_max_tentativas: int = 8
+    outbox_backoff_base_s: float = 2.0
+    outbox_lote: int = 20
 
     @field_validator("anexo_dominios", mode="before")
     @classmethod
@@ -55,6 +68,7 @@ class Settings(BaseSettings):
                 "SATURDAY_OPENROUTER_API_KEY": self.openrouter_api_key.get_secret_value(),
                 "SATURDAY_LLM_MODEL": self.llm_model,
                 "SATURDAY_VISION_MODEL": self.vision_model,
+                "SATURDAY_DATABASE_URL": self.database_url.get_secret_value(),
             }
             faltando = [nome for nome, valor in obrigatorias.items() if not valor]
             if faltando:
@@ -64,6 +78,18 @@ class Settings(BaseSettings):
                     + ". Preencha o .env ou desligue a validação com "
                     "SATURDAY_ENVIRONMENT=pytest."
                 )
+
+        # Anexo por URL ou base64 é guardado no S3; sem bucket, o anexo se perde
+        # no fim do turno e a retenção não tem o que apagar.
+        if (
+            self.environment != "pytest"
+            and self.database_url.get_secret_value()
+            and not self.s3_bucket
+        ):
+            raise RuntimeError(
+                "SATURDAY_S3_BUCKET é obrigatório quando SATURDAY_DATABASE_URL existe. "
+                "Use o MinIO do compose (SATURDAY_S3_ENDPOINT vazio) ou um bucket externo."
+            )
 
         if self.environment == "prod" and not self.api_key.get_secret_value():
             raise RuntimeError("SATURDAY_API_KEY é obrigatória quando SATURDAY_ENVIRONMENT=prod.")

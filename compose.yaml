@@ -2,22 +2,111 @@
 # nomeados, limites de recurso e healthcheck. Os ajustes de desenvolvimento
 # local ficam em `compose.override.yaml`, carregado automaticamente.
 #
-# `migrate`, `worker` e `painel` entram nas fases 1 e 3, quando existirem.
+# `postgres` e `minio` são opcionais: sobem com
+# `COMPOSE_PROFILES=postgres,minio` no `.env`. Sem eles, `SATURDAY_DATABASE_URL`
+# e `SATURDAY_S3_*` precisam apontar para serviços externos, e a aplicação
+# valida essa combinação na subida.
 name: saturday
 
+x-app: &app
+  image: saturday-api
+  build:
+    context: .
+    dockerfile: apps/core/Dockerfile
+  # `.env.local` é opcional: guarda o que muda por máquina (URL do Postgres,
+  # endpoint do MinIO) sem mexer no `.env` compartilhado.
+  env_file:
+    - .env
+    - path: .env.local
+      required: false
+
 services:
+  # Roda as migrações e termina. API e worker só sobem se isso der certo.
+  migrate:
+    <<: *app
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+    restart: "no"
+    mem_limit: 512m
+    cpus: 0.5
+
   api:
-    build:
-      context: apps/core
-    env_file: .env
-    environment:
-      # O volume nomeado é o único lugar gravável da imagem.
-      SATURDAY_CHECKPOINT_PATH: /app/data/checkpoints.sqlite
-    volumes:
-      - dados:/app/data
+    <<: *app
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
     mem_limit: 1g
     cpus: 1.0
 
+  # Entrega o outbox. Ouvir o canal é trabalho dele, não da API.
+  worker:
+    <<: *app
+    command: ["saturday-worker"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 0.5
+
+  postgres:
+    image: postgres:17-alpine
+    profiles: ["postgres"]
+    environment:
+      POSTGRES_DB: saturday
+      POSTGRES_USER: saturday
+      POSTGRES_PASSWORD: saturday
+    volumes:
+      - postgres_dados:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U saturday -d saturday"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 1.0
+
+  minio:
+    image: minio/minio:latest
+    profiles: ["minio"]
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${SATURDAY_S3_ACCESS_KEY:-saturday}
+      MINIO_ROOT_PASSWORD: ${SATURDAY_S3_SECRET_KEY:-saturday123}
+    volumes:
+      - minio_dados:/data
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 0.5
+
+  # Cria o bucket uma vez e termina. O app não administra infraestrutura.
+  minio-init:
+    image: minio/mc:latest
+    profiles: ["minio"]
+    depends_on:
+      minio:
+        condition: service_started
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >
+        until mc alias set local http://minio:9000
+        "$${SATURDAY_S3_ACCESS_KEY:-saturday}"
+        "$${SATURDAY_S3_SECRET_KEY:-saturday123}"; do sleep 1; done;
+        mc mb --ignore-existing local/"$${SATURDAY_S3_BUCKET:-saturday}";
+    environment:
+      SATURDAY_S3_ACCESS_KEY: ${SATURDAY_S3_ACCESS_KEY:-saturday}
+      SATURDAY_S3_SECRET_KEY: ${SATURDAY_S3_SECRET_KEY:-saturday123}
+      SATURDAY_S3_BUCKET: ${SATURDAY_S3_BUCKET:-saturday}
+    restart: "no"
+    mem_limit: 128m
+    cpus: 0.25
+
 volumes:
-  dados:
+  postgres_dados:
+  minio_dados:

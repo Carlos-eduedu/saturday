@@ -15,21 +15,33 @@ cd apps/core
 uv sync --locked
 uv run ruff format --check && uv run ruff check     # estilo
 uv run mypy                                         # tipos (usa [tool.mypy] do pyproject)
-uv run pytest -q                                    # testes, sem rede
+uv run pytest -q                                    # testes; os de banco são pulados
+```
+
+Os testes que dependem do backend real exigem um Postgres **descartável** (o
+nome do banco precisa conter `test`, porque os fixtures apagam e recriam as
+tabelas):
+
+```bash
+docker compose --profile postgres up -d postgres
+docker exec saturday-postgres-1 createdb -U saturday saturday_test
+SATURDAY_TEST_DATABASE_URL='postgresql://saturday:saturday@127.0.0.1:5432/saturday_test' \
+  uv run pytest -q
 ```
 
 O servidor local roda **da raiz do repositório**, porque `pydantic-settings` lê o
 `.env` do diretório atual e o `.env` do monorepo fica na raiz:
 
 ```bash
-uv run --project apps/core saturday    # API em http://localhost:8000
+uv run --project apps/core alembic upgrade head   # aplica as migrações
+uv run --project apps/core saturday               # API em http://localhost:8000
 ```
 
-O compose vive na raiz e constrói a imagem com contexto `apps/core`:
+O compose vive na raiz e constrói a imagem a partir dela (`apps/core/Dockerfile`):
 
 ```bash
 cp .env.example .env     # preencha as chaves; nunca versione o .env
-docker compose up --build
+docker compose --profile postgres --profile minio up --build
 curl -f localhost:8000/health
 ```
 
@@ -39,13 +51,22 @@ automaticamente e é o que publica a porta no ambiente local.
 
 ## Estado atual
 
-- **Fase 0 concluída:** monorepo, compose, CI e este arquivo. Comportamento intacto:
-  os 123 testes existentes passam sem alteração de asserção.
-- As fases 1 a 7 estão pendentes. Os diretórios `migrations/`, `simuladores/`,
-  `infra/`, `regras/`, `conhecimento/` e `apps/painel/` nascem na fase que
-  colocar neles o primeiro arquivo real.
+- **Fase 0 concluída:** monorepo, compose, CI e este arquivo.
+- **Fase 1 concluída:** Postgres com SQLAlchemy e Alembic, checkpointer
+  `PostgresSaver`, trava por conversa com `pg_advisory_xact_lock`, outbox
+  transacional com worker e backoff, storage S3 para anexos (o estado guarda só a
+  chave) e as quatro correções do ramo INSS. A suíte tem 140 testes.
+- As fases 2 a 7 estão pendentes. `simuladores/`, `infra/`, `regras/`,
+  `conhecimento/` e `apps/painel/` nascem na fase que colocar neles o primeiro
+  arquivo real.
+- `migrations/` fica em `apps/core/migrations/`, não na raiz: as migrações
+  descrevem os modelos daquele pacote e precisam do ambiente `uv` dele para
+  importar. Desvio consciente da árvore desenhada acima.
 - O único ramo existente é o INSS → C6 (em `apps/core/src/saturday/portabilidade/`
   e `apps/core/src/saturday/agent/`). Ele deve continuar funcionando em toda fase.
+- Pendência desta fase: `minio/minio` não está mais publicável nos registries
+  oficiais neste ambiente; o `S3Storage` está coberto por teste com cliente
+  falso, mas o caminho real contra MinIO não foi exercitado aqui.
 
 ---
 

@@ -1,24 +1,21 @@
-"""Teste do lifespan real: SQLite, checkpointer e rotas montadas."""
+"""Lifespan: checkpointer montado, rotas no ar e erro claro sem Postgres."""
 
 from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
 
+from saturday.dados.sessao import criar_engine
 from saturday.settings import Settings
 from saturday.web.application import get_app
 
 
-def test_lifespan_monta_checkpointer_e_rotas(tmp_path):
-    settings = Settings(
-        environment="pytest",
-        checkpoint_path=tmp_path / "checkpoints.sqlite",
-    )
+def test_lifespan_monta_checkpointer_e_rotas() -> None:
+    settings = Settings(environment="pytest")
     app = get_app(settings)
 
     with TestClient(app) as client:
         assert app.state.agent_service.checkpointer is not None
-        assert (tmp_path / "checkpoints.sqlite").exists()
 
         criada = client.post(
             "/chat",
@@ -32,17 +29,10 @@ def test_lifespan_monta_checkpointer_e_rotas(tmp_path):
         assert client.get("/conversations/lifespan-1").status_code == 404
 
 
-def test_lifespan_erro_claro_quando_caminho_do_sqlite_e_invalido(tmp_path):
-    arquivo = tmp_path / "nao-e-diretorio"
-    arquivo.write_text("x")
-    settings = Settings(
-        environment="pytest",
-        checkpoint_path=arquivo / "checkpoints.sqlite",
-    )
-    app = get_app(settings)
+def test_engine_sem_database_url_falha_com_mensagem_clara() -> None:
+    """Sem Postgres não existe estado de conversa: o erro tem que dizer isso."""
 
-    with (
-        pytest.raises(RuntimeError, match="Não foi possível abrir o SQLite"),
-        TestClient(app),
-    ):
-        pass
+    settings = Settings(environment="dev")
+
+    with pytest.raises(RuntimeError, match="SATURDAY_DATABASE_URL"):
+        criar_engine(settings)

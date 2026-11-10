@@ -8,7 +8,9 @@ def main() -> None:
     configurar_logging(settings.log_level)
     settings.validar_para_subir()
 
-    # Um único worker: o estado das conversas vive no SQLite local.
+    # Um processo por padrão. A partir da Fase 1 o estado vive no Postgres e o
+    # turno é serializado por `pg_advisory_xact_lock`, então subir mais de um
+    # worker é seguro — é escolha de implantação, não requisito do código.
     # Escuta em todas as interfaces; a autenticação fica na aplicação.
     uvicorn.run(
         "saturday.web.application:get_app",

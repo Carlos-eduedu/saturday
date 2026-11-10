@@ -254,12 +254,20 @@ def _avaliar(
 
 def _contrato_para_desconto(
     bases: list[dict[str, Any]],
+    avaliados: list[dict[str, Any]],
     desconto: float,
 ) -> int | None:
+    """Índice do contrato elegível que recebe o desconto da margem extrapolada.
+
+    Escolhe entre os que já seriam elegíveis **sem** o desconto, e preferencia o
+    de maior parcela. Antes, o desconto podia cair num contrato sem carência ou
+    com saldo alto: não virava troco para ninguém e simplesmente desaparecia.
+    """
+
     candidatos = [
         (indice, base["parcela"])
         for indice, base in enumerate(bases)
-        if base["legivel"] and contrato_ativo(base["situacao"]) and base["parcela"] > desconto
+        if avaliados[indice]["elegivel"] and base["parcela"] > desconto
     ]
     if not candidatos:
         return None
@@ -329,12 +337,16 @@ def calcular_portabilidade(
 
     bases = [_preparar_contrato(contrato) for contrato in contratos]
     desconto = _desconto_margem(extrato.margemExtrapolada)
-    indice_desconto = _contrato_para_desconto(bases, desconto) if desconto > 0 else None
 
-    avaliados = []
-    for indice, base in enumerate(bases):
-        aplicado = desconto if indice == indice_desconto else 0.0
-        avaliado = _avaliar(base, emissao, aplicado)
+    # Avalia sem desconto primeiro: só um contrato que já passa nas regras pode
+    # receber o desconto, senão ele é aplicado onde não vira troco.
+    avaliados = [_avaliar(base, emissao, 0.0) for base in bases]
+    if desconto > 0:
+        indice_desconto = _contrato_para_desconto(bases, avaliados, desconto)
+        if indice_desconto is not None:
+            avaliados[indice_desconto] = _avaliar(bases[indice_desconto], emissao, desconto)
+
+    for avaliado in avaliados:
         if avaliado["troco"] is not None:
             troco = avaliado["troco"]
             avaliado["troco_faixa"] = {
@@ -343,7 +355,6 @@ def calcular_portabilidade(
             }
         else:
             avaliado["troco_faixa"] = {"min": 0.0, "max": 0.0}
-        avaliados.append(avaliado)
 
     total = r2(sum(c["troco"] for c in avaliados if c["elegivel"]))
     resultado["contratos"] = avaliados

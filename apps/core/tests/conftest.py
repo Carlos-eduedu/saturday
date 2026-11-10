@@ -2,20 +2,34 @@
 
 from __future__ import annotations
 
+import os
+import uuid
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import urlsplit
 
 import pytest
 from fastapi.testclient import TestClient
 from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.postgres import PostgresSaver
+from psycopg.rows import dict_row
+from psycopg_pool import ConnectionPool
+from pydantic import SecretStr
+from sqlalchemy import Engine, create_engine
+from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import NullPool
 
 from saturday.agent.context import AgentContext
 from saturday.agent.graph import build_graph
 from saturday.agent.service import AgentService
+from saturday.dados.base import Base
+from saturday.dados.sessao import criar_factory
 from saturday.services.anexos import Anexo
 from saturday.services.jev import JevResult
 from saturday.services.llm import LLMAnswer
 from saturday.settings import Settings
+from saturday.storage.memoria import MemoriaStorage
 from saturday.web.application import get_app
 from saturday.web.dependencies import get_agent_service
 
@@ -146,7 +160,7 @@ class Fakes:
 def settings() -> Settings:
     return Settings(
         environment="pytest",
-        openrouter_api_key="",
+        openrouter_api_key=SecretStr(""),
         llm_model="",
         vision_model="",
     )
@@ -159,13 +173,15 @@ def fakes() -> Fakes:
 
 @pytest.fixture
 def service(settings: Settings, fakes: Fakes) -> AgentService:
-    context = AgentContext(jev=fakes.jev, llm=fakes.llm, anexos=fakes.anexos)
+    # Os fakes duplicam a interface dos clientes sem herdar deles de propósito:
+    # herdar traria a implementação real (rede) junto com a assinatura.
+    context = AgentContext(jev=fakes.jev, llm=fakes.llm, anexos=fakes.anexos)  # type: ignore[arg-type]
     checkpointer = InMemorySaver()
     graph = build_graph(checkpointer)
     agent_service = AgentService(
         graph=graph,
         context=context,
-        webhook=fakes.webhook,
+        webhook=fakes.webhook,  # type: ignore[arg-type]
         settings=settings,
         checkpointer=checkpointer,
     )
@@ -173,11 +189,130 @@ def service(settings: Settings, fakes: Fakes) -> AgentService:
 
 
 @pytest.fixture
-def app(settings: Settings, service: AgentService):
+def conversa() -> str:
+    """Id único por teste: as tabelas de checkpoint do Postgres não são limpas."""
+
+    return f"teste-{uuid.uuid4().hex[:12]}"
+
+
+def _montar_app(settings: Settings, service: AgentService) -> Any:
     application = get_app(settings)
     application.dependency_overrides[get_agent_service] = lambda: service
     application.state.agent_service = service
     return application
+
+
+@pytest.fixture
+def app(settings: Settings, service: AgentService) -> Any:
+    return _montar_app(settings, service)
+
+
+# ------------------------------------------------------------------ Postgres
+#
+# Os testes que dependem do backend real de estado (trava consultiva, poda de
+# checkpoints, sobrevivência ao restart) rodam contra Postgres. Sem
+# `SATURDAY_TEST_DATABASE_URL` eles são pulados, nunca reprovados por engano.
+
+
+def _url_sqlalchemy(url: str) -> str:
+    """SQLAlchemy precisa do dialeto explícito para o psycopg 3."""
+
+    if url.startswith("postgresql+psycopg://"):
+        return url
+    return url.replace("postgresql://", "postgresql+psycopg://", 1)
+
+
+@pytest.fixture(scope="session")
+def pg_url() -> str:
+    url = os.environ.get("SATURDAY_TEST_DATABASE_URL", "").strip()
+    if not url:
+        pytest.skip(
+            "SATURDAY_TEST_DATABASE_URL não definida: este teste exige Postgres. "
+            "Suba com `docker compose --profile postgres up -d postgres` e exporte a URL."
+        )
+    # Os fixtures abaixo rodam `drop_all`: apontar isso para um banco real
+    # apagaria tudo. O nome do banco precisa marcar que é descartável.
+    banco = urlsplit(url).path.lstrip("/")
+    if "test" not in banco.lower():
+        pytest.fail(
+            f"SATURDAY_TEST_DATABASE_URL aponta para {banco!r}, que não é banco de teste. "
+            "Os testes apagam e recriam as tabelas: use algo como saturday_test."
+        )
+    return url
+
+
+@pytest.fixture(scope="session")
+def pg_engine(pg_url: str) -> Iterator[Engine]:
+    engine = create_engine(_url_sqlalchemy(pg_url), poolclass=NullPool, future=True)
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+    yield engine
+    engine.dispose()
+
+
+@pytest.fixture
+def fabrica(pg_engine: Engine) -> sessionmaker[Session]:
+    """Schema recriado antes de cada teste que usa banco."""
+
+    Base.metadata.drop_all(pg_engine)
+    Base.metadata.create_all(pg_engine)
+    return criar_factory(pg_engine)
+
+
+@pytest.fixture
+def checkpointer_pg(pg_url: str) -> Iterator[PostgresSaver]:
+    pool = ConnectionPool(
+        conninfo=pg_url,
+        max_size=4,
+        kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row},
+        open=True,
+    )
+    saver = PostgresSaver(pool)  # type: ignore[arg-type]
+    saver.setup()
+    yield saver
+    pool.close()
+
+
+@pytest.fixture
+def storage() -> MemoriaStorage:
+    """Storage em memória, para conferir o que a retenção apagou."""
+
+    return MemoriaStorage()
+
+
+def _servico_com_banco(
+    settings: Settings,
+    fakes: Fakes,
+    checkpointer: Any,
+    fabrica: sessionmaker[Session],
+    storage: MemoriaStorage,
+) -> AgentService:
+    contexto = AgentContext(jev=fakes.jev, llm=fakes.llm, anexos=fakes.anexos)  # type: ignore[arg-type]
+    return AgentService(
+        graph=build_graph(checkpointer),
+        context=contexto,
+        webhook=fakes.webhook,  # type: ignore[arg-type]
+        settings=settings,
+        checkpointer=checkpointer,
+        fabrica=fabrica,
+        storage=storage,
+    )
+
+
+@pytest.fixture
+def service_pg(
+    settings: Settings,
+    fakes: Fakes,
+    checkpointer_pg: PostgresSaver,
+    fabrica: sessionmaker[Session],
+    storage: MemoriaStorage,
+) -> AgentService:
+    return _servico_com_banco(settings, fakes, checkpointer_pg, fabrica, storage)
+
+
+@pytest.fixture
+def client_pg(settings: Settings, service_pg: AgentService) -> TestClient:
+    return TestClient(_montar_app(settings, service_pg))
 
 
 @pytest.fixture

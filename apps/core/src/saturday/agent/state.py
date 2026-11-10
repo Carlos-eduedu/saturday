@@ -32,6 +32,8 @@ class AgentState(MessagesState, total=False):
     handoff_em: str | None
     # Sem reducer de propósito: a lista é substituída a cada gravação.
     message_ids_recentes: list[str]
+    # Resposta já dada por `message_id`, para o repetido devolver o mesmo texto.
+    respostas_recentes: dict[str, str]
 
 
 CAMPOS_DO_TURNO = (

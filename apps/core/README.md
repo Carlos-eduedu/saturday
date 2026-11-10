@@ -5,39 +5,47 @@ Agente de atendimento independente para portabilidade de empréstimos INSS → C
 ## Rodar local
 
 Este pacote é um app do monorepo `saturday`. Rode **da raiz do repositório**, onde
-fica o `.env`:
+fica o `.env`, e com um Postgres disponível:
 
 ```bash
 cp .env.example .env   # preencha as chaves e modelos do OpenRouter
+docker compose --profile postgres up -d postgres
+uv run --project apps/core alembic upgrade head
 uv run --project apps/core saturday
 ```
 
 A API sobe em `http://localhost:8000` (`GET /health`, `POST /chat`, docs em `/docs`).
-Os logs saem em JSON, uma linha por registro. Os checkpoints ficam em `./data` na
-raiz.
+Os logs saem em JSON, uma linha por registro.
 
 ## Rodar com Docker
 
 ```bash
 cp .env.example .env   # preencha as chaves e modelos
-docker compose up --build
+docker compose --profile postgres --profile minio up --build
 ```
 
-O serviço `api` constrói esta pasta como contexto, lê o `.env` da raiz, publica a
-porta `8000` (pelo `compose.override.yaml`) e persiste os checkpoints no volume
-nomeado `dados`, montado em `/app/data`. As conversas sobrevivem a
-`docker compose restart` e a `down`, a menos que o volume seja removido.
+O serviço `migrate` roda o Alembic e termina; `api` e `worker` só sobem depois
+disso. A aplicação não escreve em disco: o estado vai para o Postgres e os
+anexos para o S3.
 
-> **Permissão do volume:** o volume nomeado herda o dono definido na imagem
-> (`saturday`, UID 1000), então o caso de volume criado como root é raro. Ainda
-> assim, o entrypoint ajusta a permissão de `/app/data` e depois executa a
-> aplicação sem privilégios. Se o seu ambiente bloquear `chown`, aponte
-> `SATURDAY_CHECKPOINT_PATH` para um caminho gravável. O erro
-> `unable to open database file` indica exatamente esse problema.
+## Migrações
 
-> **Atenção:** a aplicação roda com **1 worker** porque o estado das conversas
-> vive no SQLite local (`SATURDAY_CHECKPOINT_PATH`). Não aumente o número de
-> workers sem migrar a persistência para um backend compartilhado.
+As migrações ficam em `migrations/`, dentro deste pacote, porque são os modelos
+deste pacote que elas descrevem:
+
+```bash
+uv run alembic upgrade head      # aplica
+uv run alembic revision --autogenerate -m "descrição"
+```
+
+`alembic.ini` lê a URL de `SATURDAY_DATABASE_URL` (ver `migrations/env.py`), então
+o mesmo arquivo serve para dev, homolog e produção.
+
+## Worker
+
+`saturday-worker` consome o `outbox` e entrega os envios ao canal. A API grava a
+resposta na mesma transação do turno e nunca fala com o canal: um envio que falha
+volta para a fila com backoff, sem prender a resposta ao cliente.
 
 ## Variáveis de ambiente
 
@@ -55,7 +63,12 @@ Todas usam o prefixo `SATURDAY_`. O `.env` é lido automaticamente.
 | `SATURDAY_WEBHOOK_URL` | vazio | URL do webhook de saída; vazio = responde na própria requisição. |
 | `SATURDAY_WEBHOOK_SECRET` | vazio | Segredo HMAC-SHA256; obrigatório se `WEBHOOK_URL` existir. |
 | `SATURDAY_ANEXO_DOMINIOS` | vazio | Domínios permitidos para anexos por URL, separados por vírgula; vazio = só base64. |
-| `SATURDAY_CHECKPOINT_PATH` | `data/checkpoints.sqlite` | Arquivo SQLite dos checkpoints das conversas. |
+| `SATURDAY_DATABASE_URL` | vazio | Postgres do estado das conversas, outbox e travas. Obrigatório fora de `pytest`. |
+| `SATURDAY_S3_ENDPOINT` | vazio | Endpoint do S3 (vazio = MinIO do compose). |
+| `SATURDAY_S3_BUCKET` | vazio | Bucket dos anexos. Obrigatório com Postgres. |
+| `SATURDAY_S3_ACCESS_KEY`, `SATURDAY_S3_SECRET_KEY` | vazio | Credenciais do S3. |
+| `SATURDAY_OUTBOX_MAX_TENTATIVAS` | `8` | Tentativas de entrega antes de desistir. |
+| `SATURDAY_OUTBOX_BACKOFF_BASE_S` | `2.0` | Espera inicial do backoff (dobra a cada falha). |
 | `SATURDAY_RETENCAO_EXTRATO_DIAS` | `30` | Dias de retenção do extrato; ao expirar, o extrato é apagado no próximo turno. |
 | `SATURDAY_HANDOFF_AUTO_RELEASE_HORAS` | `0` | Horas para liberar automaticamente um handoff; `0` desliga. |
 

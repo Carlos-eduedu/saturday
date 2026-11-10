@@ -9,27 +9,34 @@ As regras do projeto, o escopo e o critério de pronto de cada fase estão no
 ## Estrutura
 
 ```text
-apps/core/          pacote Python (`uv`): API, agente LangGraph e regras
-compose.yaml        deploy (Dokploy): sem portas, volumes nomeados, limites
-compose.override.yaml   desenvolvimento local: publica a porta 8000
-AGENTS.md           contrato: regras, arquitetura alvo e fases
+apps/core/              pacote Python (`uv`): API, worker, agente e regras
+apps/core/migrations/   Alembic (as migrações pertencem ao pacote, não à raiz)
+compose.yaml            deploy (Dokploy): migrate, api, worker e opcionais
+compose.override.yaml   desenvolvimento local: publica portas e console do MinIO
+AGENTS.md               contrato: regras, arquitetura alvo e fases
 ```
 
-`migrations/`, `simuladores/`, `infra/`, `regras/`, `conhecimento/` e
-`apps/painel/` entram nas fases que colocarem neles o primeiro arquivo real
-(1 a 5), conforme o `AGENTS.md`.
+Desde a Fase 1 o estado das conversas vive no **Postgres**, os anexos no **S3** e
+a entrega das respostas passa pelo **outbox**, consumido pelo worker. Não há mais
+SQLite nem volume local: a aplicação não escreve em disco.
+
+`simuladores/`, `infra/`, `regras/`, `conhecimento/` e `apps/painel/` entram nas
+fases que colocarem neles o primeiro arquivo real (2 a 5).
 
 ## Rodar local, sem container
 
+Precisa de um Postgres. O mais curto é usar o do compose:
+
 ```bash
 cp .env.example .env                  # preencha as chaves do OpenRouter
+docker compose --profile postgres up -d postgres
+uv run --project apps/core alembic upgrade head   # cria as tabelas
 uv run --project apps/core saturday
 ```
 
 Rode **da raiz**: o `pydantic-settings` lê o `.env` do diretório atual, então de
 dentro de `apps/core` as chaves não são encontradas e a aplicação não sobe (a
-mensagem de erro lista o que falta). Os checkpoints ficam em `./data`, como antes
-do monorepo.
+mensagem de erro lista o que falta).
 
 A API sobe em `http://localhost:8000` (`GET /health`, `POST /chat`, docs em `/docs`).
 Os logs saem em JSON, uma linha por registro.
@@ -38,13 +45,25 @@ Os logs saem em JSON, uma linha por registro.
 
 ```bash
 cp .env.example .env                  # preencha as chaves
-docker compose up --build
+docker compose --profile postgres --profile minio up --build
 curl -f localhost:8000/health
 ```
 
-O compose constrói a imagem com contexto `apps/core` e persiste os checkpoints
-no volume nomeado `dados`, montado em `/app/data`. O `compose.override.yaml`
-publica a porta `8000` no local.
+O compose constrói a imagem a partir da raiz (`apps/core/Dockerfile`) e sobe, em
+ordem: `postgres` → `migrate` (roda o Alembic e termina) → `api` e `worker`.
+O `compose.override.yaml` publica as portas `8000` (API), `5432` (Postgres),
+`9000`/`9001` (MinIO e console).
+
+Com `SATURDAY_WEBHOOK_URL` definida, `POST /chat` responde `202` e a resposta sai
+pelo worker: ele entrega o outbox, com backoff (2 s, 4 s, 8 s…) até
+`SATURDAY_OUTBOX_MAX_TENTATIVAS`. Sem URL de webhook, a resposta volta na própria
+requisição.
+
+### `.env.local` (opcional)
+
+O compose lê `.env` e, se existir, `.env.local` por cima. Use o segundo para o
+que muda por máquina (URL do Postgres, endpoint do S3) sem mexer no `.env`
+compartilhado. Ele é ignorado pelo git (`.env.*`).
 
 ## Desenvolvimento
 
@@ -53,8 +72,21 @@ cd apps/core
 uv run ruff format --check            # formatação
 uv run ruff check                     # lint
 uv run mypy                           # tipos
-uv run pytest -q                      # testes, sem rede
+uv run pytest -q                      # testes sem Postgres (os de banco são pulados)
 ```
+
+Os testes que exercitam o backend real (trava consultiva, poda de checkpoints,
+outbox, sobrevivência ao restart) exigem um Postgres **de teste**:
+
+```bash
+docker compose --profile postgres up -d postgres
+docker exec saturday-postgres-1 createdb -U saturday saturday_test
+SATURDAY_TEST_DATABASE_URL='postgresql://saturday:saturday@127.0.0.1:5432/saturday_test' \
+  uv run pytest -q
+```
+
+O nome do banco precisa conter `test`: os fixtures apagam e recriam as tabelas, e
+a suíte recusa um banco que não se declare descartável.
 
 Os mesmos comandos rodam no CI (`.github/workflows/tests.yml`) a cada push e
 pull request.

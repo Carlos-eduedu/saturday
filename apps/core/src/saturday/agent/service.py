@@ -2,23 +2,32 @@
 
 from __future__ import annotations
 
-import hashlib
 import logging
-import threading
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import Any, Literal, cast
 from zoneinfo import ZoneInfo
 
 from langchain_core.messages import AIMessage, HumanMessage
+from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.agent.context import AgentContext
 from saturday.agent.state import turno_inicial
 from saturday.agent.textos import mensagem_handoff
+from saturday.dados import repositorios
+from saturday.dados.outbox import enfileirar
+from saturday.dados.sessao import sessao as abrir_sessao
+from saturday.dados.trava import travar_conversa
 from saturday.metrics import TurnMetrics, iniciar_metricas, metricas_atuais
 from saturday.schemas import AgentReply, ChatRequest
 from saturday.services.webhook import WebhookClient
 from saturday.settings import TZ_OPERACAO, Settings
+from saturday.storage.base import Storage
+
+# Quantos pares mensagem/resposta ficam no checkpoint para idempotência.
+JANELA_IDEMPOTENCIA = 50
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +41,7 @@ def agora() -> datetime:
 
 
 class AgentService:
-    """Orquestra o grafo, o webhook, o checkpointer e os locks."""
+    """Orquestra o grafo, o checkpointer, o outbox e a trava por conversa."""
 
     def __init__(
         self,
@@ -41,13 +50,19 @@ class AgentService:
         webhook: WebhookClient,
         settings: Settings,
         checkpointer: Any = None,
+        fabrica: sessionmaker[Session] | None = None,
+        storage: Storage | None = None,
     ) -> None:
         self.graph = graph
         self.context = context
         self.webhook = webhook
         self.settings = settings
         self.checkpointer = checkpointer
-        self.locks = [threading.Lock() for _ in range(256)]
+        # Sem `fabrica` (ambiente `pytest`) não há Postgres: o turno não grava
+        # `mensagens` nem `outbox` e a entrega volta a ser direta. Em qualquer
+        # outro ambiente `validar_para_subir` exige `SATURDAY_DATABASE_URL`.
+        self.fabrica = fabrica
+        self.storage = storage
 
     def config(self, conversation_id: str) -> dict[str, Any]:
         return {"configurable": {"thread_id": conversation_id}}
@@ -56,9 +71,22 @@ class AgentService:
         snapshot = self.graph.get_state(config)
         return dict(snapshot.values or {})
 
-    def _lock(self, conversation_id: str) -> threading.Lock:
-        digest = hashlib.blake2b(conversation_id.encode(), digest_size=8).digest()
-        return self.locks[int.from_bytes(digest, "big") % len(self.locks)]
+    @contextmanager
+    def _trava(self, conversation_id: str) -> Iterator[Session | None]:
+        """Trava a conversa e mantém a transação aberta durante todo o turno.
+
+        A trava é ``pg_advisory_xact_lock``: vale entre processos e some no
+        commit. Devolve a sessão porque é dentro desta transação que a resposta
+        vai para `mensagens` e para o `outbox`.
+        """
+
+        if self.fabrica is None:
+            yield None
+            return
+
+        with abrir_sessao(self.fabrica) as aberta:
+            travar_conversa(aberta, conversation_id)
+            yield aberta
 
     def evento(
         self,
@@ -117,16 +145,42 @@ class AgentService:
         if agora() - recebido <= timedelta(days=self.settings.retencao_extrato_dias):
             return estado
 
-        atualizacao = {
+        self._apagar_anexos(estado.get("attachments") or [])
+        atualizacao: dict[str, Any] = {
             "hiscon": None,
             "portability_result": None,
             "oferta_pendente": False,
             "hiscon_recebido_em": None,
+            "attachments": [],
         }
         self.graph.update_state(config, atualizacao)
+        self._podar_checkpoints(config)
         estado = dict(estado)
         estado.update(atualizacao)
         return estado
+
+    def _apagar_anexos(self, anexos: list[dict[str, Any]]) -> None:
+        """Apaga do storage os arquivos referenciados pelo estado."""
+
+        if self.storage is None:
+            return
+        for anexo in anexos:
+            chave = anexo.get("chave") if isinstance(anexo, dict) else None
+            if chave:
+                self.storage.apagar(str(chave))
+
+    def _podar_checkpoints(self, config: dict[str, Any]) -> None:
+        """Remove os checkpoints anteriores, que ainda contêm o extrato.
+
+        Atualizar o estado só limpa o topo: os checkpoints antigos guardam os
+        bytes do extrato. ``prune`` mantém apenas o checkpoint atual (já limpo).
+        """
+
+        thread_id = config["configurable"]["thread_id"]
+        if hasattr(self.checkpointer, "prune"):
+            self.checkpointer.prune([thread_id], strategy="keep_latest")
+        elif hasattr(self.checkpointer, "delete_thread"):
+            self.checkpointer.delete_thread(thread_id)
 
     @staticmethod
     def _atualizacao_liberacao() -> dict[str, Any]:
@@ -200,7 +254,6 @@ class AgentService:
         *,
         inicio: float,
         caminho: list[str],
-        message_ids: list[str] | None,
     ) -> AgentReply:
         resposta = mensagem_handoff("erro_interno")
         atualizacao: dict[str, Any] = {
@@ -210,8 +263,6 @@ class AgentService:
             "handoff_em": agora().isoformat(),
             "messages": [AIMessage(content=resposta)],
         }
-        if message_ids is not None:
-            atualizacao["message_ids_recentes"] = message_ids[-50:]
         try:
             self.graph.update_state(config, atualizacao)
         except Exception:
@@ -228,10 +279,37 @@ class AgentService:
         )
         return self.evento(conversation_id, atualizacao, status="handoff")
 
-    def _processar_turno(self, payload: ChatRequest) -> AgentReply:
+    def _processar_turno(
+        self,
+        payload: ChatRequest,
+        sessao: Session | None = None,
+    ) -> AgentReply:
         config = self.config(payload.conversation_id)
         estado = self.estado_atual(config)
         estado = self._aplicar_retencao(config, estado)
+
+        conversa = None
+        if sessao is not None:
+            conversa = repositorios.obter_ou_criar_conversa(sessao, payload.conversation_id)
+
+        ids_recentes = list(estado.get("message_ids_recentes") or [])
+        respostas = dict(estado.get("respostas_recentes") or {})
+        if payload.message_id and payload.message_id in ids_recentes:
+            # Devolve a mesma resposta já dada, não uma vazia.
+            return self.evento(
+                payload.conversation_id,
+                estado,
+                status="duplicate",
+                answer=respostas.get(payload.message_id, ""),
+            )
+
+        if conversa is not None:
+            repositorios.registrar_entrada(
+                sessao,  # type: ignore[arg-type]
+                conversa,
+                message_id=payload.message_id,
+                conteudo=payload.message,
+            )
 
         if estado.get("status") == "handoff":
             if not self._deve_liberar_auto(estado):
@@ -244,15 +322,6 @@ class AgentService:
             self.graph.update_state(config, self._atualizacao_liberacao())
             estado = self.estado_atual(config)
 
-        ids_recentes = list(estado.get("message_ids_recentes") or [])
-        if payload.message_id and payload.message_id in ids_recentes:
-            return self.evento(
-                payload.conversation_id,
-                estado,
-                status="duplicate",
-                answer="",
-            )
-
         cliente = self._cliente_mesclado(estado, payload)
         entrada = turno_inicial(
             user_message=payload.message,
@@ -260,9 +329,6 @@ class AgentService:
         )
         if cliente:
             entrada["cliente"] = cliente
-        if payload.message_id:
-            ids_recentes.append(payload.message_id)
-            entrada["message_ids_recentes"] = ids_recentes[-50:]
         if payload.message.strip():
             entrada["messages"] = [HumanMessage(content=payload.message)]
 
@@ -287,12 +353,18 @@ class AgentService:
                 "erro_interno conversation_id=%s",
                 payload.conversation_id,
             )
+            self._registrar_resposta(
+                config,
+                ids_recentes,
+                respostas,
+                payload.message_id,
+                mensagem_handoff("erro_interno"),
+            )
             return self._fallback_erro_interno(
                 payload.conversation_id,
                 config,
                 inicio=inicio,
                 caminho=caminho,
-                message_ids=ids_recentes if payload.message_id else None,
             )
 
         final = dict(self.graph.get_state(config).values or {})
@@ -303,13 +375,52 @@ class AgentService:
             inicio,
             metricas,
         )
-        return self.evento(payload.conversation_id, final)
+        resposta = self.evento(payload.conversation_id, final)
+
+        if payload.message_id and resposta.answer:
+            self._registrar_resposta(
+                config, ids_recentes, respostas, payload.message_id, resposta.answer
+            )
+        if sessao is not None and conversa is not None:
+            repositorios.registrar_saida(sessao, conversa, conteudo=resposta.answer or "")
+            if self.webhook.configurado and resposta.status not in ("with_human", "duplicate"):
+                enfileirar(
+                    sessao,
+                    conversa_id=conversa.id,
+                    canal="webhook",
+                    payload=resposta.model_dump(mode="json"),
+                )
+        return resposta
+
+    def _registrar_resposta(
+        self,
+        config: dict[str, Any],
+        ids_recentes: list[str],
+        respostas: dict[str, str],
+        message_id: str | None,
+        answer: str,
+    ) -> None:
+        """Guarda o par mensagem/resposta no checkpoint para a idempotência."""
+
+        if not message_id:
+            return
+        ids = [*ids_recentes, message_id][-JANELA_IDEMPOTENCIA:]
+        recentes = {**respostas, message_id: answer}
+        self.graph.update_state(
+            config,
+            {
+                "message_ids_recentes": ids,
+                "respostas_recentes": {
+                    chave: texto for chave, texto in recentes.items() if chave in set(ids)
+                },
+            },
+        )
 
     def process_message(self, payload: ChatRequest) -> AgentReply:
         """Roda um turno inteiro sob a trava da conversa."""
 
-        with self._lock(payload.conversation_id):
-            return self._processar_turno(payload)
+        with self._trava(payload.conversation_id) as sessao:
+            return self._processar_turno(payload, sessao)
 
     def processar_e_enviar(self, payload: ChatRequest) -> None:
         try:
@@ -323,5 +434,8 @@ class AgentService:
             return
         if resposta.status in ("with_human", "duplicate"):
             # Não envia nada: a conversa está congelada ou o evento é repetido.
+            return
+        if self.fabrica is not None:
+            # Com Postgres a entrega é do worker, pelo `outbox` gravado no turno.
             return
         self.webhook.enviar(resposta.model_dump(mode="json"))

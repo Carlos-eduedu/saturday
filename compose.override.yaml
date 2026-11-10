@@ -1,6 +1,8 @@
 # Ajustes de desenvolvimento local. O Docker Compose carrega este arquivo
 # automaticamente junto com `compose.yaml`.
 #
+# Publica as portas que o desenvolvedor usa por fora dos containers:
+# a API, o Postgres (para rodar `pytest` contra ele) e o console do MinIO.
 # `simuladores/granatech` e `simuladores/meta` entram nas fases 2 e 4, junto com
 # as variáveis que apontam `SATURDAY_WHATSAPP_GRAPH_URL` e
 # `SATURDAY_GRANATECH_BASE_URL` para eles.
@@ -8,3 +10,12 @@ services:
   api:
     ports:
       - "8000:8000"
+
+  postgres:
+    ports:
+      - "5432:5432"
+
+  minio:
+    ports:
+      - "9000:9000"
+      - "9001:9001"
