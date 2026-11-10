@@ -7,11 +7,16 @@ on:
 jobs:
   qualidade:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/core
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.14"
+          # O `uv.lock` vive em apps/core, não na raiz.
+          cache-dependency-glob: apps/core/uv.lock
 
       - name: Instalar dependências
         run: uv sync --locked
@@ -23,7 +28,7 @@ jobs:
         run: uv run ruff check
 
       - name: Tipos
-        run: uv run mypy src
+        run: uv run mypy
 
       - name: Testes
         run: uv run pytest

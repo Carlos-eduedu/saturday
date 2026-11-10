@@ -1,0 +1,10 @@
+# Ajustes de desenvolvimento local. O Docker Compose carrega este arquivo
+# automaticamente junto com `compose.yaml`.
+#
+# `simuladores/granatech` e `simuladores/meta` entram nas fases 2 e 4, junto com
+# as variáveis que apontam `SATURDAY_WHATSAPP_GRAPH_URL` e
+# `SATURDAY_GRANATECH_BASE_URL` para eles.
+services:
+  api:
+    ports:
+      - "8000:8000"

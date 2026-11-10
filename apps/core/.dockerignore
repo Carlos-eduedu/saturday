@@ -1,0 +1,17 @@
+# O contexto de build é `apps/core`. Nada de credenciais nem de dados de
+# conversa entra na imagem.
+.env
+.env.*
+!.env.example
+.venv
+.ruff_cache
+.mypy_cache
+.pytest_cache
+__pycache__
+*.pyc
+*.pyo
+tests
+data
+*.sqlite
+*.sqlite3
+*.pdf

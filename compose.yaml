@@ -1,0 +1,23 @@
+# Forma de deploy (Dokploy): sem `ports`, sem `container_name`, só volumes
+# nomeados, limites de recurso e healthcheck. Os ajustes de desenvolvimento
+# local ficam em `compose.override.yaml`, carregado automaticamente.
+#
+# `migrate`, `worker` e `painel` entram nas fases 1 e 3, quando existirem.
+name: saturday
+
+services:
+  api:
+    build:
+      context: apps/core
+    env_file: .env
+    environment:
+      # O volume nomeado é o único lugar gravável da imagem.
+      SATURDAY_CHECKPOINT_PATH: /app/data/checkpoints.sqlite
+    volumes:
+      - dados:/app/data
+    restart: unless-stopped
+    mem_limit: 1g
+    cpus: 1.0
+
+volumes:
+  dados:
