@@ -80,6 +80,21 @@ A condição de crédito simulada que o agente apresenta ao cliente, sempre
 dentro do teto e com o seguro dito por extenso.
 _Evitar_: proposta (proposta é o que se cria no banco depois do aceite)
 
+**Aceite**:
+O SIM do cliente ao resumo fechado da oferta, com os valores e a conta; é o que
+autoriza criar a proposta.
+_Evitar_: contratação, fechamento
+
+**Proposta**:
+O pedido de crédito criado no banco depois do aceite; acompanha a
+formalização até o pagamento.
+_Evitar_: oferta (oferta é a condição apresentada antes do aceite), contrato
+
+**Formalização**:
+A etapa em que o cliente confirma a identidade no banco (biometria) pelo link
+que o agente envia.
+_Evitar_: assinatura, validação
+
 **Não elegível**:
 Fim da jornada para quem a triagem, a empresa, a idade ou a consulta
 reprovaram; só um atendente reabre.

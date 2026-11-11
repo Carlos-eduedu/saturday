@@ -1,8 +1,9 @@
 """Recontatos vencidos, disparados pelo worker.
 
-Só o de cota esgotada dispara nesta fase: o turno de sistema tenta a consulta de
-novo. O de tempo de casa fica gravado até a Fase 6, que traz o modelo
-`recontato_tempo_casa` e o opt-in.
+- cota esgotada: o turno de sistema tenta a consulta de novo;
+- tempo de casa: só gravado com opt-in; o turno de sistema envia o modelo de
+  marketing `recontato_tempo_casa` e a jornada recomeça pela triagem. O nó
+  confere o opt-in de novo (o cliente pode ter pedido para não receber).
 
 O recontato é marcado como feito antes do turno (no máximo uma vez): se o turno
 falhar, fica o log, e não um cliente recebendo a mesma mensagem duas vezes.
@@ -36,18 +37,23 @@ def disparar(
     agora = agora or datetime.now(UTC)
     with abrir_sessao(fabrica) as sessao:
         alvos = []
-        for recontato in recontatos.vencidos(
-            sessao, motivo=recontatos.COTA_ESGOTADA, agora=agora, limite=LOTE
-        ):
-            recontato.feito_em = agora
-            conversation_id = sessao.scalar(
-                select(Conversa.conversation_id).where(Conversa.id == recontato.conversa_id)
-            )
-            if conversation_id:
-                alvos.append((conversation_id, recontato.tentativas))
-    for conversation_id, tentativas in alvos:
+        for motivo in (recontatos.COTA_ESGOTADA, recontatos.TEMPO_CASA):
+            for recontato in recontatos.vencidos(sessao, motivo=motivo, agora=agora, limite=LOTE):
+                recontato.feito_em = agora
+                conversation_id = sessao.scalar(
+                    select(Conversa.conversation_id).where(Conversa.id == recontato.conversa_id)
+                )
+                if not conversation_id:
+                    continue
+                evento = (
+                    f"recontato:{recontato.tentativas}"
+                    if motivo == recontatos.COTA_ESGOTADA
+                    else "recontato_tempo_casa"
+                )
+                alvos.append((conversation_id, evento))
+    for conversation_id, evento in alvos:
         try:
-            servico.continuar(conversation_id, f"recontato:{tentativas}")
+            servico.continuar(conversation_id, evento)
         except Exception:  # noqa: BLE001 - um recontato não derruba os outros
-            logger.exception("recontato_falhou tentativas=%s", tentativas)
+            logger.exception("recontato_falhou evento=%s", evento)
     return len(alvos)

@@ -11,19 +11,35 @@ from saturday.agent.clt import mensagens, nos
 
 FONTES = Path(__file__).resolve().parents[1] / "src" / "saturday"
 # `texto("chave")` e os atalhos do nó que recebem a chave direto.
-CHAMADA = re.compile(r"""(?:texto|erro|nao_elegivel)\(\s*["']([a-z_]+)["']""")
+CHAMADA = re.compile(r"""(?:texto\(|erro\(|nao_elegivel\(|_aviso\(t,)\s*["']([a-z_]+)["']""")
+LITERAL = re.compile(r"""["']([a-z_]+)["']""")
+
+
+def _fontes() -> list[str]:
+    return [
+        arquivo.read_text(encoding="utf-8")
+        for arquivo in FONTES.rglob("*.py")
+        if "mensagens" in arquivo.read_text(encoding="utf-8")
+    ]
 
 
 def _chaves_usadas() -> set[str]:
     usadas: set[str] = set()
-    for arquivo in FONTES.rglob("*.py"):
-        conteudo = arquivo.read_text(encoding="utf-8")
-        if "mensagens" in conteudo:
-            usadas |= set(CHAMADA.findall(conteudo))
+    for conteudo in _fontes():
+        usadas |= set(CHAMADA.findall(conteudo))
     # Chaves guardadas em tabelas do nó (perguntas e reprovações da triagem).
     usadas |= set(nos.PERGUNTAS.values())
     usadas |= {chave for _, chave in nos.REPROVA.values()}
     return usadas
+
+
+def _literais() -> set[str]:
+    """Qualquer texto entre aspas no código: cobre chaves passadas por variável."""
+
+    literais: set[str] = set()
+    for conteudo in _fontes():
+        literais |= set(LITERAL.findall(conteudo))
+    return literais | _chaves_usadas()
 
 
 def test_toda_chave_usada_existe() -> None:
@@ -33,7 +49,7 @@ def test_toda_chave_usada_existe() -> None:
 
 
 def test_toda_chave_existente_e_usada() -> None:
-    sobrando = mensagens.chaves().keys() - _chaves_usadas()
+    sobrando = mensagens.chaves().keys() - _literais()
     assert not sobrando, f"mensagens sem uso: {sorted(sobrando)}"
 
 

@@ -2,8 +2,8 @@
 
 O evento só atualiza o registro local (consulta ou proposta), na ordem da
 jornada: status final nunca é sobrescrito e evento atrasado não faz regredir.
-Tudo o que chega fica no histórico, inclusive o que foi ignorado. O que o
-cliente recebe por causa de cada status entra nas fases 5 e 6.
+Tudo o que chega fica no histórico, inclusive o que foi ignorado. Depois de
+aplicado, cada status vira um turno de sistema na conversa (ramo CLT).
 
 Quando uma consulta fica pronta (``SUCCESS``), o detalhe é buscado e gravado.
 Se ele ainda vier sem margens, o evento falha e volta para a fila. Com o
@@ -47,7 +47,7 @@ def aplicar(
     if tipo == "consulta":
         _consulta(fabrica, cliente, payload, servico)
     elif tipo == "proposta":
-        _proposta(fabrica, payload)
+        _proposta(fabrica, payload, servico)
     else:
         with abrir_sessao(fabrica) as sessao:
             _alertar(sessao, None, motivo="tipo_desconhecido", tipo=tipo or None)
@@ -103,11 +103,7 @@ def _consulta(
             logger.info("granatech_consulta_status_ignorado atual=%s novo=%s", linha.status, novo)
         status = linha.status
         tem_detalhe = linha.detalhe is not None
-        conversation_id = (
-            sessao.scalar(select(Conversa.conversation_id).where(Conversa.id == linha.conversa_id))
-            if linha.conversa_id
-            else None
-        )
+        conversation_id = _conversation_id(sessao, linha.conversa_id)
 
     if status == "SUCCESS" and not tem_detalhe:
         if cliente is None:
@@ -131,7 +127,11 @@ def evento_da_consulta(status: str) -> str | None:
     return None
 
 
-def _proposta(fabrica: sessionmaker[Session], payload: dict[str, Any]) -> None:
+def _proposta(
+    fabrica: sessionmaker[Session],
+    payload: dict[str, Any],
+    servico: AgentService | None = None,
+) -> None:
     id_externo = str(payload.get("id_proposta") or "")
     notificacao = payload.get("tipo_notificacao")
     notificacao = str(notificacao) if notificacao else None
@@ -156,9 +156,10 @@ def _proposta(fabrica: sessionmaker[Session], payload: dict[str, Any]) -> None:
                 "recebido_em": _agora(),
             },
         ]
+        conversation_id = _conversation_id(sessao, linha.conversa_id)
         if not novo or novo not in ordem.PROPOSTA:
-            # O contrato pede handoff para status desconhecido; o alerta é o que
-            # existe até a Fase 6 ligar a proposta à conversa.
+            # Grava o alerta com os ids e faz handoff na conversa (abaixo).
+            avisar: str | None = "proposta:desconhecida"
             _alertar(
                 sessao,
                 linha.conversa_id,
@@ -167,9 +168,22 @@ def _proposta(fabrica: sessionmaker[Session], payload: dict[str, Any]) -> None:
                 status=novo,
                 tipo_notificacao=notificacao,
             )
-            return
-        if ordem.aceita_proposta(linha.status, novo, notificacao):
+        elif ordem.aceita_proposta(linha.status, novo, notificacao):
+            # Só avisa quando algo mudou: o mesmo par repetido não repete mensagem.
+            mudou = (linha.status, linha.tipo_notificacao) != (novo, notificacao)
             linha.status = novo
             linha.tipo_notificacao = notificacao
+            acao = ordem.acao_da_proposta(novo, notificacao)
+            avisar = f"proposta:{acao}" if mudou else None
         else:
+            avisar = None
             logger.info("granatech_proposta_status_ignorado atual=%s novo=%s", linha.status, novo)
+
+    if servico is not None and conversation_id and avisar:
+        servico.continuar(conversation_id, avisar)
+
+
+def _conversation_id(sessao: Session, conversa_id: Any) -> str | None:
+    if conversa_id is None:
+        return None
+    return sessao.scalar(select(Conversa.conversation_id).where(Conversa.id == conversa_id))

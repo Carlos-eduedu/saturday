@@ -30,3 +30,5 @@ class AgentContext:
     granatech: ClienteGranatech | None = None
     brasilapi: BrasilAPI | None = None
     fabrica: sessionmaker[Session] | None = None
+    # Domínio dos links curtos da biometria (`SATURDAY_DOMINIO_PUBLICO`).
+    dominio_publico: str = ""
