@@ -474,6 +474,29 @@ class ClienteGranatech:
             raise ErroGranatech("detalhe em formato inesperado")
         return normalizar_detalhe(dados), recortar_detalhe(dados)
 
+    def situacao(self, id_consulta: str) -> tuple[str, str | None, DetalheConsulta | None]:
+        """Status, link do termo e detalhe já gravados localmente para a consulta."""
+
+        with abrir_sessao(self._fabrica) as sessao:
+            linha = sessao.scalars(
+                select(ConsultaGranatech).where(ConsultaGranatech.id_externo == id_consulta)
+            ).one()
+            detalhe = normalizar_detalhe(linha.detalhe) if linha.detalhe else None
+            return linha.status, linha.link_termo, detalhe
+
+    def gravar_detalhe(self, id_consulta: str) -> DetalheConsulta | None:
+        """Busca o detalhe e grava o recorte; ``None`` se ainda vier sem margens."""
+
+        detalhe, recorte = self.detalhe(id_consulta)
+        if detalhe is None:
+            return None
+        with abrir_sessao(self._fabrica) as sessao:
+            linha = sessao.scalars(
+                select(ConsultaGranatech).where(ConsultaGranatech.id_externo == id_consulta)
+            ).one()
+            linha.detalhe = recorte
+        return detalhe
+
     # ------------------------------------------------------------------ simulação
 
     def simular(
@@ -508,6 +531,10 @@ class ClienteGranatech:
         if not isinstance(dados, dict):
             raise ErroGranatech("simulação em formato inesperado")
         return normalizar_simulacao(dados)
+
+    @property
+    def teto(self) -> Decimal:
+        return self._settings.granatech_teto_liberado
 
     def simular_no_teto(self, **pedido: Any) -> Simulacao | None:
         """Simula e, se o liberado passar do teto, reduz a parcela.

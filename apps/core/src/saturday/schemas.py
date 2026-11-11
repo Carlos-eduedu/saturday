@@ -69,6 +69,18 @@ HandoffReason = Literal[
     "aceitou_portabilidade",
     "dados_cliente_nao_informados",
     "erro_interno",
+    # Ramo CLT (Fase 5).
+    "aceite_clt",
+    "mudou_publico",
+    "dado_invalido_repetido",
+    "brasilapi_indisponivel",
+    "granatech_indisponivel",
+    "sem_consentimento",
+    "termo_falhou",
+    "cota_esgotada",
+    "consulta_com_erro",
+    "acima_do_teto",
+    "limite_simulacoes",
 ]
 
 MotivoContrato = Literal[

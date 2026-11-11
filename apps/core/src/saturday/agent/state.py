@@ -18,6 +18,13 @@ class AgentState(MessagesState, total=False):
     answer: str | None
     handoff_reason: str | None
     resposta_oferta: str | None
+    # Ramo CLT: evento do sistema que abriu o turno (sem mensagem do cliente),
+    # dados da conversa vindos do serviço e o desvio para a FAQ.
+    evento_sistema: str | None
+    conversa_ref: str | None
+    message_id: str | None
+    telefone: str | None
+    clt_faq: bool
 
     # Campos persistentes da conversa.
     publico: str | None
@@ -29,6 +36,8 @@ class AgentState(MessagesState, total=False):
     tentativas_extrato: int
     portability_result: dict[str, Any] | None
     oferta_pendente: bool
+    # Jornada CLT: etapa, passo, dados informados e oferta (ver agent/clt).
+    clt: dict[str, Any]
     handoff_em: str | None
     # Sem reducer de propósito: a lista é substituída a cada gravação.
     message_ids_recentes: list[str]
@@ -43,6 +52,11 @@ CAMPOS_DO_TURNO = (
     "answer",
     "handoff_reason",
     "resposta_oferta",
+    "evento_sistema",
+    "conversa_ref",
+    "message_id",
+    "telefone",
+    "clt_faq",
 )
 
 
@@ -64,6 +78,11 @@ def turno_inicial(
         "answer": None,
         "handoff_reason": None,
         "resposta_oferta": None,
+        "evento_sistema": None,
+        "conversa_ref": None,
+        "message_id": None,
+        "telefone": None,
+        "clt_faq": False,
     }
     if cliente:
         estado["cliente"] = cliente

@@ -112,6 +112,19 @@ def pedir_texto(state: AgentState) -> dict[str, Any]:
     }
 
 
+def _entra_no_clt(state: AgentState, publico: str, contexto: AgentContext) -> bool:
+    """CLT com a Granatech ligada e nenhuma jornada (CLT ou INSS) em curso."""
+
+    return (
+        publico == "clt"
+        and contexto.granatech is not None
+        and not (state.get("clt") or {}).get("etapa")
+        and not state.get("hiscon")
+        and not state.get("oferta_pendente")
+        and not state.get("aguardando")
+    )
+
+
 def classify_intent(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
     try:
         resultado = runtime.context.jev.classify(
@@ -150,6 +163,8 @@ def classify_intent(state: AgentState, runtime: Runtime[AgentContext]) -> dict[s
         "publico": publico,
         "resposta_oferta": resposta_oferta,
     }
+    if _entra_no_clt(state, publico, runtime.context):
+        atualizacao["clt"] = {"etapa": "abertura"}
     if pediu_humano:
         atualizacao.update({"needs_human": True, "handoff_reason": "pediu_humano"})
     elif resposta_oferta == "aceita":
