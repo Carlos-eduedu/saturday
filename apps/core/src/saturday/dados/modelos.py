@@ -2,7 +2,8 @@
 
 Nove tabelas criadas na Fase 1, duas na Fase 3 (``sessoes_painel`` e
 ``alertas``) e duas na Fase 4 (``consultas_granatech`` e
-``propostas_granatech``). ``consentimentos`` ganha escritor na Fase 5.
+``propostas_granatech``). A Fase 5 dá escritor a ``consentimentos`` e cria
+``empresas_cnpj`` e ``recontatos``.
 """
 
 from __future__ import annotations
@@ -321,3 +322,34 @@ class PropostaGranatech(Base):
     atualizada_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=AGORA, onupdate=AGORA
     )
+
+
+class EmpresaCnpj(Base):
+    """Cache da BrasilAPI por CNPJ (30 dias), compartilhado por API e worker."""
+
+    __tablename__ = "empresas_cnpj"
+
+    cnpj: Mapped[str] = mapped_column(String(14), primary_key=True)
+    dados: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    buscada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
+
+
+class Recontato(Base):
+    """Voltar a falar com o cliente numa data marcada.
+
+    ``motivo`` é ``cota_esgotada`` (o worker dispara) ou ``tempo_casa`` (só
+    gravado até a Fase 6). ``tentativas`` conta as remarcações por cota.
+    """
+
+    __tablename__ = "recontatos"
+    __table_args__ = (Index("ix_recontatos_pendentes", "motivo", "quando"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    conversa_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("conversas.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    motivo: Mapped[str] = mapped_column(String(32), nullable=False)
+    quando: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    tentativas: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    feito_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
