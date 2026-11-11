@@ -2,18 +2,21 @@
 # automaticamente junto com `compose.yaml`.
 #
 # Publica as portas que o desenvolvedor usa por fora dos containers (API,
-# Postgres para rodar `pytest`, console do MinIO e o simulador da Meta) e aponta
-# o canal do WhatsApp para o simulador em vez da Graph de verdade.
+# Postgres para rodar `pytest`, console do MinIO e os simuladores da Meta e da
+# Granatech) e aponta o canal do WhatsApp e o cliente da Granatech para os
+# simuladores em vez dos parceiros de verdade.
 services:
   api:
     ports:
       - "8000:8000"
     environment:
       SATURDAY_WHATSAPP_GRAPH_URL: http://meta:8100
+      SATURDAY_GRANATECH_BASE_URL: http://granatech:8200
 
   worker:
     environment:
       SATURDAY_WHATSAPP_GRAPH_URL: http://meta:8100
+      SATURDAY_GRANATECH_BASE_URL: http://granatech:8200
 
   painel:
     ports:
@@ -61,6 +64,37 @@ services:
       SATURDAY_HEALTH_URL: http://127.0.0.1:8100/admin/enviadas
     ports:
       - "8100:8100"
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
+
+  # Simulador da Granatech, no mesmo molde do da Meta. A chave do cliente
+  # precisa ser a mesma do simulador.
+  granatech:
+    image: saturday-api
+    healthcheck:
+      test: ["CMD", "saturday-health", "api"]
+      interval: 30s
+      timeout: 5s
+    working_dir: /app
+    volumes:
+      - ./simuladores:/simuladores:ro
+    command:
+      - uvicorn
+      - app:app
+      - --app-dir
+      - /simuladores/granatech
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8200"
+    environment:
+      SIMULADOR_SATURDAY_URL: http://api:8000
+      SIMULADOR_GRANATECH_CHAVE: ${SATURDAY_GRANATECH_CHAVE_API:-chave-do-simulador}
+      SATURDAY_GRANATECH_WEBHOOK_TOKEN: ${SATURDAY_GRANATECH_WEBHOOK_TOKEN:-token-do-simulador}
+      SATURDAY_HEALTH_URL: http://127.0.0.1:8200/admin/estado
+    ports:
+      - "8200:8200"
     restart: unless-stopped
     mem_limit: 256m
     cpus: 0.5
