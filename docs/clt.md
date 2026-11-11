@@ -1,9 +1,8 @@
-# Ramo CLT (Fase 5)
+# Ramo CLT (fases 5 e 6)
 
-Jornada do Crédito do Trabalhador da primeira mensagem até a oferta. O aceite
-ainda vai para um especialista (handoff `aceite_clt`); a proposta entra na
-Fase 6. Os termos (triagem, consulta, vínculo, oferta, não elegível, recontato)
-estão no [`GLOSSARY.md`](../GLOSSARY.md).
+Jornada do Crédito do Trabalhador da primeira mensagem até o pagamento. Os
+termos (triagem, consulta, vínculo, oferta, aceite, proposta, formalização, não
+elegível, recontato) estão no [`GLOSSARY.md`](../GLOSSARY.md).
 
 ## Ligar
 
@@ -25,6 +24,9 @@ pela FAQ, como antes.
 | `fontes/brasilapi.py` | CNPJ na BrasilAPI, com cache de 30 dias em `empresas_cnpj` |
 | `dados/consentimentos.py` | Prova do SIM |
 | `dados/recontatos.py`, `jobs/recontatos.py` | Recontatos e o disparo pelo worker |
+| `agent/clt/turno.py` | O `Turno`: estado da jornada e as saídas comuns às etapas |
+| `agent/clt/proposta.py` | Dados da proposta, aceite, criação e pós-venda |
+| `dados/links.py`, `web/api/links.py` | Link curto da biometria (`GET /l/{codigo}`) |
 
 ## Etapas
 
@@ -90,9 +92,53 @@ O cliente ouve que o agente volta a falar no dia seguinte. O recontato
 consulta é tentada de novo. Se a cota continuar esgotada, o recontato é
 remarcado até 3 vezes; na 4ª falha, a conversa vai para handoff.
 
+## Proposta e pós-venda (Fase 6)
+
+Com `SATURDAY_GRANATECH_PROPOSTA_ATIVA=true`, quando o cliente quer seguir com a
+oferta, a jornada continua: `dados_proposta` → `aceite` → `proposta` →
+`formalizacao` → `pago` ([decisão 0008](decisoes/0008-dados-da-proposta-antes-do-sim.md)).
+Com a flag desligada, o aceite vai para handoff (`aceite_clt`). Oferta sem seguro
+também vai para handoff, porque o contrato da proposta sem seguro é pendente.
+
+- **Dados:** confirma o nome da mãe e o endereço da Granatech (se divergirem,
+  handoff), pede o estado civil e a conta, um dado por mensagem: banco por nome
+  ou código (lista `GET /bancos` com cache de 1 dia), tipo, agência, conta com
+  dígito e "a conta está no seu CPF?".
+- **Aceite:** o resumo traz valores, seguro e a conta mascarada. O SIM é gravado
+  como prova `proposta` (com o texto exato do resumo) antes do POST.
+- **Proposta:** `criar_proposta` (intenção gravada, um POST só, reconciliação
+  pela listagem) e depois `dados-tomador`. Resultado incerto sem proposta achada
+  vai para handoff `proposta_incerta`, sem novo POST.
+- **Pós-venda:** cada evento de proposta que muda o status vira o turno de
+  sistema `proposta:<acao>` (`status.acao_da_proposta`). Evento repetido,
+  atrasado ou de "só atualiza" não gera mensagem. Revisão do banco, status
+  desconhecido, pedido de cancelamento e segunda falha de pagamento vão para
+  handoff.
+- **Falha de pagamento:** o agente pede outra conta. Com
+  `SATURDAY_GRANATECH_DADOS_BANCARIOS_ATIVO` desligada (padrão), vai para handoff
+  com a conta no alerta; ligada, faz o PATCH.
+- **Biometria:** um link curto por proposta,
+  `https://{SATURDAY_DOMINIO_PUBLICO}/l/{codigo}`. No clique, a API busca o
+  `url_seguranca_identidade` vigente; se a Granatech falhar, usa o último
+  conhecido.
+- **Janela de 24 h fechada:** cada aviso diz o modelo que o substitui
+  (`assinatura_pronta` e `assinatura_refazer` com o código do link,
+  `dados_bancarios_pendentes`, `pagamento_confirmado`; os demais,
+  `atualizacao_pedido`). O texto completo espera o cliente responder.
+
+## Recontato por tempo de casa (Fase 6)
+
+Com menos de 12 meses de casa, o agente pergunta se pode avisar quando o cliente
+completar. O SIM grava `conversas.marketing = opt_in` e o recontato
+`tempo_casa`; na data, o worker envia o modelo de marketing
+`recontato_tempo_casa` e a jornada recomeça pela triagem. "Não quero receber"
+grava `opt_out` em qualquer etapa, e o recontato não sai.
+
 ## Testes
 
 - `tests/test_clt_regras.py` e `tests/test_clt_mensagens.py`: sem rede nem banco.
+- `tests/test_clt_proposta.py`: proposta e pós-venda, com timeout simulado no
+  POST, cada status de proposta e o link curto.
 - `tests/test_clt_jornada.py`: jornadas com Postgres, o simulador da Granatech em
   processo e uma BrasilAPI falsa. Sem `SATURDAY_TEST_DATABASE_URL`, esses testes
   são pulados.

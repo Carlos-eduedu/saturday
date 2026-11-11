@@ -37,6 +37,11 @@ nginx que serve o build do Vite e repassa `/admin` para a API na mesma origem.
   obrigatórias.
 - Domínios pela aba Domains do stack (o Dokploy injeta os labels do Traefik),
   com HTTPS e certificado Let's Encrypt.
+- Com `SATURDAY_GRANATECH_PROPOSTA_ATIVA=true`, `SATURDAY_DOMINIO_PUBLICO` é
+  obrigatória, e o caminho `/l/` desse domínio precisa chegar à `api` (links
+  curtos da biometria, `GET /l/{codigo}`). O botão dos modelos
+  `assinatura_pronta` e `assinatura_refazer` na Meta aponta para
+  `https://{dominio}/l/{{1}}`.
 - Command (aba Advanced), trocando o appName do stack:
   `compose -p <appName> --env-file .env -f ./compose.yaml -f ./compose.dokploy.yaml up -d --build --remove-orphans`.
 

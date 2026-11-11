@@ -1,7 +1,7 @@
 # Granatech (Fase 4)
 
-Camada que fala com a API de parceiros da Granatech. O ramo CLT (Fase 5, ver
-[`clt.md`](clt.md)) a usa até a oferta; a proposta com pós-venda entra na Fase 6. Os termos (consulta, vínculo, liberado, teto, cota,
+Camada que fala com a API de parceiros da Granatech. O ramo CLT (fases 5 e 6,
+ver [`clt.md`](clt.md)) a usa da consulta ao pagamento. Os termos (consulta, vínculo, liberado, teto, cota,
 reaproveitamento) estão no [`GLOSSARY.md`](../GLOSSARY.md).
 
 ## Onde está cada coisa
@@ -154,4 +154,8 @@ Cada uma está no código como `TODO(granatech)`:
 - `tipo_empregador` (padrão 1, por configuração);
 - significado de `FIDUCIARY_INSTITUTION_NO_AUTHORIZATION` e
   `WORKER_MUST_CANCEL_RETURN_REQUEST` (por ora, alerta);
-- corpo do `PATCH /propostas/{id}/dados-bancarios` (fora desta fase).
+- corpo do `PATCH /propostas/{id}/dados-bancarios` (atrás de
+  `SATURDAY_GRANATECH_DADOS_BANCARIOS_ATIVO`, desligada; até lá, a equipe
+  corrige a conta);
+- valores aceitos de `estado_civil` nos dados do tomador (enviamos SOLTEIRO,
+  CASADO, DIVORCIADO, VIUVO, UNIAO_ESTAVEL ou SEPARADO).

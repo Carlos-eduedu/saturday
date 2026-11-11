@@ -10,7 +10,7 @@
   webhook do WhatsApp) e variáveis de ambiente.
 - [`../AGENTS.md`](../AGENTS.md) — regras inegociáveis, arquitetura alvo e fases.
 - [`granatech.md`](granatech.md) — cliente, cota, webhook e simulador da Granatech.
-- [`clt.md`](clt.md) — ramo CLT até a oferta: etapas, turnos de sistema e recontato.
+- [`clt.md`](clt.md) — ramo CLT: etapas, proposta, pós-venda, turnos de sistema e recontato.
 - [`deploy.md`](deploy.md) — ambientes, stacks e variáveis no Dokploy.
 
 ## Decisões
@@ -32,6 +32,8 @@ imutável: quando uma decisão muda, entra um registro novo que a substitui.
   — a `FonteCadastral` espera a segunda fonte.
 - [`decisoes/0007-triagem-antes-da-identificacao.md`](decisoes/0007-triagem-antes-da-identificacao.md)
   — no CLT, as perguntas de sim/não vêm antes de pedir CPF.
+- [`decisoes/0008-dados-da-proposta-antes-do-sim.md`](decisoes/0008-dados-da-proposta-antes-do-sim.md)
+  — o SIM do aceite cobre os valores e a conta.
 
 ## Estado por fase
 

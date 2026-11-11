@@ -85,7 +85,14 @@ automaticamente e é o que publica a porta no ambiente local.
   da consulta, recontato por cota esgotada (tabela `recontatos`), até 5 novas
   simulações depois da oferta e mensagens em `conhecimento/clt/mensagens.yaml`.
   O aceite vai para handoff (`aceite_clt`) até a Fase 6. Ver `docs/clt.md`.
-- As fases 6 e 7 estão pendentes. `infra/` e `regras/` nascem
+- **Fase 6 concluída:** dados da proposta antes do SIM (docs/decisoes/0008),
+  aceite com prova `proposta`, criação única com reconciliação e dados do
+  tomador, pós-venda por turno de sistema com o modelo certo fora da janela,
+  link curto `/l/{codigo}` resolvido no clique (`SATURDAY_DOMINIO_PUBLICO`),
+  falha de pagamento com PATCH atrás de `SATURDAY_GRANATECH_DADOS_BANCARIOS_ATIVO`
+  e recontato por tempo de casa com opt-in (`conversas.marketing`). Ver
+  `docs/clt.md`.
+- A fase 7 está pendente. `infra/` e `regras/` nascem
   na fase que colocar neles o primeiro arquivo real.
 - Fora das fases, o repositório já tem: workspace `uv` único (um lock e um
   venv na raiz), healthcheck próprio por serviço (a API responde `/health`, o
