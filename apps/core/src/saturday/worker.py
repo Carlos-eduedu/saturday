@@ -22,7 +22,12 @@ from saturday.jobs.outbox import EntregadorPorCanal, EntregadorWebhook, drenar
 from saturday.log import configurar_logging
 from saturday.settings import Settings, get_settings
 from saturday.storage.base import criar_storage
-from saturday.web.composicao import criar_canal_whatsapp, criar_checkpointer, criar_servico
+from saturday.web.composicao import (
+    criar_canal_whatsapp,
+    criar_checkpointer,
+    criar_cliente_granatech,
+    criar_servico,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +59,7 @@ def rodar(settings: Settings, parar: threading.Event) -> None:
             storage=storage,
         )
         entrada_whatsapp, saida_whatsapp = criar_canal_whatsapp(http, settings, fabrica, storage)
+        granatech = criar_cliente_granatech(http, settings, fabrica)
         entregador = EntregadorPorCanal(
             {
                 "webhook": EntregadorWebhook(http, settings),
@@ -68,7 +74,7 @@ def rodar(settings: Settings, parar: threading.Event) -> None:
             # não pode continuar parecendo saudável.
             registrar_batimento()
             try:
-                eventos = processar(fabrica, servico, entrada_whatsapp, settings)
+                eventos = processar(fabrica, servico, entrada_whatsapp, settings, granatech)
                 entregues = drenar(fabrica, entregador, settings)
                 if time.monotonic() >= proxima_verificacao:
                     alertas.verificar(fabrica)

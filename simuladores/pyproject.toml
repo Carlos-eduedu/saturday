@@ -30,3 +30,5 @@ select = ["E", "F", "W", "I", "B", "UP", "S", "SIM"]
 strict = true
 ignore_missing_imports = true
 files = ["."]
+# Cada simulador tem seu `app.py`: os módulos viram `meta.app` e `granatech.app`.
+explicit_package_bases = true
