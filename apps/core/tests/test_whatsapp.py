@@ -181,9 +181,19 @@ def test_parser_de_audio_traz_midia_e_tipo() -> None:
     assert evento.midia is not None
 
 
-@pytest.mark.parametrize("tipo", ["location", "contacts", "sticker", "reaction"])
-def test_tipos_so_registrados_nao_rodam_turno(tipo: str) -> None:
-    evento = eventos(_payload_mensagem({"type": tipo, tipo: {}}))[0]
+@pytest.mark.parametrize(
+    ("tipo", "corpo"),
+    [
+        ("location", {"latitude": -23.5, "longitude": -46.6}),
+        ("contacts", {}),
+        ("reaction", {"message_id": "wamid.X", "emoji": "👍"}),
+        # Figurinha e vídeo trazem `id` de mídia, como no payload real da Meta.
+        ("sticker", {"id": "s1", "mime_type": "image/webp", "animated": False}),
+        ("video", {"id": "v1", "mime_type": "video/mp4"}),
+    ],
+)
+def test_tipos_so_registrados_nao_rodam_turno(tipo: str, corpo: dict[str, object]) -> None:
+    evento = eventos(_payload_mensagem({"type": tipo, tipo: corpo}))[0]
 
     assert evento.roda_turno is False
 

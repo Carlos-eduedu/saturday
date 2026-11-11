@@ -40,26 +40,26 @@ class Evento:
     roda_turno: bool = True
 
 
-def _texto_de(mensagem: dict[str, Any]) -> tuple[str, bool]:
-    """Texto da mensagem e se ela veio de botão/interativo."""
+def _texto_de(mensagem: dict[str, Any]) -> str:
+    """Texto digitado, ou o título do botão ou da resposta interativa."""
 
     tipo = mensagem.get("type")
     if tipo == "text":
         corpo = mensagem.get("text")
         if isinstance(corpo, dict):
-            return str(corpo.get("body") or ""), False
+            return str(corpo.get("body") or "")
     if tipo == "button":
         corpo = mensagem.get("button")
         if isinstance(corpo, dict):
-            return str(corpo.get("text") or ""), True
+            return str(corpo.get("text") or "")
     if tipo == "interactive":
         corpo = mensagem.get("interactive")
         if isinstance(corpo, dict):
             for chave in ("button_reply", "list_reply"):
                 resposta = corpo.get(chave)
                 if isinstance(resposta, dict):
-                    return str(resposta.get("title") or ""), True
-    return "", False
+                    return str(resposta.get("title") or "")
+    return ""
 
 
 def _midia_de(mensagem: dict[str, Any]) -> Midia | None:
@@ -85,7 +85,7 @@ def _de_mensagem(mensagem: dict[str, Any], phone_number_id: str) -> Evento | Non
         return None
 
     tipo = str(mensagem.get("type") or "")
-    texto, interativo = _texto_de(mensagem)
+    texto = _texto_de(mensagem)
     midia = _midia_de(mensagem)
     referral = mensagem.get("referral")
 
@@ -99,8 +99,9 @@ def _de_mensagem(mensagem: dict[str, Any], phone_number_id: str) -> Evento | Non
         tipo_midia=tipo,
         midia=midia,
         referral=referral if isinstance(referral, dict) else None,
-        # Botão e interativo valem como resposta digitada: viram turno.
-        roda_turno=bool(texto) or interativo or midia is not None or tipo not in TIPOS_SEM_TURNO,
+        # O tipo decide sozinho: figurinha e vídeo trazem `id` de mídia, mas só
+        # são registrados. Botão e interativo valem como resposta digitada.
+        roda_turno=tipo not in TIPOS_SEM_TURNO,
     )
 
 
