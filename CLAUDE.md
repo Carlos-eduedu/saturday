@@ -90,3 +90,17 @@ ambiente. Variável nova entra também no `.env.example`.
 
 **Decisões registradas** ficam em `docs/decisoes/NNNN-*.md`; registre ali
 qualquer desvio consciente do `AGENTS.md`.
+
+## Agent skills
+
+### Issue tracker
+
+Issues e specs vivem nas GitHub Issues de `Carlos-eduedu/saturday`, via `gh`. Ver `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Os cinco rótulos padrão (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). Ver `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Contexto único: `GLOSSARY.md` na raiz (criado sob demanda) e decisões em `docs/decisoes/`. Ver `docs/agents/domain.md`.
