@@ -34,6 +34,17 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(payload, ensure_ascii=False, default=str)
 
 
+class SemQueryString(logging.Filter):
+    """Corta a query do access log: busca por telefone e tokens viajam nela."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        # Formato do uvicorn: (cliente, método, caminho, versão, status).
+        args = record.args
+        if isinstance(args, tuple) and len(args) >= 3 and isinstance(args[2], str):
+            record.args = (*args[:2], args[2].split("?", 1)[0], *args[3:])
+        return True
+
+
 def configurar_logging(nivel: str) -> None:
     """Configura o logger raiz e os loggers do uvicorn com o mesmo handler."""
 
@@ -50,3 +61,6 @@ def configurar_logging(nivel: str) -> None:
         logger.handlers.clear()
         logger.addHandler(handler)
         logger.propagate = False
+    acesso = logging.getLogger("uvicorn.access")
+    if not any(isinstance(f, SemQueryString) for f in acesso.filters):
+        acesso.addFilter(SemQueryString())
