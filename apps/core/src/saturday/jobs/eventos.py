@@ -14,6 +14,7 @@ from typing import Any
 from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.agent.service import AgentService
+from saturday.bancos.granatech.cliente import ClienteGranatech
 from saturday.canais.base import OrigemCanal
 from saturday.canais.whatsapp import webhook as parser
 from saturday.canais.whatsapp.entrada import EntradaWhatsApp, prefixo_do_canal
@@ -22,11 +23,13 @@ from saturday.dados import repositorios
 from saturday.dados.modelos import EventoRecebido
 from saturday.dados.outbox import enfileirar
 from saturday.dados.sessao import sessao as abrir_sessao
+from saturday.jobs import granatech as eventos_granatech
 from saturday.settings import Settings
 
 logger = logging.getLogger(__name__)
 
 CANAL = "whatsapp"
+ORIGEM_GRANATECH = "granatech"
 
 
 def processar(
@@ -34,6 +37,7 @@ def processar(
     servico: AgentService,
     entrada: EntradaWhatsApp,
     settings: Settings,
+    granatech: ClienteGranatech | None = None,
 ) -> int:
     """Reivindica um lote de eventos e processa. Devolve quantos tentou."""
 
@@ -45,7 +49,10 @@ def processar(
 
     for linha in linhas:
         try:
-            _processar_um(fabrica, servico, entrada, linha)
+            if linha.origem == ORIGEM_GRANATECH:
+                eventos_granatech.aplicar(fabrica, granatech, linha.payload or {})
+            else:
+                _processar_um(fabrica, servico, entrada, linha)
         except Exception as exc:  # noqa: BLE001 - o erro fica na linha, não derruba o laço
             logger.exception("evento_falhou id=%s", linha.id)
             _registrar_resultado(

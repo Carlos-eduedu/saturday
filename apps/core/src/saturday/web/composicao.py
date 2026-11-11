@@ -19,6 +19,7 @@ from psycopg_pool import ConnectionPool
 from saturday.agent.context import AgentContext
 from saturday.agent.graph import build_graph
 from saturday.agent.service import AgentService
+from saturday.bancos.granatech.cliente import ClienteGranatech
 from saturday.canais.whatsapp.cliente import WhatsAppClient
 from saturday.canais.whatsapp.entrada import EntradaWhatsApp
 from saturday.canais.whatsapp.saida import SaidaWhatsApp
@@ -85,6 +86,18 @@ def criar_canal_whatsapp(
         EntradaWhatsApp(cliente, storage, Transcritor(http, settings)),
         SaidaWhatsApp(cliente, fabrica, settings),
     )
+
+
+def criar_cliente_granatech(
+    http: httpx.Client,
+    settings: Settings,
+    fabrica: Any,
+) -> ClienteGranatech | None:
+    """Cliente da Granatech, ou ``None`` com ``SATURDAY_GRANATECH_ATIVO`` desligado."""
+
+    if not settings.granatech_ativo or fabrica is None:
+        return None
+    return ClienteGranatech(http, settings, fabrica)
 
 
 def criar_servico(
