@@ -9,6 +9,9 @@ const ROTULOS: Record<string, string> = {
   erro_interno: "Erro interno no atendimento",
   envio_falhou: "Mensagem não entregue",
   sem_resposta: "Cliente sem resposta há mais de 10 min",
+  cota_80: "Cota da Granatech passou de 80% do mês",
+  consulta_parada: "Consulta da Granatech sem resposta há mais de 15 min",
+  granatech_evento: "Evento da Granatech pede atenção",
 };
 
 export function Alertas() {

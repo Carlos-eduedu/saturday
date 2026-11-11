@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from datetime import timedelta
 from types import ModuleType
 from typing import Any
 
@@ -10,12 +11,13 @@ import pytest
 from conftest import _montar_app, settings_granatech
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.agent.service import AgentService
 from saturday.bancos.granatech.cliente import ClienteGranatech
 from saturday.dados.modelos import Alerta, ConsultaGranatech, EventoRecebido, PropostaGranatech
+from saturday.jobs import alertas
 from saturday.jobs.eventos import processar
 from saturday.settings import Settings
 
@@ -428,3 +430,39 @@ def test_proposta_com_status_desconhecido_vira_alerta(
     motivos = sorted(a["motivo"] for a in _alertas(fabrica))
     assert motivos == ["proposta_desconhecida", "status_desconhecido"]
     assert _proposta(fabrica, id_proposta).status is None
+
+
+# ------------------------------------------------------------------ consulta parada
+
+
+def _envelhecer(fabrica: sessionmaker[Session], minutos: int) -> None:
+    with fabrica.begin() as sessao:
+        sessao.execute(
+            update(ConsultaGranatech).values(atualizada_em=func.now() - timedelta(minutes=minutos))
+        )
+
+
+def test_consulta_sem_evento_ha_15_min_gera_um_alerta_so(
+    cliente: ClienteGranatech, fabrica: sessionmaker[Session]
+) -> None:
+    aberta = cliente.abrir_consulta(CPF, "FULANO", "11987654321")
+    assert alertas.verificar(fabrica) == 0
+
+    _envelhecer(fabrica, 16)
+    alertas.verificar(fabrica)
+    alertas.verificar(fabrica)
+
+    assert _alertas(fabrica) == [
+        {"consulta": aberta.id_externo, "status": "AWAITING_CLIENT_AUTHORIZATION"}
+    ]
+
+
+def test_consulta_final_parada_nao_gera_alerta(
+    cliente: ClienteGranatech, fabrica: sessionmaker[Session]
+) -> None:
+    aberta = cliente.abrir_consulta(CPF, "FULANO", "11987654321")
+    with fabrica.begin() as sessao:
+        sessao.get_one(ConsultaGranatech, aberta.id_local).status = "SUCCESS"
+    _envelhecer(fabrica, 60)
+
+    assert alertas.verificar(fabrica) == 0
