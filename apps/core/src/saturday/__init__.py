@@ -1,4 +1,12 @@
 def main() -> None:
+    import sys
+
+    # `saturday criar-usuario ...` cria usuário do painel; sem argumento, sobe a API.
+    if sys.argv[1:2] == ["criar-usuario"]:
+        from saturday.painel.cli import criar_usuario_cli
+
+        raise SystemExit(criar_usuario_cli(sys.argv[2:]))
+
     import uvicorn
 
     from saturday.log import configurar_logging

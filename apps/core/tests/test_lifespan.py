@@ -51,6 +51,7 @@ def _completo(**extras: object) -> Settings:
         "whatsapp_token": SecretStr("token"),
         "whatsapp_app_secret": SecretStr("segredo"),
         "whatsapp_verify_token": SecretStr("verificacao"),
+        "sessao_segredo": SecretStr("sessao"),
         "whatsapp_numeros": ["100000000000001"],
     }
     base.update(extras)
