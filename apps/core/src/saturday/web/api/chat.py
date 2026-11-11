@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import JSONResponse
 
 from saturday.agent.service import AgentService
@@ -27,6 +27,11 @@ def chat(
     background_tasks: BackgroundTasks,
     service: Annotated[AgentService, Depends(get_agent_service)],
 ) -> JSONResponse | AgentReply:
+    # `chave` aponta para o storage e só é preenchida pelos canais internos:
+    # aceitá-la de fora deixaria ler o documento de outro cliente.
+    if any(anexo.chave is not None for anexo in payload.attachments):
+        raise HTTPException(status_code=422, detail="attachment.chave não é aceito nesta rota")
+
     if service.webhook.configurado:
         background_tasks.add_task(service.processar_e_enviar, payload)
         return JSONResponse(

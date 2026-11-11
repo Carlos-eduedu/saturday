@@ -205,6 +205,14 @@ def test_webhook_assinatura_confere() -> None:
             "message": "oi",
             "attachments": [{"base64": "eA==", "mime_type": "text/plain"}],
         },
+        # `chave` é do storage interno: de fora, leria o anexo de outro cliente.
+        {
+            "conversation_id": cid(),
+            "message": "oi",
+            "attachments": [
+                {"chave": "whatsapp/11987654321/wamid.X.jpg", "mime_type": "image/jpeg"}
+            ],
+        },
         {"conversation_id": cid(), "message": "x" * 4001},
         {"conversation_id": "com espaço", "message": "oi"},
     ],
