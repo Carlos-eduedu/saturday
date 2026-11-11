@@ -81,12 +81,18 @@ class Settings(BaseSettings):
     granatech_webhook_token: SecretStr = SecretStr("")
     granatech_ativo: bool = False
     granatech_proposta_ativa: bool = False
+    # TODO(granatech): corpo do PATCH de dados bancários; até lá, desligado.
+    granatech_dados_bancarios_ativo: bool = False
     granatech_teto_liberado: Decimal = Decimal("6999")
     granatech_cota_mensal: int = 500
     granatech_cota_diaria: int = 20
     granatech_reaproveitar_dias: int = 30
     # TODO(granatech): confirmar o `tipo_empregador` do corpo da proposta.
     granatech_tipo_empregador: int = 1
+
+    # Domínio dos links curtos (`https://{dominio}/l/{codigo}`), obrigatório com a
+    # proposta ligada.
+    dominio_publico: str = ""
 
     @field_validator("anexo_dominios", "whatsapp_numeros", mode="before")
     @classmethod
@@ -155,6 +161,16 @@ class Settings(BaseSettings):
                 raise RuntimeError(
                     "SATURDAY_GRANATECH_ATIVO=true exige " + ", ".join(faltando) + "."
                 )
+
+        if (
+            self.granatech_proposta_ativa
+            and not self.dominio_publico
+            and self.environment != "pytest"
+        ):
+            raise RuntimeError(
+                "SATURDAY_GRANATECH_PROPOSTA_ATIVA=true exige SATURDAY_DOMINIO_PUBLICO "
+                "(links da biometria)."
+            )
 
         # O webhook da Granatech fica sempre no ar; sem token ele recusa tudo, e
         # fora de dev isso esconderia eventos perdidos.

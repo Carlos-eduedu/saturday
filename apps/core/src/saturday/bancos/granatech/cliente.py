@@ -57,6 +57,7 @@ from saturday.settings import (
 logger = logging.getLogger(__name__)
 
 PARCEIRO = "granatech"
+CACHE_BANCOS_S = 24 * 3600
 CONSIGNADO = "/api-consignado/v1"
 RENOVAR_ANTES_S = 300
 TOKEN_PADRAO_S = 3600
@@ -146,6 +147,8 @@ class ClienteGranatech:
         self._trava_token = threading.Lock()
         self._token: str | None = None
         self._vence_em = 0.0
+        self._bancos: list[dict[str, Any]] | None = None
+        self._bancos_ate = 0.0
 
     # ------------------------------------------------------------------ token
 
@@ -536,6 +539,29 @@ class ClienteGranatech:
     def teto(self) -> Decimal:
         return self._settings.granatech_teto_liberado
 
+    @property
+    def proposta_ativa(self) -> bool:
+        return self._settings.granatech_proposta_ativa
+
+    @property
+    def dados_bancarios_ativo(self) -> bool:
+        return self._settings.granatech_dados_bancarios_ativo
+
+    @property
+    def tipo_empregador(self) -> int:
+        return self._settings.granatech_tipo_empregador
+
+    def historico_proposta(self, id_proposta: str) -> list[dict[str, Any]]:
+        """Eventos recebidos da proposta, do mais antigo ao mais novo."""
+
+        with abrir_sessao(self._fabrica) as sessao:
+            historico = sessao.scalars(
+                select(PropostaGranatech.historico).where(
+                    PropostaGranatech.id_externo == id_proposta
+                )
+            ).first()
+            return list(historico or [])
+
     def simular_no_teto(self, **pedido: Any) -> Simulacao | None:
         """Simula e, se o liberado passar do teto, reduz a parcela.
 
@@ -557,10 +583,19 @@ class ClienteGranatech:
         return replace(simulacao, limitado_ao_teto=tentativa > 0)
 
     def bancos(self) -> list[dict[str, Any]]:
+        """Bancos habilitados para receber o crédito."""
+
         dados = self._chamar("GET", f"{CONSIGNADO}/bancos", f"{CONSIGNADO}/bancos")
         return [b for b in itens_da_listagem(dados) if b.get("habilitado")]
 
-    # ------------------------------------------------------------------ proposta
+    def bancos_em_cache(self) -> list[dict[str, Any]]:
+        """``bancos()`` com cache de 1 dia no processo: a lista quase não muda."""
+
+        agora = self._relogio()
+        if self._bancos is None or agora >= self._bancos_ate:
+            self._bancos = self.bancos()
+            self._bancos_ate = agora + CACHE_BANCOS_S
+        return self._bancos
 
     def criar_proposta(
         self,
@@ -715,6 +750,57 @@ class ClienteGranatech:
             logger.info("granatech_proposta_reconciliada proposta=%s", proposta_id)
             return id_externo
         return None
+
+    def id_local_da_consulta(self, id_consulta: str) -> int:
+        with abrir_sessao(self._fabrica) as sessao:
+            return sessao.scalars(
+                select(ConsultaGranatech.id).where(ConsultaGranatech.id_externo == id_consulta)
+            ).one()
+
+    def enviar_dados_tomador(
+        self, id_proposta: str, corpo: dict[str, Any], *, conversa_id: Any = None
+    ) -> None:
+        """``POST /propostas/{id}/dados-tomador``. Sem retry, como todo POST."""
+
+        self._chamar(
+            "POST",
+            f"{CONSIGNADO}/propostas/{{id}}/dados-tomador",
+            f"{CONSIGNADO}/propostas/{id_proposta}/dados-tomador",
+            json=corpo,
+            conversa_id=conversa_id,
+        )
+
+    def cancelar(self, id_proposta: str, *, conversa_id: Any = None) -> None:
+        """Cancela a proposta. Nesta fase só um atendente decide cancelar."""
+
+        self._chamar(
+            "POST",
+            f"{CONSIGNADO}/propostas/{{id}}/cancelar",
+            f"{CONSIGNADO}/propostas/{id_proposta}/cancelar",
+            conversa_id=conversa_id,
+        )
+
+    def corrigir_dados_bancarios(
+        self, id_proposta: str, banco_detalhe: dict[str, Any], *, conversa_id: Any = None
+    ) -> None:
+        """Nova conta depois de uma falha de pagamento.
+
+        TODO(granatech): corpo do ``PATCH /propostas/{id}/dados-bancarios``. Enviamos
+        o mesmo ``banco_detalhe`` dos dados do tomador; fica atrás de
+        ``SATURDAY_GRANATECH_DADOS_BANCARIOS_ATIVO`` até a Granatech confirmar.
+        """
+
+        if not self._settings.granatech_dados_bancarios_ativo:
+            raise RuntimeError(
+                "correção de conta desligada (SATURDAY_GRANATECH_DADOS_BANCARIOS_ATIVO)"
+            )
+        self._chamar(
+            "PATCH",
+            f"{CONSIGNADO}/propostas/{{id}}/dados-bancarios",
+            f"{CONSIGNADO}/propostas/{id_proposta}/dados-bancarios",
+            json={"tipo_dados_bancarios": "dados_bancarios", "banco_detalhe": banco_detalhe},
+            conversa_id=conversa_id,
+        )
 
     def status_proposta(self, id_proposta: str) -> dict[str, Any]:
         dados = self._chamar(
