@@ -1,8 +1,8 @@
 """Tabelas do Saturday.
 
-Nove tabelas, todas criadas na Fase 1. Só ``conversas``, ``mensagens``,
-``outbox`` e ``eventos_recebidos`` têm escritor nesta fase; as demais nascem
-inertes e ganham escritor nas fases 3 a 5 (ver AGENTS.md).
+Nove tabelas criadas na Fase 1 e duas na Fase 3 (``sessoes_painel`` e
+``alertas``). ``consentimentos``, ``chamadas_externas`` e ``cota`` ainda nascem
+inertes e ganham escritor nas fases 4 e 5 (ver AGENTS.md).
 """
 
 from __future__ import annotations
@@ -46,6 +46,17 @@ class Conversa(Base):
     phone_number_id: Mapped[str | None] = mapped_column(String(32))
     # Base da janela de 24 h: a última mensagem que o cliente mandou.
     ultima_entrada_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Estado de atendimento (`ia`, `handoff`, `assumida`): fonte da verdade de
+    # quem responde, ver docs/decisoes/0003.
+    atendimento: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="ia", server_default="ia", index=True
+    )
+    atendente_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("usuarios_painel.id", ondelete="SET NULL")
+    )
+    atendimento_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Último "visto" de qualquer usuário do painel: base do "não lida".
+    vista_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
     atualizada_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=AGORA, onupdate=AGORA
@@ -75,6 +86,11 @@ class Mensagem(Base):
     # `wamid` da Meta: identifica a mensagem nos dois lados do canal.
     wamid: Mapped[str | None] = mapped_column(String(128), unique=True)
     status_entrega: Mapped[str | None] = mapped_column(String(16))
+    # Quem escreveu: `cliente`, `ia`, `atendente` ou `sistema`.
+    autor: Mapped[str] = mapped_column(String(16), nullable=False, default="ia")
+    usuario_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("usuarios_painel.id", ondelete="SET NULL")
+    )
     conteudo: Mapped[str] = mapped_column(Text, nullable=False, default="")
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
 
@@ -184,7 +200,7 @@ class Cota(Base):
 
 
 class UsuarioPainel(Base):
-    """Usuário do painel da equipe. Escritor entra na Fase 3."""
+    """Usuário do painel da equipe."""
 
     __tablename__ = "usuarios_painel"
 
@@ -198,7 +214,7 @@ class UsuarioPainel(Base):
 
 
 class Auditoria(Base):
-    """Trilha de ação humana. Escritor entra na Fase 3."""
+    """Trilha de ação humana."""
 
     __tablename__ = "auditoria"
 
@@ -210,3 +226,36 @@ class Auditoria(Base):
     alvo: Mapped[str] = mapped_column(Text, nullable=False, default="")
     detalhe: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
+
+
+class SessaoPainel(Base):
+    """Sessão de login. O cookie leva o token; aqui fica só o sha256 dele."""
+
+    __tablename__ = "sessoes_painel"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    usuario_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("usuarios_painel.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    expira_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
+
+
+class Alerta(Base):
+    """Algo que pede atenção da equipe; resolvido por alguém do painel."""
+
+    __tablename__ = "alertas"
+    __table_args__ = (Index("ix_alertas_abertos", "resolvido_em", "criado_em"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    tipo: Mapped[str] = mapped_column(String(32), nullable=False)
+    conversa_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("conversas.id", ondelete="CASCADE")
+    )
+    detalhe: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
+    resolvido_por: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("usuarios_painel.id", ondelete="SET NULL")
+    )
+    resolvido_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
