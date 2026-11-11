@@ -1,0 +1,17 @@
+# Só no Dokploy, somado ao `compose.yaml` pelo comando do stack
+# (`-f ./compose.yaml -f ./compose.dokploy.yaml`). O stack roda isolado, e o
+# Postgres gerenciado pelo Dokploy é um serviço Swarm que só entra em rede
+# overlay: quem usa o banco precisa da rede overlay do ambiente, criada no
+# Dokploy e ligada ao Postgres. Ver docs/deploy.md.
+services:
+  migrate:
+    networks: [default, dados]
+  api:
+    networks: [default, dados]
+  worker:
+    networks: [default, dados]
+
+networks:
+  dados:
+    external: true
+    name: ${SATURDAY_REDE_DADOS:?defina a rede do Postgres do ambiente}
