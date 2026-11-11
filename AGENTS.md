@@ -430,6 +430,7 @@ Uma fase só está pronta quando os testes passam, os critérios de aceite foram
 - Commits pequenos, mensagens em português no imperativo; uma fase termina com todos os testes verdes.
 - Comentários e textos em português, no estilo do código atual.
 - Pendência da Granatech vira `TODO(granatech): <pergunta>` e fica atrás de flag; liste todas no fim da fase.
-- Nunca rode comandos que falem com produção (Granatech, Meta, Dokploy) nem leia arquivos `.env` reais; use o `.env.example`.
+- Nunca rode comandos que falem com produção da Granatech ou da Meta nem leia arquivos `.env` reais; use o `.env.example`.
+- Dokploy: leitura livre (listar e consultar projetos, ambientes, serviços, deploys e logs); qualquer alteração (criar, editar, deploy, parar, apagar) só depois de confirmação explícita do usuário para aquela ação, com alvo por nome e ID. Nunca leia nem exiba o token do painel nem os valores de variáveis de ambiente dos serviços (docs/decisoes/0005).
 - Ao final de cada fase, atualize o `README.md` e o `docs/` com o que mudou e como rodar.
 - Em dúvida entre duas interpretações, pergunte em vez de escolher.
