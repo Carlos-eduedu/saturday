@@ -10,6 +10,7 @@
   webhook do WhatsApp) e variáveis de ambiente.
 - [`../AGENTS.md`](../AGENTS.md) — regras inegociáveis, arquitetura alvo e fases.
 - [`granatech.md`](granatech.md) — cliente, cota, webhook e simulador da Granatech.
+- [`deploy.md`](deploy.md) — ambientes, stacks e variáveis no Dokploy.
 
 ## Decisões
 
@@ -24,6 +25,8 @@ imutável: quando uma decisão muda, entra um registro novo que a substitui.
   — quem responde a conversa mora em `conversas`, não no checkpoint.
 - [`decisoes/0004-sem-interface-banco-com-um-banco-so.md`](decisoes/0004-sem-interface-banco-com-um-banco-so.md)
   — o `Protocol` de banco espera o segundo banco.
+- [`decisoes/0005-dokploy-leitura-livre-alteracao-confirmada.md`](decisoes/0005-dokploy-leitura-livre-alteracao-confirmada.md)
+  — no Dokploy de produção, ler é livre e alterar exige confirmação.
 
 ## Estado por fase
 

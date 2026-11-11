@@ -34,7 +34,7 @@ services:
   # Simulador da WhatsApp Cloud API. Roda na mesma imagem da API (que já tem
   # fastapi e uvicorn) com o código montado do repositório: só existe em dev.
   meta:
-    image: saturday-api
+    image: saturday-api:${SATURDAY_IMAGEM_TAG:-local}
     # Herda o healthcheck da imagem, mas serve na 8100: aponta para ela.
     healthcheck:
       test: ["CMD", "saturday-health", "api"]
@@ -71,7 +71,7 @@ services:
   # Simulador da Granatech, no mesmo molde do da Meta. A chave do cliente
   # precisa ser a mesma do simulador.
   granatech:
-    image: saturday-api
+    image: saturday-api:${SATURDAY_IMAGEM_TAG:-local}
     healthcheck:
       test: ["CMD", "saturday-health", "api"]
       interval: 30s

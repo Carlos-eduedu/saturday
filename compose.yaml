@@ -9,7 +9,9 @@
 name: saturday
 
 x-app: &app
-  image: saturday-api
+  # Tag por stack: no Dokploy os três ambientes dividem o servidor, e uma tag
+  # fixa deixaria o build de um ambiente trocar a imagem do outro.
+  image: saturday-api:${SATURDAY_IMAGEM_TAG:-local}
   build:
     context: .
     dockerfile: apps/core/Dockerfile
@@ -72,6 +74,7 @@ services:
   # Painel da equipe: nginx com o build do Vite e proxy de `/admin` para a API,
   # na mesma origem. É este serviço que o domínio do painel expõe.
   painel:
+    image: saturday-painel:${SATURDAY_IMAGEM_TAG:-local}
     build:
       context: apps/painel
     depends_on:
