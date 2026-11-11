@@ -58,7 +58,7 @@ Precisa de um Postgres. O mais curto é usar o do compose:
 ```bash
 cp .env.example .env                  # preencha as chaves e as do WhatsApp
 docker compose --profile postgres up -d postgres
-uv run --project apps/core alembic upgrade head   # cria as tabelas
+uv run --project apps/core alembic -c apps/core/alembic.ini upgrade head   # cria as tabelas
 uv run --project apps/core saturday
 ```
 

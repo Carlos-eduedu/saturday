@@ -36,7 +36,7 @@ O servidor local roda **da raiz do repositório**, porque `pydantic-settings` l�
 `.env` do diretório atual e o `.env` do monorepo fica na raiz:
 
 ```bash
-uv run --project apps/core alembic upgrade head   # aplica as migrações
+uv run --project apps/core alembic -c apps/core/alembic.ini upgrade head   # aplica as migrações
 uv run --project apps/core saturday               # API em http://localhost:8000
 ```
 
