@@ -13,6 +13,7 @@ from typing import Annotated, Any, Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session, sessionmaker
@@ -35,6 +36,7 @@ from saturday.web.dependencies import (
     get_settings,
     usuario_logado,
 )
+from saturday.web.eventos import Difusor, fluxo_sse
 
 router = APIRouter(prefix="/admin", tags=["painel"])
 
@@ -390,4 +392,30 @@ def midia(
         content=dados,
         media_type=str(anexo.get("mime_type") or "application/octet-stream"),
         headers={"Cache-Control": "private, no-store"},
+    )
+
+
+# ------------------------------------------------------------------ tempo real
+
+
+@router.get("/eventos")
+async def eventos(request: Request, _usuario: Logado) -> StreamingResponse:
+    difusor: Difusor | None = getattr(request.app.state, "difusor", None)
+    if difusor is None:
+        raise HTTPException(status_code=503, detail="tempo real indisponível")
+    fila = difusor.assinar()
+
+    async def corpo() -> Any:
+        try:
+            async for evento in fluxo_sse(fila):
+                if await request.is_disconnected():
+                    break
+                yield evento
+        finally:
+            difusor.cancelar(fila)
+
+    return StreamingResponse(
+        corpo(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
     )

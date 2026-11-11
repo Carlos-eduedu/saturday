@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy import ColumnElement, and_, exists, func, not_, select
 from sqlalchemy.orm import Session
 
+from saturday.dados import repositorios
 from saturday.dados.modelos import Conversa, Outbox
 
 # Tempo que a linha fica reservada por um worker. Se ele morrer no meio da
@@ -134,6 +135,10 @@ def marcar_desistencia(sessao: Session, linha: Outbox, *, erro: str) -> None:
     linha.falhou_em = agora()
     linha.ultimo_erro = erro[:2000]
     sessao.flush()
+    # O erro fica na linha; o alerta leva só a referência.
+    repositorios.abrir_alerta(
+        sessao, "envio_falhou", conversa_id=linha.conversa_id, detalhe={"outbox": linha.id}
+    )
 
 
 def marcar_falha(sessao: Session, linha: Outbox, *, erro: str, espera_s: float) -> None:

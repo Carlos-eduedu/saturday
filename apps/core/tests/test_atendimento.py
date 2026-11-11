@@ -125,3 +125,16 @@ def test_handoff_antigo_so_no_checkpoint_continua_valendo(service_pg, fakes, fab
 
     assert resposta.status == "with_human"
     assert _conversa(fabrica, conversa).atendimento == "handoff"
+
+
+def test_erro_interno_vai_para_handoff_com_alerta(service_pg, fabrica, conversa, monkeypatch):
+    def quebra(*_args, **_kwargs):
+        raise RuntimeError("grafo caiu")
+
+    monkeypatch.setattr(service_pg.graph, "stream", quebra)
+    resposta = service_pg.process_message(ChatRequest(conversation_id=conversa, message="oi"))
+
+    assert resposta.status == "handoff"
+    assert _conversa(fabrica, conversa).atendimento == "handoff"
+    with abrir_sessao(fabrica) as sessao:
+        assert [a.tipo for a in sessao.scalars(select(Alerta))] == ["erro_interno"]

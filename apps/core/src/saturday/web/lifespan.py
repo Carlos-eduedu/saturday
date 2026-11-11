@@ -14,6 +14,7 @@ from saturday.log import configurar_logging
 from saturday.settings import Settings
 from saturday.storage.base import criar_storage
 from saturday.web.composicao import criar_checkpointer, criar_servico
+from saturday.web.eventos import Difusor
 
 logger = logging.getLogger(__name__)
 
@@ -55,10 +56,16 @@ def criar_lifespan(
         # O webhook precisa da fábrica para enfileirar eventos; `None` em pytest.
         app.state.fabrica = fabrica
         app.state.storage = storage
+        difusor = None if de_teste else Difusor(settings.database_url.get_secret_value())
+        if difusor is not None:
+            difusor.iniciar()
+        app.state.difusor = difusor
 
         try:
             yield
         finally:
+            if difusor is not None:
+                await difusor.parar()
             http.close()
             if pool is not None:
                 pool.close()
