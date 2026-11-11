@@ -10,6 +10,7 @@ import pytest
 
 from saturday.canais.whatsapp.cliente import (
     CODIGOS_TEMPORARIOS,
+    ErroJanelaFechada,
     ErroPermanente,
     ErroTemporario,
     classificar,
@@ -127,7 +128,11 @@ def test_classificar_codigos_temporarios() -> None:
 
 
 def test_classificar_erro_permanente() -> None:
-    assert isinstance(classificar(400, {"error": {"code": 131047}}), ErroPermanente)
+    assert isinstance(classificar(400, {"error": {"code": 131026}}), ErroPermanente)
+
+
+def test_classificar_janela_fechada_nao_e_permanente() -> None:
+    assert isinstance(classificar(400, {"error": {"code": 131047}}), ErroJanelaFechada)
 
 
 def test_parser_de_texto() -> None:

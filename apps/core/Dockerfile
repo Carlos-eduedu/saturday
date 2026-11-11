@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1
 
-# O contexto de build é a raiz do monorepo: `migrations/` e `alembic.ini` vivem
-# lá e precisam entrar na imagem para o serviço `migrate` rodar.
+# O contexto de build é a raiz do monorepo: o `uv.lock` e o `pyproject.toml` do
+# workspace vivem aqui. A imagem instala só o pacote `saturday` (`--package`),
+# não os simuladores.
 
 # ---------- Etapa 1: dependências ----------
 FROM python:3.14-slim AS builder
@@ -14,17 +15,19 @@ ENV UV_COMPILE_BYTECODE=1 \
 
 WORKDIR /app
 
-# Copie apenas os arquivos de dependência para aproveitar o cache de camadas.
-COPY apps/core/pyproject.toml apps/core/uv.lock ./
+# Metadados do workspace e dos membros: basta para resolver e cachear.
+COPY pyproject.toml uv.lock ./
+COPY apps/core/pyproject.toml ./apps/core/pyproject.toml
+COPY simuladores/pyproject.toml ./simuladores/pyproject.toml
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-dev --no-install-project
+    uv sync --locked --no-dev --no-install-project --package saturday
 
 # Instala o projeto depois de copiar o código, para manter o cache de dependências.
-COPY apps/core/src ./src
-COPY apps/core/README.md ./
+COPY apps/core/src ./apps/core/src
+COPY apps/core/README.md ./apps/core/README.md
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-dev
+    uv sync --locked --no-dev --no-editable --package saturday
 
 # ---------- Etapa 2: runtime ----------
 FROM python:3.14-slim AS runtime
@@ -34,12 +37,8 @@ RUN groupadd --system --gid 1000 saturday \
 
 WORKDIR /app
 
-# Ambiente virtual já resolvido na etapa de build.
+# Ambiente virtual já resolvido no build, com o pacote instalado.
 COPY --from=builder /app/.venv /app/.venv
-
-# Metadados e código da aplicação.
-COPY apps/core/pyproject.toml apps/core/uv.lock apps/core/README.md ./
-COPY apps/core/src ./src
 
 # Migrações: o serviço `migrate` roda `alembic upgrade head` nesta imagem.
 COPY apps/core/alembic.ini ./alembic.ini
@@ -57,6 +56,6 @@ USER 1000:1000
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+    CMD ["saturday-health", "api"]
 
 CMD ["saturday"]

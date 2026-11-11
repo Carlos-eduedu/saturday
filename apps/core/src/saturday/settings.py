@@ -25,7 +25,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    environment: Literal["dev", "prod", "pytest"] = "dev"
+    environment: Literal["dev", "homolog", "prod", "pytest"] = "dev"
     log_level: str = "INFO"
     api_key: SecretStr = SecretStr("")
     openrouter_api_key: SecretStr = SecretStr("")
@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     s3_regiao: str = "us-east-1"
 
     # Outbox: quantas vezes reentregar antes de desistir e quanto esperar.
-    outbox_max_tentativas: int = 8
+    outbox_max_tentativas: int = 6
     outbox_backoff_base_s: float = 2.0
     outbox_lote: int = 20
 
@@ -111,8 +111,11 @@ class Settings(BaseSettings):
                 "Use o MinIO do compose (SATURDAY_S3_ENDPOINT vazio) ou um bucket externo."
             )
 
-        if self.environment == "prod" and not self.api_key.get_secret_value():
-            raise RuntimeError("SATURDAY_API_KEY é obrigatória quando SATURDAY_ENVIRONMENT=prod.")
+        # Fora de `dev` e `pytest` a API atende dados pessoais: sem chave, não sobe.
+        if self.environment in {"homolog", "prod"} and not self.api_key.get_secret_value():
+            raise RuntimeError(
+                f"SATURDAY_API_KEY é obrigatória quando SATURDAY_ENVIRONMENT={self.environment}."
+            )
 
         if self.environment != "pytest" and not self.whatsapp_numeros:
             raise RuntimeError(

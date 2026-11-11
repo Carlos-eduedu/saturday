@@ -9,8 +9,11 @@ As regras do projeto, o escopo e o critério de pronto de cada fase estão no
 ## Estrutura
 
 ```text
-apps/core/              pacote Python (`uv`): API, worker, agente e regras
+apps/core/              pacote Python: API, worker, agente e regras
 apps/core/migrations/   Alembic (as migrações pertencem ao pacote, não à raiz)
+simuladores/            simuladores dos parceiros (projeto do workspace)
+docs/                   índice e decisões registradas (docs/decisoes/)
+pyproject.toml, uv.lock workspace `uv`: um lock e um .venv para os dois membros
 compose.yaml            deploy (Dokploy): migrate, api, worker e opcionais
 compose.override.yaml   desenvolvimento local: publica portas e console do MinIO
 AGENTS.md               contrato: regras, arquitetura alvo e fases
@@ -80,6 +83,7 @@ compartilhado. Ele é ignorado pelo git (`.env.*`).
 ## Desenvolvimento
 
 ```bash
+uv sync --locked                      # na raiz: ambiente único do workspace
 cd apps/core
 uv run ruff format --check            # formatação
 uv run ruff check                     # lint

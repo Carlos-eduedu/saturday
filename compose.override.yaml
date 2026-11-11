@@ -28,6 +28,11 @@ services:
   # fastapi e uvicorn) com o código montado do repositório: só existe em dev.
   meta:
     image: saturday-api
+    # Herda o healthcheck da imagem, mas serve na 8100: aponta para ela.
+    healthcheck:
+      test: ["CMD", "saturday-health", "api"]
+      interval: 30s
+      timeout: 5s
     build:
       context: .
       dockerfile: apps/core/Dockerfile
@@ -49,6 +54,7 @@ services:
       SATURDAY_WHATSAPP_APP_SECRET: ${SATURDAY_WHATSAPP_APP_SECRET:-segredo}
       SIMULADOR_WHATSAPP_NUMERO: "11987654321"
       SIMULADOR_PHONE_NUMBER_ID: "100000000000001"
+      SATURDAY_HEALTH_URL: http://127.0.0.1:8100/admin/enviadas
     ports:
       - "8100:8100"
     restart: unless-stopped

@@ -14,6 +14,7 @@ import threading
 import httpx
 
 from saturday.dados.sessao import criar_engine, criar_factory
+from saturday.health import registrar_batimento
 from saturday.jobs.eventos import processar
 from saturday.jobs.outbox import EntregadorPorCanal, EntregadorWebhook, drenar
 from saturday.log import configurar_logging
@@ -60,6 +61,9 @@ def rodar(settings: Settings, parar: threading.Event) -> None:
 
         logger.info("worker_iniciado")
         while not parar.is_set():
+            # O healthcheck do container lê este batimento: worker travado
+            # não pode continuar parecendo saudável.
+            registrar_batimento()
             try:
                 eventos = processar(fabrica, servico, entrada_whatsapp, settings)
                 entregues = drenar(fabrica, entregador, settings)

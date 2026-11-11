@@ -395,3 +395,53 @@ def test_webhook_duplicado_nao_gera_dois_turnos(
 
     assert len(fakes.jev.chamadas) == 1
     assert len(_enviadas(http, simulador)) == 1
+
+
+def test_mensagem_recebida_e_marcada_como_lida(
+    client_pg: TestClient,
+    settings: Settings,
+    service_pg: AgentService,
+    fabrica: sessionmaker[Session],
+    canais: tuple[httpx.Client, EntradaWhatsApp, SaidaWhatsApp, TranscritorFalso],
+    simulador: str,
+) -> None:
+    http, entrada, saida, _transcritor = canais
+    _entregar_webhook(client_pg, settings, _webhook_texto("oi", "wamid.R1"))
+
+    processar(fabrica, service_pg, entrada, settings)
+
+    resposta = http.get(f"{simulador}/admin/lidas")
+    assert resposta.status_code == 200
+    lidas = resposta.json()["lidas"]
+    assert lidas, "a mensagem não foi marcada como lida"
+    assert lidas[-1]["message_id"] == "wamid.R1"
+    assert lidas[-1]["phone_number_id"] == PHONE_NUMBER_ID
+
+
+def test_texto_recusado_pela_meta_vira_modelo(
+    client_pg: TestClient,
+    settings: Settings,
+    service_pg: AgentService,
+    fabrica: sessionmaker[Session],
+    canais: tuple[httpx.Client, EntradaWhatsApp, SaidaWhatsApp, TranscritorFalso],
+    simulador: str,
+) -> None:
+    """A janela pode fechar do lado da Meta mesmo com a nossa dizendo aberta.
+
+    Ela responde 131047 ao texto; o outbox converte para modelo na mesma
+    tentativa e a mensagem sai.
+    """
+
+    http, entrada, saida, _transcritor = canais
+    _entregar_webhook(client_pg, settings, _webhook_texto("oi", "wamid.J1"))
+    processar(fabrica, service_pg, entrada, settings)
+
+    programada = http.post(f"{simulador}/admin/falhas", json={"status": 400, "code": 131047})
+    assert programada.status_code == 200
+
+    drenar(fabrica, EntregadorPorCanal({"whatsapp": saida}), settings)
+
+    enviadas = _enviadas(http, simulador)
+    assert enviadas, "nem o modelo saiu"
+    assert enviadas[-1]["type"] == "template"
+    assert enviadas[-1]["template"]["name"] == "atualizacao_pedido"

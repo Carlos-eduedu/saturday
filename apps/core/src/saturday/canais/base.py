@@ -9,7 +9,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 from typing import Protocol
+
+
+class Resultado(StrEnum):
+    """O que o canal sabe sobre uma tentativa de entrega.
+
+    O canal classifica e para; quem decide esperar ou desistir é o outbox.
+    """
+
+    OK = "ok"
+    TEMPORARIO = "temporario"
+    # A requisição pode ter sido aceita (timeout de leitura): repetir às cegas
+    # duplicaria a mensagem, porque a Meta não tem chave de idempotência.
+    TEMPORARIO_INCERTO = "temporario_incerto"
+    PERMANENTE = "permanente"
+    # A Meta recusou texto porque a janela fechou; o outbox converte para modelo.
+    JANELA_FECHADA = "janela_fechada"
 
 
 @dataclass(frozen=True)
@@ -22,7 +39,7 @@ class OrigemCanal:
 
 
 class Canal(Protocol):
-    """Entrega de uma resposta ao cliente."""
+    """Entrega de uma resposta ao cliente. Não repete nada."""
 
     def janela_aberta(self, conversation_id: str, agora: datetime) -> bool: ...
 

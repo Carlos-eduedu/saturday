@@ -67,6 +67,16 @@ class EntradaWhatsApp:
         self._storage = storage
         self._transcritor = transcritor
 
+    def marcar_lida(self, evento: parser.Evento) -> None:
+        """Confirma para o cliente que a mensagem foi recebida.
+
+        Falhar aqui não é motivo para desfazer o turno: o cliente já mandou a
+        mensagem, o recibo é cortesia do canal.
+        """
+
+        if evento.wamid:
+            self._cliente.marcar_lida(evento.phone_number_id, evento.wamid)
+
     def preparar(self, evento: parser.Evento) -> Entrada:
         conversa = prefixo_do_canal(evento.numero)
         if not evento.roda_turno:

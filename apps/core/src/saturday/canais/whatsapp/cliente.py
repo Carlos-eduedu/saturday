@@ -40,6 +40,18 @@ class ErroPermanente(ErroWhatsApp):
     """4xx de conteúdo ou credencial: repetir não resolve."""
 
 
+class ErroIncerto(ErroWhatsApp):
+    """A requisição pode ter sido aceita (timeout de leitura).
+
+    A Meta não tem chave de idempotência para envio, então repetir às cegas pode
+    duplicar a mensagem no celular do cliente.
+    """
+
+
+class ErroJanelaFechada(ErroWhatsApp):
+    """Texto recusado com 131047: o outbox converte a entrega para modelo."""
+
+
 def _codigo_da_resposta(corpo: dict[str, Any]) -> int | None:
     erro = corpo.get("error")
     if isinstance(erro, dict):
@@ -54,6 +66,8 @@ def classificar(status: int, corpo: dict[str, Any]) -> ErroWhatsApp:
 
     codigo = _codigo_da_resposta(corpo)
     detalhe = f"status={status} codigo={codigo}"
+    if codigo == CODIGO_JANELA_FECHADA:
+        return ErroJanelaFechada(detalhe, codigo=codigo)
     if status >= 500 or codigo in CODIGOS_TEMPORARIOS:
         return ErroTemporario(detalhe, codigo=codigo)
     return ErroPermanente(detalhe, codigo=codigo)
@@ -77,6 +91,9 @@ class WhatsAppClient:
         url = f"{self._base}/{phone_number_id}/messages"
         try:
             resposta = self._http.post(url, json=corpo, headers=self._cabecalhos())
+        except (httpx.ReadTimeout, httpx.ReadError, httpx.RemoteProtocolError) as exc:
+            # A conexão caiu depois do envio: não dá para saber se a Meta aceitou.
+            raise ErroIncerto(f"leitura: {type(exc).__name__}") from exc
         except httpx.HTTPError as exc:
             raise ErroTemporario(f"rede: {type(exc).__name__}") from exc
 

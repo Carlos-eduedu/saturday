@@ -24,6 +24,7 @@ from fastapi.responses import JSONResponse
 app = FastAPI(title="Simulador da Meta", version="0.1.0")
 
 ENVIADAS: list[dict[str, Any]] = []
+LIDAS: list[dict[str, Any]] = []
 MIDIAS: dict[str, tuple[bytes, str]] = {}
 FALHAS: list[dict[str, Any]] = []
 CONTADOR = {"wamid": 0}
@@ -52,6 +53,7 @@ async def enviar(phone_number_id: str, request: Request) -> Any:
         )
 
     if corpo.get("status") == "read":
+        LIDAS.append({"phone_number_id": phone_number_id, "message_id": corpo.get("message_id")})
         return {"success": True}
 
     wamid = _proximo_wamid()
@@ -64,9 +66,15 @@ def listar_enviadas() -> dict[str, Any]:
     return {"enviadas": ENVIADAS}
 
 
+@app.get("/admin/lidas")
+def listar_lidas() -> dict[str, Any]:
+    return {"lidas": LIDAS}
+
+
 @app.post("/admin/limpar")
 def limpar() -> dict[str, int]:
     ENVIADAS.clear()
+    LIDAS.clear()
     MIDIAS.clear()
     FALHAS.clear()
     return {"ok": 1}

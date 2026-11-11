@@ -288,76 +288,118 @@ class AgentService:
         sessao: Session | None = None,
         origem: OrigemCanal | None = None,
     ) -> AgentReply:
-        config = self.config(payload.conversation_id)
-        estado = self.estado_atual(config)
-        estado = self._aplicar_retencao(config, estado)
+        """Um turno, em etapas: estado, conversa, dedupe, entrada, grafo, saída."""
 
-        conversa = None
-        if sessao is not None:
-            conversa = repositorios.obter_ou_criar_conversa(
-                sessao,
-                payload.conversation_id,
-                canal=origem.canal if origem else "chat",
-                telefone=origem.telefone if origem else None,
-                phone_number_id=origem.phone_number_id if origem else None,
-            )
+        config = self.config(payload.conversation_id)
+        estado = self._aplicar_retencao(config, self.estado_atual(config))
+        conversa = self._conversa(sessao, payload, origem)
 
         ids_recentes = list(estado.get("message_ids_recentes") or [])
         respostas = dict(estado.get("respostas_recentes") or {})
-        if payload.message_id and payload.message_id in ids_recentes:
-            # Devolve a mesma resposta já dada, não uma vazia.
-            return self.evento(
-                payload.conversation_id,
-                estado,
-                status="duplicate",
-                answer=respostas.get(payload.message_id, ""),
-            )
 
-        if conversa is not None:
-            repositorios.registrar_entrada(
-                sessao,  # type: ignore[arg-type]
-                conversa,
-                message_id=payload.message_id,
-                conteudo=payload.message,
-            )
+        duplicada = self._resposta_duplicada(payload, estado, respostas)
+        if duplicada is not None:
+            return duplicada
+
+        self._registrar_entrada(sessao, conversa, payload)
 
         if estado.get("status") == "handoff":
             if not self._deve_liberar_auto(estado):
-                return self.evento(
-                    payload.conversation_id,
-                    estado,
-                    status="with_human",
-                    answer="",
-                )
-            self.graph.update_state(config, self._atualizacao_liberacao())
-            estado = self.estado_atual(config)
+                return self._resposta_em_handoff(payload, estado)
+            estado = self._liberar_handoff(config)
 
-        cliente = self._cliente_mesclado(estado, payload)
-        entrada = turno_inicial(
-            user_message=payload.message,
-            attachments=[a.model_dump(mode="json", exclude_none=True) for a in payload.attachments],
+        return self._rodar_e_fechar(
+            payload,
+            config,
+            estado,
+            sessao,
+            conversa,
+            ids_recentes,
+            respostas,
         )
-        if cliente:
-            entrada["cliente"] = cliente
-        if payload.message.strip():
-            entrada["messages"] = [HumanMessage(content=payload.message)]
 
+    def _conversa(
+        self,
+        sessao: Session | None,
+        payload: ChatRequest,
+        origem: OrigemCanal | None,
+    ) -> Conversa | None:
+        if sessao is None:
+            return None
+        return repositorios.obter_ou_criar_conversa(
+            sessao,
+            payload.conversation_id,
+            canal=origem.canal if origem else "chat",
+            telefone=origem.telefone if origem else None,
+            phone_number_id=origem.phone_number_id if origem else None,
+        )
+
+    def _resposta_duplicada(
+        self,
+        payload: ChatRequest,
+        estado: dict[str, Any],
+        respostas: dict[str, str],
+    ) -> AgentReply | None:
+        """O mesmo `message_id` devolve a resposta já dada, não uma vazia."""
+
+        if not payload.message_id:
+            return None
+        if payload.message_id not in list(estado.get("message_ids_recentes") or []):
+            return None
+        return self.evento(
+            payload.conversation_id,
+            estado,
+            status="duplicate",
+            answer=respostas.get(payload.message_id, ""),
+        )
+
+    def _registrar_entrada(
+        self,
+        sessao: Session | None,
+        conversa: Conversa | None,
+        payload: ChatRequest,
+    ) -> None:
+        if sessao is None or conversa is None:
+            return
+        repositorios.registrar_entrada(
+            sessao,
+            conversa,
+            message_id=payload.message_id,
+            conteudo=payload.message,
+        )
+
+    def _resposta_em_handoff(
+        self,
+        payload: ChatRequest,
+        estado: dict[str, Any],
+    ) -> AgentReply:
+        return self.evento(
+            payload.conversation_id,
+            estado,
+            status="with_human",
+            answer="",
+        )
+
+    def _liberar_handoff(self, config: dict[str, Any]) -> dict[str, Any]:
+        self.graph.update_state(config, self._atualizacao_liberacao())
+        return self.estado_atual(config)
+
+    def _rodar_e_fechar(
+        self,
+        payload: ChatRequest,
+        config: dict[str, Any],
+        estado: dict[str, Any],
+        sessao: Session | None,
+        conversa: Conversa | None,
+        ids_recentes: list[str],
+        respostas: dict[str, str],
+    ) -> AgentReply:
+        entrada = self._entrada_do_grafo(estado, payload)
         metricas = iniciar_metricas()
         inicio = time.monotonic()
         caminho: list[str] = []
         try:
-            for atualizacao in self.graph.stream(
-                entrada,
-                config,
-                context=self.context,
-                stream_mode="updates",
-            ):
-                if isinstance(atualizacao, dict):
-                    caminho.extend(
-                        nome
-                        for nome in atualizacao
-                        if isinstance(nome, str) and not nome.startswith("__")
-                    )
+            self._stream(entrada, config, caminho)
         except Exception:
             logger.exception(
                 "erro_interno conversation_id=%s",
@@ -394,6 +436,45 @@ class AgentService:
         if sessao is not None and conversa is not None:
             self._gravar_saida(sessao, conversa, resposta)
         return resposta
+
+    def _entrada_do_grafo(
+        self,
+        estado: dict[str, Any],
+        payload: ChatRequest,
+    ) -> dict[str, Any]:
+        entrada = turno_inicial(
+            user_message=payload.message,
+            attachments=[
+                anexo.model_dump(mode="json", exclude_none=True) for anexo in payload.attachments
+            ],
+        )
+        cliente = self._cliente_mesclado(estado, payload)
+        if cliente:
+            entrada["cliente"] = cliente
+        if payload.message.strip():
+            entrada["messages"] = [HumanMessage(content=payload.message)]
+        return entrada
+
+    def _stream(
+        self,
+        entrada: dict[str, Any],
+        config: dict[str, Any],
+        caminho: list[str],
+    ) -> None:
+        """Consome o grafo, guardando o caminho mesmo quando ele falha depois."""
+
+        for atualizacao in self.graph.stream(
+            entrada,
+            config,
+            context=self.context,
+            stream_mode="updates",
+        ):
+            if isinstance(atualizacao, dict):
+                caminho.extend(
+                    nome
+                    for nome in atualizacao
+                    if isinstance(nome, str) and not nome.startswith("__")
+                )
 
     def _gravar_saida(
         self,

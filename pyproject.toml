@@ -1,0 +1,5 @@
+# Raiz do workspace `uv`: não é um pacote, só agrupa os projetos do monorepo.
+# Os membros mantêm o próprio `pyproject.toml` (dependências, scripts, tooling);
+# o `uv.lock` e o `.venv` passam a ser únicos, na raiz.
+[tool.uv.workspace]
+members = ["apps/core", "simuladores"]

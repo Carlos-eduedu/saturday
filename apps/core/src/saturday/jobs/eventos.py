@@ -95,6 +95,9 @@ def _processar_um(
         return
 
     evento = _evento_de(payload)
+    # Recibo de leitura antes de processar: o cliente vê que foi recebido mesmo
+    # quando o turno demora ou cai para a equipe.
+    entrada.marcar_lida(evento)
     preparada = entrada.preparar(evento)
     if preparada.resposta_local is not None:
         _enfileirar_resposta(fabrica, evento, preparada.resposta_local)

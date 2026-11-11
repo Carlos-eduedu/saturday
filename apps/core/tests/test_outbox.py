@@ -1,4 +1,8 @@
-"""Outbox: reentrega com backoff, desistência e dois workers em paralelo."""
+"""Outbox: o único dono do reagendamento.
+
+O canal só devolve `Resultado`; aqui se prova a espera, o teto de tentativas, a
+conversão para modelo e o limite de uma nova tentativa no caso incerto.
+"""
 
 from __future__ import annotations
 
@@ -8,27 +12,29 @@ from typing import Any
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session, sessionmaker
 
+from saturday.canais.base import Resultado
 from saturday.dados import outbox as fila
 from saturday.dados import repositorios
 from saturday.dados.modelos import Outbox
-from saturday.jobs.outbox import drenar
+from saturday.jobs.outbox import ESPERA_MAXIMA_S, JITTER, drenar
 from saturday.settings import Settings
 
-# Data bem no passado: vence qualquer lease e destrava a linha para o próximo lote.
+# Data no passado: vence o lease e destrava a linha para o próximo lote.
 PASSADO = datetime(2000, 1, 1, tzinfo=UTC)
 
 
-class EntregadorQueFalha:
-    """Falha sempre, ou só nas primeiras ``falhar`` chamadas."""
+class EntregadorFalso:
+    """Devolve os resultados na ordem, registrando se pediram modelo."""
 
-    def __init__(self, falhar: int | None = None) -> None:
-        self.chamadas = 0
-        self.falhar = falhar
+    def __init__(self, resultados: list[Resultado] | None = None) -> None:
+        self.resultados = list(resultados or [])
+        self.chamadas: list[bool] = []
 
-    def entregar(self, linha: Outbox) -> bool:
-        self.chamadas += 1
-        falhou = self.falhar is None or self.chamadas <= self.falhar
-        return not falhou
+    def entregar(self, linha: Outbox, *, permitir_modelo: bool = False) -> Resultado:
+        self.chamadas.append(permitir_modelo)
+        if not self.resultados:
+            return Resultado.TEMPORARIO
+        return self.resultados.pop(0)
 
 
 def _enfileirar(fabrica: sessionmaker[Session], conversa: str) -> int:
@@ -37,7 +43,7 @@ def _enfileirar(fabrica: sessionmaker[Session], conversa: str) -> int:
         linha = fila.enfileirar(
             sessao,
             conversa_id=linha_conversa.id,
-            canal="webhook",
+            canal="whatsapp",
             payload={"conversation_id": conversa, "answer": "oi"},
         )
         sessao.commit()
@@ -45,8 +51,6 @@ def _enfileirar(fabrica: sessionmaker[Session], conversa: str) -> int:
 
 
 def _liberar(fabrica: sessionmaker[Session], linha_id: int) -> None:
-    """Vence o lease da linha sem esperar os 60 s reais."""
-
     with fabrica() as sessao:
         sessao.execute(
             update(Outbox).where(Outbox.id == linha_id).values(proxima_tentativa_em=PASSADO)
@@ -66,50 +70,112 @@ def _estado(fabrica: sessionmaker[Session], linha_id: int) -> tuple[Any, ...]:
         )
 
 
-def test_envio_que_falha_e_reentregue(
+def test_ok_marca_entregue(
     settings: Settings,
     fabrica: sessionmaker[Session],
     conversa: str,
 ) -> None:
     linha_id = _enfileirar(fabrica, conversa)
-    entregador = EntregadorQueFalha(falhar=1)
 
-    assert drenar(fabrica, entregador, settings) == 1
-
-    entregue_em, falhou_em, tentativas, _ = _estado(fabrica, linha_id)
-    # Falhou: continua na fila, com a tentativa contada.
-    assert entregue_em is None
-    assert falhou_em is None
-    assert tentativas == 1
-
-    _liberar(fabrica, linha_id)
-    assert drenar(fabrica, entregador, settings) == 1
+    assert drenar(fabrica, EntregadorFalso([Resultado.OK]), settings) == 1
 
     entregue_em, falhou_em, tentativas, _ = _estado(fabrica, linha_id)
     assert entregue_em is not None
     assert falhou_em is None
-    assert tentativas == 2
-    assert entregador.chamadas == 2
+    assert tentativas == 1
 
 
-def test_backoff_cresce_a_cada_falha(
+def test_temporario_volta_para_a_fila(
     settings: Settings,
     fabrica: sessionmaker[Session],
     conversa: str,
 ) -> None:
     linha_id = _enfileirar(fabrica, conversa)
-    entregador = EntregadorQueFalha()
 
-    esperas = []
+    drenar(fabrica, EntregadorFalso([Resultado.TEMPORARIO]), settings)
+
+    entregue_em, falhou_em, tentativas, proxima = _estado(fabrica, linha_id)
+    assert entregue_em is None
+    assert falhou_em is None
+    assert tentativas == 1
+    assert proxima > datetime.now(UTC)
+
+
+def test_backoff_cresce_com_jitter_dentro_da_faixa(
+    settings: Settings,
+    fabrica: sessionmaker[Session],
+    conversa: str,
+) -> None:
+    """Base 2 s: 1ª espera em [1;3], 2ª em [2;6], 3ª em [4;12]."""
+
+    linha_id = _enfileirar(fabrica, conversa)
+    entregador = EntregadorFalso()
+
+    esperas: list[float] = []
     for _ in range(3):
         drenar(fabrica, entregador, settings)
         _, _, _, proxima = _estado(fabrica, linha_id)
-        esperas.append(proxima)
+        esperas.append((proxima - datetime.now(UTC)).total_seconds())
         _liberar(fabrica, linha_id)
 
-    agora = datetime.now(UTC)
-    segundos = [(espera - agora).total_seconds() for espera in esperas]
-    assert segundos[0] < segundos[1] < segundos[2]
+    base = settings.outbox_backoff_base_s
+    for numero, espera in enumerate(esperas, start=1):
+        exponencial = base * 2 ** (numero - 1)
+        assert exponencial * (1 - JITTER) - 1 <= espera <= exponencial * (1 + JITTER) + 1
+
+
+def test_permanente_desiste_na_primeira(
+    settings: Settings,
+    fabrica: sessionmaker[Session],
+    conversa: str,
+) -> None:
+    linha_id = _enfileirar(fabrica, conversa)
+
+    drenar(fabrica, EntregadorFalso([Resultado.PERMANENTE]), settings)
+
+    entregue_em, falhou_em, tentativas, _ = _estado(fabrica, linha_id)
+    assert entregue_em is None
+    assert falhou_em is not None
+    assert tentativas == 1
+
+
+def test_incerto_tenta_no_maximo_uma_vez_a_mais(
+    settings: Settings,
+    fabrica: sessionmaker[Session],
+    conversa: str,
+) -> None:
+    linha_id = _enfileirar(fabrica, conversa)
+    entregador = EntregadorFalso([Resultado.TEMPORARIO_INCERTO, Resultado.TEMPORARIO_INCERTO])
+
+    drenar(fabrica, entregador, settings)
+    _, falhou_em, tentativas, _ = _estado(fabrica, linha_id)
+    assert falhou_em is None  # ainda vale uma tentativa
+    assert tentativas == 1
+
+    _liberar(fabrica, linha_id)
+    drenar(fabrica, entregador, settings)
+
+    _, falhou_em, tentativas, _ = _estado(fabrica, linha_id)
+    assert falhou_em is not None  # a segunda incerteza encerra
+    assert tentativas == 2
+
+
+def test_janela_fechada_converte_para_modelo(
+    settings: Settings,
+    fabrica: sessionmaker[Session],
+    conversa: str,
+) -> None:
+    linha_id = _enfileirar(fabrica, conversa)
+    entregador = EntregadorFalso([Resultado.JANELA_FECHADA, Resultado.OK])
+
+    drenar(fabrica, entregador, settings)
+
+    assert entregador.chamadas == [False, True]
+    # A conversão acontece na mesma tentativa: não consome o orçamento.
+    entregue_em, falhou_em, tentativas, _ = _estado(fabrica, linha_id)
+    assert entregue_em is not None
+    assert falhou_em is None
+    assert tentativas == 1
 
 
 def test_desiste_depois_do_limite_de_tentativas(
@@ -118,16 +184,34 @@ def test_desiste_depois_do_limite_de_tentativas(
     conversa: str,
 ) -> None:
     linha_id = _enfileirar(fabrica, conversa)
-    entregador = EntregadorQueFalha()
+    entregador = EntregadorFalso()
 
     for _ in range(settings.outbox_max_tentativas):
         drenar(fabrica, entregador, settings)
         _liberar(fabrica, linha_id)
 
     entregue_em, falhou_em, tentativas, _ = _estado(fabrica, linha_id)
-    assert entregue_em is None  # nunca foi entregue
-    assert falhou_em is not None  # e o sistema assume que desistiu
+    assert entregue_em is None
+    assert falhou_em is not None
     assert tentativas == settings.outbox_max_tentativas
+    assert settings.outbox_max_tentativas == 6
+
+
+def test_espera_nunca_passa_do_teto(
+    settings: Settings,
+    fabrica: sessionmaker[Session],
+    conversa: str,
+) -> None:
+    linha_id = _enfileirar(fabrica, conversa)
+    entregador = EntregadorFalso()
+
+    for _ in range(5):
+        drenar(fabrica, entregador, settings)
+        _liberar(fabrica, linha_id)
+
+    _, _, _, proxima = _estado(fabrica, linha_id)
+    espera = (proxima - datetime.now(UTC)).total_seconds()
+    assert espera <= ESPERA_MAXIMA_S + 1
 
 
 def test_dois_workers_nao_pegam_a_mesma_linha(
@@ -139,9 +223,6 @@ def test_dois_workers_nao_pegam_a_mesma_linha(
     _enfileirar(fabrica, conversa + "-a")
     _enfileirar(fabrica, conversa + "-b")
 
-    # Os dois pedem uma linha cada, com as transações abertas ao mesmo tempo.
-    # Sem SKIP LOCKED, o segundo ficaria bloqueado esperando o primeiro
-    # commitar; com SKIP LOCKED, ele leva a outra linha e segue.
     with fabrica() as um, fabrica() as dois:
         primeira = fila.reivindicar(um, 1)
         segunda = fila.reivindicar(dois, 1)
@@ -151,10 +232,6 @@ def test_dois_workers_nao_pegam_a_mesma_linha(
     assert len(primeira) == 1
     assert len(segunda) == 1
     assert primeira[0].id != segunda[0].id
-
-    with fabrica() as sessao:
-        pendentes = sessao.scalars(select(Outbox).where(Outbox.entregue_em.is_(None))).all()
-    assert len(pendentes) == 2
 
 
 def test_conversa_sem_envio_nao_drena_nada(
@@ -166,4 +243,17 @@ def test_conversa_sem_envio_nao_drena_nada(
         repositorios.obter_ou_criar_conversa(sessao, conversa)
         sessao.commit()
 
-    assert drenar(fabrica, EntregadorQueFalha(), settings) == 0
+    assert drenar(fabrica, EntregadorFalso(), settings) == 0
+
+
+def test_linhas_pendentes_continuam_visiveis(
+    settings: Settings,
+    fabrica: sessionmaker[Session],
+    conversa: str,
+) -> None:
+    _enfileirar(fabrica, conversa)
+    drenar(fabrica, EntregadorFalso([Resultado.TEMPORARIO]), settings)
+
+    with fabrica() as sessao:
+        pendentes = sessao.scalars(select(Outbox).where(Outbox.entregue_em.is_(None))).all()
+    assert len(pendentes) == 1

@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  qualidade:
+  core:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -15,8 +15,8 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.14"
-          # O `uv.lock` vive em apps/core, não na raiz.
-          cache-dependency-glob: apps/core/uv.lock
+          # O lock do workspace vive na raiz, não em cada membro.
+          cache-dependency-glob: uv.lock
 
       - name: Instalar dependências
         run: uv sync --locked
@@ -32,3 +32,27 @@ jobs:
 
       - name: Testes
         run: uv run pytest
+
+  simuladores:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: simuladores
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.14"
+          cache-dependency-glob: uv.lock
+
+      - name: Instalar dependências
+        run: uv sync --locked
+
+      - name: Formatação
+        run: uv run ruff format --check
+
+      - name: Lint
+        run: uv run ruff check
+
+      - name: Tipos
+        run: uv run mypy

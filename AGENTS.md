@@ -12,11 +12,14 @@ Python rodam a partir dele:
 
 ```bash
 cd apps/core
-uv sync --locked
+uv sync --locked                                    # o lock é do workspace, na raiz
 uv run ruff format --check && uv run ruff check     # estilo
 uv run mypy                                         # tipos (usa [tool.mypy] do pyproject)
 uv run pytest -q                                    # testes; os de banco são pulados
 ```
+
+O `uv.lock` e o `.venv` são únicos, na raiz do monorepo: `uv sync` pode rodar
+de `apps/core` ou de `simuladores`, e os dois usam o mesmo ambiente.
 
 Os testes que dependem do backend real exigem um Postgres **descartável** (o
 nome do banco precisa conter `test`, porque os fixtures apagam e recriam as
@@ -63,9 +66,16 @@ automaticamente e é o que publica a porta no ambiente local.
   dela, as sete mensagens do piloto e o simulador da Meta. A suíte tem 185 testes.
 - As fases 3 a 7 estão pendentes. `infra/`, `regras/`, `conhecimento/` e
   `apps/painel/` nascem na fase que colocar neles o primeiro arquivo real.
+- Fora das fases, o repositório já tem: workspace `uv` único (um lock e um
+  venv na raiz), healthcheck próprio por serviço (a API responde `/health`, o
+  worker verifica banco e batimento do laço, o migrate não tem), entrega com
+  reagendamento só no outbox (6 tentativas, jitter, incerto com 1 retry) e
+  `docs/` com as decisões registradas em `docs/decisoes/`.
 - `migrations/` fica em `apps/core/migrations/`, não na raiz: as migrações
   descrevem os modelos daquele pacote e precisam do ambiente `uv` dele para
   importar. Desvio consciente da árvore desenhada acima.
+- Em `homolog` e `prod` o serviço não sobe sem `SATURDAY_API_KEY`; em `dev` e
+  `pytest` a ausência só gera aviso no log.
 - O único ramo existente é o INSS → C6 (em `apps/core/src/saturday/portabilidade/`
   e `apps/core/src/saturday/agent/`). Ele deve continuar funcionando em toda fase.
 - Pendência desta fase: `minio/minio` não está mais publicável nos registries
