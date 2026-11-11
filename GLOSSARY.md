@@ -43,6 +43,33 @@ Mostrar ao usuário do painel um dado pessoal sem máscara; sempre deixa rastro
 na auditoria.
 _Evitar_: desmascarar, ver completo
 
+## Crédito do Trabalhador
+
+**Consulta**:
+Pedido à Granatech para ver o emprego, o salário e a margem de um CPF; cada
+uma gasta cota.
+_Evitar_: consulta de saldo (fora da borda com a API), pesquisa
+
+**Cota**:
+Quantas consultas a MEX pode abrir na Granatech, por dia e por mês.
+
+**Reaproveitamento**:
+Usar uma consulta recente do mesmo CPF em vez de abrir outra.
+
+**Vínculo**:
+Um emprego do cliente que tem margem, com seus produtos de crédito.
+_Evitar_: margem (para o emprego), matrícula
+
+**Simulação**:
+Cálculo de uma condição de crédito para um vínculo; não gasta cota.
+
+**Liberado**:
+O valor que cai na conta do cliente, sem IOF nem seguro.
+_Evitar_: valor solicitado (fora da borda com a API), valor do empréstimo
+
+**Teto**:
+O maior liberado que a MEX apresenta ou contrata (R$ 6.999).
+
 ## Equipe
 
 **Atendente**:

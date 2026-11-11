@@ -73,6 +73,29 @@ def test_dev_sem_api_key_so_avisa() -> None:
 
 
 def test_homolog_com_api_key_sobe() -> None:
-    settings = _completo(environment="homolog", api_key=SecretStr("chave"))
+    settings = _completo(
+        environment="homolog",
+        api_key=SecretStr("chave"),
+        granatech_webhook_token=SecretStr("token-webhook"),
+    )
 
     settings.validar_para_subir()
+
+
+@pytest.mark.parametrize("ambiente", ["homolog", "prod"])
+def test_homolog_e_prod_exigem_token_do_webhook_granatech(ambiente: str) -> None:
+    settings = _completo(environment=ambiente, api_key=SecretStr("chave"))
+
+    with pytest.raises(RuntimeError, match="SATURDAY_GRANATECH_WEBHOOK_TOKEN"):
+        settings.validar_para_subir()
+
+
+def test_dev_sem_token_granatech_sobe_com_flag_desligada() -> None:
+    _completo(environment="dev").validar_para_subir()
+
+
+def test_granatech_ativa_exige_chave_e_token() -> None:
+    settings = _completo(environment="dev", granatech_ativo=True)
+
+    with pytest.raises(RuntimeError, match="SATURDAY_GRANATECH_CHAVE_API"):
+        settings.validar_para_subir()

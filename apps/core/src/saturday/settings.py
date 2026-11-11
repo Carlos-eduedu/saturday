@@ -8,6 +8,7 @@ devem ser sobrescritas por ambiente sem revisão.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 from functools import lru_cache
 from typing import Annotated, Literal
 
@@ -73,10 +74,19 @@ class Settings(BaseSettings):
     # Painel: assina o CSRF da sessão. Obrigatória fora de `pytest`.
     sessao_segredo: SecretStr = SecretStr("")
 
-    # Cota da Granatech: o painel mostra o uso contra estes tetos. Quem gasta
-    # cota entra na Fase 4.
+    # Granatech. `ativo` liga o cliente; o webhook fica sempre no ar e responde
+    # 503 enquanto o token estiver vazio.
+    granatech_base_url: str = "https://api-dev.granatech.com.br"
+    granatech_chave_api: SecretStr = SecretStr("")
+    granatech_webhook_token: SecretStr = SecretStr("")
+    granatech_ativo: bool = False
+    granatech_proposta_ativa: bool = False
+    granatech_teto_liberado: Decimal = Decimal("6999")
     granatech_cota_mensal: int = 500
     granatech_cota_diaria: int = 20
+    granatech_reaproveitar_dias: int = 30
+    # TODO(granatech): confirmar o `tipo_empregador` do corpo da proposta.
+    granatech_tipo_empregador: int = 1
 
     @field_validator("anexo_dominios", "whatsapp_numeros", mode="before")
     @classmethod
@@ -132,6 +142,31 @@ class Settings(BaseSettings):
                 "o canal não sabe de qual número responder."
             )
 
+        if self.granatech_ativo and self.environment != "pytest":
+            faltando = [
+                nome
+                for nome, valor in {
+                    "SATURDAY_GRANATECH_CHAVE_API": self.granatech_chave_api,
+                    "SATURDAY_GRANATECH_WEBHOOK_TOKEN": self.granatech_webhook_token,
+                }.items()
+                if not valor.get_secret_value()
+            ]
+            if faltando:
+                raise RuntimeError(
+                    "SATURDAY_GRANATECH_ATIVO=true exige " + ", ".join(faltando) + "."
+                )
+
+        # O webhook da Granatech fica sempre no ar; sem token ele recusa tudo, e
+        # fora de dev isso esconderia eventos perdidos.
+        if (
+            self.environment in {"homolog", "prod"}
+            and not self.granatech_webhook_token.get_secret_value()
+        ):
+            raise RuntimeError(
+                "SATURDAY_GRANATECH_WEBHOOK_TOKEN é obrigatória quando "
+                f"SATURDAY_ENVIRONMENT={self.environment}."
+            )
+
         if (
             self.webhook_url
             and not self.webhook_secret.get_secret_value()
@@ -156,6 +191,8 @@ LLM_TIMEOUT_S = 30
 LLM_TEMPERATURE = 0
 HISTORY_MAX_MESSAGES = 10
 WEBHOOK_TIMEOUT_S = 10
+GRANATECH_TIMEOUT_S = 15
+GRANATECH_ESPERA_RETRY_S = 1.5
 ANEXO_MAX_MB = 10
 ANEXO_TIMEOUT_S = 15
 MIME_ACEITOS = frozenset(
