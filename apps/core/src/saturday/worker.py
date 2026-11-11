@@ -16,7 +16,7 @@ import httpx
 
 from saturday.dados.sessao import criar_engine, criar_factory
 from saturday.health import registrar_batimento
-from saturday.jobs import alertas
+from saturday.jobs import alertas, recontatos
 from saturday.jobs.eventos import processar
 from saturday.jobs.outbox import EntregadorPorCanal, EntregadorWebhook, drenar
 from saturday.log import configurar_logging
@@ -77,7 +77,8 @@ def rodar(settings: Settings, parar: threading.Event) -> None:
                 eventos = processar(fabrica, servico, entrada_whatsapp, settings, granatech)
                 entregues = drenar(fabrica, entregador, settings)
                 if time.monotonic() >= proxima_verificacao:
-                    alertas.verificar(fabrica)
+                    alertas.verificar(fabrica, servico)
+                    recontatos.disparar(fabrica, servico)
                     proxima_verificacao = time.monotonic() + alertas.INTERVALO_S
             except Exception:
                 logger.exception("worker_erro_no_lote")

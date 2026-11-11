@@ -50,7 +50,7 @@ def processar(
     for linha in linhas:
         try:
             if linha.origem == ORIGEM_GRANATECH:
-                eventos_granatech.aplicar(fabrica, granatech, linha.payload or {})
+                eventos_granatech.aplicar(fabrica, granatech, linha.payload or {}, servico)
             else:
                 _processar_um(fabrica, servico, entrada, linha)
         except Exception as exc:  # noqa: BLE001 - o erro fica na linha, não derruba o laço
