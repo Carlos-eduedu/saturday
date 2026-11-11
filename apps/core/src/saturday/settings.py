@@ -53,7 +53,24 @@ class Settings(BaseSettings):
     outbox_backoff_base_s: float = 2.0
     outbox_lote: int = 20
 
-    @field_validator("anexo_dominios", mode="before")
+    # WhatsApp Cloud API (Meta). Obrigatórias fora de `pytest`.
+    whatsapp_token: SecretStr = SecretStr("")
+    whatsapp_app_secret: SecretStr = SecretStr("")
+    whatsapp_verify_token: SecretStr = SecretStr("")
+    whatsapp_numeros: Annotated[list[str], NoDecode] = Field(default_factory=list)
+    whatsapp_graph_url: str = "https://graph.facebook.com/v23.0"
+    whatsapp_limite_midia_mb: int = 50
+
+    # Transcrição de áudio: endpoint compatível com OpenAI (`/audio/transcriptions`).
+    transcricao_api_key: SecretStr = SecretStr("")
+    transcricao_modelo: str = ""
+    transcricao_base_url: str = "https://api.openai.com/v1"
+
+    # Fila de eventos: tamanho do lote e quantas tentativas antes de desistir.
+    eventos_lote: int = 20
+    eventos_max_tentativas: int = 8
+
+    @field_validator("anexo_dominios", "whatsapp_numeros", mode="before")
     @classmethod
     def _lista_por_virgula(cls, valor: object) -> object:
         if isinstance(valor, str):
@@ -69,6 +86,9 @@ class Settings(BaseSettings):
                 "SATURDAY_LLM_MODEL": self.llm_model,
                 "SATURDAY_VISION_MODEL": self.vision_model,
                 "SATURDAY_DATABASE_URL": self.database_url.get_secret_value(),
+                "SATURDAY_WHATSAPP_TOKEN": self.whatsapp_token.get_secret_value(),
+                "SATURDAY_WHATSAPP_APP_SECRET": self.whatsapp_app_secret.get_secret_value(),
+                "SATURDAY_WHATSAPP_VERIFY_TOKEN": self.whatsapp_verify_token.get_secret_value(),
             }
             faltando = [nome for nome, valor in obrigatorias.items() if not valor]
             if faltando:
@@ -93,6 +113,12 @@ class Settings(BaseSettings):
 
         if self.environment == "prod" and not self.api_key.get_secret_value():
             raise RuntimeError("SATURDAY_API_KEY é obrigatória quando SATURDAY_ENVIRONMENT=prod.")
+
+        if self.environment != "pytest" and not self.whatsapp_numeros:
+            raise RuntimeError(
+                "SATURDAY_WHATSAPP_NUMEROS é obrigatória: sem um phone_number_id ativo "
+                "o canal não sabe de qual número responder."
+            )
 
         if (
             self.webhook_url

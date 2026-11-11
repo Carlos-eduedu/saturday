@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -14,14 +14,34 @@ def obter_ou_criar_conversa(
     conversation_id: str,
     *,
     canal: str = "chat",
+    telefone: str | None = None,
+    phone_number_id: str | None = None,
 ) -> Conversa:
     conversa = sessao.scalar(select(Conversa).where(Conversa.conversation_id == conversation_id))
-    if conversa is not None:
+    if conversa is None:
+        conversa = Conversa(
+            conversation_id=conversation_id,
+            canal=canal,
+            telefone=telefone,
+            phone_number_id=phone_number_id,
+        )
+        sessao.add(conversa)
+        sessao.flush()
         return conversa
-    conversa = Conversa(conversation_id=conversation_id, canal=canal)
-    sessao.add(conversa)
-    sessao.flush()
+
+    # O cliente fica preso ao número em que escreveu; o telefone só é gravado
+    # uma vez, para não reescrever a cada turno.
+    if telefone and conversa.telefone != telefone:
+        conversa.telefone = telefone
+    if phone_number_id:
+        conversa.phone_number_id = phone_number_id
     return conversa
+
+
+def marcar_entrada(conversa: Conversa) -> None:
+    """Toda mensagem do cliente reabre a janela de 24 h do canal."""
+
+    conversa.ultima_entrada_em = func.now()
 
 
 def registrar_entrada(
@@ -31,6 +51,7 @@ def registrar_entrada(
     message_id: str | None,
     conteudo: str,
 ) -> bool:
+    marcar_entrada(conversa)
     """Grava a mensagem do cliente. ``False`` quando o ``message_id`` já existe.
 
     A decisão é do banco, não de uma lista em memória: ``ON CONFLICT DO NOTHING``
@@ -62,13 +83,52 @@ def registrar_saida(
     *,
     conteudo: str,
     message_id: str | None = None,
-) -> None:
-    sessao.add(
-        Mensagem(
-            conversa_id=conversa.id,
-            direcao="saida",
-            message_id=message_id,
-            conteudo=conteudo,
-        )
+) -> int:
+    """Grava a resposta e devolve o id.
+
+    O id volta para o outbox: quando a Meta confirmar o envio, é nesta linha que
+    o `wamid` e o status de entrega vão ser gravados.
+    """
+
+    linha = Mensagem(
+        conversa_id=conversa.id,
+        direcao="saida",
+        message_id=message_id,
+        conteudo=conteudo,
     )
+    sessao.add(linha)
     sessao.flush()
+    return linha.id
+
+
+def buscar_conversa(sessao: Session, conversation_id: str) -> Conversa | None:
+    return sessao.scalar(select(Conversa).where(Conversa.conversation_id == conversation_id))
+
+
+def marcar_envio(
+    sessao: Session,
+    mensagem_id: int,
+    *,
+    wamid: str | None,
+    status: str,
+) -> None:
+    """Guarda a identificação da Meta na mensagem que a originou."""
+
+    linha = sessao.get(Mensagem, mensagem_id)
+    if linha is None:
+        return
+    if wamid:
+        linha.wamid = wamid
+    linha.status_entrega = status
+    sessao.flush()
+
+
+def atualizar_status(sessao: Session, *, wamid: str, status: str) -> bool:
+    """Aplica um `statuses` do webhook. ``False`` se a mensagem é desconhecida."""
+
+    linha = sessao.scalar(select(Mensagem).where(Mensagem.wamid == wamid))
+    if linha is None:
+        return False
+    linha.status_entrega = status
+    sessao.flush()
+    return True

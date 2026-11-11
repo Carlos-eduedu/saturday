@@ -15,6 +15,7 @@ import httpx
 
 from saturday.metrics import registrar_chamada
 from saturday.settings import ANEXO_MAX_MB, ANEXO_TIMEOUT_S, MIME_ACEITOS, Settings
+from saturday.storage.base import Storage
 
 LIMITE_BYTES = ANEXO_MAX_MB * 1024 * 1024
 
@@ -76,9 +77,15 @@ def mensagem_anexo_invalido() -> str:
 class AnexosClient:
     """Baixa/decodifica anexos usando o cliente HTTP compartilhado."""
 
-    def __init__(self, http: httpx.Client, settings: Settings) -> None:
+    def __init__(
+        self,
+        http: httpx.Client,
+        settings: Settings,
+        storage: Storage | None = None,
+    ) -> None:
         self._http = http
         self._settings = settings
+        self._storage = storage
 
     def _validar_host(self, host: str) -> None:
         host = host.strip().lower().rstrip(".")
@@ -161,10 +168,24 @@ class AnexosClient:
         mime = _normalizar_mime(item.get("mime_type"))
         url = item.get("url")
         base64_valor = item.get("base64")
+        chave = item.get("chave")
 
-        if bool(url) == bool(base64_valor):
-            raise AnexoInvalido("anexo deve ter url ou base64")
-        data = self._baixar(str(url)) if url else _decodificar_base64(str(base64_valor))
+        origens = [url, base64_valor, chave]
+        if sum(origem is not None for origem in origens) != 1:
+            raise AnexoInvalido("anexo deve ter url, base64 ou chave")
+
+        if chave:
+            if self._storage is None:
+                raise AnexoInvalido("anexo arquivado sem storage configurado")
+            try:
+                data = self._storage.ler(str(chave))
+            except KeyError as exc:
+                raise AnexoInvalido("anexo não encontrado no storage") from exc
+        elif url:
+            data = self._baixar(str(url))
+        else:
+            data = _decodificar_base64(str(base64_valor))
+
         return Anexo(mime_type=mime, data=data)
 
     def carregar_anexos(self, itens: list[dict[str, Any]]) -> list[Anexo]:

@@ -102,3 +102,18 @@ def mensagem_handoff(motivo: str, resposta: str | None = None) -> str:
     if not dentro_horario_equipe():
         texto = f"{texto} {MENSAGEM_FORA_HORARIO}"
     return texto
+
+
+def mensagem_audio_ilegivel() -> str:
+    """Áudio sem transcrição: pede o mesmo conteúdo por escrito."""
+
+    return (
+        "Não consegui ouvir esse áudio. Pode me contar por texto? "
+        "Se for o extrato, ele pode ir como foto ou PDF."
+    )
+
+
+def mensagem_midia_ilegivel() -> str:
+    """Mídia que não deu para baixar ou que passou do limite de leitura."""
+
+    return "Não consegui abrir esse arquivo. Envie de novo como foto ou PDF, ou me conte por texto."

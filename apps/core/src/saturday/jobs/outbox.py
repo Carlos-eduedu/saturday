@@ -24,6 +24,23 @@ class Entregador(Protocol):
     def entregar(self, linha: Outbox) -> bool: ...
 
 
+class EntregadorPorCanal:
+    """Despacha pelo `canal` da linha do outbox.
+
+    É o seam para as fases seguintes: acrescentar um canal é acrescentar um
+    entregador aqui, sem mexer no laço de consumo.
+    """
+
+    def __init__(self, entregadores: dict[str, Entregador]) -> None:
+        self._entregadores = entregadores
+
+    def entregar(self, linha: Outbox) -> bool:
+        entregador = self._entregadores.get(linha.canal)
+        if entregador is None:
+            raise ValueError(f"canal sem entregador: {linha.canal}")
+        return entregador.entregar(linha)
+
+
 class EntregadorWebhook:
     """Entrega pelo webhook configurado. Devolve ``False`` quando o canal recusa."""
 

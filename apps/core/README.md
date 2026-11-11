@@ -173,3 +173,32 @@ Os testes não fazem chamadas reais ao OpenRouter, downloads ou webhooks.
 - `agent/`: grafo LangGraph, estado e nós.
 - `portabilidade/`: regras, cálculo, leitura do Hiscon e mensagens fixas.
 - `services/`: OpenRouter (Jev/visão/texto), anexos e webhook.
+
+## Canal WhatsApp
+
+Arquivos em `canais/whatsapp/`. O caminho de uma mensagem:
+
+1. `GET /webhooks/whatsapp` responde o desafio da Meta (uma vez, no cadastro).
+2. `POST /webhooks/whatsapp` valida `X-Hub-Signature-256` (HMAC-SHA256 do corpo
+   cru, comparação em tempo constante), grava o evento em `eventos_recebidos` e
+   responde 200. O turno **não** roda aqui: a Meta reenvia quando demora.
+3. O worker reivindica o evento, roda o turno sob a trava da conversa e grava a
+   resposta no `outbox`.
+4. O worker entrega pelo canal: janela de 24 h aberta → texto dividido por linha
+   em branco (até 5 partes, 0,9 s entre elas); fechada → modelo `atualizacao_pedido`.
+
+Mídia: dois passos (`GET /{media_id}` e depois a URL devolvida), limite de 50 MB,
+guardada em `whatsapp/{telefone}/{wamid}.{ext}`. Foto e PDF até 4,5 MB seguem como
+anexo do grafo; áudio é transcrito (endpoint compatível com OpenAI) e, se a
+transcrição falhar, o cliente recebe o pedido para escrever.
+
+Autenticação de saída: `Authorization: Bearer SATURDAY_WHATSAPP_TOKEN`. Retry com
+esperas de 2 s, 5 s e 10 s só em erro temporário (5xx, timeout e os códigos
+listados em `canais/whatsapp/cliente.py`); esgotado, o outbox reentrega depois.
+
+O simulador da Meta fica em `simuladores/meta/` e cobre envio, download de mídia
+e injeção de mensagem assinada:
+
+```bash
+uv run --project simuladores/meta uvicorn app:app --app-dir simuladores/meta --port 8100
+```

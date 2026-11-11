@@ -55,10 +55,14 @@ automaticamente e é o que publica a porta no ambiente local.
 - **Fase 1 concluída:** Postgres com SQLAlchemy e Alembic, checkpointer
   `PostgresSaver`, trava por conversa com `pg_advisory_xact_lock`, outbox
   transacional com worker e backoff, storage S3 para anexos (o estado guarda só a
-  chave) e as quatro correções do ramo INSS. A suíte tem 140 testes.
-- As fases 2 a 7 estão pendentes. `simuladores/`, `infra/`, `regras/`,
-  `conhecimento/` e `apps/painel/` nascem na fase que colocar neles o primeiro
-  arquivo real.
+  chave) e as quatro correções do ramo INSS.
+- **Fase 2 concluída:** webhook da Meta (verificação, assinatura em tempo
+  constante, deduplicação por `wamid`), fila de eventos processada no worker,
+  mídia em dois passos com limite de 50 MB, transcrição de áudio, status de
+  entrega, texto dividido em até cinco partes, janela de 24 h com modelo fora
+  dela, as sete mensagens do piloto e o simulador da Meta. A suíte tem 185 testes.
+- As fases 3 a 7 estão pendentes. `infra/`, `regras/`, `conhecimento/` e
+  `apps/painel/` nascem na fase que colocar neles o primeiro arquivo real.
 - `migrations/` fica em `apps/core/migrations/`, não na raiz: as migrações
   descrevem os modelos daquele pacote e precisam do ambiente `uv` dele para
   importar. Desvio consciente da árvore desenhada acima.

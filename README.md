@@ -20,18 +20,30 @@ Desde a Fase 1 o estado das conversas vive no **Postgres**, os anexos no **S3** 
 a entrega das respostas passa pelo **outbox**, consumido pelo worker. Não há mais
 SQLite nem volume local: a aplicação não escreve em disco.
 
-`simuladores/`, `infra/`, `regras/`, `conhecimento/` e `apps/painel/` entram nas
-fases que colocarem neles o primeiro arquivo real (2 a 5).
+Desde a Fase 2 existe o **canal WhatsApp** (`apps/core/src/saturday/canais/`):
+webhook da Meta que grava e responde 200, fila de eventos processada pelo worker,
+mídia no S3, transcrição de áudio e entrega em texto ou modelo conforme a janela
+de 24 h. O simulador da Meta vive em `simuladores/meta/` (projeto `uv` próprio).
+
+`infra/`, `regras/`, `conhecimento/` e `apps/painel/` entram nas fases que
+colocarem neles o primeiro arquivo real (3 a 7).
 
 ## Rodar local, sem container
 
 Precisa de um Postgres. O mais curto é usar o do compose:
 
 ```bash
-cp .env.example .env                  # preencha as chaves do OpenRouter
+cp .env.example .env                  # preencha as chaves e as do WhatsApp
 docker compose --profile postgres up -d postgres
 uv run --project apps/core alembic upgrade head   # cria as tabelas
 uv run --project apps/core saturday
+```
+
+Para conversar pelo simulador em vez da Meta, suba-o à parte e aponte a Graph:
+
+```bash
+uv run --project simuladores/meta uvicorn app:app --app-dir simuladores/meta --port 8100
+# SATURDAY_WHATSAPP_GRAPH_URL=http://127.0.0.1:8100 no .env
 ```
 
 Rode **da raiz**: o `pydantic-settings` lê o `.env` do diretório atual, então de

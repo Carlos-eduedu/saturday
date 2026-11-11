@@ -1,15 +1,19 @@
 # Ajustes de desenvolvimento local. O Docker Compose carrega este arquivo
 # automaticamente junto com `compose.yaml`.
 #
-# Publica as portas que o desenvolvedor usa por fora dos containers:
-# a API, o Postgres (para rodar `pytest` contra ele) e o console do MinIO.
-# `simuladores/granatech` e `simuladores/meta` entram nas fases 2 e 4, junto com
-# as variáveis que apontam `SATURDAY_WHATSAPP_GRAPH_URL` e
-# `SATURDAY_GRANATECH_BASE_URL` para eles.
+# Publica as portas que o desenvolvedor usa por fora dos containers (API,
+# Postgres para rodar `pytest`, console do MinIO e o simulador da Meta) e aponta
+# o canal do WhatsApp para o simulador em vez da Graph de verdade.
 services:
   api:
     ports:
       - "8000:8000"
+    environment:
+      SATURDAY_WHATSAPP_GRAPH_URL: http://meta:8100
+
+  worker:
+    environment:
+      SATURDAY_WHATSAPP_GRAPH_URL: http://meta:8100
 
   postgres:
     ports:
@@ -19,3 +23,34 @@ services:
     ports:
       - "9000:9000"
       - "9001:9001"
+
+  # Simulador da WhatsApp Cloud API. Roda na mesma imagem da API (que já tem
+  # fastapi e uvicorn) com o código montado do repositório: só existe em dev.
+  meta:
+    image: saturday-api
+    build:
+      context: .
+      dockerfile: apps/core/Dockerfile
+    working_dir: /app
+    volumes:
+      - ./simuladores:/simuladores:ro
+    command:
+      - uvicorn
+      - app:app
+      - --app-dir
+      - /simuladores/meta
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8100"
+    environment:
+      SIMULADOR_SATURDAY_URL: http://api:8000
+      SIMULADOR_BASE_URL: http://meta:8100
+      SATURDAY_WHATSAPP_APP_SECRET: ${SATURDAY_WHATSAPP_APP_SECRET:-segredo}
+      SIMULADOR_WHATSAPP_NUMERO: "11987654321"
+      SIMULADOR_PHONE_NUMBER_ID: "100000000000001"
+    ports:
+      - "8100:8100"
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5

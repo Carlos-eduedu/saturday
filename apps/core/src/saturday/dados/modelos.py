@@ -41,6 +41,11 @@ class Conversa(Base):
     conversation_id: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
     canal: Mapped[str] = mapped_column(String(32), nullable=False, default="chat")
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="in_progress")
+    # WhatsApp: DDD + número, e o número em que o cliente escreveu por último.
+    telefone: Mapped[str | None] = mapped_column(String(20), index=True)
+    phone_number_id: Mapped[str | None] = mapped_column(String(32))
+    # Base da janela de 24 h: a última mensagem que o cliente mandou.
+    ultima_entrada_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
     atualizada_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=AGORA, onupdate=AGORA
@@ -67,6 +72,9 @@ class Mensagem(Base):
     )
     direcao: Mapped[str] = mapped_column(String(8), nullable=False)
     message_id: Mapped[str | None] = mapped_column(String(128))
+    # `wamid` da Meta: identifica a mensagem nos dois lados do canal.
+    wamid: Mapped[str | None] = mapped_column(String(128), unique=True)
+    status_entrega: Mapped[str | None] = mapped_column(String(16))
     conteudo: Mapped[str] = mapped_column(Text, nullable=False, default="")
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
 
@@ -102,14 +110,26 @@ class Outbox(Base):
 
 
 class EventoRecebido(Base):
-    """Deduplicação de eventos de entrada (webhook da Meta, da Granatech, chat)."""
+    """Fila e deduplicação de eventos de entrada.
+
+    O webhook só grava e responde 200; o worker é quem processa. A chave única
+    ``(origem, evento_id)`` impede que um reenvio da Meta vire dois turnos.
+    """
 
     __tablename__ = "eventos_recebidos"
-    __table_args__ = (UniqueConstraint("origem", "evento_id", name="uq_evento_origem_id"),)
+    __table_args__ = (
+        UniqueConstraint("origem", "evento_id", name="uq_evento_origem_id"),
+        Index("ix_eventos_pendentes", "processado_em", "falhou_em"),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     origem: Mapped[str] = mapped_column(String(32), nullable=False)
     evento_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    tentativas: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    processado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    falhou_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ultimo_erro: Mapped[str | None] = mapped_column(Text)
     recebido_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
 
 

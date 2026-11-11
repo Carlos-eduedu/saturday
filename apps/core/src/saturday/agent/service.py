@@ -16,12 +16,15 @@ from sqlalchemy.orm import Session, sessionmaker
 from saturday.agent.context import AgentContext
 from saturday.agent.state import turno_inicial
 from saturday.agent.textos import mensagem_handoff
+from saturday.canais.base import OrigemCanal
 from saturday.dados import repositorios
+from saturday.dados.modelos import Conversa
 from saturday.dados.outbox import enfileirar
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.dados.trava import travar_conversa
 from saturday.metrics import TurnMetrics, iniciar_metricas, metricas_atuais
-from saturday.schemas import AgentReply, ChatRequest
+from saturday.schemas import MIME_TYPES, AgentReply, Attachment, ChatRequest
+from saturday.services.anexos import AnexoInvalido
 from saturday.services.webhook import WebhookClient
 from saturday.settings import TZ_OPERACAO, Settings
 from saturday.storage.base import Storage
@@ -283,6 +286,7 @@ class AgentService:
         self,
         payload: ChatRequest,
         sessao: Session | None = None,
+        origem: OrigemCanal | None = None,
     ) -> AgentReply:
         config = self.config(payload.conversation_id)
         estado = self.estado_atual(config)
@@ -290,7 +294,13 @@ class AgentService:
 
         conversa = None
         if sessao is not None:
-            conversa = repositorios.obter_ou_criar_conversa(sessao, payload.conversation_id)
+            conversa = repositorios.obter_ou_criar_conversa(
+                sessao,
+                payload.conversation_id,
+                canal=origem.canal if origem else "chat",
+                telefone=origem.telefone if origem else None,
+                phone_number_id=origem.phone_number_id if origem else None,
+            )
 
         ids_recentes = list(estado.get("message_ids_recentes") or [])
         respostas = dict(estado.get("respostas_recentes") or {})
@@ -382,15 +392,54 @@ class AgentService:
                 config, ids_recentes, respostas, payload.message_id, resposta.answer
             )
         if sessao is not None and conversa is not None:
-            repositorios.registrar_saida(sessao, conversa, conteudo=resposta.answer or "")
-            if self.webhook.configurado and resposta.status not in ("with_human", "duplicate"):
-                enfileirar(
-                    sessao,
-                    conversa_id=conversa.id,
-                    canal="webhook",
-                    payload=resposta.model_dump(mode="json"),
-                )
+            self._gravar_saida(sessao, conversa, resposta)
         return resposta
+
+    def _gravar_saida(
+        self,
+        sessao: Session,
+        conversa: Conversa,
+        resposta: AgentReply,
+    ) -> None:
+        """Histórico da resposta e, quando houver canal, o envio no outbox."""
+
+        mensagem_id = repositorios.registrar_saida(sessao, conversa, conteudo=resposta.answer or "")
+        canal = self._canal_de_saida(conversa, resposta)
+        if canal is None:
+            return
+        # O id volta no payload: é nesta linha que o worker grava o `wamid` e o
+        # status de entrega quando a Meta confirmar.
+        payload = self._payload_de_saida(conversa, resposta, canal)
+        payload["mensagem_id"] = mensagem_id
+        enfileirar(sessao, conversa_id=conversa.id, canal=canal, payload=payload)
+
+    def _canal_de_saida(self, conversa: Conversa, resposta: AgentReply) -> str | None:
+        """Quem entrega esta resposta.
+
+        No WhatsApp a resposta sempre passa pelo outbox, inclusive no handoff —
+        o cliente precisa saber que a conversa foi para uma pessoa. No webhook,
+        o handoff continua não gerando envio, como antes.
+        """
+
+        if resposta.status == "duplicate":
+            return None
+        if conversa.canal == "whatsapp":
+            return "whatsapp"
+        if self.webhook.configurado and resposta.status != "with_human":
+            return "webhook"
+        return None
+
+    @staticmethod
+    def _payload_de_saida(
+        conversa: Conversa,
+        resposta: AgentReply,
+        canal: str,
+    ) -> dict[str, Any]:
+        payload = resposta.model_dump(mode="json")
+        if canal == "whatsapp":
+            payload["numero"] = conversa.telefone
+            payload["phone_number_id"] = conversa.phone_number_id
+        return payload
 
     def _registrar_resposta(
         self,
@@ -416,11 +465,46 @@ class AgentService:
             },
         )
 
-    def process_message(self, payload: ChatRequest) -> AgentReply:
+    def process_message(
+        self,
+        payload: ChatRequest,
+        origem: OrigemCanal | None = None,
+    ) -> AgentReply:
         """Roda um turno inteiro sob a trava da conversa."""
 
+        payload = self._arquivar_anexos(payload)
         with self._trava(payload.conversation_id) as sessao:
-            return self._processar_turno(payload, sessao)
+            return self._processar_turno(payload, sessao, origem)
+
+    def _arquivar_anexos(self, payload: ChatRequest) -> ChatRequest:
+        """Leva para o storage o que veio por `url` ou `base64`.
+
+        O estado do grafo passa a guardar só a chave: base64 no checkpoint
+        incha cada versão do estado e espalha dado pessoal por todas elas.
+        """
+
+        if not payload.attachments or self.storage is None:
+            return payload
+
+        arquivados: list[Attachment] = []
+        for anexo in payload.attachments:
+            if anexo.chave is not None:
+                arquivados.append(anexo)
+                continue
+            try:
+                carregado = self.context.anexos.carregar_anexo(
+                    anexo.model_dump(mode="json", exclude_none=True)
+                )
+            except AnexoInvalido:
+                # Mantém como veio: o nó reporta o anexo inválido como antes.
+                arquivados.append(anexo)
+                continue
+            # `_normalizar_mime` já recusou o que não está em `MIME_ACEITOS`,
+            # então o valor aqui é sempre um dos tipos aceitos pelo schema.
+            mime = cast(MIME_TYPES, carregado.mime_type)
+            chave = self.storage.salvar(carregado.data, mime_type=mime)
+            arquivados.append(Attachment(chave=chave, mime_type=mime))
+        return payload.model_copy(update={"attachments": arquivados})
 
     def processar_e_enviar(self, payload: ChatRequest) -> None:
         try:

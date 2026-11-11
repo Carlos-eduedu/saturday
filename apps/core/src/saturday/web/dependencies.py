@@ -7,6 +7,7 @@ from typing import Annotated, cast
 
 from fastapi import HTTPException, Request, Security
 from fastapi.security import APIKeyHeader
+from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.agent.service import AgentService
 from saturday.settings import Settings
@@ -18,6 +19,16 @@ def get_agent_service(request: Request) -> AgentService:
     """Devolve o serviço criado no lifespan (ou substituído em testes)."""
 
     return cast(AgentService, request.app.state.agent_service)
+
+
+def get_settings(request: Request) -> Settings:
+    return cast(Settings, request.app.state.settings)
+
+
+def get_fabrica(request: Request) -> sessionmaker[Session] | None:
+    """Fábrica de sessões. ``None`` em `pytest`, onde não há Postgres."""
+
+    return cast("sessionmaker[Session] | None", getattr(request.app.state, "fabrica", None))
 
 
 def verificar_api_key(

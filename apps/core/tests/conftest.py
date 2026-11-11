@@ -163,6 +163,10 @@ def settings() -> Settings:
         openrouter_api_key=SecretStr(""),
         llm_model="",
         vision_model="",
+        whatsapp_token=SecretStr("token-de-teste"),
+        whatsapp_app_secret=SecretStr("segredo-de-teste"),
+        whatsapp_verify_token=SecretStr("verificacao-de-teste"),
+        whatsapp_numeros=["100000000000001"],
     )
 
 
@@ -195,10 +199,16 @@ def conversa() -> str:
     return f"teste-{uuid.uuid4().hex[:12]}"
 
 
-def _montar_app(settings: Settings, service: AgentService) -> Any:
+def _montar_app(
+    settings: Settings,
+    service: AgentService,
+    fabrica: Any = None,
+) -> Any:
     application = get_app(settings)
     application.dependency_overrides[get_agent_service] = lambda: service
     application.state.agent_service = service
+    # O webhook grava no banco; em `pytest` sem Postgres a fábrica fica nula.
+    application.state.fabrica = fabrica
     return application
 
 
@@ -311,8 +321,12 @@ def service_pg(
 
 
 @pytest.fixture
-def client_pg(settings: Settings, service_pg: AgentService) -> TestClient:
-    return TestClient(_montar_app(settings, service_pg))
+def client_pg(
+    settings: Settings,
+    service_pg: AgentService,
+    fabrica: sessionmaker[Session],
+) -> TestClient:
+    return TestClient(_montar_app(settings, service_pg, fabrica))
 
 
 @pytest.fixture

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
+from sqlalchemy.sql.schema import SchemaItem
 
 from saturday.dados import modelos  # noqa: F401  (registra as tabelas em Base)
 from saturday.dados.base import Base
@@ -15,6 +16,32 @@ from saturday.settings import Settings
 
 config = context.config
 target_metadata = Base.metadata
+
+# Tabelas que existem no banco mas não são nossas: o checkpointer do LangGraph
+# cria e evolui as dele. Sem esta lista, o autogenerate conclui que elas
+# "sobraram" e gera `drop_table` — o que apagaria todo o estado das conversas.
+TABELAS_DE_TERCEIROS = frozenset(
+    {
+        "alembic_version",
+        "checkpoints",
+        "checkpoint_blobs",
+        "checkpoint_writes",
+        "checkpoint_migrations",
+    }
+)
+
+
+def incluir_objeto(
+    objeto: SchemaItem,
+    nome: str | None,
+    tipo: str,
+    _refletido: bool,
+    _comparado: SchemaItem | None,
+) -> bool:
+    if tipo == "table":
+        return nome not in TABELAS_DE_TERCEIROS
+    pai = getattr(objeto, "table", None)
+    return getattr(pai, "name", None) not in TABELAS_DE_TERCEIROS
 
 
 def _url() -> str:
@@ -35,6 +62,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         compare_type=True,
+        include_object=incluir_objeto,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -50,6 +78,7 @@ def run_migrations_online() -> None:
             connection=conexao,
             target_metadata=target_metadata,
             compare_type=True,
+            include_object=incluir_objeto,
         )
         with context.begin_transaction():
             context.run_migrations()

@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from saturday.settings import Settings, get_settings
-from saturday.web.api import chat, conversas, monitoring, webhooks
+from saturday.web.api import chat, conversas, monitoring, webhooks, whatsapp
 from saturday.web.lifespan import criar_lifespan
 from saturday.web.limites import LimiteDeCorpo
 
@@ -34,6 +34,7 @@ def get_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(monitoring.router)
     app.include_router(chat.router)
     app.include_router(conversas.router)
+    app.include_router(whatsapp.router)
     webhooks.documentar_webhook(app)
 
     @app.exception_handler(Exception)

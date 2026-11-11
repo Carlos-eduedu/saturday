@@ -11,10 +11,10 @@ class MemoriaStorage:
     def __init__(self) -> None:
         self._objetos: dict[str, bytes] = {}
 
-    def salvar(self, dados: bytes, *, mime_type: str) -> str:
-        chave = f"anexos/{uuid.uuid4().hex}"
-        self._objetos[chave] = dados
-        return chave
+    def salvar(self, dados: bytes, *, mime_type: str, chave: str | None = None) -> str:
+        destino = chave or f"anexos/{uuid.uuid4().hex}"
+        self._objetos[destino] = dados
+        return destino
 
     def ler(self, chave: str) -> bytes:
         return self._objetos[chave]

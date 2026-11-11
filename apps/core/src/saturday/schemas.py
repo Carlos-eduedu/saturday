@@ -97,16 +97,20 @@ AguardandoColeta = Literal["data_nascimento", "uf"]
 
 
 class Attachment(BaseModel):
+    """Origem do anexo: `url` ou `base64` na entrada; `chave` já arquivado."""
+
     model_config = ConfigDict(extra="ignore")
 
     url: HttpUrl | None = None
     base64: str | None = Field(default=None, max_length=14_000_000)
+    chave: str | None = Field(default=None, max_length=512)
     mime_type: MIME_TYPES
 
     @model_validator(mode="after")
     def exatamente_uma_origem(self) -> Attachment:
-        if (self.url is None) == (self.base64 is None):
-            raise ValueError("attachment deve ter url ou base64, nunca os dois")
+        origens = (self.url, self.base64, self.chave)
+        if sum(origem is not None for origem in origens) != 1:
+            raise ValueError("attachment deve ter exatamente uma origem: url, base64 ou chave")
         return self
 
 

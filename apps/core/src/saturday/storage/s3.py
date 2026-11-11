@@ -26,15 +26,15 @@ class S3Storage:
             config=Config(signature_version="s3v4", s3={"addressing_style": "path"}),
         )
 
-    def salvar(self, dados: bytes, *, mime_type: str) -> str:
-        chave = f"anexos/{uuid.uuid4().hex}"
+    def salvar(self, dados: bytes, *, mime_type: str, chave: str | None = None) -> str:
+        destino = chave or f"anexos/{uuid.uuid4().hex}"
         self._cliente.put_object(
             Bucket=self.bucket,
-            Key=chave,
+            Key=destino,
             Body=dados,
             ContentType=mime_type,
         )
-        return chave
+        return destino
 
     def ler(self, chave: str) -> bytes:
         try:
