@@ -466,3 +466,29 @@ def test_consulta_final_parada_nao_gera_alerta(
     _envelhecer(fabrica, 60)
 
     assert alertas.verificar(fabrica) == 0
+
+
+# ------------------------------------------------------------------ evidência de webhook
+
+
+def test_eventos_por_id_exigem_api_key_e_mascaram_cpf(
+    service: AgentService, fabrica: sessionmaker[Session]
+) -> None:
+    api = _api(service, fabrica, api_key=SecretStr("chave-api"))
+    cabecalho = {"x-webhook-token": TOKEN}
+    api.post("/webhooks/granatech", json=EVENTO, headers=cabecalho)
+    api.post("/webhooks/granatech", json={**EVENTO, "status": "SUCCESS"}, headers=cabecalho)
+    api.post("/webhooks/granatech", json={**EVENTO, "id_solicitacao": "outra"}, headers=cabecalho)
+    proposta = {"tipo": "proposta", "id_proposta": "p1", "status_da_proposta": "PAYED"}
+    api.post("/webhooks/granatech", json=proposta, headers=cabecalho)
+
+    assert api.get("/eventos/granatech/c1").status_code == 401
+    resposta = api.get("/eventos/granatech/c1", headers={"X-API-Key": "chave-api"})
+    assert resposta.status_code == 200
+    eventos = resposta.json()
+    assert [e["payload"]["status"] for e in eventos] == ["PROCESSING", "SUCCESS"]
+    assert eventos[0]["payload"]["cpf"] == "***.***.***-67"
+    assert CPF not in resposta.text
+
+    por_proposta = api.get("/eventos/granatech/p1", headers={"X-API-Key": "chave-api"}).json()
+    assert [e["payload"]["status_da_proposta"] for e in por_proposta] == ["PAYED"]

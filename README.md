@@ -49,7 +49,10 @@ prova, consulta, escolha de vínculo e oferta; desde a Fase 6, também dados da
 proposta, aceite, criação da proposta, formalização e pagamento. Os textos ficam em
 `conhecimento/clt/mensagens.yaml`. Ver [`docs/clt.md`](docs/clt.md).
 
-`infra/` e `regras/` entram nas fases que colocarem neles o primeiro arquivo real.
+Desde a Fase 7: guia de deploy completo em [`docs/deploy.md`](docs/deploy.md)
+(ambiente do zero, backup e restauração), `infra/testar_restauracao.sh` e
+`scripts/homologacao_granatech.py`, que gera as evidências da homologação com a
+Granatech (ver [`docs/granatech.md`](docs/granatech.md)).
 
 ## Rodar local, sem container
 
@@ -58,7 +61,7 @@ Precisa de um Postgres. O mais curto é usar o do compose:
 ```bash
 cp .env.example .env                  # preencha as chaves e as do WhatsApp
 docker compose --profile postgres up -d postgres
-uv run --project apps/core alembic upgrade head   # cria as tabelas
+uv run --project apps/core alembic -c apps/core/alembic.ini upgrade head   # cria as tabelas
 uv run --project apps/core saturday
 ```
 

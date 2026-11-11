@@ -1,0 +1,401 @@
+{
+  "info": {
+    "_postman_id": "2fb18525-f606-49ea-86f1-364473d640db",
+    "name": "Rotas consumo API-Granatech-CONSULTAS DEV CORBAN MEX",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "14620867"
+  },
+  "item": [
+    {
+      "name": "Auth login API",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "let response = pm.response.json();\r",
+              "if (response.token) {\r",
+              "    pm.collectionVariables.set(\"token\", response.token);\r",
+              "}"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"chave_api\":\"{{api_key}}\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{dev-path}}/api/v1/auth/login",
+          "host": [
+            "{{dev-path}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "login"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Teste consumers (CPF) Copy",
+      "protocolProfileBehavior": {
+        "disableBodyPruning": true
+      },
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{dev-path}}/api-fgts/v1/test-consumers/cpf?digitos=001",
+          "host": [
+            "{{dev-path}}"
+          ],
+          "path": [
+            "api-fgts",
+            "v1",
+            "test-consumers",
+            "cpf"
+          ],
+          "query": [
+            {
+              "key": "digitos",
+              "value": "001"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Criar consulta",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "let response = pm.response.json();\r\nif (response.token) {\r\n    pm.collectionVariables.set(\"id-consulta\", response.id);\r\n}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{dev-path}}/api-consignado/v1/consulta-saldo?cpf=00189004967",
+          "host": [
+            "{{dev-path}}"
+          ],
+          "path": [
+            "api-consignado",
+            "v1",
+            "consulta-saldo"
+          ],
+          "query": [
+            {
+              "key": "nome",
+              "value": "",
+              "disabled": true
+            },
+            {
+              "key": "telefone",
+              "value": "",
+              "disabled": true
+            },
+            {
+              "key": "cpf",
+              "value": "00189004967"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Assinar Termo de Consentimento",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"cpf\": \"00189004967\",\r\n    \"email\": \"cliente@exemplo.com\",\r\n    \"nome\": \"Cliente de Teste\",\r\n    \"telefone\": \"11999999999\",\r\n    \"id_consulta\": \"{{id-consulta}}\"\r\n}\r\n",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{dev-path}}/api-consignado/v1/termo-consentimento",
+          "host": [
+            "{{dev-path}}"
+          ],
+          "path": [
+            "api-consignado",
+            "v1",
+            "termo-consentimento"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Listar consultas",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{dev-path}}/api-consignado/v1/consulta-saldo/usuario?pagina=2&filtrar_por=cpf&valor_filtro=00189004967",
+          "host": [
+            "{{dev-path}}"
+          ],
+          "path": [
+            "api-consignado",
+            "v1",
+            "consulta-saldo",
+            "usuario"
+          ],
+          "query": [
+            {
+              "key": "pagina",
+              "value": "2"
+            },
+            {
+              "key": "filtrar_por",
+              "value": "cpf"
+            },
+            {
+              "key": "nome",
+              "value": "",
+              "disabled": true
+            },
+            {
+              "key": "telefone",
+              "value": "",
+              "disabled": true
+            },
+            {
+              "key": "valor_filtro",
+              "value": "00189004967"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Listar consulta",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{dev-path}}/api-consignado/v1/consulta-saldo/{{id-consulta}}",
+          "host": [
+            "{{dev-path}}"
+          ],
+          "path": [
+            "api-consignado",
+            "v1",
+            "consulta-saldo",
+            "{{id-consulta}}"
+          ],
+          "query": [
+            {
+              "key": "nome",
+              "value": null,
+              "type": "text",
+              "disabled": true
+            },
+            {
+              "key": "telefone",
+              "value": null,
+              "type": "text",
+              "disabled": true
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Simulação",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{dev-path}}/api-consignado/v1/simulacao/{{id-produto}}?numero_parcelas=36&id_margem=2ac4ac21-ab2e-4b7b-b731-a8ae8c284888&idade=31&id_empresa_seguro=b1316746-f84d-4fed-a70b-0bb0130e2703&id_produto_seguro=1214&valor_parcela=100",
+          "host": [
+            "{{dev-path}}"
+          ],
+          "path": [
+            "api-consignado",
+            "v1",
+            "simulacao",
+            "{{id-produto}}"
+          ],
+          "query": [
+            {
+              "key": "numero_parcelas",
+              "value": "36"
+            },
+            {
+              "key": "id_margem",
+              "value": "2ac4ac21-ab2e-4b7b-b731-a8ae8c284888"
+            },
+            {
+              "key": "idade",
+              "value": "31"
+            },
+            {
+              "key": "id_empresa_seguro",
+              "value": "b1316746-f84d-4fed-a70b-0bb0130e2703"
+            },
+            {
+              "key": "id_produto_seguro",
+              "value": "1214"
+            },
+            {
+              "key": "valor_parcela",
+              "value": "100"
+            }
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "api_key",
+      "value": ""
+    },
+    {
+      "key": "dev-path",
+      "value": "https://api-dev.granatech.com.br"
+    },
+    {
+      "key": "id-consulta",
+      "value": ""
+    },
+    {
+      "key": "id-produto",
+      "value": ""
+    },
+    {
+      "key": "local-path",
+      "value": "http://localhost:8182"
+    }
+  ]
+}

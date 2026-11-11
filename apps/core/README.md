@@ -10,7 +10,7 @@ fica o `.env`, e com um Postgres disponível:
 ```bash
 cp .env.example .env   # preencha as chaves e modelos do OpenRouter
 docker compose --profile postgres up -d postgres
-uv run --project apps/core alembic upgrade head
+uv run --project apps/core alembic -c apps/core/alembic.ini upgrade head
 uv run --project apps/core saturday
 ```
 

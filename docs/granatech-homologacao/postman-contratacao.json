@@ -1,0 +1,644 @@
+{
+  "info": {
+    "_postman_id": "d63c70b9-70cc-4341-ba55-69784af36824",
+    "name": "Rotas API-Granatech - Contratacao-Consulta-dev -Corban MEX",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "14620867"
+  },
+  "item": [
+    {
+      "name": "Auth login API",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "let response = pm.response.json();\r\nif (response.token) {\r\n    pm.collectionVariables.set(\"token\", response.token);\r\n}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"chave_api\":\"{{api_key}}\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{dev-path}}/api/v1/auth/login",
+          "host": [
+            "{{dev-path}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "login"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Teste consumers (CPF)",
+      "protocolProfileBehavior": {
+        "disableBodyPruning": true
+      },
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{dev-path}}/api-consignado/v1/tools/cpf?digitos=01",
+          "host": [
+            "{{dev-path}}"
+          ],
+          "path": [
+            "api-consignado",
+            "v1",
+            "tools",
+            "cpf"
+          ],
+          "query": [
+            {
+              "key": "digitos",
+              "value": "01"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Criar consulta",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "let response = pm.response.json();\r\nif (response.id) {\r\n    pm.collectionVariables.set(\"id-consulta\", response.id);\r\n}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{dev-path}}/api-consignado/v1/consulta-saldo?cpf=00189004967",
+          "host": [
+            "{{dev-path}}"
+          ],
+          "path": [
+            "api-consignado",
+            "v1",
+            "consulta-saldo"
+          ],
+          "query": [
+            {
+              "key": "nome",
+              "value": "",
+              "disabled": true
+            },
+            {
+              "key": "telefone",
+              "value": "",
+              "disabled": true
+            },
+            {
+              "key": "cpf",
+              "value": "00189004967"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Assinar Termo de Consentimento",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"cpf\": \"00189004967\",\r\n    \"email\": \"cliente@exemplo.com\",\r\n    \"nome\": \"Cliente de Teste\",\r\n    \"telefone\": \"11999999999\",\r\n    \"id_consulta\": \"{{id-consulta}}\"\r\n}\r\n",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{dev-path}}/api-consignado/v1/termo-consentimento",
+          "host": [
+            "{{dev-path}}"
+          ],
+          "path": [
+            "api-consignado",
+            "v1",
+            "termo-consentimento"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Criar Consulta em lote",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n\t\"consultas\": [\r\n\t\t{\r\n\t\t\t\"cpf\": \"00189004967\",\r\n\t\t\t\"nome\": \"Cliente de Teste\",\r\n            \"email\":\"cliente@exemplo.com\",\r\n            \"telefone\":\"11999999999\"\r\n\t\t},\r\n\t\t{\r\n\t\t\t\"cpf\": \"00189004967\",\r\n\t\t\t\"nome\": \"Cliente de Teste\",\r\n            \"email\":\"cliente@exemplo.com\",\r\n            \"telefone\":\"11999999999\"\r\n\t\t},\r\n\t\t{\r\n\t\t\t\"cpf\": \"00189004967\",\r\n\t\t\t\"nome\": \"Cliente de Teste\",\r\n             \"email\":\"cliente@exemplo.com\",\r\n            \"telefone\":\"11999999999\"\r\n\t\t},\r\n\t\t{\r\n\t\t\t\"cpf\": \"00189004967\",\r\n\t\t\t\"nome\": \"Cliente de Teste\",\r\n             \"email\":\"cliente@exemplo.com\",\r\n            \"telefone\":\"11999999999\"\r\n\t\t}\r\n\t]\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{local-path}}/api-consignado/v1/consulta-saldo/lote",
+          "host": [
+            "{{local-path}}"
+          ],
+          "path": [
+            "api-consignado",
+            "v1",
+            "consulta-saldo",
+            "lote"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Listar consultas",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{dev-path}}/api-consignado/v1/consulta-saldo/usuario?pagina=1&filtrar_por=cpf&valor_filtro=00189004967",
+          "host": [
+            "{{dev-path}}"
+          ],
+          "path": [
+            "api-consignado",
+            "v1",
+            "consulta-saldo",
+            "usuario"
+          ],
+          "query": [
+            {
+              "key": "pagina",
+              "value": "1"
+            },
+            {
+              "key": "filtrar_por",
+              "value": "cpf"
+            },
+            {
+              "key": "nome",
+              "value": "",
+              "disabled": true
+            },
+            {
+              "key": "telefone",
+              "value": "",
+              "disabled": true
+            },
+            {
+              "key": "valor_filtro",
+              "value": "00189004967"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Listar consulta",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{dev-path}}/api-consignado/v1/consulta-saldo/{{id-consulta}}",
+          "host": [
+            "{{dev-path}}"
+          ],
+          "path": [
+            "api-consignado",
+            "v1",
+            "consulta-saldo",
+            "{{id-consulta}}"
+          ],
+          "query": [
+            {
+              "key": "nome",
+              "value": "",
+              "disabled": true
+            },
+            {
+              "key": "telefone",
+              "value": "",
+              "disabled": true
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Simulação",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{dev-path}}/api-consignado/v1/simulacao/{{id-produto}}?numero_parcelas=36&id_margem=&idade=43&id_empresa_seguro=&id_produto_seguro=1214&valor_parcela=100",
+          "host": [
+            "{{dev-path}}"
+          ],
+          "path": [
+            "api-consignado",
+            "v1",
+            "simulacao",
+            "{{id-produto}}"
+          ],
+          "query": [
+            {
+              "key": "numero_parcelas",
+              "value": "36"
+            },
+            {
+              "key": "id_margem",
+              "value": ""
+            },
+            {
+              "key": "idade",
+              "value": "",
+              "disabled": true
+            },
+            {
+              "key": "idade",
+              "value": "43"
+            },
+            {
+              "key": "id_empresa_seguro",
+              "value": ""
+            },
+            {
+              "key": "id_produto_seguro",
+              "value": "1214"
+            },
+            {
+              "key": "valor_parcela",
+              "value": "100"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Criar proposta",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "// {\r\n//     \"id_empregador\": \"0b290283-42a3-403d-9ca0-e502fccf5714\",\r\n//     \"id_consulta\": \"6b316a9a-c5f2-4a21-b85b-00127c4c3b24\",\r\n//     \"id_produto\": \"55e93a69-2c8e-4973-a5e8-dddb5a4a0802\",\r\n//     \"id_margem\": \"f50eb5d4-f235-48cc-916c-ff08978b9b3b\",\r\n//     \"informacoesFinanceira\": [\r\n//         {\r\n//             \"tipo_empregador\": 1,\r\n//             \"documento_empregador\": \"27887114000151\",\r\n//             \"valor_solicitado\": 677.77,\r\n//             \"valor_total_financiado\": 833.34,\r\n//             \"valor_parcela\": 99.59,\r\n//             \"numero_parcelas\": 12,\r\n//             \"taxa_mensal\": 4.5,\r\n//             \"valor_seguro\": 133.33,\r\n//             \"valor_liberado_habilitado\": false,\r\n//             \"cet_anual\":135.2476,\r\n//             \"cet_mensal\":7.38916,\r\n//             \"valor_iof\": 22.24,\r\n//             \"taxa_anual\":69.59\r\n//         }\r\n//     ],\r\n//     \"informacaoDeSeguros\": {\r\n//         \"id_empresa_seguradora\": \"427ff8fd-f700-4e19-b7a6-cf6415474116\",\r\n//             \"id_externo\": 79,\r\n//             \"valor_seguro\": 133.33,\r\n//             \"valor_total_financiado\": 833.34,\r\n//             \"numero_parcelas\": 12,\r\n//             \"iof\": 0.5\r\n//     }\r\n// }\r\n{\r\n    \"id_empregador\": \"b1ac567c-dbc0-46ca-af32-8b2a5fd87dc1\",\r\n    \"id_consulta\": \"4efc8a68-aac0-4c1c-97d7-1201cd8a9329\",\r\n    \"id_produto\": \"847957bf-8648-47f5-a759-63526893fe00\",\r\n    \"id_margem\": \"b15a3d28-2806-46e7-adaa-21ed70929aa5\",\r\n    \"informacoesFinanceira\": [\r\n        {\r\n            \"tipo_empregador\": 1,\r\n            \"documento_empregador\": \"11222333000181\",\r\n            \"cet_anual\": 101.3313,\r\n            \"cet_mensal\": 6.0049,\r\n            \"taxa_anual\": 79.18,\r\n            \"taxa_mensal\": 4.9799999999999995,\r\n            \"valor_iof\": 41.83,\r\n            \"valor_seguro\": 89.7,\r\n            \"valor_total_financiado\": 1303.14,\r\n            \"valor_parcela\": 100,\r\n            \"numero_parcelas\": 25,\r\n            \"valor_liberado_habilitado\": false,\r\n            \"valor_solicitado\": 1171.61\r\n        }\r\n    ]\r\n    // \"informacaoDeSeguros\": {\r\n    //     \"id_empresa_seguradora\": \"427ff8fd-f700-4e19-b7a6-cf6415474107\",\r\n    //     \"id_externo\": \"58a3b99e-0909-41ec-8403-273bad983921\",\r\n    //     \"valor_seguro\": 102.24,\r\n    //     \"valor_emprestimo\": 1704.02,\r\n    //     \"numero_parcelas\": 36,\r\n    //     \"iof\": 0\r\n    // }\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{dev-path}}/api-consignado/v1/propostas",
+          "host": [
+            "{{dev-path}}"
+          ],
+          "path": [
+            "api-consignado",
+            "v1",
+            "propostas"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Update DadosTomador Copy",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n  \"nome_completo\": \"Cliente de Teste\",\r\n  \"estado_civil\": \"SOLTEIRO\",\r\n  \"data_nascimento\": \"1990-05-15T00:00:00.000Z\",\r\n  \"telefone_endereco\": \"00189004967\",\r\n  \"nome_completo_mae\": \"Cliente de Teste\",\r\n  \"cep\": \"01001-000\",\r\n  \"endereco\": \"Praça da Sé\",\r\n  \"numero_endereco\": \"123\",\r\n  \"bairro\": \"Sé\",\r\n  \"cidade\": \"São Paulo\",\r\n  \"estado\": \"SP\",\r\n  \"complemento\": \"Apto 45\",\r\n  \"cpf\": \"00189004967\",\r\n  \"tipo_dados_bancarios\": \"dados_bancarios\",\r\n  \"banco_detalhe\": {\r\n    \"agencia\": \"0001\",\r\n    \"digito_agencia\": \"9\",\r\n    \"numero_conta\": \"123456\",\r\n    \"digito_conta\": \"7\",\r\n    \"tipo_conta\": \"conta_corrente\",\r\n    \"banco_codigo\": \"341\"\r\n  }\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{local-path}}/api-consignado/v1/propostas/:idProposta/dados-tomador",
+          "host": [
+            "{{local-path}}"
+          ],
+          "path": [
+            "api-consignado",
+            "v1",
+            "propostas",
+            ":idProposta",
+            "dados-tomador"
+          ],
+          "variable": [
+            {
+              "key": "idProposta",
+              "value": "261d0d1b-7652-479e-88e5-36c70e867293"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Update DadosTomador Copy 2",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n  \"nome_completo\": \"Cliente de Teste\",\r\n  \"estado_civil\": \"SOLTEIRO\",\r\n  \"data_nascimento\": \"1990-05-15T00:00:00.000Z\",\r\n  \"telefone_endereco\": \"00189004967\",\r\n  \"nome_completo_mae\": \"Cliente de Teste\",\r\n  \"cep\": \"01001-000\",\r\n  \"endereco\": \"Praça da Sé\",\r\n  \"numero_endereco\": \"123\",\r\n  \"bairro\": \"Sé\",\r\n  \"cidade\": \"São Paulo\",\r\n  \"estado\": \"SP\",\r\n  \"complemento\": \"Apto 45\",\r\n  \"cpf\": \"00189004967\",\r\n  \"tipo_dados_bancarios\": \"dados_bancarios\",\r\n  \"banco_detalhe\": {\r\n    \"agencia\": \"0001\",\r\n    \"digito_agencia\": \"9\",\r\n    \"numero_conta\": \"123456\",\r\n    \"digito_conta\": \"7\",\r\n    \"tipo_conta\": \"conta_corrente\",\r\n    \"banco_codigo\": \"341\"\r\n  }\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{local-path}}/api-consignado/v1/propostas/:idProposta/dados-tomador",
+          "host": [
+            "{{local-path}}"
+          ],
+          "path": [
+            "api-consignado",
+            "v1",
+            "propostas",
+            ":idProposta",
+            "dados-tomador"
+          ],
+          "variable": [
+            {
+              "key": "idProposta",
+              "value": "261d0d1b-7652-479e-88e5-36c70e867293"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Listar propostas",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{dev-path}}/api-consignado/v1/propostas/lista?tamanho_pagina=1&pagina=1",
+          "host": [
+            "{{dev-path}}"
+          ],
+          "path": [
+            "api-consignado",
+            "v1",
+            "propostas",
+            "lista"
+          ],
+          "query": [
+            {
+              "key": "tamanho_pagina",
+              "value": "1"
+            },
+            {
+              "key": "pagina",
+              "value": "1"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Listar proposta",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{dev-path}}/api-consignado/v1/propostas/:idProposta",
+          "host": [
+            "{{dev-path}}"
+          ],
+          "path": [
+            "api-consignado",
+            "v1",
+            "propostas",
+            ":idProposta"
+          ],
+          "variable": [
+            {
+              "key": "idProposta",
+              "value": "f062946b-59d1-466b-b3a4-cf8c8423c713"
+            }
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "api_key",
+      "value": ""
+    },
+    {
+      "key": "dev-path",
+      "value": "https://api-dev.granatech.com.br"
+    },
+    {
+      "key": "id-consulta",
+      "value": ""
+    },
+    {
+      "key": "id-produto",
+      "value": ""
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "local-path",
+      "value": "http://localhost:8182"
+    }
+  ]
+}

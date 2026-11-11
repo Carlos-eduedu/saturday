@@ -434,6 +434,16 @@ async def cancelar(id_proposta: str, request: Request) -> Any:
     return {"success": True}
 
 
+@app.get(PREFIXO + "/tools/cpf")
+async def gerar_cpf(request: Request) -> Any:
+    """Na dev, gera um CPF válido com o prefixo pedido; aqui, sempre o de teste."""
+
+    falha, _ = await _entrada(request)
+    if falha is not None:
+        return falha
+    return {"cpf": PESSOA["document"]}
+
+
 @app.get(PREFIXO + "/bancos")
 async def bancos(request: Request) -> Any:
     falha, _ = await _entrada(request)

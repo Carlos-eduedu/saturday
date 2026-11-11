@@ -18,12 +18,15 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.dados.eventos import enfileirar
+from saturday.dados.modelos import EventoRecebido
 from saturday.dados.sessao import sessao as abrir_sessao
+from saturday.privacidade import mascarar_cpf
 from saturday.settings import Settings
-from saturday.web.dependencies import get_fabrica, get_settings
+from saturday.web.dependencies import exigir_fabrica, get_fabrica, get_settings, verificar_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -73,3 +76,39 @@ async def receber(
         with abrir_sessao(fabrica) as sessao:
             enfileirar(sessao, origem=ORIGEM, evento_id=evento_id(payload), payload=payload)
     return Response(status_code=200)
+
+
+@router.get("/eventos/granatech/{id_externo}", dependencies=[Depends(verificar_api_key)])
+def eventos_recebidos(
+    id_externo: str,
+    fabrica: Annotated[sessionmaker[Session], Depends(exigir_fabrica)],
+) -> list[dict[str, Any]]:
+    """Eventos da Granatech recebidos para uma consulta ou proposta.
+
+    Evidência de webhook para a homologação (``scripts/homologacao_granatech.py``),
+    que roda fora do servidor e não enxerga o banco. O CPF sai mascarado.
+    """
+
+    with abrir_sessao(fabrica) as sessao:
+        linhas = sessao.scalars(
+            select(EventoRecebido)
+            .where(
+                EventoRecebido.origem == ORIGEM,
+                or_(
+                    EventoRecebido.payload["id_solicitacao"].astext == id_externo,
+                    EventoRecebido.payload["id_proposta"].astext == id_externo,
+                ),
+            )
+            .order_by(EventoRecebido.id)
+        ).all()
+        return [
+            {
+                "recebido_em": linha.recebido_em.isoformat(),
+                "processado_em": linha.processado_em.isoformat() if linha.processado_em else None,
+                "payload": {
+                    **(linha.payload or {}),
+                    "cpf": mascarar_cpf(str((linha.payload or {}).get("cpf") or "")),
+                },
+            }
+            for linha in linhas
+        ]
