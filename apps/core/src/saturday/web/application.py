@@ -8,7 +8,16 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from saturday.settings import Settings, get_settings
-from saturday.web.api import admin, chat, conversas, granatech, monitoring, webhooks, whatsapp
+from saturday.web.api import (
+    admin,
+    chat,
+    conversas,
+    granatech,
+    links,
+    monitoring,
+    webhooks,
+    whatsapp,
+)
 from saturday.web.lifespan import criar_lifespan
 from saturday.web.limites import LimiteDeCorpo
 
@@ -36,6 +45,7 @@ def get_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(conversas.router)
     app.include_router(whatsapp.router)
     app.include_router(granatech.router)
+    app.include_router(links.router)
     app.include_router(admin.router)
     webhooks.documentar_webhook(app)
 
