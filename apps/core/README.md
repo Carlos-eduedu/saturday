@@ -263,7 +263,8 @@ em [`docs/granatech.md`](../../docs/granatech.md).
   `x-webhook-token` (tempo constante), grava em `eventos_recebidos` com o hash do
   JSON canônico como id e responde 200. Sem token configurado, 503.
 - O worker aplica o status na consulta ou proposta local, na ordem da jornada;
-  o `SUCCESS` da consulta grava o detalhe. Fase 4 não fala com o cliente.
+  o `SUCCESS` da consulta grava o detalhe e, desde a Fase 5, roda um turno de
+  sistema na conversa (ramo CLT, ver [`docs/clt.md`](../../docs/clt.md)).
 
 O simulador fica em `simuladores/granatech/`:
 

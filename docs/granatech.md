@@ -1,8 +1,7 @@
 # Granatech (Fase 4)
 
-Camada que fala com a API de parceiros da Granatech. Na Fase 4 ela ainda não
-está ligada ao grafo: o ramo CLT (Fase 5) e a proposta com pós-venda (Fase 6)
-vão usá-la. Os termos (consulta, vínculo, liberado, teto, cota,
+Camada que fala com a API de parceiros da Granatech. O ramo CLT (Fase 5, ver
+[`clt.md`](clt.md)) a usa até a oferta; a proposta com pós-venda entra na Fase 6. Os termos (consulta, vínculo, liberado, teto, cota,
 reaproveitamento) estão no [`GLOSSARY.md`](../GLOSSARY.md).
 
 ## Onde está cada coisa
@@ -101,10 +100,14 @@ O worker separa os eventos pela origem. Para a Granatech:
 - no `SUCCESS` da consulta, com o cliente ligado, busca e grava o detalhe. Se ele
   ainda vier sem margens, o evento volta para a fila;
 - status desconhecido, id desconhecido e os status de consulta de significado
-  pendente abrem o alerta `granatech_evento`, só com ids e status, sem CPF.
+  pendente abrem o alerta `granatech_evento`, só com ids e status, sem CPF;
+- com a consulta em status final, roda um turno de sistema na conversa
+  (`consulta_pronta`, `consulta_sem_margem` ou `consulta_erro:<status>`, ver
+  [`clt.md`](clt.md)).
 
 Uma consulta não final sem nenhuma mudança há 15 min abre `consulta_parada`
-(uma vez por consulta). Fora isso não há polling: a reconciliação cobre só a
+(uma vez por consulta). Se ela ainda espera a autorização do cliente, a conversa
+recebe o link do termo (`termo_pendente`). Fora isso não há polling: a reconciliação cobre só a
 proposta incerta.
 
 ## Simulador

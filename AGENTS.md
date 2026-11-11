@@ -78,7 +78,14 @@ automaticamente e é o que publica a porta no ambiente local.
   token), status aplicado no worker sem regredir, alerta de consulta parada há
   15 min e o simulador em `simuladores/granatech/`. Sem interface `Banco` até o
   segundo banco (docs/decisoes/0004). Detalhes e pendências em `docs/granatech.md`.
-- As fases 5 a 7 estão pendentes. `infra/`, `regras/` e `conhecimento/` nascem
+- **Fase 5 concluída:** ramo CLT em `agent/clt/` até a oferta, com triagem antes
+  da identificação (docs/decisoes/0007), BrasilAPI com cache em `empresas_cnpj`
+  e sem `FonteCadastral` (docs/decisoes/0006), prova do SIM antes de qualquer
+  consulta, turno de sistema (`AgentService.continuar`) disparado pelos eventos
+  da consulta, recontato por cota esgotada (tabela `recontatos`), até 5 novas
+  simulações depois da oferta e mensagens em `conhecimento/clt/mensagens.yaml`.
+  O aceite vai para handoff (`aceite_clt`) até a Fase 6. Ver `docs/clt.md`.
+- As fases 6 e 7 estão pendentes. `infra/` e `regras/` nascem
   na fase que colocar neles o primeiro arquivo real.
 - Fora das fases, o repositório já tem: workspace `uv` único (um lock e um
   venv na raiz), healthcheck próprio por serviço (a API responde `/health`, o
