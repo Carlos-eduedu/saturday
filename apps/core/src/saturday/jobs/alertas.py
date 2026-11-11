@@ -2,7 +2,9 @@
 
 - cliente sem resposta numa conversa assumida;
 - consulta da Granatech sem evento há mais de 15 min (o webhook é o único
-  aviso de que ela ficou pronta; se ele se perde, alguém precisa saber).
+  aviso de que ela ficou pronta; se ele se perde, alguém precisa saber). Se ela
+  ainda espera a autorização do cliente, o termo pela API não pegou: a conversa
+  recebe o link do termo como plano B.
 """
 
 from __future__ import annotations
@@ -13,6 +15,7 @@ from datetime import timedelta
 from sqlalchemy import and_, exists, func, select
 from sqlalchemy.orm import Session, sessionmaker
 
+from saturday.agent.service import AgentService
 from saturday.bancos.granatech import status as ordem_granatech
 from saturday.dados import repositorios
 from saturday.dados.modelos import Alerta, ConsultaGranatech, Conversa, Mensagem
@@ -27,7 +30,7 @@ INTERVALO_S = 60.0
 TRAVA_VERIFICACAO = 0x5A7A_0003
 
 
-def verificar(fabrica: sessionmaker[Session]) -> int:
+def verificar(fabrica: sessionmaker[Session], servico: AgentService | None = None) -> int:
     """Abre os alertas de tempo; devolve quantos abriu."""
 
     with abrir_sessao(fabrica) as sessao:
@@ -60,14 +63,20 @@ def verificar(fabrica: sessionmaker[Session]) -> int:
                 conversa_id=conversa.id,
                 detalhe={"atendente_id": str(conversa.atendente_id)},
             )
-        paradas = _consultas_paradas(sessao)
+        paradas, termo_pendente = _consultas_paradas(sessao)
     if conversas:
         logger.info("alertas_sem_resposta quantidade=%s", len(conversas))
+    if servico is not None:
+        for conversation_id in termo_pendente:
+            servico.continuar(conversation_id, "termo_pendente")
     return len(conversas) + paradas
 
 
-def _consultas_paradas(sessao: Session) -> int:
-    """Um alerta por consulta não final sem nenhuma mudança há 15 min."""
+def _consultas_paradas(sessao: Session) -> tuple[int, list[str]]:
+    """Um alerta por consulta não final sem nenhuma mudança há 15 min.
+
+    Devolve também as conversas cuja consulta parou esperando a autorização.
+    """
 
     finais = [
         s for s, posicao in ordem_granatech.CONSULTA.items() if posicao == ordem_granatech.FINAL
@@ -92,4 +101,14 @@ def _consultas_paradas(sessao: Session) -> int:
         )
     if consultas:
         logger.info("alertas_consulta_parada quantidade=%s", len(consultas))
-    return len(consultas)
+    ids = [
+        c.conversa_id
+        for c in consultas
+        if c.status == "AWAITING_CLIENT_AUTHORIZATION" and c.conversa_id is not None
+    ]
+    termo_pendente = (
+        list(sessao.scalars(select(Conversa.conversation_id).where(Conversa.id.in_(ids))))
+        if ids
+        else []
+    )
+    return len(consultas), termo_pendente

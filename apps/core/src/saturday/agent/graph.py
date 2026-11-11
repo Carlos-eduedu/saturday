@@ -6,6 +6,7 @@ from typing import Any
 
 from langgraph.graph import END, START, StateGraph
 
+from saturday.agent.clt.nos import clt
 from saturday.agent.context import AgentContext
 from saturday.agent.nodes import (
     calculate_portability,
@@ -23,6 +24,7 @@ from saturday.agent.routing import (
     after_calculate,
     after_check,
     after_classify,
+    after_clt,
     after_collect,
     after_generate,
     after_read,
@@ -46,6 +48,7 @@ def build_graph(checkpointer: Any = None) -> Any:
     builder.add_node("collect_customer_data", collect_customer_data)
     builder.add_node("calculate_portability", calculate_portability)
     builder.add_node("present_offer", present_offer)
+    builder.add_node("clt", clt)
 
     builder.add_conditional_edges(
         START,
@@ -55,6 +58,7 @@ def build_graph(checkpointer: Any = None) -> Any:
             "pedir_texto": "pedir_texto",
             "collect_customer_data": "collect_customer_data",
             "classify_intent": "classify_intent",
+            "clt": "clt",
         },
     )
     builder.add_conditional_edges(
@@ -64,6 +68,16 @@ def build_graph(checkpointer: Any = None) -> Any:
             "handoff": "handoff",
             "decline_offer": "decline_offer",
             "collect_customer_data": "collect_customer_data",
+            "generate_answer": "generate_answer",
+            "clt": "clt",
+        },
+    )
+    builder.add_conditional_edges(
+        "clt",
+        after_clt,
+        {
+            END: END,
+            "handoff": "handoff",
             "generate_answer": "generate_answer",
         },
     )

@@ -6,7 +6,10 @@ Tudo o que chega fica no histórico, inclusive o que foi ignorado. O que o
 cliente recebe por causa de cada status entra nas fases 5 e 6.
 
 Quando uma consulta fica pronta (``SUCCESS``), o detalhe é buscado e gravado.
-Se ele ainda vier sem margens, o evento falha e volta para a fila.
+Se ele ainda vier sem margens, o evento falha e volta para a fila. Com o
+detalhe gravado (ou com a consulta encerrada sem ele), a conversa recebe um
+turno de sistema para seguir a jornada CLT. O turno é idempotente: a etapa
+``consultando`` só avança uma vez.
 """
 
 from __future__ import annotations
@@ -18,10 +21,11 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from saturday.agent.service import AgentService
 from saturday.bancos.granatech import status as ordem
 from saturday.bancos.granatech.cliente import ClienteGranatech
 from saturday.dados import repositorios
-from saturday.dados.modelos import ConsultaGranatech, PropostaGranatech
+from saturday.dados.modelos import ConsultaGranatech, Conversa, PropostaGranatech
 from saturday.dados.sessao import sessao as abrir_sessao
 
 logger = logging.getLogger(__name__)
@@ -37,10 +41,11 @@ def aplicar(
     fabrica: sessionmaker[Session],
     cliente: ClienteGranatech | None,
     payload: dict[str, Any],
+    servico: AgentService | None = None,
 ) -> None:
     tipo = str(payload.get("tipo") or "").lower()
     if tipo == "consulta":
-        _consulta(fabrica, cliente, payload)
+        _consulta(fabrica, cliente, payload, servico)
     elif tipo == "proposta":
         _proposta(fabrica, payload)
     else:
@@ -62,6 +67,7 @@ def _consulta(
     fabrica: sessionmaker[Session],
     cliente: ClienteGranatech | None,
     payload: dict[str, Any],
+    servico: AgentService | None = None,
 ) -> None:
     id_externo = str(payload.get("id_solicitacao") or "")
     novo = str(payload.get("status") or "")
@@ -95,18 +101,34 @@ def _consulta(
                 )
         else:
             logger.info("granatech_consulta_status_ignorado atual=%s novo=%s", linha.status, novo)
-        buscar_detalhe = linha.status == "SUCCESS" and linha.detalhe is None
+        status = linha.status
+        tem_detalhe = linha.detalhe is not None
+        conversation_id = (
+            sessao.scalar(select(Conversa.conversation_id).where(Conversa.id == linha.conversa_id))
+            if linha.conversa_id
+            else None
+        )
 
-    if not buscar_detalhe or cliente is None:
-        return
-    detalhe, recorte = cliente.detalhe(id_externo)
-    if detalhe is None:
-        raise DetalheAindaNaoPronto(id_externo)
-    with abrir_sessao(fabrica) as sessao:
-        linha = sessao.scalars(
-            select(ConsultaGranatech).where(ConsultaGranatech.id_externo == id_externo)
-        ).one()
-        linha.detalhe = recorte
+    if status == "SUCCESS" and not tem_detalhe:
+        if cliente is None:
+            return
+        if cliente.gravar_detalhe(id_externo) is None:
+            raise DetalheAindaNaoPronto(id_externo)
+    evento = evento_da_consulta(status)
+    if servico is not None and conversation_id and evento:
+        servico.continuar(conversation_id, evento)
+
+
+def evento_da_consulta(status: str) -> str | None:
+    """Turno de sistema que cada status de consulta provoca na conversa."""
+
+    if status == "SUCCESS":
+        return "consulta_pronta"
+    if status == "NO_MARGIN":
+        return "consulta_sem_margem"
+    if ordem.CONSULTA.get(status) == ordem.FINAL:
+        return f"consulta_erro:{status}"
+    return None
 
 
 def _proposta(fabrica: sessionmaker[Session], payload: dict[str, Any]) -> None:

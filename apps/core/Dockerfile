@@ -44,6 +44,10 @@ COPY --from=builder /app/.venv /app/.venv
 COPY apps/core/alembic.ini ./alembic.ini
 COPY apps/core/migrations ./migrations
 
+# Mensagens fixas por produto (`conhecimento/clt/mensagens.yaml`), lidas a
+# partir do diretório de trabalho.
+COPY conhecimento ./conhecimento
+
 RUN chown -R saturday:saturday /app
 
 ENV PATH="/app/.venv/bin:$PATH" \

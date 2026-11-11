@@ -70,6 +70,26 @@ _Evitar_: valor solicitado (fora da borda com a API), valor do empréstimo
 **Teto**:
 O maior liberado que a MEX apresenta ou contrata (R$ 6.999).
 
+**Triagem**:
+Perguntas ao cliente, antes de qualquer consulta, que descartam quem não pode
+contratar; não gasta cota.
+_Evitar_: pré-análise, qualificação
+
+**Oferta**:
+A condição de crédito simulada que o agente apresenta ao cliente, sempre
+dentro do teto e com o seguro dito por extenso.
+_Evitar_: proposta (proposta é o que se cria no banco depois do aceite)
+
+**Não elegível**:
+Fim da jornada para quem a triagem, a empresa, a idade ou a consulta
+reprovaram; só um atendente reabre.
+_Evitar_: reprovado (reprovado é status de proposta no banco)
+
+**Recontato**:
+Voltar a falar com o cliente numa data marcada, porque algo o impediu de seguir
+agora (tempo de casa curto, cota esgotada).
+_Evitar_: follow-up, retorno
+
 ## Equipe
 
 **Atendente**:

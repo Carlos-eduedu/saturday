@@ -23,6 +23,7 @@ from saturday.bancos.granatech.cliente import ClienteGranatech
 from saturday.canais.whatsapp.cliente import WhatsAppClient
 from saturday.canais.whatsapp.entrada import EntradaWhatsApp
 from saturday.canais.whatsapp.saida import SaidaWhatsApp
+from saturday.fontes.brasilapi import BrasilAPI
 from saturday.services.anexos import AnexosClient
 from saturday.services.jev import JevClient
 from saturday.services.llm import LLMClient
@@ -36,13 +37,22 @@ def criar_contexto(
     http: httpx.Client,
     settings: Settings,
     storage: Storage | None = None,
+    fabrica: Any = None,
 ) -> AgentContext:
-    """Clientes de IA e de leitura de anexo, compartilhando o mesmo `httpx`."""
+    """Clientes de IA, de anexo e, com a Granatech ligada, os do ramo CLT.
 
+    Todos compartilham o mesmo `httpx`. API e worker montam o contexto por aqui,
+    porque os dois rodam turnos (o `POST /chat` sem webhook roda na API).
+    """
+
+    granatech = criar_cliente_granatech(http, settings, fabrica)
     return AgentContext(
         jev=JevClient(http, settings),
         llm=LLMClient(http, settings),
         anexos=AnexosClient(http, settings, storage),
+        granatech=granatech,
+        brasilapi=BrasilAPI(http, fabrica) if granatech is not None else None,
+        fabrica=fabrica,
     )
 
 
@@ -112,7 +122,7 @@ def criar_servico(
 
     return AgentService(
         graph=build_graph(checkpointer),
-        context=criar_contexto(http, settings, storage),
+        context=criar_contexto(http, settings, storage, fabrica),
         webhook=WebhookClient(http, settings),
         settings=settings,
         checkpointer=checkpointer,

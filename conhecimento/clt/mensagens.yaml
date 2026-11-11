@@ -1,0 +1,159 @@
+# Mensagens fixas do ramo CLT (Crédito do Trabalhador).
+#
+# Toda frase que o cliente lê no ramo CLT sai daqui. As variáveis vão entre
+# chaves e são preenchidas pelo código; um teste garante que toda chave usada
+# existe e que toda variável é preenchida. Valores em reais chegam já
+# formatados ("4.619,53").
+#
+# `versao` é gravada junto com a prova de consentimento: mude-a sempre que o
+# texto de `consentimento` mudar.
+
+versao: "2026-11-11"
+
+mensagens:
+  # ---------------------------------------------------------------- abertura
+  abertura: >-
+    Oi! Sou o assistente da MEX para o Crédito do Trabalhador. Vou usar os
+    dados do seu emprego para encontrar, entre os bancos parceiros da MEX, a
+    melhor condição para você. Antes, algumas perguntas rápidas.
+
+  # ---------------------------------------------------------------- triagem
+  triagem_carteira: Você trabalha de carteira assinada?
+  triagem_tempo_casa: >-
+    Há quanto tempo você está na empresa atual? Pode responder em anos ou
+    meses, por exemplo: 2 anos.
+  triagem_contrato_especial: >-
+    Você é estagiário, está em contrato de experiência, tem contrato com data
+    para terminar, está em aviso prévio ou em licença-maternidade?
+  triagem_granatech: Você já tem empréstimo com a Granatech?
+  triagem_funcionarios: A empresa onde você trabalha tem 30 funcionários ou mais?
+  repetir_sim_nao: "Não entendi. Pode responder só com sim ou não?"
+  repetir_tempo_casa: >-
+    Não entendi o tempo. Me diga em anos ou meses, por exemplo: 1 ano e 3
+    meses.
+
+  # ---------------------------------------------------------------- empresa
+  pedir_cnpj: Qual é o CNPJ da empresa? Ele aparece no seu holerite.
+  cnpj_invalido: >-
+    Não consegui reconhecer esse CNPJ. Confira no holerite e me envie os 14
+    números.
+
+  # ---------------------------------------------------------------- identificação
+  pedir_cpf: Agora preciso de alguns dados seus. Qual é o seu CPF?
+  cpf_invalido: Esse CPF não parece válido. Pode conferir e me enviar os 11 números?
+  pedir_nome: Qual é o seu nome completo?
+  nome_invalido: Preciso do nome completo, com nome e sobrenome.
+  pedir_nascimento: Qual é a sua data de nascimento? (dd/mm/aaaa)
+  nascimento_invalido: "Não entendi a data. Me envie no formato dd/mm/aaaa, por exemplo: 15/05/1990."
+  pedir_sexo: "O banco pede o sexo do cadastro: feminino ou masculino?"
+  sexo_invalido: "Não entendi. Responda feminino ou masculino."
+
+  # ---------------------------------------------------------------- consentimento
+  pedir_email: Qual é o seu e-mail? O banco usa no termo de autorização.
+  email_invalido: Esse e-mail não parece válido. Pode conferir?
+  confirmar_celular: O celular para o termo é o {celular}? Responda sim ou não.
+  pedir_celular: Me envie o celular com DDD, só os 11 números.
+  celular_invalido: Não consegui reconhecer esse celular. Me envie os 11 números, com DDD.
+  consentimento: >-
+    Para eu ver quanto você tem disponível, preciso da sua autorização para o
+    banco consultar os dados do seu emprego (empresa, salário e margem) no
+    sistema do governo. É só a consulta, não contrata nada. Você autoriza?
+    Responda SIM.
+  consentimento_recusado: >-
+    Tudo bem. Sem a sua autorização eu não consigo consultar. Se mudar de
+    ideia, é só responder SIM.
+  repetir_consentimento: >-
+    Para seguir, preciso que você responda SIM autorizando a consulta. Se não
+    quiser, tudo bem.
+
+  # ---------------------------------------------------------------- consulta
+  consultando: >-
+    Obrigado! Já pedi a consulta ao banco. Assim que ela ficar pronta eu te
+    mando a condição; costuma levar poucos minutos.
+  aguardando_consulta: >-
+    A consulta ainda está em andamento no banco. Assim que ficar pronta eu te
+    aviso por aqui.
+  termo_link: >-
+    Para concluir a autorização, abra este link do banco e confirme: {link}
+  cota_esgotada: >-
+    Hoje o banco já atingiu o limite de consultas. Amanhã cedo eu volto a
+    falar com você para continuar, combinado?
+  aguardando_recontato: >-
+    Combinado! Amanhã cedo eu volto a falar com você para continuar a
+    consulta.
+
+  # ---------------------------------------------------------------- vínculo
+  escolher_vinculo: >-
+    Encontrei mais de um emprego com margem disponível. Qual você quer usar?
+    Responda com o número.
+  opcao_vinculo: "{numero}. {empregador}, margem de R$ {margem}"
+  vinculo_invalido: Não entendi. Responda com o número do emprego, por exemplo 1.
+
+  # ---------------------------------------------------------------- oferta
+  oferta: >-
+    Boa notícia, {nome}! Consegui uma condição para você: R$ {liberado}
+    liberados na sua conta, em {n} parcelas de R$ {parcela} descontadas no
+    salário. Taxa de {taxa}% a.m. (CET de {cet}% a.m.). Já inclui o seguro
+    Super Proteção (R$ {seguro}), que cobre desemprego, morte e invalidez. Ele
+    é opcional: se preferir sem seguro, é só me dizer que eu refaço a
+    simulação. Quer seguir com essa proposta?
+  oferta_sem_seguro: >-
+    Boa notícia, {nome}! Consegui uma condição para você: R$ {liberado}
+    liberados na sua conta, em {n} parcelas de R$ {parcela} descontadas no
+    salário. Taxa de {taxa}% a.m. (CET de {cet}% a.m.), sem seguro. Quer
+    seguir com essa proposta?
+  aviso_teto: >-
+    O valor liberado foi ajustado ao limite de R$ {teto} que a MEX oferece.
+  sem_seguro_indisponivel: >-
+    Para esse emprego o banco só oferece a condição com seguro. Ela continua
+    valendo; quer seguir com ela?
+  prazo_indisponivel: >-
+    Esse prazo não está disponível para você. Os prazos possíveis são: {prazos}
+    meses.
+  parcela_acima_margem: A maior parcela possível para você é de R$ {margem}.
+  pedido_sem_oferta: >-
+    Com esse pedido não encontrei uma condição dentro das regras. A condição
+    anterior continua valendo; quer seguir com ela?
+  oferta_recusada: >-
+    Tudo bem! Se quiser outra condição, é só me dizer: sem seguro, outro prazo
+    ou outra parcela.
+  pedido_nao_entendido: >-
+    Não entendi o que você quer mudar. Pode pedir, por exemplo: sem seguro, em
+    25 parcelas ou parcela de R$ 200. Ou responda sim para seguir.
+  aceite: >-
+    Ótimo! Vou passar para um especialista da MEX finalizar a contratação com
+    você.
+
+  # ---------------------------------------------------------------- não elegível e recontato
+  nao_elegivel_carteira: >-
+    Obrigado por responder! Esse crédito é só para quem trabalha de carteira
+    assinada, então não consigo seguir por aqui.
+  recontato_tempo_casa: >-
+    Esse crédito pede pelo menos 12 meses na empresa atual. Você completa 12
+    meses por volta de {data}; anotei para voltar a falar com você nessa época.
+  nao_elegivel_contrato_especial: >-
+    Nesse tipo de contrato o banco não libera esse crédito agora, então não
+    consigo seguir.
+  nao_elegivel_granatech: >-
+    Como você já tem empréstimo com a Granatech, não consigo oferecer outro por
+    aqui agora.
+  nao_elegivel_funcionarios: >-
+    O banco só libera esse crédito para quem trabalha em empresa com 30
+    funcionários ou mais.
+  nao_elegivel_empresa: >-
+    Conferi a empresa e, pelas regras do banco, ela não está apta para esse
+    crédito agora.
+  nao_elegivel_idade: >-
+    Pelas regras de idade do banco, não consigo oferecer esse crédito para
+    você.
+  nao_elegivel_sem_margem: >-
+    O banco respondeu que você não tem margem disponível para esse crédito
+    agora.
+  nao_elegivel_sem_oferta: Não encontrei uma condição dentro das regras para você agora.
+
+  # ---------------------------------------------------------------- outros
+  handoff: >-
+    Vou passar a sua conversa para um especialista da MEX, que continua o
+    atendimento daqui.
+  sem_documento: >-
+    Para o Crédito do Trabalhador não preciso de documento agora. {pergunta}

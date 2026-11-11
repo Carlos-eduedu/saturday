@@ -463,6 +463,7 @@ class AgentService:
         respostas: dict[str, str],
     ) -> AgentReply:
         entrada = self._entrada_do_grafo(estado, payload)
+        entrada.update(self._dados_da_conversa(conversa), message_id=payload.message_id)
         metricas = iniciar_metricas()
         inicio = time.monotonic()
         caminho: list[str] = []
@@ -508,6 +509,54 @@ class AgentService:
                 self._abrir_handoff(sessao, conversa, "handoff", resposta.handoff_reason)
             self._gravar_saida(sessao, conversa, resposta)
         return resposta
+
+    @staticmethod
+    def _dados_da_conversa(conversa: Conversa | None) -> dict[str, Any]:
+        """O que o ramo CLT precisa da conversa: id (provas, cota) e telefone."""
+
+        if conversa is None:
+            return {}
+        return {"conversa_ref": str(conversa.id), "telefone": conversa.telefone}
+
+    def continuar(self, conversation_id: str, evento: str) -> AgentReply | None:
+        """Turno de sistema: segue a jornada sem mensagem do cliente.
+
+        Usado quando a Granatech avisa que a consulta mudou e pelo recontato. Com
+        a conversa em handoff ou assumida, a IA não fala: vira alerta para quem
+        está com ela. Devolve ``None`` quando nada rodou.
+        """
+
+        with self._trava(conversation_id) as sessao:
+            config = self.config(conversation_id)
+            estado = self.estado_atual(config)
+            conversa = repositorios.buscar_conversa(sessao, conversation_id) if sessao else None
+            if sessao is not None and conversa is not None:
+                if conversa.atendimento != "ia":
+                    repositorios.abrir_alerta(
+                        sessao,
+                        "evento_com_humano",
+                        conversa_id=conversa.id,
+                        detalhe={"evento": evento},
+                    )
+                    return None
+            elif estado.get("status") == "handoff":
+                return None
+
+            entrada = turno_inicial(user_message="", attachments=[])
+            entrada.update(self._dados_da_conversa(conversa), evento_sistema=evento)
+            caminho: list[str] = []
+            inicio = time.monotonic()
+            metricas = iniciar_metricas()
+            self._stream(entrada, config, caminho)
+            final = dict(self.graph.get_state(config).values or {})
+            self._log_turno(conversation_id, final, caminho, inicio, metricas)
+            resposta = self.evento(conversation_id, final)
+            if sessao is not None and conversa is not None:
+                if resposta.status == "handoff":
+                    self._abrir_handoff(sessao, conversa, "handoff", resposta.handoff_reason)
+                if resposta.answer or resposta.status == "handoff":
+                    self._gravar_saida(sessao, conversa, resposta)
+            return resposta
 
     def _entrada_do_grafo(
         self,

@@ -41,11 +41,14 @@ Desde a Fase 4 existe a **camada da Granatech** (`apps/core/src/saturday/bancos/
 cliente com token em cache e retry só em GET, normalização em `Decimal`, ajuste ao
 teto de R$ 6.999, controle de cota, proposta criada uma única vez (com
 reconciliação pela listagem), webhook `/webhooks/granatech` e o simulador em
-`simuladores/granatech/`. Ainda não há ramo CLT no grafo: ele entra na Fase 5.
-Ver [`docs/granatech.md`](docs/granatech.md).
+`simuladores/granatech/`. Ver [`docs/granatech.md`](docs/granatech.md).
 
-`infra/`, `regras/` e `conhecimento/` entram nas fases que colocarem neles o
-primeiro arquivo real (5 a 7).
+Desde a Fase 5 existe o **ramo CLT** no grafo (`apps/core/src/saturday/agent/clt/`):
+triagem sem gastar cota, empresa pela BrasilAPI, identificação, consentimento com
+prova, consulta, escolha de vínculo e oferta. Os textos ficam em
+`conhecimento/clt/mensagens.yaml`. Ver [`docs/clt.md`](docs/clt.md).
+
+`infra/` e `regras/` entram nas fases que colocarem neles o primeiro arquivo real.
 
 ## Rodar local, sem container
 
