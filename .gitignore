@@ -25,3 +25,9 @@ data/
 
 # Configuração local do Claude Code
 .claude/settings.local.json
+
+# Arquivos do macOS
+.DS_Store
+
+# Evidências geradas pelo script de homologação da Granatech
+evidencias/
