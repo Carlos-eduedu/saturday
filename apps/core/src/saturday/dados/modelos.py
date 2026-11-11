@@ -86,6 +86,8 @@ class Mensagem(Base):
     # `wamid` da Meta: identifica a mensagem nos dois lados do canal.
     wamid: Mapped[str | None] = mapped_column(String(128), unique=True)
     status_entrega: Mapped[str | None] = mapped_column(String(16))
+    # Referências no storage (`chave`, `mime_type`), nunca o conteúdo.
+    anexos: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
     # Quem escreveu: `cliente`, `ia`, `atendente` ou `sistema`.
     autor: Mapped[str] = mapped_column(String(16), nullable=False, default="ia")
     usuario_id: Mapped[uuid.UUID | None] = mapped_column(

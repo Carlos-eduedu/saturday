@@ -19,7 +19,7 @@ from saturday.canais.whatsapp.cliente import ErroTemporario
 from saturday.canais.whatsapp.saida import SaidaWhatsApp
 from saturday.dados import outbox as fila
 from saturday.dados import repositorios
-from saturday.dados.modelos import Outbox
+from saturday.dados.modelos import Mensagem, Outbox
 from saturday.jobs.outbox import ESPERA_MAXIMA_S, JITTER, drenar
 from saturday.settings import Settings
 
@@ -372,3 +372,39 @@ def test_janela_fechada_avisa_uma_vez_por_conversa(
         linhas = sessao.scalars(select(Outbox).where(Outbox.id.in_([primeira, segunda]))).all()
         assert all(linha.aguardando_cliente_desde is not None for linha in linhas)
         assert all(linha.entregue_em is None for linha in linhas)
+
+
+def test_modelo_do_painel_sai_como_modelo_e_fecha_a_linha(
+    settings: Settings,
+    fabrica: sessionmaker[Session],
+    conversa: str,
+) -> None:
+    with fabrica() as sessao:
+        linha_conversa = repositorios.obter_ou_criar_conversa(sessao, conversa, canal="whatsapp")
+        mensagem_id = repositorios.registrar_saida(
+            sessao, linha_conversa, conteudo="[modelo pagamento_confirmado]", autor="atendente"
+        )
+        linha = fila.enfileirar(
+            sessao,
+            conversa_id=linha_conversa.id,
+            canal="whatsapp",
+            payload={
+                "conversation_id": conversa,
+                "numero": "11987654321",
+                "phone_number_id": "p1",
+                "answer": "",
+                "modelo": "pagamento_confirmado",
+                "mensagem_id": mensagem_id,
+            },
+        )
+        sessao.commit()
+        linha_id = linha.id
+    cliente = ClienteGraphFalso()
+
+    drenar(fabrica, SaidaWhatsApp(cliente, fabrica, settings), settings)  # type: ignore[arg-type]
+
+    # Modelo escolhido no painel não espera o cliente, mesmo com a janela fechada.
+    assert cliente.modelos == ["pagamento_confirmado"]
+    assert _estado(fabrica, linha_id)[0] is not None
+    with fabrica() as sessao:
+        assert sessao.get(Mensagem, mensagem_id).wamid == "wamid.modelo"

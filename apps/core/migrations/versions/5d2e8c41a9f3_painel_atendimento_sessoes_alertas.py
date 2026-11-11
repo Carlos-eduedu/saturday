@@ -1,4 +1,4 @@
-"""painel: estado de atendimento, autor da mensagem, sessões e alertas
+"""painel: estado de atendimento, autor e anexos da mensagem, sessões e alertas
 
 Revision ID: 5d2e8c41a9f3
 Revises: 3c1f9a7b2d40
@@ -54,6 +54,7 @@ def upgrade() -> None:
             nullable=True,
         ),
     )
+    op.add_column("mensagens", sa.Column("anexos", postgresql.JSONB))
     op.execute("UPDATE mensagens SET autor = 'cliente' WHERE direcao = 'entrada'")
     op.alter_column("mensagens", "autor", server_default=None)
 
@@ -104,6 +105,7 @@ def downgrade() -> None:
     op.drop_table("alertas")
     op.drop_index("ix_sessoes_painel_usuario_id", table_name="sessoes_painel")
     op.drop_table("sessoes_painel")
+    op.drop_column("mensagens", "anexos")
     op.drop_column("mensagens", "usuario_id")
     op.drop_column("mensagens", "autor")
     op.drop_index("ix_conversas_atendimento", table_name="conversas")

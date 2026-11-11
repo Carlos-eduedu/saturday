@@ -378,6 +378,12 @@ class AgentService:
             conversa,
             message_id=payload.message_id,
             conteudo=payload.message,
+            anexos=[
+                {"chave": anexo.chave, "mime_type": anexo.mime_type}
+                for anexo in payload.attachments
+                if anexo.chave
+            ]
+            or None,
         )
 
     def _resposta_em_handoff(

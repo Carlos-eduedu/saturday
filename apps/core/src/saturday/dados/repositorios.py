@@ -65,6 +65,7 @@ def registrar_entrada(
     *,
     message_id: str | None,
     conteudo: str,
+    anexos: list[dict[str, Any]] | None = None,
 ) -> bool:
     """Grava a mensagem do cliente. ``False`` quando o ``message_id`` já existe.
 
@@ -75,7 +76,13 @@ def registrar_entrada(
     marcar_entrada(conversa)
     if message_id is None:
         sessao.add(
-            Mensagem(conversa_id=conversa.id, direcao="entrada", autor="cliente", conteudo=conteudo)
+            Mensagem(
+                conversa_id=conversa.id,
+                direcao="entrada",
+                autor="cliente",
+                conteudo=conteudo,
+                anexos=anexos,
+            )
         )
         sessao.flush()
         notificar(sessao, "mensagem", conversa=conversa.id)
@@ -89,6 +96,7 @@ def registrar_entrada(
             autor="cliente",
             message_id=message_id,
             conteudo=conteudo,
+            anexos=anexos,
         )
         .on_conflict_do_nothing(index_elements=["conversa_id", "direcao", "message_id"])
         .returning(Mensagem.id)
