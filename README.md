@@ -37,8 +37,15 @@ Quem responde cada conversa está em `conversas.atendimento`
 ([decisão 0003](docs/decisoes/0003-estado-de-atendimento-na-tabela-conversas.md));
 os termos estão no [`GLOSSARY.md`](GLOSSARY.md).
 
+Desde a Fase 4 existe a **camada da Granatech** (`apps/core/src/saturday/bancos/`):
+cliente com token em cache e retry só em GET, normalização em `Decimal`, ajuste ao
+teto de R$ 6.999, controle de cota, proposta criada uma única vez (com
+reconciliação pela listagem), webhook `/webhooks/granatech` e o simulador em
+`simuladores/granatech/`. Ainda não há ramo CLT no grafo: ele entra na Fase 5.
+Ver [`docs/granatech.md`](docs/granatech.md).
+
 `infra/`, `regras/` e `conhecimento/` entram nas fases que colocarem neles o
-primeiro arquivo real (4 a 7).
+primeiro arquivo real (5 a 7).
 
 ## Rodar local, sem container
 
@@ -56,6 +63,14 @@ Para conversar pelo simulador em vez da Meta, suba-o à parte e aponte a Graph:
 ```bash
 uv run --project simuladores/meta uvicorn app:app --app-dir simuladores/meta --port 8100
 # SATURDAY_WHATSAPP_GRAPH_URL=http://127.0.0.1:8100 no .env
+```
+
+O da Granatech segue o mesmo molde (o compose local já sobe os dois):
+
+```bash
+uv run --project simuladores uvicorn app:app --app-dir simuladores/granatech --port 8200
+# SATURDAY_GRANATECH_BASE_URL=http://127.0.0.1:8200 e
+# SATURDAY_GRANATECH_CHAVE_API=chave-do-simulador no .env
 ```
 
 Rode **da raiz**: o `pydantic-settings` lê o `.env` do diretório atual, então de

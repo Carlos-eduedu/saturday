@@ -70,7 +70,15 @@ automaticamente e é o que publica a porta no ambiente local.
   `assumida`) em `conversas` (docs/decisoes/0003); assumir, devolver, transferir
   e responder; ficha mascarada com revelar auditado; alertas; contador de cota;
   tempo real por `pg_notify` + SSE.
-- As fases 4 a 7 estão pendentes. `infra/`, `regras/` e `conhecimento/` nascem
+- **Fase 4 concluída:** cliente Granatech em `bancos/granatech/` (token em cache,
+  retry só em GET, normalização em `Decimal`, teto, proposta única com
+  reconciliação pela listagem), cota com trava e alerta a 80%, reaproveitamento
+  por CPF (local e depois remoto), tabelas `consultas_granatech` e
+  `propostas_granatech`, webhook `/webhooks/granatech` sempre no ar (503 sem
+  token), status aplicado no worker sem regredir, alerta de consulta parada há
+  15 min e o simulador em `simuladores/granatech/`. Sem interface `Banco` até o
+  segundo banco (docs/decisoes/0004). Detalhes e pendências em `docs/granatech.md`.
+- As fases 5 a 7 estão pendentes. `infra/`, `regras/` e `conhecimento/` nascem
   na fase que colocar neles o primeiro arquivo real.
 - Fora das fases, o repositório já tem: workspace `uv` único (um lock e um
   venv na raiz), healthcheck próprio por serviço (a API responde `/health`, o

@@ -43,7 +43,8 @@ o mesmo arquivo serve para dev, homolog e produção.
 
 ## Worker
 
-`saturday-worker` consome o `outbox` e entrega os envios ao canal. A API grava a
+`saturday-worker` processa a fila de eventos (WhatsApp e Granatech), verifica os
+alertas de tempo e consome o `outbox`, entregando os envios ao canal. A API grava a
 resposta na mesma transação do turno e nunca fala com o canal: um envio que falha
 volta para a fila com backoff, sem prender a resposta ao cliente.
 
@@ -72,8 +73,16 @@ Todas usam o prefixo `SATURDAY_`. O `.env` é lido automaticamente.
 | `SATURDAY_RETENCAO_EXTRATO_DIAS` | `30` | Dias de retenção do extrato; ao expirar, o extrato é apagado no próximo turno. |
 | `SATURDAY_HANDOFF_AUTO_RELEASE_HORAS` | `0` | Horas para liberar automaticamente um handoff sem dono; `0` desliga. Conversa assumida nunca é liberada sozinha. |
 | `SATURDAY_SESSAO_SEGREDO` | vazio | Assina o CSRF do painel. Obrigatória fora de `pytest`. |
-| `SATURDAY_GRANATECH_COTA_MENSAL` | `500` | Teto mensal mostrado no contador de cota. |
-| `SATURDAY_GRANATECH_COTA_DIARIA` | `20` | Limite diário mostrado no contador de cota. |
+| `SATURDAY_GRANATECH_BASE_URL` | api-dev | Base da API da Granatech; em dev, o simulador (`http://granatech:8200`). |
+| `SATURDAY_GRANATECH_CHAVE_API` | vazio | Chave do login. Obrigatória com `GRANATECH_ATIVO=true`. |
+| `SATURDAY_GRANATECH_WEBHOOK_TOKEN` | vazio | Token do webhook. Sem ele, `/webhooks/granatech` responde 503; obrigatória em `homolog` e `prod` e com `GRANATECH_ATIVO=true`. |
+| `SATURDAY_GRANATECH_ATIVO` | `false` | Liga o cliente da Granatech no worker. O webhook fica sempre no ar. |
+| `SATURDAY_GRANATECH_PROPOSTA_ATIVA` | `false` | Libera a criação automática de proposta. |
+| `SATURDAY_GRANATECH_TETO_LIBERADO` | `6999` | Maior liberado apresentado ou contratado. |
+| `SATURDAY_GRANATECH_COTA_MENSAL` | `500` | Teto de consultas no mês (alerta a 80%). |
+| `SATURDAY_GRANATECH_COTA_DIARIA` | `20` | Limite de consultas no dia. |
+| `SATURDAY_GRANATECH_REAPROVEITAR_DIAS` | `30` | Janela para reaproveitar consulta do mesmo CPF. |
+| `SATURDAY_GRANATECH_TIPO_EMPREGADOR` | `1` | `tipo_empregador` do corpo da proposta (pendente de confirmação). |
 
 > **Atenção:** todas as variáveis de ambiente agora usam o prefixo `SATURDAY_`.
 > Por exemplo, `OPENROUTER_API_KEY` virou `SATURDAY_OPENROUTER_API_KEY`,
@@ -242,4 +251,22 @@ e injeção de mensagem assinada:
 
 ```bash
 uv run --project simuladores/meta uvicorn app:app --app-dir simuladores/meta --port 8100
+```
+
+## Granatech
+
+Arquivos em `bancos/granatech/` (cliente, normalização, teto e ordem de status),
+`dados/cota.py`, `web/api/granatech.py` e `jobs/granatech.py`. Explicação completa
+em [`docs/granatech.md`](../../docs/granatech.md).
+
+- `POST /webhooks/granatech` aceita o token em `?t=`, `Authorization: Bearer` ou
+  `x-webhook-token` (tempo constante), grava em `eventos_recebidos` com o hash do
+  JSON canônico como id e responde 200. Sem token configurado, 503.
+- O worker aplica o status na consulta ou proposta local, na ordem da jornada;
+  o `SUCCESS` da consulta grava o detalhe. Fase 4 não fala com o cliente.
+
+O simulador fica em `simuladores/granatech/`:
+
+```bash
+uv run --project simuladores uvicorn app:app --app-dir simuladores/granatech --port 8200
 ```
