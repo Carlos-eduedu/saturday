@@ -248,3 +248,79 @@ def pedido_de_mudanca(texto: str) -> Pedido | None:
     if not sem_seguro and parcelas is None and valor is None:
         return None
     return Pedido(sem_seguro=sem_seguro, parcelas=parcelas, valor_parcela=valor)
+
+
+# ---------------------------------------------------------------- dados da proposta
+
+_ESTADOS_CIVIS = (
+    (r"\buniao estavel\b|\bamasiad|\bmoro junto|\bmoramos junto", "UNIAO_ESTAVEL"),
+    (r"\bsolteir", "SOLTEIRO"),
+    (r"\bcasad", "CASADO"),
+    (r"\bdivorciad", "DIVORCIADO"),
+    (r"\bviuv", "VIUVO"),
+    (r"\bseparad", "SEPARADO"),
+)
+
+
+def estado_civil(texto: str) -> str | None:
+    """Estado civil no formato do detalhe da Granatech (maiúsculas)."""
+
+    normal = normalizar(texto)
+    achados = {valor for padrao, valor in _ESTADOS_CIVIS if re.search(padrao, normal)}
+    return achados.pop() if len(achados) == 1 else None
+
+
+def bancos_candidatos(texto: str, bancos: list[dict[str, object]]) -> list[dict[str, object]]:
+    """Bancos da lista que casam com o nome ou o código digitado."""
+
+    normal = normalizar(texto)
+    if re.fullmatch(r"\d{1,3}", normal):
+        codigo = normal.zfill(3)
+        return [b for b in bancos if str(b.get("codigo") or "").zfill(3) == codigo]
+    if len(normal) < 2:
+        return []
+    exatos = [b for b in bancos if normalizar(str(b.get("nome") or "")) == normal]
+    if exatos:
+        return exatos
+    return [b for b in bancos if normal in normalizar(str(b.get("nome") or ""))]
+
+
+def tipo_conta(texto: str) -> str | None:
+    normal = normalizar(texto)
+    corrente = "corrente" in normal or normal in {"cc", "c/c"}
+    poupanca = "poupanca" in normal or normal in {"cp", "pp"}
+    if corrente == poupanca:
+        return None
+    return "conta_corrente" if corrente else "conta_poupanca"
+
+
+def agencia(texto: str) -> tuple[str, str] | None:
+    """Agência e dígito (vazio se não houver): ``"1234-5"`` → ``("1234", "5")``."""
+
+    achado = re.fullmatch(r"\s*(\d{1,5})\s*(?:[-\s]\s*([\dxX]))?\s*", texto)
+    if not achado:
+        return None
+    return achado.group(1), (achado.group(2) or "").upper()
+
+
+def conta_com_digito(texto: str) -> tuple[str, str] | None:
+    """Conta e dígito. Sem separador, o último algarismo é o dígito."""
+
+    achado = re.fullmatch(r"\s*(\d{1,13})\s*[-\s]\s*([\dxX])\s*", texto)
+    if achado:
+        return achado.group(1), achado.group(2).upper()
+    so_numeros = re.fullmatch(r"\s*(\d{2,14})\s*", texto)
+    if so_numeros:
+        numero = so_numeros.group(1)
+        return numero[:-1], numero[-1]
+    return None
+
+
+def nao_quer_receber(texto: str) -> bool:
+    """Botão "Não quero receber" do modelo de marketing (chega como texto)."""
+
+    return "nao quero receber" in normalizar(texto)
+
+
+def pediu_cancelamento(texto: str) -> bool:
+    return bool(re.search(r"\b(cancel\w*|desist\w*)\b", normalizar(texto)))
