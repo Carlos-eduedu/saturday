@@ -1,14 +1,15 @@
 """Tabelas do Saturday.
 
-Nove tabelas criadas na Fase 1 e duas na Fase 3 (``sessoes_painel`` e
-``alertas``). ``consentimentos``, ``chamadas_externas`` e ``cota`` ainda nascem
-inertes e ganham escritor nas fases 4 e 5 (ver AGENTS.md).
+Nove tabelas criadas na Fase 1, duas na Fase 3 (``sessoes_painel`` e
+``alertas``) e duas na Fase 4 (``consultas_granatech`` e
+``propostas_granatech``). ``consentimentos`` ganha escritor na Fase 5.
 """
 
 from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import (
@@ -18,6 +19,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -190,7 +192,7 @@ class ChamadaExterna(Base):
 
 
 class Cota(Base):
-    """Consultas gastas por parceiro e por dia. Escritor entra na Fase 4."""
+    """Consultas gastas por parceiro e por dia (ver ``dados/cota.py``)."""
 
     __tablename__ = "cota"
     __table_args__ = (UniqueConstraint("parceiro", "dia", name="uq_cota_parceiro_dia"),)
@@ -261,3 +263,61 @@ class Alerta(Base):
         ForeignKey("usuarios_painel.id", ondelete="SET NULL")
     )
     resolvido_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ConsultaGranatech(Base):
+    """Consulta de saldo aberta na Granatech; cada uma gastou cota.
+
+    ``detalhe`` guarda o detalhe já normalizado, preenchido quando a consulta
+    fica pronta. ``historico`` guarda todos os eventos recebidos, inclusive os
+    ignorados por virem fora de ordem.
+    """
+
+    __tablename__ = "consultas_granatech"
+    __table_args__ = (Index("ix_consultas_granatech_cpf", "cpf", "criada_em"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id_externo: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    cpf: Mapped[str] = mapped_column(String(11), nullable=False)
+    conversa_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("conversas.id", ondelete="CASCADE")
+    )
+    status: Mapped[str] = mapped_column(String(64), nullable=False)
+    link_termo: Mapped[str | None] = mapped_column(Text)
+    detalhe: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    historico: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
+    atualizada_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=AGORA, onupdate=AGORA
+    )
+
+
+class PropostaGranatech(Base):
+    """Proposta na Granatech, gravada como intenção antes do POST.
+
+    ``estado_envio`` diz o que sabemos do POST: ``intencao`` (ainda não saiu),
+    ``criada``, ``incerta`` (timeout ou 5xx: procurar na listagem antes de tentar
+    de novo) ou ``falhou`` (erro comprovado). Parcela e prazo bastam para
+    reconhecer a proposta na listagem; o corpo enviado não é guardado.
+    """
+
+    __tablename__ = "propostas_granatech"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    consulta_id: Mapped[int] = mapped_column(
+        ForeignKey("consultas_granatech.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    conversa_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("conversas.id", ondelete="CASCADE")
+    )
+    id_externo: Mapped[str | None] = mapped_column(String(64), unique=True)
+    estado_envio: Mapped[str] = mapped_column(String(16), nullable=False, default="intencao")
+    valor_parcela: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    numero_parcelas: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str | None] = mapped_column(String(64))
+    tipo_notificacao: Mapped[str | None] = mapped_column(String(64))
+    historico: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
+    intencao_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
+    atualizada_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=AGORA, onupdate=AGORA
+    )
