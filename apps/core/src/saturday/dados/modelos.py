@@ -3,7 +3,8 @@
 Nove tabelas criadas na Fase 1, duas na Fase 3 (``sessoes_painel`` e
 ``alertas``) e duas na Fase 4 (``consultas_granatech`` e
 ``propostas_granatech``). A Fase 5 dá escritor a ``consentimentos`` e cria
-``empresas_cnpj`` e ``recontatos``.
+``empresas_cnpj`` e ``recontatos``; a Fase 6 cria ``links_curtos`` e a coluna
+``conversas.marketing``.
 """
 
 from __future__ import annotations
@@ -58,6 +59,8 @@ class Conversa(Base):
         ForeignKey("usuarios_painel.id", ondelete="SET NULL")
     )
     atendimento_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Mensagens de marketing: `opt_in`, `opt_out` ou nada (nunca perguntado).
+    marketing: Mapped[str | None] = mapped_column(String(8))
     # Último "visto" de qualquer usuário do painel: base do "não lida".
     vista_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
@@ -352,4 +355,18 @@ class Recontato(Base):
     quando: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     tentativas: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     feito_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
+
+
+class LinkCurto(Base):
+    """``/l/{codigo}`` → link de biometria vigente da proposta.
+
+    ``url`` é a última URL conhecida, usada se a Granatech não responder no clique.
+    """
+
+    __tablename__ = "links_curtos"
+
+    codigo: Mapped[str] = mapped_column(String(16), primary_key=True)
+    id_proposta: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    url: Mapped[str] = mapped_column(Text, nullable=False)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)

@@ -4,9 +4,10 @@ O canal **só classifica** o que aconteceu e para. Quem espera e decide desistir
 o outbox (`jobs/outbox.py`): um único dono do reagendamento. Aqui ficam a janela
 de 24 h, a divisão em partes e o aviso por modelo quando a janela está fechada.
 
-Fora da janela só sai o modelo `atualizacao_pedido`, sem variáveis: o texto da
-resposta não cabe num parâmetro (a Meta recusa quebra de linha) e fica na linha
-do outbox até o cliente escrever de novo.
+Fora da janela sai um modelo, nunca o texto: o do aviso que o turno escolheu
+(`modelo_aviso`, com o código do link curto quando o modelo tem botão) ou
+`atualizacao_pedido`. O texto da resposta não cabe num parâmetro (a Meta recusa
+quebra de linha) e fica na linha do outbox até o cliente escrever de novo.
 """
 
 from __future__ import annotations
@@ -145,4 +146,10 @@ class SaidaWhatsApp:
         with abrir_sessao(self._fabrica) as sessao:
             if fila.outro_esperando_cliente(sessao, linha):
                 return
-        self._cliente.enviar_modelo(phone_number_id, numero, MODELOS[MODELO_PADRAO])
+        payload = linha.payload or {}
+        modelo = MODELOS.get(str(payload.get("modelo_aviso") or "")) or MODELOS[MODELO_PADRAO]
+        sufixo = str(payload.get("link_aviso") or "") if modelo.tem_link else ""
+        if modelo.tem_link and not sufixo:
+            # Modelo de link sem o código não fecha: avisa pelo genérico.
+            modelo = MODELOS[MODELO_PADRAO]
+        self._cliente.enviar_modelo(phone_number_id, numero, modelo, sufixo_link=sufixo or None)

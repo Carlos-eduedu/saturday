@@ -245,3 +245,63 @@ def _empresa(**extras: object) -> dict[str, object]:
 )
 def test_empresa(extras: dict[str, object], motivo: str | None) -> None:
     assert regras.empresa_reprovada(_empresa(**extras), HOJE) == motivo
+
+
+# ---------------------------------------------------------------- dados da proposta
+
+BANCOS = [
+    {"codigo": "001", "nome": "Banco do Brasil", "habilitado": True},
+    {"codigo": "341", "nome": "Itaú", "habilitado": True},
+    {"codigo": "260", "nome": "Nu Pagamentos", "habilitado": True},
+    {"codigo": "237", "nome": "Bradesco", "habilitado": True},
+    {"codigo": "422", "nome": "Banco Safra", "habilitado": True},
+]
+
+
+@pytest.mark.parametrize(
+    ("texto", "esperado"),
+    [
+        ("solteiro", "SOLTEIRO"),
+        ("Sou casada", "CASADO"),
+        ("divorciado", "DIVORCIADO"),
+        ("viúva", "VIUVO"),
+        ("união estável", "UNIAO_ESTAVEL"),
+        ("separado", "SEPARADO"),
+        ("casado e solteiro", None),
+        ("normal", None),
+    ],
+)
+def test_estado_civil(texto: str, esperado: str | None) -> None:
+    assert leitura.estado_civil(texto) == esperado
+
+
+def test_bancos_candidatos() -> None:
+    def codigos(texto: str) -> list[object]:
+        return [b["codigo"] for b in leitura.bancos_candidatos(texto, BANCOS)]
+
+    assert codigos("341") == ["341"]
+    assert codigos("1") == ["001"]
+    assert codigos("itau") == ["341"]
+    assert codigos("Bradesco") == ["237"]
+    assert codigos("banco") == ["001", "422"]
+    assert codigos("caixa") == []
+
+
+def test_conta() -> None:
+    assert leitura.tipo_conta("corrente") == "conta_corrente"
+    assert leitura.tipo_conta("Poupança") == "conta_poupanca"
+    assert leitura.tipo_conta("sei lá") is None
+    assert leitura.agencia("1234") == ("1234", "")
+    assert leitura.agencia("1234-x") == ("1234", "X")
+    assert leitura.agencia("agência 12") is None
+    assert leitura.conta_com_digito("12345-6") == ("12345", "6")
+    assert leitura.conta_com_digito("123456") == ("12345", "6")
+    assert leitura.conta_com_digito("conta 1") is None
+
+
+def test_marketing_e_cancelamento() -> None:
+    assert leitura.nao_quer_receber("Não quero receber")
+    assert not leitura.nao_quer_receber("quero receber")
+    assert leitura.pediu_cancelamento("quero cancelar")
+    assert leitura.pediu_cancelamento("desisti")
+    assert not leitura.pediu_cancelamento("quando cai o dinheiro?")

@@ -81,6 +81,17 @@ HandoffReason = Literal[
     "consulta_com_erro",
     "acima_do_teto",
     "limite_simulacoes",
+    # Proposta e pós-venda (Fase 6).
+    "proposta_sem_seguro",
+    "dados_divergentes",
+    "proposta_incerta",
+    "dados_tomador_falhou",
+    "pediu_cancelamento",
+    "link_indisponivel",
+    "revisao_banco",
+    "falha_pagamento",
+    "falha_pagamento_repetida",
+    "status_desconhecido",
 ]
 
 MotivoContrato = Literal[

@@ -25,6 +25,14 @@ class AgentState(MessagesState, total=False):
     message_id: str | None
     telefone: str | None
     clt_faq: bool
+    # Saída do turno além do texto: modelo para a janela fechada (com o código do
+    # link curto), modelo enviado sempre (marketing) e detalhe do alerta de handoff.
+    modelo_aviso: str | None
+    link_aviso: str | None
+    modelo_envio: str | None
+    handoff_detalhe: dict[str, Any] | None
+    # Opt-in/opt-out de marketing a gravar em `conversas` pelo serviço.
+    marketing: str | None
 
     # Campos persistentes da conversa.
     publico: str | None
@@ -57,6 +65,11 @@ CAMPOS_DO_TURNO = (
     "message_id",
     "telefone",
     "clt_faq",
+    "modelo_aviso",
+    "link_aviso",
+    "modelo_envio",
+    "handoff_detalhe",
+    "marketing",
 )
 
 
@@ -83,6 +96,11 @@ def turno_inicial(
         "message_id": None,
         "telefone": None,
         "clt_faq": False,
+        "modelo_aviso": None,
+        "link_aviso": None,
+        "modelo_envio": None,
+        "handoff_detalhe": None,
+        "marketing": None,
     }
     if cliente:
         estado["cliente"] = cliente

@@ -79,3 +79,44 @@ def _aceita(ordem: dict[str, int], atual: str | None, novo: str, *, regressao: b
 
 def final(ordem: dict[str, int], status: str | None) -> bool:
     return status is not None and ordem.get(status) == FINAL
+
+
+# O que a conversa faz com cada evento de proposta (AGENTS.md, tabela de status).
+# A notificação é mais específica que o status: ela manda; o status é a reserva.
+ACAO_POR_NOTIFICACAO = {
+    "AGUARDANDO_CONFIRMACAO": "criada",
+    "AGUARDANDO_FORMALIZACAO": "formalizar",
+    "REFAZER_SEGURANCA_IDENTIDADE": "refazer",
+    "BLOQUEIO_DE_SALDO_EM_ANDAMENTO": "silencio",
+    "BLOQUEIO_SALDO": "silencio",
+    "FORMALIZACAO_EM_ANDAMENTO": "silencio",
+    "AGUARDANDO_ANALISE_BANCO": "analise",
+    "SUCESSO_SEGURANCA_IDENTIDADE": "identidade_ok",
+    "AGUARDANDO_REVISAO_USUARIO": "revisao",
+    "FALHA_PAGAMENTO": "falha_pagamento",
+    "REPROVADO": "reprovada",
+    "PAGO": "paga",
+    "PROPOSTA_PAGA": "paga",
+}
+ACAO_POR_STATUS = {
+    "PENDING_CONFIRMATION": "criada",
+    "PENDING_FORMALIZATION": "formalizar",
+    "PENDING_REFORMALIZATION": "refazer",
+    "PENDING_BANK_ANALYSIS": "analise",
+    "PENDING_PAYMENT": "identidade_ok",
+    "PENDING_USER_REVIEW": "revisao",
+    "REPROVED": "reprovada",
+    "CANCELED": "cancelada",
+    "CANCELED_BY_CLIENT": "cancelada",
+    "PAYED": "paga",
+}
+
+
+def acao_da_proposta(status: str | None, notificacao: str | None) -> str:
+    """Ação da conversa para um evento de proposta; ``desconhecida`` faz handoff."""
+
+    if status in ("CANCELED", "CANCELED_BY_CLIENT"):
+        return "cancelada"
+    if notificacao in ACAO_POR_NOTIFICACAO:
+        return ACAO_POR_NOTIFICACAO[notificacao]
+    return ACAO_POR_STATUS.get(status or "", "desconhecida")

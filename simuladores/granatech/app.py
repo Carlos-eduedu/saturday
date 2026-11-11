@@ -391,9 +391,11 @@ async def detalhe_proposta(id_proposta: str, request: Request) -> Any:
     proposta = PROPOSTAS.get(id_proposta)
     if proposta is None:
         return _erro(404, "proposta não encontrada")
+    # O link muda a cada "refazer": o Saturday precisa sempre do vigente.
+    versao = int(proposta.get("versao_link", 1))
     return {
         **proposta,
-        "url_seguranca_identidade": f"https://biometria.simulador/{id_proposta}",
+        "url_seguranca_identidade": f"https://biometria.simulador/{id_proposta}/v{versao}",
     }
 
 
@@ -404,6 +406,19 @@ async def dados_tomador(id_proposta: str, request: Request) -> Any:
         return falha
     if id_proposta not in PROPOSTAS:
         return _erro(404, "proposta não encontrada")
+    PROPOSTAS[id_proposta]["dados_tomador"] = await request.json()
+    return {"success": True}
+
+
+@app.patch(PREFIXO + "/propostas/{id_proposta}/dados-bancarios")
+async def dados_bancarios(id_proposta: str, request: Request) -> Any:
+    # TODO(granatech): corpo real; o simulador guarda o que receber.
+    falha, _ = await _entrada(request)
+    if falha is not None:
+        return falha
+    if id_proposta not in PROPOSTAS:
+        return _erro(404, "proposta não encontrada")
+    PROPOSTAS[id_proposta]["dados_bancarios"] = await request.json()
     return {"success": True}
 
 
@@ -438,6 +453,12 @@ def montar_evento(pedido: dict[str, Any]) -> dict[str, Any]:
     """Payload de webhook no formato que a Granatech envia."""
 
     if str(pedido.get("tipo", "")).lower() == "proposta":
+        proposta = PROPOSTAS.get(str(pedido.get("id")))
+        if proposta is not None:
+            if pedido.get("status"):
+                proposta["status"] = pedido["status"]
+            if pedido.get("tipo_notificacao") == "REFAZER_SEGURANCA_IDENTIDADE":
+                proposta["versao_link"] = int(proposta.get("versao_link", 1)) + 1
         return {
             "tipo": "proposta",
             "status_da_proposta": pedido.get("status"),

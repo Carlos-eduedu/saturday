@@ -377,3 +377,48 @@ def montar_corpo_proposta(
         }
     # TODO(granatech): `informacaoDeSeguros` de uma proposta sem seguro.
     return corpo
+
+
+def montar_dados_tomador(
+    *,
+    pessoa: Pessoa,
+    cpf: str,
+    nome: str,
+    estado_civil: str,
+    celular: str,
+    conta: dict[str, str],
+) -> dict[str, Any]:
+    """Corpo do ``POST /propostas/{id}/dados-tomador``.
+
+    Mãe, nascimento e endereço vêm da Granatech (confirmados pelo cliente); nome,
+    estado civil, celular e conta vêm da conversa. ``conta`` traz ``banco_codigo``,
+    ``agencia``, ``digito_agencia``, ``numero_conta``, ``digito_conta`` e
+    ``tipo_conta`` (``conta_corrente`` ou ``conta_poupanca``).
+    """
+
+    endereco = pessoa.endereco
+    return {
+        "nome_completo": nome,
+        # TODO(granatech): valores aceitos de `estado_civil` (enviamos em maiúsculas).
+        "estado_civil": estado_civil,
+        "data_nascimento": pessoa.nascimento.isoformat() if pessoa.nascimento else None,
+        "telefone_endereco": celular,
+        "nome_completo_mae": pessoa.nome_mae,
+        "cep": endereco.cep if endereco else None,
+        "endereco": endereco.logradouro if endereco else None,
+        "numero_endereco": endereco.numero if endereco else None,
+        "bairro": endereco.bairro if endereco else None,
+        "cidade": endereco.cidade if endereco else None,
+        "estado": endereco.uf if endereco else None,
+        "complemento": endereco.complemento if endereco else "",
+        "cpf": cpf,
+        "tipo_dados_bancarios": "dados_bancarios",
+        "banco_detalhe": {
+            "agencia": conta["agencia"],
+            "digito_agencia": conta.get("digito_agencia", ""),
+            "numero_conta": conta["numero_conta"],
+            "digito_conta": conta["digito_conta"],
+            "tipo_conta": conta["tipo_conta"],
+            "banco_codigo": conta["banco_codigo"],
+        },
+    }

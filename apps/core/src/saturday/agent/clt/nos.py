@@ -14,23 +14,22 @@ from __future__ import annotations
 
 import copy
 import logging
-import uuid
 from collections.abc import Callable
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from langchain_core.messages import AIMessage
 from langgraph.runtime import Runtime
 
-from saturday.agent.clt import leitura, regras
-from saturday.agent.clt.mensagens import texto, versao
+from saturday.agent.clt import leitura, proposta, regras
+from saturday.agent.clt.mensagens import chaves, texto, variaveis, versao
+from saturday.agent.clt.turno import PERGUNTAS, Turno, primeiro_nome, reais
 from saturday.agent.coleta import hoje_operacao
 from saturday.agent.context import AgentContext
 from saturday.agent.state import AgentState
-from saturday.bancos.granatech.cliente import ClienteGranatech, ErroGranatech
+from saturday.bancos.granatech.cliente import ErroGranatech
 from saturday.bancos.granatech.normalizacao import DetalheConsulta, Simulacao, Vinculo
 from saturday.dados import consentimentos, recontatos
 from saturday.dados.cota import CotaEsgotada
@@ -44,24 +43,9 @@ logger = logging.getLogger(__name__)
 ATIVAS = frozenset(
     {"abertura", "triagem", "empresa", "identificacao", "consentimento", "consultando"}
     | {"escolha_vinculo", "oferta", "recontato"}
+    | {"dados_proposta", "aceite", "proposta", "formalizacao", "nova_conta"}
 )
 TRIAGEM = ("carteira", "tempo_casa", "contrato_especial", "granatech", "funcionarios")
-PERGUNTAS = {
-    "carteira": "triagem_carteira",
-    "tempo_casa": "triagem_tempo_casa",
-    "contrato_especial": "triagem_contrato_especial",
-    "granatech": "triagem_granatech",
-    "funcionarios": "triagem_funcionarios",
-    "cnpj": "pedir_cnpj",
-    "cpf": "pedir_cpf",
-    "nome": "pedir_nome",
-    "nascimento": "pedir_nascimento",
-    "sexo": "pedir_sexo",
-    "email": "pedir_email",
-    "celular": "pedir_celular",
-    "sim": "consentimento",
-    "vinculo": "escolher_vinculo",
-}
 # Resposta da triagem que reprova: (resposta, motivo do não elegível).
 REPROVA = {
     "carteira": (False, "nao_elegivel_carteira"),
@@ -72,93 +56,6 @@ REPROVA = {
 CONSENTIMENTO_CONSULTA = "consulta"
 MAX_RECONTATOS_COTA = 3
 HORA_RECONTATO = time(9, 0)
-ERROS_ATE_HANDOFF = 2
-
-
-# ---------------------------------------------------------------- formatação
-
-
-def reais(valor: Decimal) -> str:
-    return f"{valor:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
-
-
-def _primeiro_nome(nome: str) -> str:
-    return nome.split()[0].capitalize() if nome.strip() else ""
-
-
-# ---------------------------------------------------------------- turno
-
-
-@dataclass
-class Turno:
-    """O que uma etapa precisa: estado da jornada, texto e clientes."""
-
-    clt: dict[str, Any]
-    state: AgentState
-    contexto: AgentContext
-    texto: str
-    hoje: date
-
-    @property
-    def dados(self) -> dict[str, Any]:
-        dados: dict[str, Any] = self.clt.setdefault("dados", {})
-        return dados
-
-    @property
-    def granatech(self) -> ClienteGranatech:
-        if self.contexto.granatech is None:
-            raise RuntimeError("ramo CLT sem cliente da Granatech")
-        return self.contexto.granatech
-
-    @property
-    def conversa_id(self) -> uuid.UUID | None:
-        ref = self.state.get("conversa_ref")
-        return uuid.UUID(ref) if ref else None
-
-    # -- saídas -------------------------------------------------------
-
-    def responder(self, *partes: str) -> dict[str, Any]:
-        resposta = "\n\n".join(p for p in partes if p)
-        return {
-            "clt": self.clt,
-            "status": "answered",
-            "answer": resposta,
-            "needs_human": False,
-            "messages": [AIMessage(content=resposta)] if resposta else [],
-        }
-
-    def perguntar(self, etapa: str, passo: str, *antes: str, **valores: object) -> dict[str, Any]:
-        self.clt.update(etapa=etapa, passo=passo, erros=0)
-        return self.responder(*antes, texto(PERGUNTAS[passo], **valores))
-
-    def handoff(self, motivo: str, resposta: str | None = None) -> dict[str, Any]:
-        logger.info("clt_handoff etapa=%s motivo=%s", self.clt.get("etapa"), motivo)
-        return {
-            "clt": self.clt,
-            "needs_human": True,
-            "handoff_reason": motivo,
-            "answer": resposta or texto("handoff"),
-        }
-
-    def faq(self) -> dict[str, Any]:
-        return {"clt": self.clt, "clt_faq": True}
-
-    def nao_elegivel(self, chave: str, **valores: object) -> dict[str, Any]:
-        logger.info("clt_nao_elegivel etapa=%s motivo=%s", self.clt.get("etapa"), chave)
-        self.clt.update(etapa="nao_elegivel", passo=None, motivo=chave)
-        return self.responder(texto(chave, **valores))
-
-    def erro(self, chave: str, **valores: object) -> dict[str, Any]:
-        """Resposta não reconhecida: pergunta vai à FAQ; dois erros, handoff."""
-
-        if leitura.eh_pergunta(self.texto):
-            return self.faq()
-        if self.state.get("publico") == "inss":
-            return self.handoff("mudou_publico")
-        self.clt["erros"] = int(self.clt.get("erros") or 0) + 1
-        if self.clt["erros"] >= ERROS_ATE_HANDOFF:
-            return self.handoff("dado_invalido_repetido")
-        return self.responder(texto(chave, **valores))
 
 
 # ---------------------------------------------------------------- abertura e triagem
@@ -192,16 +89,16 @@ def _triagem(t: Turno) -> dict[str, Any]:
 
 
 def _recontato_tempo_casa(t: Turno, meses: int) -> dict[str, Any]:
+    """Menos de 12 meses de casa: pergunta se pode avisar quando completar (opt-in)."""
+
     quando = regras.data_recontato_tempo_casa(meses, t.hoje)
-    if t.contexto.fabrica is not None and t.conversa_id is not None:
-        with abrir_sessao(t.contexto.fabrica) as sessao:
-            recontatos.agendar(
-                sessao,
-                conversa_id=t.conversa_id,
-                motivo=recontatos.TEMPO_CASA,
-                quando=_as_nove(quando),
-            )
-    t.clt.update(etapa="recontato", passo=None, motivo=recontatos.TEMPO_CASA)
+    t.clt.update(
+        etapa="recontato",
+        passo="optin",
+        erros=0,
+        motivo=recontatos.TEMPO_CASA,
+        recontato_em=quando.isoformat(),
+    )
     return t.responder(texto("recontato_tempo_casa", data=quando.strftime("%d/%m/%Y")))
 
 
@@ -415,9 +312,32 @@ def _consultando(t: Turno) -> dict[str, Any]:
 
 
 def _recontato(t: Turno) -> dict[str, Any]:
+    if t.clt.get("motivo") == recontatos.TEMPO_CASA and t.clt.get("passo") == "optin":
+        return _optin_tempo_casa(t)
     if t.clt.get("motivo") == recontatos.COTA_ESGOTADA and not leitura.eh_pergunta(t.texto):
         return t.responder(texto("aguardando_recontato"))
     return t.faq()
+
+
+def _optin_tempo_casa(t: Turno) -> dict[str, Any]:
+    resposta = leitura.sim_ou_nao(t.texto)
+    if resposta is None:
+        return t.erro("repetir_sim_nao")
+    quando = date.fromisoformat(str(t.clt["recontato_em"]))
+    t.clt.update(passo=None, erros=0)
+    if resposta is False:
+        proposta.gravar_marketing(t, "opt_out")
+        return t.responder(texto("optin_recusado"))
+    proposta.gravar_marketing(t, "opt_in")
+    if t.contexto.fabrica is not None and t.conversa_id is not None:
+        with abrir_sessao(t.contexto.fabrica) as sessao:
+            recontatos.agendar(
+                sessao,
+                conversa_id=t.conversa_id,
+                motivo=recontatos.TEMPO_CASA,
+                quando=_as_nove(quando),
+            )
+    return t.responder(texto("optin_confirmado", data=quando.strftime("%d/%m/%Y")))
 
 
 def _pos_consulta(t: Turno, detalhe: DetalheConsulta) -> dict[str, Any]:
@@ -531,7 +451,7 @@ def _guardar_oferta(
 
 def _texto_oferta(t: Turno, simulacao: Simulacao) -> str:
     valores: dict[str, object] = {
-        "nome": _primeiro_nome(t.dados.get("nome") or ""),
+        "nome": primeiro_nome(t.dados.get("nome") or ""),
         "liberado": reais(simulacao.liberado),
         "n": simulacao.numero_parcelas,
         "parcela": reais(simulacao.valor_parcela),
@@ -554,7 +474,7 @@ def _oferta(t: Turno) -> dict[str, Any]:
     if pedido is None:
         if leitura.aceitou(t.texto):
             # Fase 5: o aceite vai para um especialista até a proposta existir.
-            return t.handoff("aceite_clt", texto("aceite"))
+            return proposta.iniciar(t)
         if leitura.eh_pergunta(t.texto):
             return t.faq()
         if leitura.sim_ou_nao(t.texto) is False:
@@ -593,6 +513,10 @@ def _oferta(t: Turno) -> dict[str, Any]:
 def _evento(t: Turno, evento: str) -> dict[str, Any]:
     etapa = t.clt.get("etapa")
     nome, _, detalhe = evento.partition(":")
+    if nome == "proposta":
+        return proposta.evento(t, detalhe)
+    if nome == "recontato_tempo_casa":
+        return _recontato_tempo_casa_vencido(t)
     if nome == "recontato":
         if etapa != "recontato" or t.clt.get("motivo") != recontatos.COTA_ESGOTADA:
             return t.responder()
@@ -616,6 +540,18 @@ def _evento(t: Turno, evento: str) -> dict[str, Any]:
     return t.responder()
 
 
+def _recontato_tempo_casa_vencido(t: Turno) -> dict[str, Any]:
+    """Data do recontato: modelo de marketing e a jornada recomeça pela triagem."""
+
+    if proposta.marketing(t) != "opt_in" or t.clt.get("motivo") != recontatos.TEMPO_CASA:
+        return t.responder()
+    t.clt.clear()
+    t.clt["etapa"] = "abertura"
+    saida = t.responder()
+    saida["modelo_envio"] = "recontato_tempo_casa"
+    return saida
+
+
 ETAPAS: dict[str, Callable[[Turno], dict[str, Any]]] = {
     "abertura": _abertura,
     "triagem": _triagem,
@@ -626,6 +562,11 @@ ETAPAS: dict[str, Callable[[Turno], dict[str, Any]]] = {
     "escolha_vinculo": _escolha_vinculo,
     "oferta": _oferta,
     "recontato": _recontato,
+    "dados_proposta": proposta.dados_proposta,
+    "aceite": proposta.aceite,
+    "proposta": proposta.aguardando,
+    "formalizacao": proposta.aguardando,
+    "nova_conta": proposta.conta,
 }
 
 
@@ -642,12 +583,17 @@ def clt(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
     evento = state.get("evento_sistema")
     if evento:
         return _evento(t, evento)
+    if leitura.nao_quer_receber(t.texto):
+        # Botão do modelo de marketing: vale em qualquer etapa.
+        proposta.gravar_marketing(t, "opt_out")
+        return t.responder(texto("optout"))
     etapa = str(t.clt.get("etapa") or "abertura")
     manipulador = ETAPAS.get(etapa)
     if manipulador is None:
-        # `nao_elegivel`: a jornada acabou; só a FAQ responde.
+        # `nao_elegivel`, `encerrada`, `pago`: a jornada acabou; só a FAQ responde.
         return t.faq()
-    passo = t.clt.get("passo")
-    if state.get("attachments") and passo in PERGUNTAS and etapa != "abertura":
-        return t.responder(texto("sem_documento", pergunta=texto(PERGUNTAS[str(passo)])))
+    passo = str(t.clt.get("passo"))
+    chave = PERGUNTAS.get(passo)
+    if state.get("attachments") and chave and not variaveis(chaves()[chave]):
+        return t.responder(texto("sem_documento", pergunta=texto(chave)))
     return manipulador(t)

@@ -45,7 +45,8 @@ reconciliação pela listagem), webhook `/webhooks/granatech` e o simulador em
 
 Desde a Fase 5 existe o **ramo CLT** no grafo (`apps/core/src/saturday/agent/clt/`):
 triagem sem gastar cota, empresa pela BrasilAPI, identificação, consentimento com
-prova, consulta, escolha de vínculo e oferta. Os textos ficam em
+prova, consulta, escolha de vínculo e oferta; desde a Fase 6, também dados da
+proposta, aceite, criação da proposta, formalização e pagamento. Os textos ficam em
 `conhecimento/clt/mensagens.yaml`. Ver [`docs/clt.md`](docs/clt.md).
 
 `infra/` e `regras/` entram nas fases que colocarem neles o primeiro arquivo real.

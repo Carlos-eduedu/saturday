@@ -34,6 +34,7 @@ from saturday.dados.modelos import (
     ConsultaGranatech,
     Conversa,
     Mensagem,
+    Outbox,
     Recontato,
 )
 from saturday.dados.sessao import sessao as abrir_sessao
@@ -174,6 +175,7 @@ def _montar(
         granatech=cliente,
         brasilapi=brasilapi,  # type: ignore[arg-type]
         fabrica=fabrica,
+        dominio_publico=settings.dominio_publico,
     )
     checkpointer = InMemorySaver()
     servico = AgentService(
@@ -311,19 +313,55 @@ def test_reprovado_na_triagem(nova: Any, respostas: tuple[str, ...], chave: str)
     assert jornada.clt()["etapa"] == "nao_elegivel"
 
 
-def test_tempo_de_casa_curto_grava_recontato(nova: Any, fabrica: sessionmaker[Session]) -> None:
+def test_tempo_de_casa_curto_pede_optin_e_recontata(
+    nova: Any, fabrica: sessionmaker[Session]
+) -> None:
     jornada = nova()
     resposta = jornada.roteiro("Quero o crédito CLT", "sim", "8 meses")
     quando = regras.data_recontato_tempo_casa(8, hoje_operacao())
-    assert resposta.answer == texto("recontato_tempo_casa", data=quando.strftime("%d/%m/%Y"))
+    data = quando.strftime("%d/%m/%Y")
+    assert resposta.answer == texto("recontato_tempo_casa", data=data)
+
+    assert jornada.falar("sim").answer == texto("optin_confirmado", data=data)
     with abrir_sessao(fabrica) as sessao:
-        recontato = sessao.scalars(select(Recontato)).one()
-        assert recontato.motivo == "tempo_casa"
-    # O de tempo de casa não dispara nesta fase.
-    assert (
-        job_recontatos.disparar(fabrica, jornada.servico, datetime.now(UTC) + timedelta(days=400))
-        == 0
-    )
+        assert sessao.scalars(select(Recontato.motivo)).one() == "tempo_casa"
+        conversa = sessao.scalars(
+            select(Conversa).where(Conversa.conversation_id == jornada.id)
+        ).one()
+        assert conversa.marketing == "opt_in"
+
+    # Antes da data, nada; na data, o modelo sai e a jornada recomeça.
+    assert job_recontatos.disparar(fabrica, jornada.servico) == 0
+    futuro = datetime.now(UTC) + timedelta(days=200)
+    assert job_recontatos.disparar(fabrica, jornada.servico, futuro) == 1
+    assert jornada.ultima_saida() == "[modelo recontato_tempo_casa]"
+    with abrir_sessao(fabrica) as sessao:
+        payload = sessao.scalars(select(Outbox.payload).order_by(Outbox.id.desc())).first()
+        assert payload is not None and payload["modelo"] == "recontato_tempo_casa"
+    assert jornada.clt() == {"etapa": "abertura"}
+    assert "Vou usar os dados do seu emprego" in jornada.falar("oi, já completei").answer
+
+
+def test_tempo_de_casa_sem_optin_nao_recontata(nova: Any, fabrica: sessionmaker[Session]) -> None:
+    jornada = nova()
+    jornada.roteiro("Quero o crédito CLT", "sim", "8 meses")
+    assert jornada.falar("não").answer == texto("optin_recusado")
+    with abrir_sessao(fabrica) as sessao:
+        assert sessao.scalar(select(func.count()).select_from(Recontato)) == 0
+
+
+def test_nao_quero_receber_grava_optout(nova: Any, fabrica: sessionmaker[Session]) -> None:
+    jornada = nova()
+    jornada.roteiro("Quero o crédito CLT", "sim", "8 meses", "sim")
+    assert jornada.falar("Não quero receber").answer == texto("optout")
+    with abrir_sessao(fabrica) as sessao:
+        conversa = sessao.scalars(
+            select(Conversa).where(Conversa.conversation_id == jornada.id)
+        ).one()
+        assert conversa.marketing == "opt_out"
+    futuro = datetime.now(UTC) + timedelta(days=200)
+    job_recontatos.disparar(fabrica, jornada.servico, futuro)
+    assert jornada.ultima_saida() == texto("optout")
 
 
 def test_dois_erros_no_mesmo_dado_vao_para_handoff(nova: Any) -> None:

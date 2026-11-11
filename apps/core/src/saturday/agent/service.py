@@ -442,10 +442,14 @@ class AgentService:
         conversa: Conversa,
         tipo_alerta: str,
         motivo: str | None,
+        detalhe: dict[str, Any] | None = None,
     ) -> None:
         repositorios.mudar_atendimento(sessao, conversa, "handoff")
         repositorios.abrir_alerta(
-            sessao, tipo_alerta, conversa_id=conversa.id, detalhe={"motivo": motivo}
+            sessao,
+            tipo_alerta,
+            conversa_id=conversa.id,
+            detalhe={"motivo": motivo, **(detalhe or {})},
         )
 
     def _liberar_handoff(self, config: dict[str, Any]) -> dict[str, Any]:
@@ -506,8 +510,14 @@ class AgentService:
             )
         if sessao is not None and conversa is not None:
             if resposta.status == "handoff":
-                self._abrir_handoff(sessao, conversa, "handoff", resposta.handoff_reason)
-            self._gravar_saida(sessao, conversa, resposta)
+                self._abrir_handoff(
+                    sessao,
+                    conversa,
+                    "handoff",
+                    resposta.handoff_reason,
+                    final.get("handoff_detalhe"),
+                )
+            self._gravar_saida(sessao, conversa, resposta, final)
         return resposta
 
     @staticmethod
@@ -553,9 +563,15 @@ class AgentService:
             resposta = self.evento(conversation_id, final)
             if sessao is not None and conversa is not None:
                 if resposta.status == "handoff":
-                    self._abrir_handoff(sessao, conversa, "handoff", resposta.handoff_reason)
-                if resposta.answer or resposta.status == "handoff":
-                    self._gravar_saida(sessao, conversa, resposta)
+                    self._abrir_handoff(
+                        sessao,
+                        conversa,
+                        "handoff",
+                        resposta.handoff_reason,
+                        final.get("handoff_detalhe"),
+                    )
+                if resposta.answer or resposta.status == "handoff" or final.get("modelo_envio"):
+                    self._gravar_saida(sessao, conversa, resposta, final)
             return resposta
 
     def _entrada_do_grafo(
@@ -602,10 +618,21 @@ class AgentService:
         sessao: Session,
         conversa: Conversa,
         resposta: AgentReply,
+        final: dict[str, Any] | None = None,
     ) -> None:
-        """Histórico da resposta e, quando houver canal, o envio no outbox."""
+        """Histórico da resposta e, quando houver canal, o envio no outbox.
 
-        mensagem_id = repositorios.registrar_saida(sessao, conversa, conteudo=resposta.answer or "")
+        ``final`` (o estado do turno) pode pedir um modelo: ``modelo_envio`` sai
+        sempre como modelo (marketing); ``modelo_aviso`` e ``link_aviso`` são o
+        aviso usado se a janela de 24 h estiver fechada.
+        """
+
+        final = final or {}
+        if final.get("marketing") in ("opt_in", "opt_out"):
+            conversa.marketing = final["marketing"]
+        modelo_envio = final.get("modelo_envio")
+        conteudo = resposta.answer or (f"[modelo {modelo_envio}]" if modelo_envio else "")
+        mensagem_id = repositorios.registrar_saida(sessao, conversa, conteudo=conteudo)
         canal = self._canal_de_saida(conversa, resposta)
         if canal is None:
             return
@@ -613,6 +640,14 @@ class AgentService:
         # status de entrega quando a Meta confirmar.
         payload = self._payload_de_saida(conversa, resposta, canal)
         payload["mensagem_id"] = mensagem_id
+        if canal == "whatsapp":
+            for chave, destino in (
+                ("modelo_envio", "modelo"),
+                ("modelo_aviso", "modelo_aviso"),
+                ("link_aviso", "link_aviso"),
+            ):
+                if final.get(chave):
+                    payload[destino] = final[chave]
         enfileirar(sessao, conversa_id=conversa.id, canal=canal, payload=payload)
 
     def _canal_de_saida(self, conversa: Conversa, resposta: AgentReply) -> str | None:

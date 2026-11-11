@@ -301,6 +301,7 @@ class ClienteGraphFalso:
         self.falhar_em = falhar_em or set()
         self.textos: list[str] = []
         self.modelos: list[str] = []
+        self.sufixos: list[str | None] = []
         self._chamadas = 0
 
     def enviar_texto(self, phone_number_id: str, numero: str, texto: str) -> str:
@@ -310,8 +311,9 @@ class ClienteGraphFalso:
         self.textos.append(texto)
         return f"wamid.{self._chamadas}"
 
-    def enviar_modelo(self, phone_number_id: str, numero: str, modelo: Any) -> str:
+    def enviar_modelo(self, phone_number_id: str, numero: str, modelo: Any, **_extras: Any) -> str:
         self.modelos.append(modelo.nome)
+        self.sufixos.append(_extras.get("sufixo_link"))
         return "wamid.modelo"
 
 
@@ -372,6 +374,50 @@ def test_janela_fechada_avisa_uma_vez_por_conversa(
         linhas = sessao.scalars(select(Outbox).where(Outbox.id.in_([primeira, segunda]))).all()
         assert all(linha.aguardando_cliente_desde is not None for linha in linhas)
         assert all(linha.entregue_em is None for linha in linhas)
+
+
+@pytest.mark.parametrize(
+    ("extras", "modelo", "sufixo"),
+    [
+        (
+            {"modelo_aviso": "assinatura_pronta", "link_aviso": "abc123"},
+            "assinatura_pronta",
+            "abc123",
+        ),
+        ({"modelo_aviso": "pagamento_confirmado"}, "pagamento_confirmado", None),
+        # Modelo de link sem o código não fecha: sai o genérico.
+        ({"modelo_aviso": "assinatura_refazer"}, "atualizacao_pedido", None),
+    ],
+)
+def test_janela_fechada_usa_o_modelo_do_aviso(
+    settings: Settings,
+    fabrica: sessionmaker[Session],
+    conversa: str,
+    extras: dict[str, str],
+    modelo: str,
+    sufixo: str | None,
+) -> None:
+    with fabrica() as sessao:
+        linha_conversa = repositorios.obter_ou_criar_conversa(sessao, conversa, canal="whatsapp")
+        fila.enfileirar(
+            sessao,
+            conversa_id=linha_conversa.id,
+            canal="whatsapp",
+            payload={
+                "conversation_id": conversa,
+                "numero": "11987654321",
+                "phone_number_id": "p1",
+                "answer": "texto completo do aviso",
+                **extras,
+            },
+        )
+        sessao.commit()
+    cliente = ClienteGraphFalso()
+    drenar(fabrica, SaidaWhatsApp(cliente, fabrica, settings), settings)  # type: ignore[arg-type]
+
+    assert cliente.modelos == [modelo]
+    assert cliente.sufixos == [sufixo]
+    assert cliente.textos == []
 
 
 def test_modelo_do_painel_sai_como_modelo_e_fecha_a_linha(

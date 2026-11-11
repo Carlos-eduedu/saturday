@@ -53,6 +53,7 @@ def criar_contexto(
         granatech=granatech,
         brasilapi=BrasilAPI(http, fabrica) if granatech is not None else None,
         fabrica=fabrica,
+        dominio_publico=settings.dominio_publico,
     )
 
 

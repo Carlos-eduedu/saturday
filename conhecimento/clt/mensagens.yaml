@@ -124,13 +124,89 @@ mensagens:
     Ótimo! Vou passar para um especialista da MEX finalizar a contratação com
     você.
 
+  # ---------------------------------------------------------------- dados da proposta
+  confirmar_mae: >-
+    Para montar a proposta, confirme alguns dados que o banco tem. O nome da sua
+    mãe é {mae}? Responda sim ou não.
+  confirmar_endereco: Seu endereço é {endereco}? Responda sim ou não.
+  pedir_estado_civil: >-
+    Qual é o seu estado civil? Solteiro, casado, divorciado, viúvo, união
+    estável ou separado.
+  estado_civil_invalido: >-
+    Não entendi. Responda solteiro, casado, divorciado, viúvo, união estável ou
+    separado.
+  pedir_banco: >-
+    Em qual banco você quer receber o dinheiro? Pode dizer o nome ou o código
+    do banco. A conta precisa estar no seu CPF.
+  banco_invalido: >-
+    Não encontrei esse banco entre os aceitos. Pode conferir o nome ou mandar o
+    código do banco (3 números)?
+  escolher_banco: Encontrei mais de um banco com esse nome. Qual é o seu? Responda com o número.
+  opcao_banco: "{numero}. {nome} ({codigo})"
+  banco_lista_invalida: Não entendi. Responda com o número do banco, por exemplo 1.
+  pedir_tipo_conta: A conta é corrente ou poupança?
+  tipo_conta_invalido: "Não entendi. A conta é corrente ou poupança?"
+  pedir_agencia: >-
+    Qual é o número da agência? Se tiver dígito, mande junto, por exemplo
+    1234-5.
+  agencia_invalida: "Não entendi a agência. Mande só os números, por exemplo: 1234."
+  pedir_conta: E o número da conta, com o dígito? Por exemplo 12345-6.
+  conta_invalida: "Não entendi a conta. Mande o número com o dígito, por exemplo: 12345-6."
+  confirmar_titular: Essa conta está no seu CPF? Responda sim ou não.
+  conta_de_terceiro: O banco só deposita em conta no seu CPF. Vamos usar outra conta.
+
+  # ---------------------------------------------------------------- aceite e proposta
+  resumo_aceite: >-
+    Confira o resumo da proposta: R$ {liberado} liberados na conta {conta} do
+    {banco}, em {n} parcelas de R$ {parcela} descontadas no salário. Taxa de
+    {taxa}% a.m. (CET de {cet}% a.m.). Inclui o seguro Super Proteção (R$
+    {seguro}), que é opcional. Se estiver tudo certo, responda SIM para eu criar
+    a proposta no banco.
+  repetir_aceite: >-
+    Para criar a proposta, preciso que você responda SIM. Se quiser mudar algo,
+    é só me dizer.
+  aceite_recusado: >-
+    Tudo bem, a proposta não foi criada. Se quiser outra condição, é só me
+    dizer: sem seguro, outro prazo ou outra parcela.
+  proposta_enviada: >-
+    Pronto! Enviei a proposta ao banco. Assim que ele responder eu te aviso por
+    aqui.
+  acompanhando: Estou acompanhando a sua proposta com o banco e te aviso a cada novidade.
+
+  # ---------------------------------------------------------------- pós-venda
+  aviso_criada: >-
+    Sua proposta foi criada no banco. O próximo passo é confirmar a sua
+    identidade; te mando o link assim que estiver liberado.
+  aviso_formalizar: >-
+    Agora falta só confirmar a sua identidade. Abra o link e siga as instruções
+    do banco (é rápido, com uma foto do rosto): {link}
+  aviso_refazer: >-
+    O banco pediu para refazer a confirmação de identidade. Dicas: tire a foto
+    num lugar bem iluminado, sem óculos, boné ou máscara, com o rosto inteiro
+    na tela. Abra o link: {link}
+  aviso_analise: O banco está analisando a sua proposta. Te aviso assim que tiver novidade.
+  aviso_identidade_ok: Sua identidade foi aprovada! Agora o pagamento está a caminho da sua conta.
+  aviso_falha_pagamento: >-
+    O banco não conseguiu depositar na conta informada. Vamos cadastrar outra
+    conta no seu CPF.
+  conta_corrigida: Pronto, atualizei a conta no banco. Te aviso quando o pagamento sair.
+  aviso_reprovada: Infelizmente o banco não aprovou a sua proposta desta vez.
+  aviso_cancelada: Sua proposta foi cancelada pelo banco.
+  aviso_cancelada_motivo: "Sua proposta foi cancelada pelo banco. Motivo informado: {motivo}"
+  aviso_paga: >-
+    Pagamento confirmado! O valor já foi enviado para a sua conta. Obrigado por
+    contratar com a MEX.
+
   # ---------------------------------------------------------------- não elegível e recontato
   nao_elegivel_carteira: >-
     Obrigado por responder! Esse crédito é só para quem trabalha de carteira
     assinada, então não consigo seguir por aqui.
   recontato_tempo_casa: >-
     Esse crédito pede pelo menos 12 meses na empresa atual. Você completa 12
-    meses por volta de {data}; anotei para voltar a falar com você nessa época.
+    meses por volta de {data}. Posso te avisar nessa época? Responda sim ou não.
+  optin_confirmado: Combinado! Te aviso por volta de {data}.
+  optin_recusado: Tudo bem, não vou te avisar.
+  optout: Tudo bem, você não vai mais receber esse tipo de mensagem.
   nao_elegivel_contrato_especial: >-
     Nesse tipo de contrato o banco não libera esse crédito agora, então não
     consigo seguir.
