@@ -37,17 +37,34 @@ nginx que serve o build do Vite e repassa `/admin` para a API na mesma origem.
   obrigatórias.
 - Domínios pela aba Domains do stack (o Dokploy injeta os labels do Traefik),
   com HTTPS e certificado Let's Encrypt.
+- Command (aba Advanced), trocando o appName do stack:
+  `compose -p <appName> --env-file .env -f ./compose.yaml -f ./compose.dokploy.yaml up -d --build --remove-orphans`.
+
+## Rede do banco
+
+O Postgres gerenciado roda como serviço Swarm, que só entra em rede overlay; o
+stack isolado não o enxerga. Por ambiente há uma rede `saturday-<ambiente>-dados`
+(overlay, attachable), criada no Dokploy, sincronizada com o Docker e ligada ao
+Postgres (Networks do serviço, seguido de deploy do banco).
+`compose.dokploy.yaml` liga `migrate`, `api` e `worker` a ela, pelo nome em
+`SATURDAY_REDE_DADOS`. O `serviceNetworks` do stack não serve: ele liga os
+serviços à rede, mas não a declara no compose, que então é recusado.
 
 ## Variáveis
 
-Preenchidas na aba Environment de cada stack, a partir do `.env.example`. O
-Dokploy grava um `.env` ao lado do compose, que é o `env_file` dos serviços.
-Em `development` e `homolog`, `SATURDAY_GRANATECH_PROPOSTA_ATIVA=false` e o
-WhatsApp nunca aponta para número real de cliente.
+Preenchidas na aba Environment de cada stack, a partir do `.env.example`, mais
+`SATURDAY_REDE_DADOS`. O Dokploy grava um `.env` ao lado do compose, que é o
+`env_file` dos serviços. Segredos podem ficar nas variáveis do ambiente e ser
+referenciados no stack como `${{environment.NOME}}`; sem a referência, não
+chegam ao stack. Senha do Postgres só com letras e números: caractere especial
+quebra a URL. Em `development` e `homolog`,
+`SATURDAY_GRANATECH_PROPOSTA_ATIVA=false` e o WhatsApp nunca aponta para número
+real de cliente.
 
 ## Ordem de um deploy
 
-1. Postgres do ambiente criado e com o host interno em `SATURDAY_DATABASE_URL`.
+1. Postgres do ambiente criado, ligado à rede de dados e com o host interno em
+   `SATURDAY_DATABASE_URL`.
 2. Conferir o compose final (Preview Compose) antes do primeiro deploy.
 3. Deploy. O `migrate` aplica as migrações e termina; `api` e `worker` só sobem
    se ele der certo.
