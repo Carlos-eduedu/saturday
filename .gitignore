@@ -22,3 +22,6 @@ wheels/
 data/
 *.sqlite
 *.sqlite3
+
+# Configuração local do Claude Code
+.claude/settings.local.json
