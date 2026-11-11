@@ -106,6 +106,9 @@ class Outbox(Base):
     # Desistência: tentativas esgotadas. Diferente de entregue — nunca foi.
     falhou_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ultimo_erro: Mapped[str | None] = mapped_column(Text)
+    # Janela fechada: o modelo já avisou o cliente e o texto espera ele escrever
+    # depois deste horário (ver `dados/outbox.py`).
+    aguardando_cliente_desde: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
 
 

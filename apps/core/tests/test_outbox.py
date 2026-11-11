@@ -9,10 +9,14 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
+import pytest
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.canais.base import Resultado
+from saturday.canais.whatsapp import saida as modulo_saida
+from saturday.canais.whatsapp.cliente import ErroTemporario
+from saturday.canais.whatsapp.saida import SaidaWhatsApp
 from saturday.dados import outbox as fila
 from saturday.dados import repositorios
 from saturday.dados.modelos import Outbox
@@ -257,3 +261,114 @@ def test_linhas_pendentes_continuam_visiveis(
     with fabrica() as sessao:
         pendentes = sessao.scalars(select(Outbox).where(Outbox.entregue_em.is_(None))).all()
     assert len(pendentes) == 1
+
+
+def _cliente_escreveu(fabrica: sessionmaker[Session], conversa: str) -> None:
+    with fabrica() as sessao:
+        linha = repositorios.buscar_conversa(sessao, conversa)
+        assert linha is not None
+        repositorios.marcar_entrada(linha)
+        sessao.commit()
+
+
+def test_aguardando_cliente_so_volta_quando_ele_escreve(
+    settings: Settings,
+    fabrica: sessionmaker[Session],
+    conversa: str,
+) -> None:
+    linha_id = _enfileirar(fabrica, conversa)
+    entregador = EntregadorFalso([Resultado.AGUARDANDO_CLIENTE, Resultado.OK])
+
+    assert drenar(fabrica, entregador, settings) == 1
+    _liberar(fabrica, linha_id)
+    # O modelo já avisou: sem mensagem nova do cliente, a linha não sai.
+    assert drenar(fabrica, entregador, settings) == 0
+
+    _cliente_escreveu(fabrica, conversa)
+    assert drenar(fabrica, entregador, settings) == 1
+
+    entregue_em, falhou_em, tentativas, _ = _estado(fabrica, linha_id)
+    assert entregue_em is not None
+    assert falhou_em is None
+    # A espera zerou as tentativas: a entrega do texto foi a primeira.
+    assert tentativas == 1
+
+
+class ClienteGraphFalso:
+    """Envia texto e modelo; falha nas chamadas de texto indicadas (1, 2, ...)."""
+
+    def __init__(self, falhar_em: set[int] | None = None) -> None:
+        self.falhar_em = falhar_em or set()
+        self.textos: list[str] = []
+        self.modelos: list[str] = []
+        self._chamadas = 0
+
+    def enviar_texto(self, phone_number_id: str, numero: str, texto: str) -> str:
+        self._chamadas += 1
+        if self._chamadas in self.falhar_em:
+            raise ErroTemporario("status=503")
+        self.textos.append(texto)
+        return f"wamid.{self._chamadas}"
+
+    def enviar_modelo(self, phone_number_id: str, numero: str, modelo: Any) -> str:
+        self.modelos.append(modelo.nome)
+        return "wamid.modelo"
+
+
+def _enfileirar_whatsapp(fabrica: sessionmaker[Session], conversa: str, texto: str) -> int:
+    with fabrica() as sessao:
+        linha_conversa = repositorios.obter_ou_criar_conversa(sessao, conversa, canal="whatsapp")
+        linha = fila.enfileirar(
+            sessao,
+            conversa_id=linha_conversa.id,
+            canal="whatsapp",
+            payload={
+                "conversation_id": conversa,
+                "numero": "11987654321",
+                "phone_number_id": "p1",
+                "answer": texto,
+            },
+        )
+        sessao.commit()
+        return linha.id
+
+
+def test_nova_tentativa_nao_repete_partes_ja_enviadas(
+    settings: Settings,
+    fabrica: sessionmaker[Session],
+    conversa: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(modulo_saida, "INTERVALO_ENTRE_PARTES_S", 0)
+    linha_id = _enfileirar_whatsapp(fabrica, conversa, "um\n\ndois\n\ntrês")
+    _cliente_escreveu(fabrica, conversa)
+    cliente = ClienteGraphFalso(falhar_em={2})
+    saida = SaidaWhatsApp(cliente, fabrica, settings)  # type: ignore[arg-type]
+
+    drenar(fabrica, saida, settings)
+    _liberar(fabrica, linha_id)
+    drenar(fabrica, saida, settings)
+
+    assert cliente.textos == ["um", "dois", "três"]
+    assert _estado(fabrica, linha_id)[0] is not None
+
+
+def test_janela_fechada_avisa_uma_vez_por_conversa(
+    settings: Settings,
+    fabrica: sessionmaker[Session],
+    conversa: str,
+) -> None:
+    primeira = _enfileirar_whatsapp(fabrica, conversa, "primeira\n\ncom parágrafo")
+    segunda = _enfileirar_whatsapp(fabrica, conversa, "segunda")
+    cliente = ClienteGraphFalso()
+    saida = SaidaWhatsApp(cliente, fabrica, settings)  # type: ignore[arg-type]
+
+    drenar(fabrica, saida, settings)
+
+    # Um aviso só, e nenhum texto: as duas respostas esperam o cliente.
+    assert cliente.modelos == ["atualizacao_pedido"]
+    assert cliente.textos == []
+    with fabrica() as sessao:
+        linhas = sessao.scalars(select(Outbox).where(Outbox.id.in_([primeira, segunda]))).all()
+        assert all(linha.aguardando_cliente_desde is not None for linha in linhas)
+        assert all(linha.entregue_em is None for linha in linhas)

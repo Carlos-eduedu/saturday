@@ -185,7 +185,9 @@ Arquivos em `canais/whatsapp/`. O caminho de uma mensagem:
 3. O worker reivindica o evento, roda o turno sob a trava da conversa e grava a
    resposta no `outbox`.
 4. O worker entrega pelo canal: janela de 24 h aberta → texto dividido por linha
-   em branco (até 5 partes, 0,9 s entre elas); fechada → modelo `atualizacao_pedido`.
+   em branco (até 5 partes, 0,9 s entre elas); fechada → modelo `atualizacao_pedido`
+   (sem variáveis, um por conversa) e a resposta espera na fila até o cliente
+   escrever de novo.
 
 Mídia: dois passos (`GET /{media_id}` e depois a URL devolvida), limite de 50 MB,
 guardada em `whatsapp/{telefone}/{wamid}.{ext}`. Foto e PDF até 4,5 MB seguem como

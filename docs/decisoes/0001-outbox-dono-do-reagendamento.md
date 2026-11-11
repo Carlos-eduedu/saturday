@@ -25,6 +25,7 @@ O canal **só classifica** e para. O resultado de uma entrega é um dos:
 | `temporario_incerto` | timeout de leitura / conexão caída depois do envio | no máximo **1** nova tentativa |
 | `permanente` | 4xx de conteúdo ou credencial | desiste na hora |
 | `janela_fechada` | a Meta recusou texto com `131047` | converte para modelo na mesma tentativa |
+| `aguardando_cliente` | janela fechada: o modelo `atualizacao_pedido` avisou o cliente | segura a linha até o cliente escrever, com as tentativas zeradas |
 
 O reagendamento é exclusivamente do outbox:
 
@@ -34,6 +35,10 @@ O reagendamento é exclusivamente do outbox:
   estruturado em `ERROR` (`outbox_desistiu`);
 - `janela_fechada` não gasta tentativa extra: a conversão acontece no mesmo
   laço, chamando o entregador com `permitir_modelo=True`.
+- `aguardando_cliente` grava `aguardando_cliente_desde`; o `reivindicar` só
+  devolve a linha quando `conversas.ultima_entrada_em` passa desse horário. O
+  modelo vai sem variáveis (a Meta recusa quebra de linha em parâmetro) e sai
+  uma vez por conversa, mesmo com várias respostas esperando.
 
 ## Alternativas descartadas
 
@@ -49,10 +54,9 @@ O reagendamento é exclusivamente do outbox:
 - Um único lugar decide esperar/desistir, e um único lugar registra o motivo.
 - "Alerta" hoje é log em `ERROR`: a tabela de alertas do painel chega na Fase 3,
   que passa a consumir esse evento em vez de inventar outro.
-- **Limitação conhecida:** mensagem dividida em partes pode duplicar as partes já
-  enviadas se uma parte do meio falhar. O risco é inerente a envio sem
-  idempotência; a mitigação possível seria marcar parte a parte, o que ainda não
-  se justifica pelo volume do piloto.
+- Mensagem dividida em partes grava o progresso (`partes_enviadas` no payload)
+  a cada parte: a nova tentativa continua de onde parou. Só a parte com
+  resultado incerto pode chegar duas vezes.
 - O webhook (canal `webhook`, não WhatsApp) mapeia qualquer falha para
   `temporario`, preservando o comportamento da Fase 1: um webhook que falha é
   reentregue.

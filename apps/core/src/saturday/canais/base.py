@@ -27,6 +27,8 @@ class Resultado(StrEnum):
     PERMANENTE = "permanente"
     # A Meta recusou texto porque a janela fechou; o outbox converte para modelo.
     JANELA_FECHADA = "janela_fechada"
+    # Janela fechada: o modelo avisou o cliente e o texto espera ele responder.
+    AGUARDANDO_CLIENTE = "aguardando_cliente"
 
 
 @dataclass(frozen=True)

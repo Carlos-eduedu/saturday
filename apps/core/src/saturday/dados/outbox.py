@@ -5,10 +5,10 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import ColumnElement, and_, exists, func, not_, select
 from sqlalchemy.orm import Session
 
-from saturday.dados.modelos import Outbox
+from saturday.dados.modelos import Conversa, Outbox
 
 # Tempo que a linha fica reservada por um worker. Se ele morrer no meio da
 # entrega, outro worker a pega depois deste prazo — é o lease que evita duas
@@ -35,6 +35,20 @@ def enfileirar(
     return linha
 
 
+def _esperando_cliente() -> ColumnElement[bool]:
+    """Linha que já mandou o modelo e o cliente ainda não escreveu depois dele."""
+
+    return and_(
+        Outbox.aguardando_cliente_desde.is_not(None),
+        not_(
+            exists().where(
+                Conversa.id == Outbox.conversa_id,
+                Conversa.ultima_entrada_em > Outbox.aguardando_cliente_desde,
+            )
+        ),
+    )
+
+
 def reivindicar(sessao: Session, limite: int) -> list[Outbox]:
     """Reserva até ``limite`` envios prontos, sem esperar por linhas travadas.
 
@@ -49,6 +63,7 @@ def reivindicar(sessao: Session, limite: int) -> list[Outbox]:
             Outbox.entregue_em.is_(None),
             Outbox.falhou_em.is_(None),
             Outbox.proxima_tentativa_em <= func.now(),
+            not_(_esperando_cliente()),
         )
         .order_by(Outbox.id)
         .limit(limite)
@@ -60,6 +75,52 @@ def reivindicar(sessao: Session, limite: int) -> list[Outbox]:
         linha.proxima_tentativa_em = reserva
     sessao.flush()
     return list(linhas)
+
+
+def outro_esperando_cliente(sessao: Session, linha: Outbox) -> bool:
+    """Já há aviso por modelo pendente nesta conversa: não manda outro."""
+
+    return bool(
+        sessao.scalar(
+            select(
+                exists().where(
+                    Outbox.conversa_id == linha.conversa_id,
+                    Outbox.id != linha.id,
+                    Outbox.entregue_em.is_(None),
+                    Outbox.falhou_em.is_(None),
+                    _esperando_cliente(),
+                )
+            )
+        )
+    )
+
+
+def marcar_aguardando_cliente(sessao: Session, linha: Outbox) -> None:
+    """O modelo avisou; o texto volta à fila quando o cliente escrever.
+
+    shortcut: o horário é o do registro, não o do envio do modelo; uma mensagem
+    do cliente nesse segundo deixa o texto esperando a próxima. Se aparecer no
+    painel, grave o horário antes de chamar a Meta.
+    """
+
+    linha.aguardando_cliente_desde = func.now()
+    # Quem segura a linha agora é a espera, não o lease: quando o cliente
+    # escrever, ela sai na hora e antes das respostas mais novas.
+    linha.proxima_tentativa_em = func.now()
+    # Esperar não é falhar: a entrega do texto começa com as tentativas zeradas.
+    linha.tentativas = 0
+    linha.ultimo_erro = None
+    sessao.flush()
+
+
+def registrar_partes_enviadas(sessao: Session, linha_id: int, quantidade: int) -> None:
+    """Progresso da entrega em partes: a nova tentativa não repete as já enviadas."""
+
+    linha = sessao.get(Outbox, linha_id)
+    if linha is None:
+        return
+    linha.payload = {**linha.payload, "partes_enviadas": quantidade}
+    sessao.flush()
 
 
 def marcar_entregue(sessao: Session, linha: Outbox) -> None:

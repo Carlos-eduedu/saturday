@@ -339,6 +339,15 @@ def test_janela_fechada_sai_como_modelo(
     assert enviadas[-1]["type"] == "template"
     assert enviadas[-1]["template"]["name"] == "atualizacao_pedido"
     assert enviadas[-1]["template"]["language"]["code"] == "pt_BR"
+    # O texto não vai como parâmetro: a Meta recusa quebra de linha em variável.
+    assert "components" not in enviadas[-1]["template"]
+
+    # O cliente responde ao aviso: a resposta que esperava sai como texto.
+    _entregar_webhook(client_pg, settings, _webhook_texto("oi", "wamid.M2"))
+    _processar_e_entregar(fabrica, service_pg, entrada, saida, settings)
+
+    tipos = [enviada["type"] for enviada in _enviadas(http, simulador)]
+    assert tipos == ["template", "text", "text"]
 
 
 def test_status_de_entrega_atualiza_a_mensagem(

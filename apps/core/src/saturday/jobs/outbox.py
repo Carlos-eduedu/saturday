@@ -1,7 +1,8 @@
 """Consumo do outbox: o único dono do reagendamento.
 
 O canal classifica (`Resultado`) e para. Aqui ficam a espera, o teto de
-tentativas e a conversão para modelo quando a janela fechou do lado da Meta.
+tentativas, a conversão para modelo quando a janela fechou do lado da Meta e a
+espera pelo cliente depois do modelo.
 
 Backoff exponencial com jitter: `base × 2^(n−1) × U(0,5; 1,5)`, teto de 300 s.
 O jitter existe para dois workers não baterem na Meta no mesmo instante depois
@@ -102,6 +103,11 @@ def _aplicar(
     if resultado is Resultado.OK:
         fila.marcar_entregue(sessao, linha)
         logger.info("outbox_entregue id=%s canal=%s", linha.id, linha.canal)
+        return
+
+    if resultado is Resultado.AGUARDANDO_CLIENTE:
+        fila.marcar_aguardando_cliente(sessao, linha)
+        logger.info("outbox_aguardando_cliente id=%s canal=%s", linha.id, linha.canal)
         return
 
     if resultado is Resultado.PERMANENTE:
