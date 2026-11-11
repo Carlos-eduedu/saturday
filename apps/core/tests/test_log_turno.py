@@ -23,3 +23,20 @@ def test_log_do_turno_tem_caminho_e_custo_sem_texto(client, fakes, caplog):
     assert "generate_answer" in registro.caminho
     assert hasattr(registro, "custo_total_usd")
     assert texto not in caplog.text
+
+
+def test_access_log_nao_grava_query_string():
+    from saturday.log import SemQueryString
+
+    registro = logging.LogRecord(
+        "uvicorn.access",
+        logging.INFO,
+        "",
+        0,
+        '%s - "%s %s HTTP/%s" %d',
+        ("127.0.0.1:1", "GET", "/admin/conversas?busca=987654321", "1.1", 200),
+        None,
+    )
+    SemQueryString().filter(registro)
+    assert "987654321" not in registro.getMessage()
+    assert "/admin/conversas" in registro.getMessage()

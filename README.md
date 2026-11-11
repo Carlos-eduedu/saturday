@@ -11,6 +11,7 @@ As regras do projeto, o escopo e o critério de pronto de cada fase estão no
 ```text
 apps/core/              pacote Python: API, worker, agente e regras
 apps/core/migrations/   Alembic (as migrações pertencem ao pacote, não à raiz)
+apps/painel/            painel da equipe: React + Vite + TS, servido por nginx
 simuladores/            simuladores dos parceiros (projeto do workspace)
 docs/                   índice e decisões registradas (docs/decisoes/)
 pyproject.toml, uv.lock workspace `uv`: um lock e um .venv para os dois membros
@@ -28,8 +29,16 @@ webhook da Meta que grava e responde 200, fila de eventos processada pelo worker
 mídia no S3, transcrição de áudio e entrega em texto ou modelo conforme a janela
 de 24 h. O simulador da Meta vive em `simuladores/meta/` (projeto `uv` próprio).
 
-`infra/`, `regras/`, `conhecimento/` e `apps/painel/` entram nas fases que
-colocarem neles o primeiro arquivo real (3 a 7).
+Desde a Fase 3 existe o **painel da equipe** (`apps/painel/`) e a API admin
+(`/admin/*`): login com argon2id, inbox por fila (com a IA, handoff, assumida),
+conversa com assumir, devolver, transferir e responder, ficha com dados
+mascarados e revelar auditado, alertas e contador de cota, em tempo real por SSE.
+Quem responde cada conversa está em `conversas.atendimento`
+([decisão 0003](docs/decisoes/0003-estado-de-atendimento-na-tabela-conversas.md));
+os termos estão no [`GLOSSARY.md`](GLOSSARY.md).
+
+`infra/`, `regras/` e `conhecimento/` entram nas fases que colocarem neles o
+primeiro arquivo real (4 a 7).
 
 ## Rodar local, sem container
 
@@ -56,6 +65,16 @@ mensagem de erro lista o que falta).
 A API sobe em `http://localhost:8000` (`GET /health`, `POST /chat`, docs em `/docs`).
 Os logs saem em JSON, uma linha por registro.
 
+O painel roda à parte, com o Vite fazendo proxy de `/admin` para a API local:
+
+```bash
+uv run --project apps/core saturday criar-usuario --email voce@mex.com.br --perfil gestor
+cd apps/painel && npm ci && npm run dev            # http://localhost:5173
+```
+
+O primeiro gestor só nasce pelo comando; a senha é pedida no terminal (mínimo
+de 12 caracteres) e nunca passa por argumento.
+
 ## Rodar com Docker
 
 ```bash
@@ -65,9 +84,15 @@ curl -f localhost:8000/health
 ```
 
 O compose constrói a imagem a partir da raiz (`apps/core/Dockerfile`) e sobe, em
-ordem: `postgres` → `migrate` (roda o Alembic e termina) → `api` e `worker`.
-O `compose.override.yaml` publica as portas `8000` (API), `5432` (Postgres),
-`9000`/`9001` (MinIO e console).
+ordem: `postgres` → `migrate` (roda o Alembic e termina) → `api`, `worker` e
+`painel`. O `compose.override.yaml` publica as portas `8000` (API), `5173`
+(painel), `5432` (Postgres), `9000`/`9001` (MinIO e console). Crie o primeiro
+gestor com `docker compose exec api saturday criar-usuario --email ... --perfil gestor`.
+
+O contêiner `painel` (nginx) serve o build do Vite e faz proxy de `/admin/` para
+a `api`: painel e API ficam na mesma origem, sem CORS, e o cookie de sessão é
+`HttpOnly`, `SameSite=Strict` e `Secure` fora de `dev`. No Dokploy, o domínio do
+painel aponta para o serviço `painel`.
 
 Com `SATURDAY_WEBHOOK_URL` definida, `POST /chat` responde `202` e a resposta sai
 pelo worker: ele entrega o outbox, com backoff (2 s, 4 s, 8 s…) até

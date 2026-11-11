@@ -3,14 +3,20 @@
 from __future__ import annotations
 
 import secrets
+import uuid
+from dataclasses import dataclass
 from typing import Annotated, cast
 
-from fastapi import HTTPException, Request, Security
+from fastapi import Cookie, Depends, Header, HTTPException, Request, Security
 from fastapi.security import APIKeyHeader
 from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.agent.service import AgentService
+from saturday.dados.sessao import sessao as abrir_sessao
+from saturday.painel import sessoes
 from saturday.settings import Settings
+
+COOKIE_SESSAO = "saturday_sessao"
 
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
@@ -46,3 +52,50 @@ def verificar_api_key(
 
     if recebida is None or not secrets.compare_digest(recebida.encode(), esperada.encode()):
         raise HTTPException(status_code=401, detail="não autorizado")
+
+
+def exigir_fabrica(request: Request) -> sessionmaker[Session]:
+    """O painel não existe sem Postgres: estado de atendimento mora lá."""
+
+    fabrica = get_fabrica(request)
+    if fabrica is None:
+        raise HTTPException(status_code=503, detail="painel indisponível sem banco")
+    return fabrica
+
+
+@dataclass(frozen=True)
+class UsuarioLogado:
+    id: uuid.UUID
+    email: str
+    perfil: str
+    token: str
+
+    @property
+    def gestor(self) -> bool:
+        return self.perfil == "gestor"
+
+
+def usuario_logado(
+    fabrica: Annotated[sessionmaker[Session], Depends(exigir_fabrica)],
+    token: Annotated[str | None, Cookie(alias=COOKIE_SESSAO)] = None,
+) -> UsuarioLogado:
+    if not token:
+        raise HTTPException(status_code=401, detail="não autenticado")
+    with abrir_sessao(fabrica) as sessao:
+        usuario = sessoes.usuario_da_sessao(sessao, token)
+        if usuario is None:
+            raise HTTPException(status_code=401, detail="não autenticado")
+        return UsuarioLogado(usuario.id, usuario.email, usuario.perfil, token)
+
+
+def exigir_csrf(
+    request: Request,
+    usuario: Annotated[UsuarioLogado, Depends(usuario_logado)],
+    recebido: Annotated[str | None, Header(alias="X-CSRF-Token")] = None,
+) -> UsuarioLogado:
+    """Toda ação que muda estado confere o CSRF da sessão."""
+
+    segredo = get_settings(request).sessao_segredo.get_secret_value()
+    if not sessoes.csrf_confere(segredo, usuario.token, recebido):
+        raise HTTPException(status_code=403, detail="CSRF inválido")
+    return usuario

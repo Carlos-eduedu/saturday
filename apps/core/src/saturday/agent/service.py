@@ -200,22 +200,32 @@ class AgentService:
     def liberar(self, conversation_id: str) -> dict[str, Any] | None:
         """Devolve a conversa ao agente preservando histórico e dados."""
 
-        config = self.config(conversation_id)
-        estado = self.estado_atual(config)
-        if not estado:
+        if not self.estado_atual(self.config(conversation_id)):
             return None
-        self.graph.update_state(config, self._atualizacao_liberacao())
+        with self._trava(conversation_id) as sessao:
+            if sessao is not None:
+                conversa = repositorios.buscar_conversa(sessao, conversation_id)
+                if conversa is not None and conversa.atendimento != "ia":
+                    repositorios.mudar_atendimento(sessao, conversa, "ia")
+            self.limpar_handoff(conversation_id)
         return {"conversation_id": conversation_id, "status": "in_progress"}
 
-    def _deve_liberar_auto(self, estado: dict[str, Any]) -> bool:
-        if self.settings.handoff_auto_release_horas <= 0:
+    def limpar_handoff(self, conversation_id: str) -> None:
+        """Zera o handoff no checkpoint. Quem responde é decidido em `conversas`."""
+
+        config = self.config(conversation_id)
+        if self.estado_atual(config):
+            self.graph.update_state(config, self._atualizacao_liberacao())
+
+    def _expirou(self, desde: datetime | None) -> bool:
+        if self.settings.handoff_auto_release_horas <= 0 or desde is None:
             return False
+        return agora() - desde > timedelta(hours=self.settings.handoff_auto_release_horas)
+
+    def _deve_liberar_auto(self, estado: dict[str, Any]) -> bool:
         if estado.get("status") != "handoff":
             return False
-        em = self._parse_iso(estado.get("handoff_em"))
-        if em is None:
-            return False
-        return agora() - em > timedelta(hours=self.settings.handoff_auto_release_horas)
+        return self._expirou(self._parse_iso(estado.get("handoff_em")))
 
     def _log_turno(
         self,
@@ -303,10 +313,12 @@ class AgentService:
 
         self._registrar_entrada(sessao, conversa, payload)
 
-        if estado.get("status") == "handoff":
-            if not self._deve_liberar_auto(estado):
-                return self._resposta_em_handoff(payload, estado)
-            estado = self._liberar_handoff(config)
+        if sessao is not None and conversa is not None:
+            silencio, estado = self._silencio_pelo_banco(sessao, conversa, config, estado)
+        else:
+            silencio, estado = self._silencio_pelo_checkpoint(config, estado)
+        if silencio:
+            return self._resposta_em_handoff(payload, estado)
 
         return self._rodar_e_fechar(
             payload,
@@ -366,6 +378,12 @@ class AgentService:
             conversa,
             message_id=payload.message_id,
             conteudo=payload.message,
+            anexos=[
+                {"chave": anexo.chave, "mime_type": anexo.mime_type}
+                for anexo in payload.attachments
+                if anexo.chave
+            ]
+            or None,
         )
 
     def _resposta_em_handoff(
@@ -378,6 +396,56 @@ class AgentService:
             estado,
             status="with_human",
             answer="",
+        )
+
+    def _silencio_pelo_banco(
+        self,
+        sessao: Session,
+        conversa: Conversa,
+        config: dict[str, Any],
+        estado: dict[str, Any],
+    ) -> tuple[bool, dict[str, Any]]:
+        """A IA fica calada em `handoff` e `assumida` (docs/decisoes/0003).
+
+        A liberação automática vale só para o handoff sem dono: conversa
+        assumida só volta para a IA quando alguém a devolve.
+        """
+
+        if conversa.atendimento == "ia" and estado.get("status") == "handoff":
+            # Handoff anterior à Fase 3, gravado só no checkpoint.
+            repositorios.mudar_atendimento(sessao, conversa, "handoff")
+        if conversa.atendimento == "assumida":
+            return True, estado
+        if conversa.atendimento == "handoff":
+            if not self._expirou(conversa.atendimento_em):
+                return True, estado
+            repositorios.mudar_atendimento(sessao, conversa, "ia")
+            return False, self._liberar_handoff(config)
+        return False, estado
+
+    def _silencio_pelo_checkpoint(
+        self,
+        config: dict[str, Any],
+        estado: dict[str, Any],
+    ) -> tuple[bool, dict[str, Any]]:
+        """Sem Postgres (`pytest`), o handoff continua só no checkpoint."""
+
+        if estado.get("status") != "handoff":
+            return False, estado
+        if not self._deve_liberar_auto(estado):
+            return True, estado
+        return False, self._liberar_handoff(config)
+
+    @staticmethod
+    def _abrir_handoff(
+        sessao: Session,
+        conversa: Conversa,
+        tipo_alerta: str,
+        motivo: str | None,
+    ) -> None:
+        repositorios.mudar_atendimento(sessao, conversa, "handoff")
+        repositorios.abrir_alerta(
+            sessao, tipo_alerta, conversa_id=conversa.id, detalhe={"motivo": motivo}
         )
 
     def _liberar_handoff(self, config: dict[str, Any]) -> dict[str, Any]:
@@ -412,6 +480,8 @@ class AgentService:
                 payload.message_id,
                 mensagem_handoff("erro_interno"),
             )
+            if sessao is not None and conversa is not None:
+                self._abrir_handoff(sessao, conversa, "erro_interno", "erro_interno")
             return self._fallback_erro_interno(
                 payload.conversation_id,
                 config,
@@ -434,6 +504,8 @@ class AgentService:
                 config, ids_recentes, respostas, payload.message_id, resposta.answer
             )
         if sessao is not None and conversa is not None:
+            if resposta.status == "handoff":
+                self._abrir_handoff(sessao, conversa, "handoff", resposta.handoff_reason)
             self._gravar_saida(sessao, conversa, resposta)
         return resposta
 

@@ -64,8 +64,14 @@ automaticamente e é o que publica a porta no ambiente local.
   mídia em dois passos com limite de 50 MB, transcrição de áudio, status de
   entrega, texto dividido em até cinco partes, janela de 24 h com modelo fora
   dela, as sete mensagens do piloto e o simulador da Meta. A suíte tem 185 testes.
-- As fases 3 a 7 estão pendentes. `infra/`, `regras/`, `conhecimento/` e
-  `apps/painel/` nascem na fase que colocar neles o primeiro arquivo real.
+- **Fase 3 concluída:** API admin `/admin/*` e painel em `apps/painel/` (React,
+  Vite, TS, servido por nginx com proxy na mesma origem); login argon2id com
+  bloqueio, sessão no banco e CSRF; estado de atendimento (`ia`, `handoff`,
+  `assumida`) em `conversas` (docs/decisoes/0003); assumir, devolver, transferir
+  e responder; ficha mascarada com revelar auditado; alertas; contador de cota;
+  tempo real por `pg_notify` + SSE.
+- As fases 4 a 7 estão pendentes. `infra/`, `regras/` e `conhecimento/` nascem
+  na fase que colocar neles o primeiro arquivo real.
 - Fora das fases, o repositório já tem: workspace `uv` único (um lock e um
   venv na raiz), healthcheck próprio por serviço (a API responde `/health`, o
   worker verifica banco e batimento do laço, o migrate não tem), entrega com

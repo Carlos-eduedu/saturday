@@ -69,6 +69,23 @@ services:
     mem_limit: 512m
     cpus: 0.5
 
+  # Painel da equipe: nginx com o build do Vite e proxy de `/admin` para a API,
+  # na mesma origem. É este serviço que o domínio do painel expõe.
+  painel:
+    build:
+      context: apps/painel
+    depends_on:
+      api:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    mem_limit: 128m
+    cpus: 0.25
+
   postgres:
     image: postgres:17-alpine
     profiles: ["postgres"]

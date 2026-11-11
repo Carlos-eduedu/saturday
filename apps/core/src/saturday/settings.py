@@ -70,6 +70,14 @@ class Settings(BaseSettings):
     eventos_lote: int = 20
     eventos_max_tentativas: int = 8
 
+    # Painel: assina o CSRF da sessão. Obrigatória fora de `pytest`.
+    sessao_segredo: SecretStr = SecretStr("")
+
+    # Cota da Granatech: o painel mostra o uso contra estes tetos. Quem gasta
+    # cota entra na Fase 4.
+    granatech_cota_mensal: int = 500
+    granatech_cota_diaria: int = 20
+
     @field_validator("anexo_dominios", "whatsapp_numeros", mode="before")
     @classmethod
     def _lista_por_virgula(cls, valor: object) -> object:
@@ -89,6 +97,7 @@ class Settings(BaseSettings):
                 "SATURDAY_WHATSAPP_TOKEN": self.whatsapp_token.get_secret_value(),
                 "SATURDAY_WHATSAPP_APP_SECRET": self.whatsapp_app_secret.get_secret_value(),
                 "SATURDAY_WHATSAPP_VERIFY_TOKEN": self.whatsapp_verify_token.get_secret_value(),
+                "SATURDAY_SESSAO_SEGREDO": self.sessao_segredo.get_secret_value(),
             }
             faltando = [nome for nome, valor in obrigatorias.items() if not valor]
             if faltando:

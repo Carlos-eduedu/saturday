@@ -15,6 +15,10 @@ services:
     environment:
       SATURDAY_WHATSAPP_GRAPH_URL: http://meta:8100
 
+  painel:
+    ports:
+      - "5173:80"
+
   postgres:
     ports:
       - "5432:5432"

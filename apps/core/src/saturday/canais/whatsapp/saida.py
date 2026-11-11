@@ -26,7 +26,7 @@ from saturday.canais.whatsapp.cliente import (
     WhatsAppClient,
 )
 from saturday.canais.whatsapp.janela import janela_aberta
-from saturday.canais.whatsapp.modelos import MODELOS
+from saturday.canais.whatsapp.modelos import MODELOS, Modelo
 from saturday.canais.whatsapp.partes import INTERVALO_ENTRE_PARTES_S, dividir
 from saturday.dados import outbox as fila
 from saturday.dados import repositorios
@@ -60,14 +60,19 @@ class SaidaWhatsApp:
         if not numero or not phone_number_id:
             logger.error("whatsapp_saida_sem_destino outbox=%s", linha.id)
             return Resultado.PERMANENTE
-        if not texto:
+        modelo = MODELOS.get(str(payload.get("modelo") or ""))
+        if modelo is None and not texto:
             logger.info("whatsapp_saida_vazia outbox=%s", linha.id)
             return Resultado.OK
 
         aberta = self._janela_aberta(str(payload.get("conversation_id") or ""))
 
         try:
-            if permitir_modelo or not aberta:
+            if modelo is not None:
+                # Modelo escolhido no painel: sai como modelo com a janela
+                # aberta ou fechada, e nunca espera o cliente.
+                self._enviar_modelo_do_painel(linha, numero, phone_number_id, modelo)
+            elif permitir_modelo or not aberta:
                 self._avisar_por_modelo(linha, numero, phone_number_id)
                 return Resultado.AGUARDANDO_CLIENTE
             self._enviar_texto(linha, numero, phone_number_id, texto)
@@ -120,6 +125,19 @@ class SaidaWhatsApp:
                 # O `wamid` da primeira parte identifica a mensagem nos status.
                 if indice == 0 and isinstance(mensagem_id, int):
                     repositorios.marcar_envio(sessao, mensagem_id, wamid=wamid, status="sent")
+
+    def _enviar_modelo_do_painel(
+        self,
+        linha: Outbox,
+        numero: str,
+        phone_number_id: str,
+        modelo: Modelo,
+    ) -> None:
+        wamid = self._cliente.enviar_modelo(phone_number_id, numero, modelo)
+        mensagem_id = (linha.payload or {}).get("mensagem_id")
+        if isinstance(mensagem_id, int):
+            with abrir_sessao(self._fabrica) as sessao:
+                repositorios.marcar_envio(sessao, mensagem_id, wamid=wamid, status="sent")
 
     def _avisar_por_modelo(self, linha: Outbox, numero: str, phone_number_id: str) -> None:
         """Um aviso por conversa: o segundo envio pendente espera o mesmo."""

@@ -1,0 +1,136 @@
+// Cliente da API admin. Mesma origem que o painel: o cookie de sessão vai
+// sozinho; o CSRF vem de `/admin/eu` e acompanha toda ação que muda estado.
+
+export type Perfil = "atendente" | "gestor";
+export type Atendimento = "ia" | "handoff" | "assumida";
+
+export interface Eu {
+  id: string;
+  email: string;
+  perfil: Perfil;
+  csrf: string;
+}
+
+export interface Resumo {
+  id: string;
+  canal: string;
+  atendimento: Atendimento;
+  atendente_id: string | null;
+  telefone: string | null;
+  ultima_entrada_em: string | null;
+  nao_lida: boolean;
+  janela_aberta: boolean;
+}
+
+export interface Mensagem {
+  id: number;
+  direcao: "entrada" | "saida";
+  autor: "cliente" | "ia" | "atendente" | "sistema";
+  usuario_id: string | null;
+  conteudo: string;
+  status_entrega: string | null;
+  criada_em: string;
+  anexos: { mime_type: string }[];
+}
+
+export interface Detalhe extends Resumo {
+  mensagens: Mensagem[];
+  modelos: string[];
+}
+
+export interface Ficha {
+  dados: Partial<Record<CampoSensivel, string>>;
+  uf: string | null;
+  publico: string | null;
+  handoff_reason: string | null;
+  portabilidade: unknown;
+}
+
+export type CampoSensivel = "cpf" | "telefone" | "data_nascimento";
+
+export interface Alerta {
+  id: number;
+  tipo: string;
+  conversa_id: string | null;
+  detalhe: Record<string, unknown> | null;
+  criado_em: string;
+}
+
+export interface Cota {
+  mes: { usadas: number; teto: number };
+  dia: { usadas: number; teto: number };
+}
+
+export interface Usuario {
+  id: string;
+  email: string;
+  perfil: Perfil;
+}
+
+export class ErroApi extends Error {
+  constructor(
+    readonly status: number,
+    mensagem: string,
+  ) {
+    super(mensagem);
+  }
+}
+
+let csrf = "";
+
+export function guardarCsrf(token: string): void {
+  csrf = token;
+}
+
+async function chamar<T>(metodo: string, caminho: string, corpo?: unknown): Promise<T> {
+  const cabecalhos: Record<string, string> = {};
+  if (metodo !== "GET") cabecalhos["X-CSRF-Token"] = csrf;
+  if (corpo !== undefined) cabecalhos["Content-Type"] = "application/json";
+  const resposta = await fetch(`/admin${caminho}`, {
+    method: metodo,
+    headers: cabecalhos,
+    body: corpo === undefined ? undefined : JSON.stringify(corpo),
+    credentials: "same-origin",
+  });
+  if (!resposta.ok) {
+    let detalhe = resposta.statusText;
+    try {
+      const json = (await resposta.json()) as { detail?: unknown };
+      if (typeof json.detail === "string") detalhe = json.detail;
+    } catch {
+      // corpo sem JSON: fica o statusText
+    }
+    throw new ErroApi(resposta.status, detalhe);
+  }
+  if (resposta.status === 204) return undefined as T;
+  return (await resposta.json()) as T;
+}
+
+export const api = {
+  entrar: (email: string, senha: string) => chamar<Eu>("POST", "/login", { email, senha }),
+  sair: () => chamar<void>("POST", "/logout"),
+  eu: () => chamar<Eu>("GET", "/eu"),
+  usuarios: () => chamar<Usuario[]>("GET", "/usuarios"),
+  conversas: (fila: string, busca: string) => {
+    const params = new URLSearchParams();
+    if (fila) params.set("fila", fila);
+    if (busca) params.set("busca", busca);
+    return chamar<Resumo[]>("GET", `/conversas?${params}`);
+  },
+  conversa: (id: string) => chamar<Detalhe>("GET", `/conversas/${id}`),
+  assumir: (id: string) => chamar<void>("POST", `/conversas/${id}/assumir`),
+  devolver: (id: string) => chamar<void>("POST", `/conversas/${id}/devolver`),
+  transferir: (id: string, usuario_id: string) =>
+    chamar<void>("POST", `/conversas/${id}/transferir`, { usuario_id }),
+  enviar: (id: string, envio: { texto: string } | { modelo: string }) =>
+    chamar<{ mensagem_id: number }>("POST", `/conversas/${id}/mensagens`, envio),
+  ficha: (id: string) => chamar<Ficha>("GET", `/conversas/${id}/ficha`),
+  revelar: (id: string, campo: CampoSensivel) =>
+    chamar<{ campo: CampoSensivel; valor: string }>("POST", `/conversas/${id}/revelar`, { campo }),
+  alertas: () => chamar<Alerta[]>("GET", "/alertas"),
+  resolverAlerta: (id: number) => chamar<void>("POST", `/alertas/${id}/resolver`),
+  cota: () => chamar<Cota>("GET", "/cota"),
+};
+
+export const midiaUrl = (mensagemId: number, indice: number) =>
+  `/admin/midia/${mensagemId}/${indice}`;

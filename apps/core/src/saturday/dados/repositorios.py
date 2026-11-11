@@ -2,11 +2,26 @@
 
 from __future__ import annotations
 
+import json
+import uuid
+from typing import Any
+
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from saturday.dados.modelos import Conversa, Mensagem
+from saturday.dados.modelos import Alerta, Conversa, Mensagem
+
+# Canal do `LISTEN` da API (`web/eventos.py`). O aviso leva só tipo e IDs:
+# nada de dado pessoal passa por ele.
+CANAL_PAINEL = "painel"
+
+
+def notificar(sessao: Session, tipo: str, **ids: Any) -> None:
+    """Avisa o painel. O Postgres só entrega no commit: rollback não avisa."""
+
+    carga = json.dumps({"tipo": tipo, **{k: str(v) for k, v in ids.items()}})
+    sessao.execute(select(func.pg_notify(CANAL_PAINEL, carga)))
 
 
 def obter_ou_criar_conversa(
@@ -50,17 +65,27 @@ def registrar_entrada(
     *,
     message_id: str | None,
     conteudo: str,
+    anexos: list[dict[str, Any]] | None = None,
 ) -> bool:
-    marcar_entrada(conversa)
     """Grava a mensagem do cliente. ``False`` quando o ``message_id`` já existe.
 
     A decisão é do banco, não de uma lista em memória: ``ON CONFLICT DO NOTHING``
     sobre a chave única é o que vale com dois workers ao mesmo tempo.
     """
 
+    marcar_entrada(conversa)
     if message_id is None:
-        sessao.add(Mensagem(conversa_id=conversa.id, direcao="entrada", conteudo=conteudo))
+        sessao.add(
+            Mensagem(
+                conversa_id=conversa.id,
+                direcao="entrada",
+                autor="cliente",
+                conteudo=conteudo,
+                anexos=anexos,
+            )
+        )
         sessao.flush()
+        notificar(sessao, "mensagem", conversa=conversa.id)
         return True
 
     resultado = sessao.execute(
@@ -68,13 +93,18 @@ def registrar_entrada(
         .values(
             conversa_id=conversa.id,
             direcao="entrada",
+            autor="cliente",
             message_id=message_id,
             conteudo=conteudo,
+            anexos=anexos,
         )
         .on_conflict_do_nothing(index_elements=["conversa_id", "direcao", "message_id"])
         .returning(Mensagem.id)
     )
-    return resultado.scalar_one_or_none() is not None
+    inserida = resultado.scalar_one_or_none() is not None
+    if inserida:
+        notificar(sessao, "mensagem", conversa=conversa.id)
+    return inserida
 
 
 def registrar_saida(
@@ -83,6 +113,8 @@ def registrar_saida(
     *,
     conteudo: str,
     message_id: str | None = None,
+    autor: str = "ia",
+    usuario_id: uuid.UUID | None = None,
 ) -> int:
     """Grava a resposta e devolve o id.
 
@@ -93,11 +125,14 @@ def registrar_saida(
     linha = Mensagem(
         conversa_id=conversa.id,
         direcao="saida",
+        autor=autor,
+        usuario_id=usuario_id,
         message_id=message_id,
         conteudo=conteudo,
     )
     sessao.add(linha)
     sessao.flush()
+    notificar(sessao, "mensagem", conversa=conversa.id)
     return linha.id
 
 
@@ -131,4 +166,35 @@ def atualizar_status(sessao: Session, *, wamid: str, status: str) -> bool:
         return False
     linha.status_entrega = status
     sessao.flush()
+    notificar(sessao, "mensagem", conversa=linha.conversa_id)
     return True
+
+
+def mudar_atendimento(
+    sessao: Session,
+    conversa: Conversa,
+    atendimento: str,
+    *,
+    atendente_id: uuid.UUID | None = None,
+) -> None:
+    """Muda quem responde a conversa: `ia`, `handoff` ou `assumida`."""
+
+    conversa.atendimento = atendimento
+    conversa.atendente_id = atendente_id if atendimento == "assumida" else None
+    conversa.atendimento_em = func.now()
+    sessao.flush()
+    notificar(sessao, "conversa", conversa=conversa.id)
+
+
+def abrir_alerta(
+    sessao: Session,
+    tipo: str,
+    *,
+    conversa_id: uuid.UUID | None = None,
+    detalhe: dict[str, Any] | None = None,
+) -> Alerta:
+    alerta = Alerta(tipo=tipo, conversa_id=conversa_id, detalhe=detalhe)
+    sessao.add(alerta)
+    sessao.flush()
+    notificar(sessao, "alerta", alerta=alerta.id)
+    return alerta

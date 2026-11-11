@@ -10,11 +10,13 @@ from __future__ import annotations
 import logging
 import signal
 import threading
+import time
 
 import httpx
 
 from saturday.dados.sessao import criar_engine, criar_factory
 from saturday.health import registrar_batimento
+from saturday.jobs import alertas
 from saturday.jobs.eventos import processar
 from saturday.jobs.outbox import EntregadorPorCanal, EntregadorWebhook, drenar
 from saturday.log import configurar_logging
@@ -60,6 +62,7 @@ def rodar(settings: Settings, parar: threading.Event) -> None:
         )
 
         logger.info("worker_iniciado")
+        proxima_verificacao = 0.0
         while not parar.is_set():
             # O healthcheck do container lê este batimento: worker travado
             # não pode continuar parecendo saudável.
@@ -67,6 +70,9 @@ def rodar(settings: Settings, parar: threading.Event) -> None:
             try:
                 eventos = processar(fabrica, servico, entrada_whatsapp, settings)
                 entregues = drenar(fabrica, entregador, settings)
+                if time.monotonic() >= proxima_verificacao:
+                    alertas.verificar(fabrica)
+                    proxima_verificacao = time.monotonic() + alertas.INTERVALO_S
             except Exception:
                 logger.exception("worker_erro_no_lote")
                 parar.wait(INTERVALO_OCIOSO_S)

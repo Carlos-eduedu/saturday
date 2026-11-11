@@ -70,7 +70,10 @@ Todas usam o prefixo `SATURDAY_`. O `.env` é lido automaticamente.
 | `SATURDAY_OUTBOX_MAX_TENTATIVAS` | `8` | Tentativas de entrega antes de desistir. |
 | `SATURDAY_OUTBOX_BACKOFF_BASE_S` | `2.0` | Espera inicial do backoff (dobra a cada falha). |
 | `SATURDAY_RETENCAO_EXTRATO_DIAS` | `30` | Dias de retenção do extrato; ao expirar, o extrato é apagado no próximo turno. |
-| `SATURDAY_HANDOFF_AUTO_RELEASE_HORAS` | `0` | Horas para liberar automaticamente um handoff; `0` desliga. |
+| `SATURDAY_HANDOFF_AUTO_RELEASE_HORAS` | `0` | Horas para liberar automaticamente um handoff sem dono; `0` desliga. Conversa assumida nunca é liberada sozinha. |
+| `SATURDAY_SESSAO_SEGREDO` | vazio | Assina o CSRF do painel. Obrigatória fora de `pytest`. |
+| `SATURDAY_GRANATECH_COTA_MENSAL` | `500` | Teto mensal mostrado no contador de cota. |
+| `SATURDAY_GRANATECH_COTA_DIARIA` | `20` | Limite diário mostrado no contador de cota. |
 
 > **Atenção:** todas as variáveis de ambiente agora usam o prefixo `SATURDAY_`.
 > Por exemplo, `OPENROUTER_API_KEY` virou `SATURDAY_OPENROUTER_API_KEY`,
@@ -134,6 +137,42 @@ Protegidas por `X-API-Key` (quando configurada em `prod`).
 
 O `GET` devolve `{conversation_id, status, handoff_reason, handoff_em, oferta_pendente, aguardando}`.
 O `DELETE` devolve `204`. O `release` devolve `{conversation_id, status: "in_progress"}`.
+
+O `release` também grava `atendimento = ia` em `conversas`, que desde a Fase 3 é
+quem decide se a IA responde (docs/decisoes/0003). O `status` do `GET` continua
+sendo o do grafo: uma conversa assumida no painel aparece ali como estava no
+último turno da IA.
+
+### API do painel (`/admin/*`)
+
+Autenticada por cookie de sessão (`saturday_sessao`, 8 h). Toda rota que não é
+`GET` exige o header `X-CSRF-Token`, devolvido pelo login e por `GET /admin/eu`,
+e grava `auditoria`. As conversas são identificadas pelo `id` interno (UUID),
+nunca pelo `conversation_id`, que no WhatsApp carrega o telefone.
+
+| Método | Rota | Descrição |
+|---|---|---|
+| `POST` | `/admin/login` | `{email, senha}`. 5 falhas bloqueiam por 15 min; a resposta de erro é sempre a mesma. |
+| `POST` | `/admin/logout` | Apaga a sessão. |
+| `GET` | `/admin/eu` | Usuário, perfil e token CSRF. |
+| `GET` | `/admin/usuarios` | Destinos de transferência. |
+| `GET` | `/admin/conversas?fila=ia\|handoff\|assumida\|minhas&busca=` | Inbox, com `nao_lida` e `janela_aberta`. |
+| `GET` | `/admin/conversas/{id}` | Histórico com autor e status de entrega; marca como vista. |
+| `POST` | `/admin/conversas/{id}/assumir` | Atendente assume da IA ou do handoff; o gestor toma de outro atendente. |
+| `POST` | `/admin/conversas/{id}/devolver` | Devolve para a IA (só o dono, ou o gestor). |
+| `POST` | `/admin/conversas/{id}/transferir` | `{usuario_id}`; só conversa assumida. |
+| `POST` | `/admin/conversas/{id}/mensagens` | `{texto}` ou `{modelo}`; só o dono, só WhatsApp. Janela fechada aceita só modelo. |
+| `GET` | `/admin/conversas/{id}/ficha` | Dados mascarados. |
+| `POST` | `/admin/conversas/{id}/revelar` | `{campo: cpf\|telefone\|data_nascimento}`; grava `revelar:{campo}` na auditoria. |
+| `GET` | `/admin/alertas` | Alertas abertos (`handoff`, `erro_interno`, `envio_falhou`, `sem_resposta`). |
+| `POST` | `/admin/alertas/{id}/resolver` | Resolve e audita. |
+| `GET` | `/admin/cota` | Consultas Granatech no dia e no mês contra os tetos. |
+| `GET` | `/admin/midia/{mensagem_id}/{indice}` | Anexo da mensagem, servido pela API (sem URL pré-assinada). |
+| `GET` | `/admin/eventos` | SSE: avisos `{tipo, conversa\|alerta}` com IDs, sem dado pessoal. |
+
+O painel só envia os modelos de utilidade sem botão de link, e sem variáveis:
+o repositório ainda não sabe quantos parâmetros cada modelo tem, e os links
+`/l/{codigo}` chegam na Fase 6.
 
 ### Política de retenção do extrato
 
