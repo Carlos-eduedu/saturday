@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import importlib.util
 import os
+import sys
 import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from pathlib import Path
+from types import ModuleType
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -372,3 +376,56 @@ def anexo_fake() -> dict[str, str]:
         "base64": base64.b64encode(b"%PDF-1.7 extrato").decode(),
         "mime_type": "application/pdf",
     }
+
+
+# ------------------------------------------------------------------ simulador da Granatech
+#
+# O simulador mora fora do pacote (`simuladores/granatech/app.py`) e roda aqui
+# em processo, pelo `TestClient`, que já é um `httpx.Client`: o cliente do
+# Saturday fala com ele exatamente como falaria pela rede.
+
+_RAIZ = Path(__file__).resolve().parents[3]
+
+
+def _carregar_simulador_granatech() -> ModuleType:
+    nome = "simulador_granatech"
+    if nome in sys.modules:
+        return sys.modules[nome]
+    spec = importlib.util.spec_from_file_location(
+        nome, _RAIZ / "simuladores" / "granatech" / "app.py"
+    )
+    assert spec is not None and spec.loader is not None
+    modulo = importlib.util.module_from_spec(spec)
+    sys.modules[nome] = modulo
+    spec.loader.exec_module(modulo)
+    return modulo
+
+
+@pytest.fixture
+def simulador_granatech() -> Iterator[ModuleType]:
+    modulo = _carregar_simulador_granatech()
+    modulo.limpar()
+    original = dict(modulo.CONFIG)
+    modulo.CONFIG.update(atraso_detalhe_s=0, expira_em="1h")
+    yield modulo
+    modulo.CONFIG.clear()
+    modulo.CONFIG.update(original)
+    modulo.limpar()
+
+
+@pytest.fixture
+def http_granatech(simulador_granatech: ModuleType) -> Iterator[TestClient]:
+    with TestClient(simulador_granatech.app, base_url="http://granatech") as cliente:
+        yield cliente
+
+
+def settings_granatech(**extras: Any) -> Settings:
+    base: dict[str, Any] = {
+        "environment": "pytest",
+        "granatech_ativo": True,
+        "granatech_base_url": "http://granatech",
+        "granatech_chave_api": SecretStr("chave-do-simulador"),
+        "granatech_webhook_token": SecretStr("token-do-simulador"),
+    }
+    base.update(extras)
+    return Settings(**base)

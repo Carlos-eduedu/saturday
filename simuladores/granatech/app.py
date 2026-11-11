@@ -20,7 +20,7 @@ import os
 import time
 import uuid
 from collections.abc import Callable
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import httpx
@@ -114,7 +114,7 @@ def _segundos(expira_em: str) -> float:
 
 
 async def _falha_programada(request: Request) -> tuple[Response | None, bool]:
-    """Consome a primeira falha cuja rota casa com o caminho.
+    """Consome a primeira falha cuja rota é exatamente o caminho pedido.
 
     Devolve a resposta de erro e se a operação deve ser executada mesmo assim
     (``registrar``: a Granatech fez, mas a resposta não chegou).
@@ -124,7 +124,7 @@ async def _falha_programada(request: Request) -> tuple[Response | None, bool]:
     for falha in FALHAS:
         if falha.get("metodo", request.method) != request.method:
             continue
-        if not caminho.startswith(PREFIXO + str(falha.get("rota", ""))):
+        if caminho != PREFIXO + str(falha.get("rota", "")):
             continue
         falha["vezes"] = int(falha.get("vezes", 1)) - 1
         if falha["vezes"] <= 0:
@@ -365,7 +365,7 @@ async def criar_proposta(request: Request) -> Any:
         "valor_parcela": financeiras[0].get("valor_parcela"),
         "numero_parcelas": financeiras[0].get("numero_parcelas"),
         "status": "PENDING_CONFIRMATION",
-        "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "created_at": datetime.now(UTC).isoformat(),
     }
     if falha is not None:
         return falha
