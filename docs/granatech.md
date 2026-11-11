@@ -159,3 +159,38 @@ Cada uma está no código como `TODO(granatech)`:
   corrige a conta);
 - valores aceitos de `estado_civil` nos dados do tomador (enviamos SOLTEIRO,
   CASADO, DIVORCIADO, VIUVO, UNIAO_ESTAVEL ou SEPARADO).
+
+## Homologação com a Granatech
+
+O material recebido da Granatech está em
+[`granatech-homologacao/`](granatech-homologacao/README.md), sem segredos. A
+homologação tem duas fases (`roteiro-homologacao.md`):
+
+- **Fase 1, consultas e simulações** (aprovada em 2026-11-11): 2 consultas (uma
+  pela resposta direta, outra pelo webhook) e 2 simulações (com e sem seguro).
+- **Fase 2, contratação:** 2 contratações com sucesso, com o status recebido
+  pelo webhook, e 1 erro de contratação.
+
+`scripts/homologacao_granatech.py` gera as evidências das duas fases contra a
+api-dev e um `RELATORIO.md` em `evidencias/granatech-<data>/` (fora do git).
+Antes de rodar:
+
+1. o webhook da dev precisa apontar para o Saturday homolog
+   (`https://saturday-homolog.dynatech.systems/webhooks/granatech`, header
+   `x-webhook-token`); até 2026-11-11 ele ia para `granatech.dynatech.systems`,
+   o serviço antigo;
+2. o homolog precisa estar no ar com a rota `GET /eventos/granatech/{id}`, que o
+   script usa para ler o que chegou pelo webhook (protegida pela
+   `SATURDAY_API_KEY`).
+
+```bash
+SATURDAY_GRANATECH_BASE_URL=https://api-dev.granatech.com.br \
+SATURDAY_GRANATECH_CHAVE_API=... \
+SATURDAY_URL_HOMOLOG=https://saturday-homolog.dynatech.systems \
+SATURDAY_API_KEY=... \
+uv run --project apps/core python scripts/homologacao_granatech.py
+```
+
+O script se recusa a rodar contra `api.granatech.com.br` e nunca grava a chave
+nem o token. Na dev, o pedido "sem seguro" é ignorado e volta o bloco com
+seguro; o relatório registra isso na evidência da simulação sem seguro.

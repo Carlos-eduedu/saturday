@@ -11,7 +11,8 @@
 - [`../AGENTS.md`](../AGENTS.md) — regras inegociáveis, arquitetura alvo e fases.
 - [`granatech.md`](granatech.md) — cliente, cota, webhook e simulador da Granatech.
 - [`clt.md`](clt.md) — ramo CLT: etapas, proposta, pós-venda, turnos de sistema e recontato.
-- [`deploy.md`](deploy.md) — ambientes, stacks e variáveis no Dokploy.
+- [`deploy.md`](deploy.md) — ambientes, ambiente do zero, backup e restauração no Dokploy.
+- [`granatech-homologacao/`](granatech-homologacao/README.md) — material da homologação com a Granatech.
 
 ## Decisões
 

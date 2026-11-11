@@ -92,8 +92,16 @@ automaticamente e é o que publica a porta no ambiente local.
   falha de pagamento com PATCH atrás de `SATURDAY_GRANATECH_DADOS_BANCARIOS_ATIVO`
   e recontato por tempo de casa com opt-in (`conversas.marketing`). Ver
   `docs/clt.md`.
-- A fase 7 está pendente. `infra/` e `regras/` nascem
-  na fase que colocar neles o primeiro arquivo real.
+- **Fase 7 (código e guia concluídos):** guia de deploy com ambiente do zero,
+  backup e restauração (`docs/deploy.md`), teste de restauração
+  (`infra/testar_restauracao.sh`), evidências da homologação Granatech
+  (`scripts/homologacao_granatech.py` e a rota `GET /eventos/granatech/{id}`) e
+  o material da Granatech sem segredos em `docs/granatech-homologacao/`. O
+  homolog foi montado no Dokploy seguindo o guia (rede, Postgres, stack,
+  variáveis sem segredo e domínios). **Pendentes:** bucket S3 de anexos e número
+  de teste da Meta do homolog, segredos e primeiro deploy do homolog, destino S3
+  dos backups e a troca do webhook da Granatech para o homolog. `regras/` nasce
+  na fase que colocar nele o primeiro arquivo real.
 - Fora das fases, o repositório já tem: workspace `uv` único (um lock e um
   venv na raiz), healthcheck próprio por serviço (a API responde `/health`, o
   worker verifica banco e batimento do laço, o migrate não tem), entrega com

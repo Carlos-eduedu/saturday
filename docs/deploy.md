@@ -88,13 +88,17 @@ Na ordem. Cada passo de escrita no Dokploy (criar, editar, deploy) segue a
 3. **Postgres.** Crie `saturday-postgres-<amb>` (imagem `postgres:17-alpine`,
    banco e usuário `saturday`, senha só com letras e números) no ambiente do
    projeto `Saturday`. Em Networks, ligue-o à rede do passo 2 e faça o deploy do
-   banco. Anote o host interno (`appName` do Postgres).
+   banco. Anote o host interno: é o `appName` que o Dokploy devolve, com um
+   sufixo aleatório (por exemplo, `saturday-postgres-homolog-yws07g`), não o
+   nome digitado.
 4. **Bucket S3** dos anexos, privado, com versionamento ligado (ver "Backup").
    Gere uma chave de acesso só para esse bucket.
 5. **Stack compose** `saturday` no ambiente: provedor GitHub, repositório
    `Carlos-eduedu/saturday`, branch `main`, compose path `./compose.yaml`,
    **Isolated deployment ligado** e o Command de "Configuração do stack" com o
-   `appName` do stack. Deploy automático só em `development`.
+   `appName` do stack (também com sufixo aleatório). O stack nasce com compose
+   path `./docker-compose.yml` e deploy automático ligado: troque os dois.
+   Deploy automático só em `development`.
 6. **Variáveis** (aba Environment), a partir do `.env.example`:
    - `SATURDAY_ENVIRONMENT=<dev|homolog|prod>`, `SATURDAY_IMAGEM_TAG` da tabela,
      `SATURDAY_REDE_DADOS=saturday-<amb>-dados`, `COMPOSE_PROFILES=` (vazio);
