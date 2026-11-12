@@ -6,7 +6,6 @@ import {
   useEffect,
   useRef,
   useState,
-  useSyncExternalStore,
 } from "react";
 import { Link, useNavigate } from "react-router";
 import { api, type Eu, type Resumo, type Usuario } from "../api";
@@ -15,6 +14,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import SwipeRow, { type SwipeAction } from "../componentes/SwipeRow";
 import { Vazio } from "../componentes/Vazio";
 import { ATENCAO, AUTORES, ETAPAS, MOTIVOS_HANDOFF, relativo, rotulo } from "../rotulos";
+import { useMidia } from "../midia";
 import { useAvisos } from "../tempoReal";
 
 // Cores do SwipeRow pelas variáveis do painel: seguem o tema claro e o escuro.
@@ -45,16 +45,6 @@ function chamarApi(p: Pendente) {
 // Uma forma de agir por tela: a partir de 600 px, o botão da linha; abaixo,
 // arrastar (o mesmo corte do CSS que esconde o botão).
 const COM_BOTAO = "(min-width: 600px)";
-function useComBotao(): boolean {
-  return useSyncExternalStore(
-    (avisar) => {
-      const m = window.matchMedia(COM_BOTAO);
-      m.addEventListener("change", avisar);
-      return () => m.removeEventListener("change", avisar);
-    },
-    () => window.matchMedia(COM_BOTAO).matches,
-  );
-}
 
 // A ação que arrastar faz numa linha; nenhuma quando quem vê não pode agir.
 function acaoDa(c: Resumo, eu: Eu): Acao | null {
@@ -115,8 +105,19 @@ function textoDaEspera(c: Resumo, agora: number): string {
 
 export const ROTULO_ATENDIMENTO = { ia: "IA", handoff: "Handoff", assumida: "Assumida" } as const;
 
-export function Inbox({ eu }: { eu: Eu }) {
-  const comBotao = useComBotao();
+// `compacta`: a lista estreita ao lado da conversa aberta (`aberta`), sem
+// assumir pela linha; quem age é o cabeçalho da conversa.
+export function Inbox({
+  eu,
+  compacta = false,
+  aberta,
+}: {
+  eu: Eu;
+  compacta?: boolean;
+  aberta?: string;
+}) {
+  const comBotao = useMidia(COM_BOTAO);
+  const Titulo = compacta ? "h2" : "h1";
   const [fila, setFila] = useState("");
   const [busca, setBusca] = useState("");
   const [conversas, setConversas] = useState<Resumo[]>([]);
@@ -250,14 +251,14 @@ export function Inbox({ eu }: { eu: Eu }) {
     : (VAZIOS[fila] ?? VAZIOS[""]);
 
   return (
-    <section>
-      <h1 className="titulo-tela">
+    <section className="lista-conversas">
+      <Titulo className="titulo-tela">
         Conversas{" "}
         <span className="contagem">
           · {rotuloFila} · {conversas.length}
           {pedemAtencao > 0 && ` · ${pedemAtencao} pedem atenção`}
         </span>
-      </h1>
+      </Titulo>
       <div className="filtros">
         <div role="tablist" aria-label="Filas">
           {FILAS.map((f) => (
@@ -308,6 +309,7 @@ export function Inbox({ eu }: { eu: Eu }) {
                     // O arrastar nativo do link cancelaria o gesto do SwipeRow.
                     draggable={false}
                     onClick={ignorarSeArrastou}
+                    aria-current={c.id === aberta ? "page" : undefined}
                   >
                     <span className="linha-conteudo">
                       <span className="linha-identidade">
@@ -335,7 +337,9 @@ export function Inbox({ eu }: { eu: Eu }) {
                           )}
                         </span>
                         {c.motivo_handoff && (
-                          <span className="motivo">{rotulo(MOTIVOS_HANDOFF, c.motivo_handoff)}</span>
+                          <span className="motivo">
+                            {rotulo(MOTIVOS_HANDOFF, c.motivo_handoff)}
+                          </span>
                         )}
                       </span>
                     </span>
@@ -363,7 +367,7 @@ export function Inbox({ eu }: { eu: Eu }) {
                     {c.nao_lida && <span className="sr">não lida</span>}
                   </Link>
                 );
-                const acao = acaoDa(c, eu);
+                const acao = compacta ? null : acaoDa(c, eu);
                 if (!acao) return linha;
                 const esperando = pendente?.id === c.id;
                 return (

@@ -5,8 +5,7 @@ import { Alertas } from "./paginas/Alertas";
 import { Canais } from "./paginas/Canais";
 import { Custos } from "./paginas/Custos";
 import StaggeredMenu from "./componentes/StaggeredMenu";
-import { Conversa } from "./paginas/Conversa";
-import { Inbox } from "./paginas/Inbox";
+import { Caixa } from "./paginas/Caixa";
 import { Login } from "./paginas/Login";
 import { iniciarTempoReal, useAvisos } from "./tempoReal";
 
@@ -117,8 +116,8 @@ function Logado({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
       />
       <main>
         <Routes>
-          <Route path="/" element={<Inbox eu={eu} />} />
-          <Route path="/conversas/:id" element={<Conversa eu={eu} />} />
+          <Route path="/" element={<Caixa eu={eu} />} />
+          <Route path="/conversas/:id" element={<Caixa eu={eu} />} />
           <Route path="/alertas" element={<Alertas />} />
           {eu.perfil === "gestor" && <Route path="/canais" element={<Canais />} />}
           {eu.perfil === "gestor" && <Route path="/custos" element={<Custos />} />}

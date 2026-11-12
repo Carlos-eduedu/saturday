@@ -322,6 +322,7 @@ main {
 }
 .inbox li.pede-atencao a,
 .inbox li.pede-atencao .swipe-row__surface { background: color-mix(in srgb, var(--handoff) 5%, var(--superficie)); }
+.inbox li a[aria-current="page"] { border-color: var(--destaque); background: var(--destaque-suave); }
 .selo {
   font-size: 0.78rem;
   font-weight: 500;
@@ -387,7 +388,10 @@ main {
 .aviso-flutuante button { background: transparent; color: inherit; border-color: color-mix(in srgb, var(--fundo) 40%, transparent); }
 .aviso-flutuante button:hover:not(:disabled) { border-color: var(--fundo); box-shadow: none; }
 
-@media (max-width: 599px) {
+/* Pela largura da lista, não da janela: vale no celular e na lista estreita ao
+   lado da conversa aberta. */
+.lista-conversas { container: lista / inline-size; }
+@container lista (max-width: 599px) {
   .acao-linha { display: none; }
   .inbox .swipe-row__toggle { display: inline-flex; }
   .inbox li a { grid-template-columns: minmax(0, 1fr); align-content: center; }
@@ -403,9 +407,29 @@ main {
 .alertas li { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; padding: 0.85rem 1.1rem; }
 .alertas li button { margin-left: auto; }
 
+/* ---------------------------------------------------------------- caixa */
+/* Desktop: lista à esquerda, rolando sozinha; a conversa usa a rolagem da página. */
+.caixa { display: grid; grid-template-columns: 21rem minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+.caixa-lista {
+  position: sticky;
+  top: calc(var(--topo) + 1rem);
+  max-height: calc(100vh - var(--topo) - 2rem);
+  overflow-y: auto;
+  /* Respiro para a sombra das linhas não ser cortada pela rolagem. */
+  padding: 2px 6px 1rem 2px;
+  overscroll-behavior: contain;
+}
+.caixa-lista .titulo-tela { font-size: 1.25rem; margin-bottom: 0.75rem; }
+.caixa-lista .titulo-tela .contagem { font-size: 0.9rem; }
+.caixa-lista .filtros { margin-bottom: 0.75rem; }
+.caixa > .vazio { padding-top: 6rem; }
+
 /* ---------------------------------------------------------------- conversa */
 .conversa { display: grid; grid-template-columns: minmax(0, 1fr) 20rem; gap: 1.5rem; align-items: start; }
 @media (max-width: 1023px) { .conversa { grid-template-columns: minmax(0, 1fr); } }
+.conversa.em-abas { grid-template-columns: minmax(0, 1fr); }
+.conversa.em-abas .abas-laterais { margin-top: 1rem; max-width: 24rem; }
+.conversa.em-abas .ficha, .conversa.em-abas .trilha { margin-top: 1rem; }
 .historico header {
   position: sticky;
   top: var(--topo);
@@ -575,7 +599,8 @@ main {
 .estado-connecting { color: var(--handoff); }
 .estado-close, .estado-refused { color: var(--erro); }
 
-/* Abas de fila no celular quebram linha: nenhuma fica escondida na rolagem. */
-@media (max-width: 599px) {
+/* Abas de fila em lista estreita (celular ou ao lado da conversa) quebram
+   linha: nenhuma fica escondida na rolagem. */
+@container lista (max-width: 599px) {
   .filtros [role="tablist"] { flex-wrap: wrap; overflow-x: visible; }
 }

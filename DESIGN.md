@@ -158,7 +158,7 @@ Cinza frio com um único cobalto de ação, mais três cores de estado com signi
 
 ## Layout
 
-Coluna única centrada com largura máxima de 82rem e respiro lateral de 1–2rem (clamp). O topo fixo tem 60px; no desktop (a partir de 1024px) leva a navegação, a cota e o Sair; abaixo disso, um botão Menu abre o painel lateral. A conversa usa duas colunas (histórico e coluna lateral de 20rem com abas Ficha/IA) a partir de 1024px; abaixo, uma coluna. Linhas e cartões se agrupam com gap de 0.5rem; seções com 1.25–1.5rem. Tabelas viram cartões com rótulos abaixo de 768px.
+Coluna única centrada com largura máxima de 82rem e respiro lateral de 1–2rem (clamp). O topo fixo tem 60px; no desktop (a partir de 1024px) leva a navegação, a cota e o Sair; abaixo disso, um botão Menu abre o painel lateral. Conversas tem layout de chat a partir de 1024px: lista de 21rem à esquerda, com rolagem própria e a conversa aberta marcada em Cobalto Suave, e a conversa à direita; a Ficha ganha coluna de 20rem a partir de 1280px e, entre 1024 e 1279px, vira aba ao lado de Mensagens. Abaixo de 1024px, lista e conversa são telas separadas. A lista se adapta pela própria largura (container query), não pela da janela. Linhas e cartões se agrupam com gap de 0.5rem; seções com 1.25–1.5rem. Tabelas viram cartões com rótulos abaixo de 768px.
 
 ## Elevation & Depth
 

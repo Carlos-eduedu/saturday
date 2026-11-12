@@ -39,8 +39,13 @@ const STATUS_ENTREGA: Record<string, string> = {
   failed: "falhou",
 };
 
-export function Conversa({ eu }: { eu: Eu }) {
+type Aba = "mensagens" | "ficha" | "ia";
+
+// `fichaEmAba`: sem espaço para a coluna lateral (conversa ao lado da lista),
+// ficha e trilha da IA viram abas ao lado das mensagens.
+export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: boolean }) {
   const { id = "" } = useParams();
+  const [aba, setAba] = useState<Aba>("mensagens");
   const [conversa, setConversa] = useState<Detalhe | null>(null);
   const [erro, setErro] = useState("");
 
@@ -81,7 +86,7 @@ export function Conversa({ eu }: { eu: Eu }) {
   const minha = conversa.atendimento === "assumida" && conversa.atendente_id === eu.id;
 
   return (
-    <div className="conversa">
+    <div className={fichaEmAba ? "conversa em-abas" : "conversa"}>
       <section className="historico">
         <header>
           <div className="identidade">
@@ -108,42 +113,64 @@ export function Conversa({ eu }: { eu: Eu }) {
             {erro}
           </p>
         )}
-        <ol className="mensagens">
-          {conversa.mensagens.map((m, i) => (
-            <li
-              key={m.id}
-              ref={i === conversa.mensagens.length - 1 ? fim : undefined}
-              className={`msg msg-${m.direcao} msg-${m.autor}`}
-            >
-              <span className="autor">{AUTOR[m.autor]}</span>
-              <p>{m.conteudo}</p>
-              {m.anexos.map((anexo, indice) => (
-                <a key={indice} href={midiaUrl(m.id, indice)} target="_blank" rel="noreferrer">
-                  Anexo ({anexo.mime_type})
-                </a>
+        {fichaEmAba && (
+          <Abas
+            rotulo="Conversa"
+            opcoes={[
+              ["mensagens", "Mensagens"],
+              ["ficha", "Ficha"],
+              ["ia", "IA"],
+            ]}
+            valor={aba}
+            mudar={setAba}
+          />
+        )}
+        {fichaEmAba && aba === "ficha" && <FichaCliente id={id} />}
+        {fichaEmAba && aba === "ia" && <TrilhaIa id={id} />}
+        {(!fichaEmAba || aba === "mensagens") && (
+          <>
+            <ol className="mensagens">
+              {conversa.mensagens.map((m, i) => (
+                <li
+                  key={m.id}
+                  ref={i === conversa.mensagens.length - 1 ? fim : undefined}
+                  className={`msg msg-${m.direcao} msg-${m.autor}`}
+                >
+                  <span className="autor">{AUTOR[m.autor]}</span>
+                  <p>{m.conteudo}</p>
+                  {m.anexos.map((anexo, indice) => (
+                    <a key={indice} href={midiaUrl(m.id, indice)} target="_blank" rel="noreferrer">
+                      Anexo ({anexo.mime_type})
+                    </a>
+                  ))}
+                  <small>
+                    {formatarHora(m.criada_em)}
+                    {m.status_entrega && (
+                      <span className={m.status_entrega === "failed" ? "status falhou" : "status"}>
+                        {" · "}
+                        {STATUS_ENTREGA[m.status_entrega] ?? m.status_entrega}
+                      </span>
+                    )}
+                  </small>
+                </li>
               ))}
-              <small>
-                {formatarHora(m.criada_em)}
-                {m.status_entrega && (
-                  <span className={m.status_entrega === "failed" ? "status falhou" : "status"}>
-                    {" · "}
-                    {STATUS_ENTREGA[m.status_entrega] ?? m.status_entrega}
-                  </span>
-                )}
-              </small>
-            </li>
-          ))}
-        </ol>
-        {(conversa.canal === "whatsapp" || conversa.canal === "evolution") &&
-          (minha ? (
-            <Envio conversa={conversa} agir={agir} />
-          ) : (
-            <button type="button" className="principal" onClick={() => agir(() => api.assumir(id))}>
-              Assumir e responder
-            </button>
-          ))}
+            </ol>
+            {(conversa.canal === "whatsapp" || conversa.canal === "evolution") &&
+              (minha ? (
+                <Envio conversa={conversa} agir={agir} />
+              ) : (
+                <button
+                  type="button"
+                  className="principal"
+                  onClick={() => agir(() => api.assumir(id))}
+                >
+                  Assumir e responder
+                </button>
+              ))}
+          </>
+        )}
       </section>
-      <Lateral id={id} />
+      {!fichaEmAba && <Lateral id={id} />}
     </div>
   );
 }
@@ -274,28 +301,46 @@ function Lateral({ id }: { id: string }) {
   const [aba, setAba] = useState<"ficha" | "ia">("ficha");
   return (
     <aside className="lateral">
-      <div role="tablist" aria-label="Painel lateral" className="abas-laterais">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={aba === "ficha"}
-          className={aba === "ficha" ? "ativo" : ""}
-          onClick={() => setAba("ficha")}
-        >
-          Ficha
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={aba === "ia"}
-          className={aba === "ia" ? "ativo" : ""}
-          onClick={() => setAba("ia")}
-        >
-          IA
-        </button>
-      </div>
+      <Abas
+        rotulo="Painel lateral"
+        opcoes={[
+          ["ficha", "Ficha"],
+          ["ia", "IA"],
+        ]}
+        valor={aba}
+        mudar={setAba}
+      />
       {aba === "ficha" ? <FichaCliente id={id} /> : <TrilhaIa id={id} />}
     </aside>
+  );
+}
+
+function Abas<T extends string>({
+  rotulo,
+  opcoes,
+  valor,
+  mudar,
+}: {
+  rotulo: string;
+  opcoes: [T, string][];
+  valor: T;
+  mudar: (v: T) => void;
+}) {
+  return (
+    <div role="tablist" aria-label={rotulo} className="abas-laterais">
+      {opcoes.map(([v, texto]) => (
+        <button
+          key={v}
+          type="button"
+          role="tab"
+          aria-selected={valor === v}
+          className={valor === v ? "ativo" : ""}
+          onClick={() => mudar(v)}
+        >
+          {texto}
+        </button>
+      ))}
+    </div>
   );
 }
 
