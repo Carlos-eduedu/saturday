@@ -120,3 +120,13 @@ time, small { font-size: 0.8rem; color: var(--suave); }
 .ficha dl { margin: 0; }
 .ficha dt { font-size: 0.8rem; color: var(--suave); margin-top: 0.6rem; }
 .ficha dd { margin: 0; }
+
+/* Canais (decisão 0010) */
+.canais { display: flex; flex-direction: column; gap: 1.5rem; }
+.canais h2 { font-size: 1.1rem; margin: 0 0 0.5rem; }
+.canais table { width: 100%; border-collapse: collapse; }
+.canais th, .canais td { text-align: left; padding: 0.4rem; border-bottom: 1px solid var(--borda); }
+.canais td.acoes { display: flex; gap: 0.4rem; justify-content: flex-end; }
+.nova-instancia { display: flex; gap: 0.5rem; align-items: end; margin-top: 1rem; }
+.qr { border: 1px solid var(--borda); border-radius: 10px; padding: 1rem; background: var(--superficie); }
+.qr img { display: block; margin: 0.5rem 0; background: #fff; }

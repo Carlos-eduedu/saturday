@@ -66,9 +66,8 @@ def rodar(settings: Settings, parar: threading.Event) -> None:
             "whatsapp": saida_whatsapp,
         }
         evolution = criar_canal_evolution(http, settings, fabrica, storage)
-        entrada_evolution = None
         if evolution is not None:
-            entrada_evolution, entregadores["evolution"] = evolution
+            entregadores["evolution"] = evolution.saida
         entregador = EntregadorPorCanal(entregadores)
 
         logger.info("worker_iniciado")
@@ -79,7 +78,13 @@ def rodar(settings: Settings, parar: threading.Event) -> None:
             registrar_batimento()
             try:
                 eventos = processar(
-                    fabrica, servico, entrada_whatsapp, settings, granatech, entrada_evolution
+                    fabrica,
+                    servico,
+                    entrada_whatsapp,
+                    settings,
+                    granatech,
+                    evolution.entrada if evolution else None,
+                    evolution.cliente if evolution else None,
                 )
                 entregues = drenar(fabrica, entregador, settings)
                 if time.monotonic() >= proxima_verificacao:

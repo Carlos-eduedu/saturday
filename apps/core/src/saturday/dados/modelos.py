@@ -370,3 +370,17 @@ class LinkCurto(Base):
     id_proposta: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     url: Mapped[str] = mapped_column(Text, nullable=False)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
+
+
+class Instancia(Base):
+    """Telefone fixado de uma instância da Evolution (decisão 0010).
+
+    Não diz quais instâncias existem (quem diz é a Evolution): só guarda o
+    telefone da primeira conexão, para recusar a mesma instância com outro.
+    """
+
+    __tablename__ = "instancias"
+
+    nome: Mapped[str] = mapped_column(String(64), primary_key=True)
+    telefone: Mapped[str] = mapped_column(String(16), nullable=False)
+    fixado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)

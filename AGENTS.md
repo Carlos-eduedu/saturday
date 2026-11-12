@@ -111,7 +111,9 @@ automaticamente e é o que publica a porta no ambiente local.
   pela Evolution API v2.3.7 (Baileys), canal `evolution` ao lado de `whatsapp`,
   sem janela nem modelos, instância própria no profile `evolution` do compose,
   webhook pela rede interna com token, simulador em `simuladores/evolution/` e
-  tudo atrás de `SATURDAY_EVOLUTION_ATIVO`. Ver `docs/evolution.md`.
+  tudo atrás de `SATURDAY_EVOLUTION_ATIVO`. Instâncias geridas pela tela Canais
+  do painel, só gestor, com telefone fixado e alerta de queda
+  (docs/decisoes/0010). Ver `docs/evolution.md`.
 - `migrations/` fica em `apps/core/migrations/`, não na raiz: as migrações
   descrevem os modelos daquele pacote e precisam do ambiente `uv` dele para
   importar. Desvio consciente da árvore desenhada acima.

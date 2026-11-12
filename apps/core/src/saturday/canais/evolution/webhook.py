@@ -1,7 +1,9 @@
 """Leitura do webhook da Evolution API (v2.3.7, integração Baileys).
 
-Cada POST traz um evento: `messages.upsert` (o que o cliente mandou) ou
-`messages.update` (o que aconteceu com o que nós mandamos). Tudo vira o mesmo
+Cada POST traz um evento: `messages.upsert` (o que o cliente mandou),
+`messages.update` (o que aconteceu com o que nós mandamos) ou
+`connection.update` (a instância conectou ou caiu; decisão 0010). Mensagem e
+status viram o mesmo
 `Evento` do WhatsApp da Meta, com o nome da instância no lugar do
 `phone_number_id`, para a entrada e o worker tratarem os dois canais igual.
 """
@@ -11,12 +13,10 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from saturday.canais.whatsapp.telefone import normalizar_telefone
+from saturday.canais.evolution.cliente import telefone_do_jid
 from saturday.canais.whatsapp.webhook import Evento, Midia
 
 logger = logging.getLogger(__name__)
-
-JID_TELEFONE = "@s.whatsapp.net"
 
 # Tipos que viram mídia lida pela entrada (foto, PDF, áudio).
 TIPOS_DE_MIDIA = frozenset({"imageMessage", "audioMessage", "documentMessage"})
@@ -39,9 +39,9 @@ def _telefone_do(chave: dict[str, Any]) -> str:
     """
 
     for campo in ("remoteJid", "remoteJidAlt"):
-        jid = chave.get(campo)
-        if isinstance(jid, str) and jid.endswith(JID_TELEFONE):
-            return normalizar_telefone(jid.removesuffix(JID_TELEFONE))
+        telefone = telefone_do_jid(chave.get(campo))
+        if telefone:
+            return telefone
     return ""
 
 
@@ -124,3 +124,30 @@ def eventos(payload: dict[str, Any]) -> list[Evento]:
     elif nome == "messages.update":
         evento = _de_status(dados, instancia)
     return [evento] if evento is not None else []
+
+
+# Estados que a Evolution só manda quando a queda é definitiva (sem nova
+# tentativa automática): viram alerta.
+ESTADOS_DE_QUEDA = frozenset({"close", "refused"})
+
+
+def conexao(payload: dict[str, Any]) -> dict[str, Any] | None:
+    """`connection.update` achatado; ``None`` se não for um.
+
+    `connecting` não interessa: é o meio do caminho entre o QR e o `open`.
+    """
+
+    dados = payload.get("data")
+    instancia = str(payload.get("instance") or "")
+    if payload.get("event") != "connection.update" or not instancia or not isinstance(dados, dict):
+        return None
+    estado = str(dados.get("state") or "")
+    if estado != "open" and estado not in ESTADOS_DE_QUEDA:
+        return None
+    return {
+        "tipo": "conexao",
+        "instancia": instancia,
+        "estado": estado,
+        "telefone": telefone_do_jid(dados.get("wuid")),
+        "motivo": dados.get("statusReason"),
+    }

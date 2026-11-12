@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, Navigate, Route, Routes } from "react-router";
 import { api, type Cota, type Eu, ErroApi, guardarCsrf } from "./api";
 import { Alertas } from "./paginas/Alertas";
+import { Canais } from "./paginas/Canais";
 import { Conversa } from "./paginas/Conversa";
 import { Inbox } from "./paginas/Inbox";
 import { Login } from "./paginas/Login";
@@ -46,6 +47,7 @@ function Logado({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
         <nav>
           <Link to="/">Conversas</Link>
           <Link to="/alertas">Alertas</Link>
+          {eu.perfil === "gestor" && <Link to="/canais">Canais</Link>}
         </nav>
         <ContadorCota />
         <span className="quem">
@@ -60,6 +62,7 @@ function Logado({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
           <Route path="/" element={<Inbox eu={eu} />} />
           <Route path="/conversas/:id" element={<Conversa eu={eu} />} />
           <Route path="/alertas" element={<Alertas />} />
+          {eu.perfil === "gestor" && <Route path="/canais" element={<Canais />} />}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </main>

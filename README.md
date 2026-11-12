@@ -51,7 +51,8 @@ proposta, aceite, criação da proposta, formalização e pagamento. Os textos f
 
 Fora das fases, o **canal Evolution** (`canais/evolution/`): números de WhatsApp
 Web pela Evolution API, ao lado da Meta, sem janela nem modelos e desligado por
-padrão (`SATURDAY_EVOLUTION_ATIVO`). Simulador em `simuladores/evolution/`. Ver
+padrão (`SATURDAY_EVOLUTION_ATIVO`). O gestor cria e conecta as instâncias na
+tela **Canais** do painel. Simulador em `simuladores/evolution/`. Ver
 [`docs/evolution.md`](docs/evolution.md) e a
 [decisão 0009](docs/decisoes/0009-evolution-api-como-segundo-canal-whatsapp.md).
 
@@ -86,14 +87,13 @@ uv run --project simuladores uvicorn app:app --app-dir simuladores/granatech --p
 # SATURDAY_GRANATECH_CHAVE_API=chave-do-simulador no .env
 ```
 
-E o da Evolution (instância `mex-sim`):
+E o da Evolution (as instâncias se criam na tela Canais):
 
 ```bash
 uv run --project simuladores uvicorn app:app --app-dir simuladores/evolution --port 8300
 # SATURDAY_EVOLUTION_ATIVO=true, SATURDAY_EVOLUTION_URL=http://127.0.0.1:8300,
 # SATURDAY_EVOLUTION_API_KEY=chave-do-simulador,
-# SATURDAY_EVOLUTION_WEBHOOK_TOKEN=token-do-simulador e
-# SATURDAY_EVOLUTION_INSTANCIAS=mex-sim no .env
+# SATURDAY_EVOLUTION_WEBHOOK_TOKEN=token-do-simulador no .env
 ```
 
 Rode **da raiz**: o `pydantic-settings` lê o `.env` do diretório atual, então de

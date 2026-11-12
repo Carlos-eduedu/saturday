@@ -1,12 +1,21 @@
 # Canal Evolution (WhatsApp Web)
 
-Segundo canal de WhatsApp, ao lado da Cloud API da Meta. A decisão e os seus
-limites estão em [decisoes/0009](decisoes/0009-evolution-api-como-segundo-canal-whatsapp.md).
+Segundo canal de WhatsApp, ao lado da Cloud API da Meta. As decisões e os seus
+limites estão em [decisoes/0009](decisoes/0009-evolution-api-como-segundo-canal-whatsapp.md)
+e [decisoes/0010](decisoes/0010-instancias-da-evolution-geridas-pelo-painel.md).
 
 ## Como funciona
 
 - Cada número é uma **instância** da Evolution (v2.3.7, integração Baileys). O
-  nome da instância faz o papel do `phone_number_id` da Meta.
+  nome da instância faz o papel do `phone_number_id` da Meta. O Saturday atende
+  toda instância da sua Evolution; o gestor as cria e conecta na tela
+  **Canais** do painel.
+- Telefone fixado: na primeira conexão o Saturday guarda o telefone da
+  instância (tabela `instancias`). Se ela voltar com outro celular, é
+  desconectada na hora e abre o alerta "instância reconectada com outro
+  celular". Outro número exige apagar e criar outra instância.
+- Queda definitiva (`connection.update` com `close` ou `refused`) abre o
+  alerta "instância desconectada", um por instância enquanto estiver aberto.
 - O canal é `evolution`. A conversa é `evolution:{celular}`: o mesmo celular no
   número da Meta é outra conversa.
 - Entrada: a Evolution chama `POST /webhooks/evolution` pela rede interna do
@@ -31,42 +40,38 @@ limites estão em [decisoes/0009](decisoes/0009-evolution-api-como-segundo-canal
 | `SATURDAY_EVOLUTION_URL` | `http://evolution:8080` no compose; o simulador em dev |
 | `SATURDAY_EVOLUTION_API_KEY` | `AUTHENTICATION_API_KEY` da Evolution (header `apikey`) |
 | `SATURDAY_EVOLUTION_WEBHOOK_TOKEN` | Token que a instância manda no webhook |
-| `SATURDAY_EVOLUTION_INSTANCIAS` | Instâncias atendidas, por vírgula |
+| `SATURDAY_EVOLUTION_WEBHOOK_URL` | Para onde a Evolution manda os eventos (padrão `http://api:8000/webhooks/evolution`) |
 | `EVOLUTION_POSTGRES_SENHA` | Senha do Postgres próprio da Evolution |
 
-Com o canal ligado e fora de `pytest`, faltar a chave, o token ou as instâncias
-derruba a subida.
+Com o canal ligado e fora de `pytest`, faltar a chave ou o token derruba a
+subida.
 
 ## Ligar num ambiente
 
-1. Acrescente `evolution` em `COMPOSE_PROFILES` e preencha as variáveis acima.
-   Sobem `evolution`, `evolution-postgres` e `evolution-redis`, sem porta e sem
-   domínio.
-2. Crie a instância e leia o QR pela própria Evolution (por exemplo com um
-   túnel temporário até `evolution:8080`; o Saturday não cria instância).
-3. Configure a instância:
-   - `POST /settings/set/{instancia}` com `readMessages: true` (o Saturday não
-     marca como lida).
-   - `POST /webhook/set/{instancia}` com
-     `{"webhook": {"enabled": true, "url": "http://api:8000/webhooks/evolution",
-     "headers": {"x-webhook-token": "<SATURDAY_EVOLUTION_WEBHOOK_TOKEN>"},
-     "byEvents": false, "base64": false,
-     "events": ["MESSAGES_UPSERT", "MESSAGES_UPDATE"]}}`.
-4. Acrescente o nome da instância em `SATURDAY_EVOLUTION_INSTANCIAS`, ligue
-   `SATURDAY_EVOLUTION_ATIVO=true` e reinicie API e worker.
+1. Acrescente `evolution` em `COMPOSE_PROFILES`, preencha as variáveis acima,
+   ligue `SATURDAY_EVOLUTION_ATIVO=true` e faça o deploy. Sobem `evolution`,
+   `evolution-postgres` e `evolution-redis`, sem porta e sem domínio.
+2. No painel, como gestor, abra **Canais**, crie a instância e leia o QR no
+   celular (WhatsApp, Aparelhos conectados). O Saturday já configura o webhook
+   (`MESSAGES_UPSERT`, `MESSAGES_UPDATE`, `CONNECTION_UPDATE`, com o token no
+   header) e o `readMessages`.
+3. Instância criada fora do painel (ou antes da tela existir): desconecte e
+   clique **Reconectar**, que reaplica a configuração antes do QR.
 
 ## Desenvolvimento
 
 O `compose.override.yaml` sobe `evolution-sim` na porta 8300 e aponta
-`SATURDAY_EVOLUTION_URL` para ele. Para usar, ligue o canal com a instância
-`mex-sim` e os valores padrão do simulador (`chave-do-simulador`,
-`token-do-simulador`).
+`SATURDAY_EVOLUTION_URL` para ele. Para usar, ligue o canal com os valores
+padrão do simulador (`chave-do-simulador`, `token-do-simulador`); a tela Canais
+cria instâncias em memória nele.
 
 ```bash
 curl -X POST localhost:8300/admin/mensagem -H 'content-type: application/json' \
   -d '{"texto": "Oi"}'
 curl localhost:8300/admin/enviadas
 curl -X POST localhost:8300/admin/falhas -d '{"status": 500}'   # ou {"inexistente": true}
+curl -X POST localhost:8300/admin/conexao -H 'content-type: application/json' \
+  -d '{"instancia": "mex-sim", "estado": "open", "telefone": "5511987654321"}'
 ```
 
 ## Riscos

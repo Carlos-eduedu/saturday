@@ -62,13 +62,14 @@ class Settings(BaseSettings):
     whatsapp_graph_url: str = "https://graph.facebook.com/v23.0"
     whatsapp_limite_midia_mb: int = 50
 
-    # Evolution API (WhatsApp Web, não oficial): segundo canal, decisão 0009.
-    # `instancias` faz o papel do `phone_number_id`; evento de outra é ignorado.
+    # Evolution API (WhatsApp Web, não oficial): segundo canal, decisões 0009 e
+    # 0010. Toda instância da Evolution do Saturday é atendida; o painel as cria.
     evolution_ativo: bool = False
     evolution_url: str = "http://evolution:8080"
     evolution_api_key: SecretStr = SecretStr("")
     evolution_webhook_token: SecretStr = SecretStr("")
-    evolution_instancias: Annotated[list[str], NoDecode] = Field(default_factory=list)
+    # Para onde a Evolution manda os eventos: a API pela rede interna.
+    evolution_webhook_url: str = "http://api:8000/webhooks/evolution"
 
     # Transcrição de áudio: endpoint compatível com OpenAI (`/audio/transcriptions`).
     transcricao_api_key: SecretStr = SecretStr("")
@@ -102,7 +103,7 @@ class Settings(BaseSettings):
     # proposta ligada.
     dominio_publico: str = ""
 
-    @field_validator("anexo_dominios", "whatsapp_numeros", "evolution_instancias", mode="before")
+    @field_validator("anexo_dominios", "whatsapp_numeros", mode="before")
     @classmethod
     def _lista_por_virgula(cls, valor: object) -> object:
         if isinstance(valor, str):
@@ -178,7 +179,6 @@ class Settings(BaseSettings):
                     "SATURDAY_EVOLUTION_WEBHOOK_TOKEN": (
                         self.evolution_webhook_token.get_secret_value()
                     ),
-                    "SATURDAY_EVOLUTION_INSTANCIAS": ",".join(self.evolution_instancias),
                 }.items()
                 if not valor
             ]

@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from saturday.settings import Settings, get_settings
 from saturday.web.api import (
     admin,
+    canais,
     chat,
     conversas,
     evolution,
@@ -49,6 +50,7 @@ def get_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(evolution.router)
     app.include_router(links.router)
     app.include_router(admin.router)
+    app.include_router(canais.router)
     webhooks.documentar_webhook(app)
 
     @app.exception_handler(Exception)
