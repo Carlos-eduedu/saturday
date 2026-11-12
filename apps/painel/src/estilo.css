@@ -261,19 +261,31 @@ main {
 }
 
 /* ---------------------------------------------------------------- inbox */
-.filtros { display: flex; justify-content: space-between; align-items: end; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+/* Filas em abas sublinhadas numa linha só (rola de lado se faltar espaço); a
+   busca embaixo, com o rótulo para leitor de tela. */
+.filtros { display: flex; flex-direction: column; align-items: stretch; gap: 0.6rem; margin-bottom: 1rem; }
 .filtros [role="tablist"] {
   display: flex;
-  gap: 0.25rem;
-  padding: 0.25rem;
-  background: var(--superficie-2);
-  border-radius: var(--raio-l);
+  gap: 1rem;
+  border-bottom: 1px solid var(--borda);
   overflow-x: auto;
-  max-width: 100%;
+  scrollbar-width: none;
 }
-.filtros [role="tablist"] button { border-color: transparent; background: none; white-space: nowrap; }
-.filtros [role="tablist"] button:hover:not(:disabled) { box-shadow: none; transform: none; background: var(--superficie); }
-.filtros [role="tablist"] button.ativo { background: var(--superficie); color: var(--texto); box-shadow: var(--sombra); border-color: transparent; }
+.filtros [role="tablist"] button {
+  min-height: 40px;
+  padding: 0 0.1rem;
+  margin-bottom: -1px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--suave);
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+.filtros [role="tablist"] button:hover:not(:disabled) { transform: none; box-shadow: none; color: var(--texto); }
+.filtros [role="tablist"] button.ativo { color: var(--destaque); border-bottom-color: var(--destaque); }
+.filtros label { width: 100%; }
 
 .inbox, .alertas, .mensagens { list-style: none; margin: 0; padding: 0; }
 .inbox { display: flex; flex-direction: column; gap: 0.5rem; }
@@ -399,7 +411,6 @@ main {
   .linha-identidade { flex-direction: row; gap: 0.6rem; align-items: baseline; padding-right: 0; border-right: 0; }
   .linha-meta { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; }
   .linha-meta .atencao { order: -1; width: 100%; text-align: left; }
-  .filtros > label { width: 100%; }
 }
 
 /* ---------------------------------------------------------------- alertas */
@@ -421,7 +432,6 @@ main {
 }
 .caixa-lista .titulo-tela { font-size: 1.25rem; margin-bottom: 0.75rem; }
 .caixa-lista .titulo-tela .contagem { font-size: 0.9rem; }
-.caixa-lista .filtros { margin-bottom: 0.75rem; }
 .caixa > .vazio { padding-top: 6rem; }
 
 /* ---------------------------------------------------------------- conversa */
@@ -583,10 +593,6 @@ main {
   .nova-instancia { flex-direction: column; align-items: stretch; }
 }
 
-@media (prefers-color-scheme: dark) {
-  .filtros [role="tablist"] button.ativo { background: var(--destaque-suave); color: var(--destaque); box-shadow: inset 0 0 0 1px var(--destaque); }
-}
-
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
   button:hover:not(:disabled), .inbox li a:hover { transform: none; }
@@ -598,9 +604,3 @@ main {
 .estado-open { color: var(--ia); }
 .estado-connecting { color: var(--handoff); }
 .estado-close, .estado-refused { color: var(--erro); }
-
-/* Abas de fila em lista estreita (celular ou ao lado da conversa) quebram
-   linha: nenhuma fica escondida na rolagem. */
-@container lista (max-width: 599px) {
-  .filtros [role="tablist"] { flex-wrap: wrap; overflow-x: visible; }
-}

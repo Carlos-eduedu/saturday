@@ -275,10 +275,11 @@ export function Inbox({
           ))}
         </div>
         <label>
-          Buscar telefone
+          <span className="sr">Buscar telefone</span>
           <input
             type="search"
             inputMode="numeric"
+            placeholder="Buscar telefone"
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
           />
