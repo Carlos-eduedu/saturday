@@ -31,3 +31,6 @@ data/
 
 # Evidências geradas pelo script de homologação da Granatech
 evidencias/
+
+# Sessões locais da ferramenta de revisão do painel (guardam chaves)
+apps/painel/.impeccable/
