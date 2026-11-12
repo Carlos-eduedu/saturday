@@ -81,3 +81,40 @@ export function relativo(iso: string, agora: number): string {
   if (horas < 48) return "ontem";
   return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 }
+
+export const NOS: Record<string, string> = {
+  classify_intent: "Classificou a mensagem",
+  generate_answer: "Respondeu pela FAQ",
+  clt: "Jornada CLT",
+  pedir_texto: "Pediu texto",
+  handoff: "Passou para a equipe",
+  decline_offer: "Registrou a recusa",
+  read_statement: "Leu o extrato",
+  check_customer_data: "Conferiu os dados",
+  collect_customer_data: "Pediu dados",
+  calculate_portability: "Calculou a portabilidade",
+  present_offer: "Apresentou a oferta",
+};
+
+export const CHAMADAS: Record<string, string> = {
+  jev: "Classificador",
+  llm: "Modelo (FAQ)",
+  visao: "Leitura de anexo",
+  anexo: "Download de anexo",
+  granatech: "Granatech",
+  brasilapi: "BrasilAPI",
+  webhook: "Webhook",
+};
+
+// US$ com 4 casas para valores pequenos (um turno custa frações de centavo).
+export function dolar(valor: number): string {
+  if (valor > 0 && valor < 0.0001) return "< US$ 0,0001";
+  const casas = valor !== 0 && Math.abs(valor) < 1 ? 4 : 2;
+  const texto = valor.toLocaleString("pt-BR", {
+    minimumFractionDigits: casas,
+    maximumFractionDigits: casas,
+  });
+  return `US$ ${texto}`;
+}
+
+export const tokens = (n: number) => n.toLocaleString("pt-BR");

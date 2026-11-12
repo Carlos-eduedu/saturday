@@ -271,7 +271,7 @@ class ClienteGranatech:
         conversa_id: Any,
     ) -> None:
         duracao_ms = (time.monotonic() - inicio) * 1000
-        registrar_chamada(PARCEIRO, duracao_ms)
+        registrar_chamada(PARCEIRO, duracao_ms, status=situacao if situacao else "erro")
         logger.info(
             "granatech_chamada metodo=%s rota=%s status=%s ms=%.0f",
             metodo,

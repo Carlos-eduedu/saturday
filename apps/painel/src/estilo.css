@@ -385,11 +385,47 @@ main {
   .envio form, .modelo, .transferir { flex-direction: column; align-items: stretch; }
   .acoes { margin-left: 0; width: 100%; }
 }
-.ficha { padding: 1.25rem; position: sticky; top: calc(var(--topo) + 1rem); }
+.lateral { position: sticky; top: calc(var(--topo) + 1rem); display: flex; flex-direction: column; gap: 0.75rem; max-height: calc(100vh - var(--topo) - 2rem); overflow-y: auto; }
+.abas-laterais { display: flex; gap: 0.25rem; padding: 0.25rem; background: var(--superficie-2); border-radius: var(--raio-l); }
+.abas-laterais button { flex: 1; border-color: transparent; background: none; }
+.abas-laterais button:hover:not(:disabled) { transform: none; box-shadow: none; background: var(--superficie); }
+.abas-laterais button.ativo { background: var(--superficie); color: var(--texto); box-shadow: var(--sombra); border-color: transparent; }
+.ficha { padding: 1.25rem; }
 .ficha dl { margin: 0; }
 .ficha dt { font-size: 0.78rem; color: var(--suave); margin-top: 0.75rem; }
 .ficha dd { margin: 0; font-family: var(--fonte-mono); }
-@media (max-width: 1023px) { .ficha { position: static; } }
+@media (max-width: 1023px) { .lateral { position: static; max-height: none; } }
+
+/* Trilha da IA: o que a IA fez em cada turno, sem texto do cliente. */
+.trilha { display: flex; flex-direction: column; gap: 0.75rem; }
+.trilha ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.trilha-total { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.turno { padding: 0.75rem 0.9rem; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio-m); }
+.turno p { margin: 0.3rem 0 0; font-size: 0.85rem; }
+.turno-topo { display: flex; align-items: center; gap: 0.6rem; font-size: 0.8rem; }
+.turno-custo { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--suave); }
+.turno-caminho { font-weight: 500; }
+.turno-classificacao { color: var(--suave); }
+.turno-chamadas { list-style: none; margin: 0.4rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.2rem; }
+.turno-chamadas li { display: flex; flex-wrap: wrap; gap: 0.5rem; font-size: 0.78rem; color: var(--suave); font-variant-numeric: tabular-nums; }
+.turno-chamadas li span:first-child { color: var(--texto); font-weight: 500; min-width: 7.5rem; }
+.turno-chamadas li.falhou span:nth-child(2) { color: var(--erro); font-weight: 600; }
+
+/* Custos (só gestor) */
+.custos { display: flex; flex-direction: column; gap: 1.5rem; }
+.totais { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; margin: 0; }
+.totais > div { padding: 1.1rem 1.25rem; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio-l); }
+.totais dt { font-size: 0.85rem; color: var(--suave); }
+.totais dd { margin: 0.25rem 0 0; font-family: var(--fonte-titulo); font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+.totais dd.nota { font-family: var(--fonte-texto); font-size: 0.85rem; }
+.custos section { padding: 1.25rem; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio-l); }
+.custos table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.custos th { text-align: left; font-size: 0.78rem; font-weight: 500; color: var(--suave); padding: 0.5rem; border-bottom: 1px solid var(--borda); }
+.custos td { padding: 0.5rem; border-bottom: 1px solid var(--borda); }
+.custos tbody tr:last-child td { border-bottom: none; }
+.custos .num { text-align: right; }
+.caras { margin: 0; padding-left: 1.25rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.caras li span { margin-left: 0.75rem; color: var(--suave); font-variant-numeric: tabular-nums; }
 
 /* ---------------------------------------------------------------- canais (decisão 0010) */
 .canais { display: flex; flex-direction: column; gap: 1.5rem; }

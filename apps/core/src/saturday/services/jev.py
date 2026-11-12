@@ -9,7 +9,7 @@ from typing import Any
 
 import httpx
 
-from saturday.metrics import custo_do_payload, registrar_chamada
+from saturday.metrics import registrar_chamada, uso_do_payload
 from saturday.services.openrouter import OpenRouterClient, OpenRouterError
 from saturday.settings import JEV_INTENT_THRESHOLD, JEV_TIMEOUT_S, Settings
 
@@ -235,13 +235,11 @@ class JevClient:
                 JEV_TIMEOUT_S,
             )
         except OpenRouterError as exc:
-            registrar_chamada("jev", (time.monotonic() - inicio) * 1000)
+            registrar_chamada("jev", (time.monotonic() - inicio) * 1000, status="erro")
             logger.warning("jev_falhou: %s", type(exc).__name__)
             raise JevError("Falha ao consultar o Jev") from exc
 
         registrar_chamada(
-            "jev",
-            (time.monotonic() - inicio) * 1000,
-            custo_do_payload(dados),
+            "jev", (time.monotonic() - inicio) * 1000, status="ok", **uso_do_payload(dados)
         )
         return _parse(dados, oferta_pendente)

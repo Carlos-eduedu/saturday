@@ -7,8 +7,11 @@ import {
   type Eu,
   type Ficha,
   midiaUrl,
+  type Trilha,
   type Usuario,
 } from "../api";
+import { Vazio } from "../componentes/Vazio";
+import { CHAMADAS, dolar, ETAPAS, MOTIVOS_HANDOFF, NOS, rotulo, tokens } from "../rotulos";
 import { useAvisos } from "../tempoReal";
 import { formatarHora, ROTULO_ATENDIMENTO } from "./Inbox";
 
@@ -105,7 +108,7 @@ export function Conversa({ eu }: { eu: Eu }) {
             </button>
           ))}
       </section>
-      <FichaCliente id={id} />
+      <Lateral id={id} />
     </div>
   );
 }
@@ -231,6 +234,125 @@ function Envio({
   );
 }
 
+// Coluna da direita: a Ficha do cliente ou a trilha da IA, turno a turno.
+function Lateral({ id }: { id: string }) {
+  const [aba, setAba] = useState<"ficha" | "ia">("ficha");
+  return (
+    <aside className="lateral">
+      <div role="tablist" aria-label="Painel lateral" className="abas-laterais">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={aba === "ficha"}
+          className={aba === "ficha" ? "ativo" : ""}
+          onClick={() => setAba("ficha")}
+        >
+          Ficha
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={aba === "ia"}
+          className={aba === "ia" ? "ativo" : ""}
+          onClick={() => setAba("ia")}
+        >
+          IA
+        </button>
+      </div>
+      {aba === "ficha" ? <FichaCliente id={id} /> : <TrilhaIa id={id} />}
+    </aside>
+  );
+}
+
+function TrilhaIa({ id }: { id: string }) {
+  const [trilha, setTrilha] = useState<Trilha | null>(null);
+  const [erro, setErro] = useState("");
+  const carregar = useCallback(() => {
+    api
+      .turnos(id)
+      .then((t) => {
+        setTrilha(t);
+        setErro("");
+      })
+      .catch((e: unknown) => setErro(e instanceof Error ? e.message : "falha ao carregar"));
+  }, [id]);
+  useEffect(carregar, [carregar]);
+  useAvisos(
+    useCallback(
+      (aviso) => (aviso.conversa === id || aviso.tipo === "reconectado") && carregar(),
+      [id, carregar],
+    ),
+  );
+
+  if (erro)
+    return (
+      <p className="erro" role="alert">
+        {erro}
+      </p>
+    );
+  if (!trilha) return <p className="centro">Carregando…</p>;
+  if (trilha.turnos.length === 0)
+    return (
+      <Vazio
+        titulo="Nenhum turno ainda."
+        texto="Cada resposta da IA aparece aqui, com o que ela fez."
+      />
+    );
+
+  return (
+    <div className="trilha">
+      {trilha.custo_usd !== null && (
+        <p className="trilha-total">
+          {dolar(trilha.custo_usd)} · {tokens(trilha.tokens ?? 0)} tokens nesta conversa
+        </p>
+      )}
+      <ol>
+        {trilha.turnos.map((t) => (
+          <li key={t.id} className="turno">
+            <div className="turno-topo">
+              <time dateTime={t.criado_em}>{formatarHora(t.criado_em)}</time>
+              {t.etapa && <span className="etapa">{rotulo(ETAPAS, t.etapa)}</span>}
+              {t.custo_usd !== null && <span className="turno-custo">{dolar(t.custo_usd)}</span>}
+            </div>
+            <p className="turno-caminho">{t.caminho.map((n) => rotulo(NOS, n)).join(" → ")}</p>
+            {t.classificacao && (
+              <p className="turno-classificacao">
+                Intenção: {t.classificacao.intencao ?? "—"} · público:{" "}
+                {t.classificacao.publico ?? "—"}
+                {t.classificacao.confianca !== null &&
+                  ` · confiança ${Math.round(t.classificacao.confianca * 100)}%`}
+              </p>
+            )}
+            {t.motivo && <p className="motivo">Motivo: {rotulo(MOTIVOS_HANDOFF, t.motivo)}</p>}
+            {t.chamadas.length > 0 && (
+              <ul className="turno-chamadas">
+                {t.chamadas.map((c, i) => (
+                  <li
+                    key={i}
+                    className={
+                      c.status && c.status !== "ok" && !c.status.startsWith("2") ? "falhou" : ""
+                    }
+                  >
+                    <span>{rotulo(CHAMADAS, c.nome)}</span>
+                    <span>{c.status ?? "—"}</span>
+                    <span>{Math.round(c.latencia_ms)} ms</span>
+                    {c.custo_usd !== null && <span>{dolar(c.custo_usd)}</span>}
+                    {c.tokens_entrada !== null && (
+                      <span>
+                        {tokens(c.tokens_entrada)}+{tokens(c.tokens_saida ?? 0)} tok
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 function FichaCliente({ id }: { id: string }) {
   const [ficha, setFicha] = useState<Ficha | null>(null);
   const [revelados, setRevelados] = useState<Partial<Record<CampoSensivel, string>>>({});
@@ -248,9 +370,9 @@ function FichaCliente({ id }: { id: string }) {
     setRevelados((atual) => ({ ...atual, [campo]: valor }));
   }
 
-  if (!ficha) return <aside className="ficha" />;
+  if (!ficha) return <div className="ficha" />;
   return (
-    <aside className="ficha">
+    <div className="ficha">
       <h2>Ficha</h2>
       <dl>
         {(Object.keys(CAMPOS) as CampoSensivel[])
@@ -288,6 +410,6 @@ function FichaCliente({ id }: { id: string }) {
         )}
       </dl>
       <p className="nota">Revelar um dado fica registrado na auditoria.</p>
-    </aside>
+    </div>
   );
 }

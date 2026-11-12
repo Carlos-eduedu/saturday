@@ -3,6 +3,7 @@ import { Link, Navigate, Route, Routes, useLocation } from "react-router";
 import { api, type Cota, type Eu, ErroApi, guardarCsrf } from "./api";
 import { Alertas } from "./paginas/Alertas";
 import { Canais } from "./paginas/Canais";
+import { Custos } from "./paginas/Custos";
 import StaggeredMenu from "./componentes/StaggeredMenu";
 import { Conversa } from "./paginas/Conversa";
 import { Inbox } from "./paginas/Inbox";
@@ -56,6 +57,12 @@ function Logado({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
             link: "/canais",
             ativo: pathname === "/canais",
           },
+          {
+            label: "Custos",
+            ariaLabel: "Ir para os custos",
+            link: "/custos",
+            ativo: pathname === "/custos",
+          },
         ]
       : []),
   ];
@@ -99,6 +106,7 @@ function Logado({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
           <Route path="/conversas/:id" element={<Conversa eu={eu} />} />
           <Route path="/alertas" element={<Alertas />} />
           {eu.perfil === "gestor" && <Route path="/canais" element={<Canais />} />}
+          {eu.perfil === "gestor" && <Route path="/custos" element={<Custos />} />}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </main>

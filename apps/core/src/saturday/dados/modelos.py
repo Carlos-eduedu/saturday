@@ -18,6 +18,7 @@ from sqlalchemy import (
     BigInteger,
     Date,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -387,3 +388,30 @@ class Instancia(Base):
     nome: Mapped[str] = mapped_column(String(64), primary_key=True)
     telefone: Mapped[str] = mapped_column(String(16), nullable=False)
     fixado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
+
+
+class Turno(Base):
+    """Trilha de um turno da IA: só códigos, números e tempos, nunca texto.
+
+    Mostrada na aba "IA" da conversa e somada na tela de custos. Apagada com
+    a conversa.
+    """
+
+    __tablename__ = "turnos"
+    __table_args__ = (Index("ix_turnos_conversa_criado", "conversa_id", "criado_em"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    conversa_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("conversas.id", ondelete="CASCADE"), nullable=False
+    )
+    criado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=AGORA, index=True
+    )
+    caminho: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+    status: Mapped[str | None] = mapped_column(String(32))
+    motivo: Mapped[str | None] = mapped_column(String(64))
+    etapa: Mapped[str | None] = mapped_column(String(32))
+    classificacao: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    chamadas: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
+    custo_usd: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

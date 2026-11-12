@@ -18,7 +18,7 @@ from saturday.agent.state import turno_inicial
 from saturday.agent.textos import mensagem_handoff
 from saturday.canais.base import CANAIS_WHATSAPP, OrigemCanal
 from saturday.dados import repositorios
-from saturday.dados.modelos import Conversa
+from saturday.dados.modelos import Conversa, Turno
 from saturday.dados.outbox import enfileirar
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.dados.trava import travar_conversa
@@ -240,10 +240,42 @@ class AgentService:
         return self._expirou(self._parse_iso(estado.get("handoff_em")))
 
     @staticmethod
-    def _registrar_turno(conversa: Conversa, estado: dict[str, Any]) -> None:
-        """Copia para a conversa o que o painel lista sem ler o checkpoint."""
+    def _registrar_turno(
+        sessao: Session,
+        conversa: Conversa,
+        estado: dict[str, Any],
+        caminho: list[str],
+        metricas: TurnMetrics | None,
+    ) -> None:
+        """Etapa na conversa (para a lista) e a trilha do turno (aba "IA").
+
+        Só códigos, números e tempos: nenhum texto do cliente ou do modelo.
+        """
 
         conversa.etapa = etapa_do_estado(estado)
+        resumo = metricas.resumo() if metricas else {"chamadas": [], "custo_total_usd": 0.0}
+        classificou = "classify_intent" in caminho
+        sessao.add(
+            Turno(
+                conversa_id=conversa.id,
+                caminho=list(caminho),
+                status=estado.get("status"),
+                motivo=estado.get("handoff_reason"),
+                etapa=conversa.etapa,
+                classificacao=(
+                    {
+                        "intencao": estado.get("intent"),
+                        "publico": estado.get("publico"),
+                        "confianca": estado.get("intent_confidence"),
+                    }
+                    if classificou
+                    else None
+                ),
+                chamadas=resumo["chamadas"],
+                custo_usd=resumo["custo_total_usd"],
+                tokens=resumo.get("tokens_total", 0),
+            )
+        )
 
     def _log_turno(
         self,
@@ -520,8 +552,8 @@ class AgentService:
             inicio,
             metricas,
         )
-        if conversa is not None:
-            self._registrar_turno(conversa, final)
+        if sessao is not None and conversa is not None:
+            self._registrar_turno(sessao, conversa, final, caminho, metricas)
         resposta = self.evento(payload.conversation_id, final)
 
         if payload.message_id and resposta.answer:
@@ -580,8 +612,8 @@ class AgentService:
             self._stream(entrada, config, caminho)
             final = dict(self.graph.get_state(config).values or {})
             self._log_turno(conversation_id, final, caminho, inicio, metricas)
-            if conversa is not None:
-                self._registrar_turno(conversa, final)
+            if sessao is not None and conversa is not None:
+                self._registrar_turno(sessao, conversa, final, caminho, metricas)
             resposta = self.evento(conversation_id, final)
             if sessao is not None and conversa is not None:
                 if resposta.status == "handoff":

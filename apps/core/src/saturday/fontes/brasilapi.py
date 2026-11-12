@@ -123,7 +123,7 @@ class BrasilAPI:
 
     def _registrar(self, situacao: int | None, inicio: float, conversa_id: Any) -> None:
         duracao_ms = (time.monotonic() - inicio) * 1000
-        registrar_chamada(SERVICO, duracao_ms)
+        registrar_chamada(SERVICO, duracao_ms, status=situacao if situacao else "erro")
         logger.info("brasilapi_chamada rota=%s status=%s ms=%.0f", ROTA, situacao, duracao_ms)
         if self._fabrica is None:
             return

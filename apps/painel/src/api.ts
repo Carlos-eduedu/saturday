@@ -91,6 +91,54 @@ export interface Qr {
   estado: string;
 }
 
+export interface ChamadaTurno {
+  nome: string;
+  latencia_ms: number;
+  status: string | null;
+  custo_usd: number | null;
+  tokens_entrada: number | null;
+  tokens_saida: number | null;
+}
+
+export interface Turno {
+  id: number;
+  criado_em: string;
+  caminho: string[];
+  status: string | null;
+  motivo: string | null;
+  etapa: string | null;
+  classificacao: {
+    intencao: string | null;
+    publico: string | null;
+    confianca: number | null;
+  } | null;
+  chamadas: ChamadaTurno[];
+  custo_usd: number | null;
+  tokens: number | null;
+}
+
+export interface Trilha {
+  custo_usd: number | null;
+  tokens: number | null;
+  turnos: Turno[];
+}
+
+export interface DiaDeCusto {
+  dia: string;
+  custo_usd: number;
+  tokens: number;
+  turnos: number;
+}
+
+export interface Custos {
+  de: string;
+  ate: string;
+  total: { custo_usd: number; tokens: number; turnos: number };
+  hoje: DiaDeCusto | null;
+  dias: DiaDeCusto[];
+  conversas_mais_caras: { id: string; telefone: string | null; canal: string; custo_usd: number }[];
+}
+
 export class ErroApi extends Error {
   constructor(
     readonly status: number,
@@ -155,6 +203,8 @@ export const api = {
   resolverAlerta: (id: number) => chamar<void>("POST", `/alertas/${id}/resolver`),
   cota: () => chamar<Cota>("GET", "/cota"),
   canais: () => chamar<Canais>("GET", "/canais"),
+  turnos: (id: string) => chamar<Trilha>("GET", `/conversas/${id}/turnos`),
+  custos: () => chamar<Custos>("GET", "/custos"),
   criarInstancia: (nome: string) => chamar<Qr>("POST", "/canais/evolution", { nome }),
   conectarInstancia: (nome: string) => chamar<Qr>("POST", `/canais/evolution/${nome}/conectar`),
   qrInstancia: (nome: string) => chamar<Qr>("GET", `/canais/evolution/${nome}/qr`),

@@ -12,6 +12,10 @@ class Chamada:
     nome: str
     latencia_ms: float
     custo_usd: float | None = None
+    # `ok`, `erro` ou o status HTTP do parceiro.
+    status: str | None = None
+    tokens_entrada: int | None = None
+    tokens_saida: int | None = None
 
 
 @dataclass
@@ -23,14 +27,25 @@ class TurnMetrics:
         nome: str,
         latencia_ms: float,
         custo_usd: float | None = None,
+        *,
+        status: str | None = None,
+        tokens_entrada: int | None = None,
+        tokens_saida: int | None = None,
     ) -> None:
         self.chamadas.append(
             Chamada(
                 nome=nome,
                 latencia_ms=round(latencia_ms, 2),
                 custo_usd=custo_usd,
+                status=status,
+                tokens_entrada=tokens_entrada,
+                tokens_saida=tokens_saida,
             )
         )
+
+    @property
+    def tokens_total(self) -> int:
+        return sum((c.tokens_entrada or 0) + (c.tokens_saida or 0) for c in self.chamadas)
 
     @property
     def custo_total_usd(self) -> float:
@@ -43,10 +58,14 @@ class TurnMetrics:
                     "nome": chamada.nome,
                     "latencia_ms": chamada.latencia_ms,
                     "custo_usd": chamada.custo_usd,
+                    "status": chamada.status,
+                    "tokens_entrada": chamada.tokens_entrada,
+                    "tokens_saida": chamada.tokens_saida,
                 }
                 for chamada in self.chamadas
             ],
             "custo_total_usd": round(self.custo_total_usd, 6),
+            "tokens_total": self.tokens_total,
         }
 
 
@@ -67,10 +86,38 @@ def registrar_chamada(
     nome: str,
     latencia_ms: float,
     custo_usd: float | None = None,
+    *,
+    status: str | int | None = None,
+    tokens_entrada: int | None = None,
+    tokens_saida: int | None = None,
 ) -> None:
     metricas = _ATUAL.get()
     if metricas is not None:
-        metricas.registrar(nome, latencia_ms, custo_usd)
+        metricas.registrar(
+            nome,
+            latencia_ms,
+            custo_usd,
+            status=None if status is None else str(status),
+            tokens_entrada=tokens_entrada,
+            tokens_saida=tokens_saida,
+        )
+
+
+def _inteiro(valor: object) -> int | None:
+    return valor if isinstance(valor, int) and not isinstance(valor, bool) else None
+
+
+def uso_do_payload(dados: dict[str, Any]) -> dict[str, Any]:
+    """Custo e tokens que a OpenRouter devolve em `usage` (vazio se não vier)."""
+
+    usage = dados.get("usage")
+    if not isinstance(usage, dict):
+        return {}
+    return {
+        "custo_usd": custo_do_payload(dados),
+        "tokens_entrada": _inteiro(usage.get("prompt_tokens")),
+        "tokens_saida": _inteiro(usage.get("completion_tokens")),
+    }
 
 
 def custo_do_payload(dados: dict[str, Any]) -> float | None:

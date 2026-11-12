@@ -11,7 +11,7 @@ from typing import Any
 import httpx
 
 from saturday.faq import FAQ
-from saturday.metrics import custo_do_payload, registrar_chamada
+from saturday.metrics import registrar_chamada, uso_do_payload
 from saturday.services.anexos import Anexo
 from saturday.services.openrouter import OpenRouterClient, OpenRouterError
 from saturday.settings import LLM_TEMPERATURE, LLM_TIMEOUT_S, Settings
@@ -149,7 +149,7 @@ class LLMClient:
         """Uma nova tentativa para falhas transitórias, dentro do prazo total."""
 
         inicio = time.monotonic()
-        custo: float | None = None
+        uso: dict[str, Any] | None = None
         try:
             ultimo_erro: OpenRouterError | None = None
             for tentativa in range(2):
@@ -162,7 +162,7 @@ class LLMClient:
                         payload,
                         restante,
                     )
-                    custo = custo_do_payload(dados)
+                    uso = uso_do_payload(dados)
                     return dados
                 except OpenRouterError as exc:
                     ultimo_erro = exc
@@ -173,7 +173,12 @@ class LLMClient:
                 raise ultimo_erro
             raise OpenRouterError("tempo esgotado antes da chamada ao OpenRouter")
         finally:
-            registrar_chamada(nome, (time.monotonic() - inicio) * 1000, custo)
+            registrar_chamada(
+                nome,
+                (time.monotonic() - inicio) * 1000,
+                status="ok" if uso is not None else "erro",
+                **(uso or {}),
+            )
 
     def ler_extrato(self, anexos: list[Anexo]) -> dict[str, Any]:
         """Lê todos os anexos numa única chamada ao modelo de visão."""
