@@ -77,7 +77,10 @@ def _triagem(t: Turno) -> dict[str, Any]:
             return _recontato_tempo_casa(t, meses)
         return t.perguntar("triagem", "contrato_especial")
 
-    resposta = leitura.sim_ou_nao(t.texto)
+    if passo == "contrato_especial":
+        resposta = leitura.contrato_especial(t.texto)
+    else:
+        resposta = leitura.sim_ou_nao(t.texto)
     if resposta is None:
         return t.erro("repetir_sim_nao")
     reprova, chave = REPROVA[passo]

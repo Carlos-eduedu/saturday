@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 from langchain_core.messages import AIMessage
 from langgraph.runtime import Runtime
 
+from saturday.agent.clt.leitura import NEGACAO
 from saturday.agent.coleta import hoje_operacao, normalizar_uf, parse_data_nascimento
 from saturday.agent.context import AgentContext
 from saturday.agent.state import AgentState
@@ -156,8 +157,12 @@ def classify_intent(state: AgentState, runtime: Runtime[AgentContext]) -> dict[s
         intent = "duvida"
 
     publico = resultado.publico
-    if publico == "indefinido":
-        publico = state.get("publico") or "indefinido"
+    anterior = state.get("publico")
+    if publico == "indefinido" or (
+        anterior and anterior != "indefinido" and NEGACAO.search(state.get("user_message", ""))
+    ):
+        # Frase com negação ("não sou servidor") não troca um público já conhecido.
+        publico = anterior or "indefinido"
 
     resposta_oferta = None
     if state.get("oferta_pendente"):

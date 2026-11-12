@@ -86,6 +86,44 @@ def sim_ou_nao(texto: str) -> bool | None:
     return True if afirma else None
 
 
+# Pergunta do contrato especial: "sou"/"estou" sozinhos não dizem sim, porque o
+# cliente costuma responder descrevendo o próprio contrato ("sou efetivado").
+_SITUACOES_ESPECIAIS = (
+    "estagi",
+    "experiencia",
+    "aviso",
+    "licenca",
+    "maternidade",
+    "temporari",
+    "data para terminar",
+    "prazo determinado",
+)
+_CONTRATO_COMUM = ("efetiv", "registrad", "fixo", "clt", "contrato normal", "indeterminado")
+
+
+def contrato_especial(texto: str) -> bool | None:
+    """Sim se o cliente está numa das situações; não se é efetivo; senão repete."""
+
+    normal = normalizar(texto)
+    if any(trecho in normal for trecho in _DUVIDA):
+        return None
+    if re.search(r"\bnao (sou|estou|tenho)\b", normal):
+        return False
+    palavras = set(_palavras(texto))
+    nega = bool(palavras & _NEGATIVAS)
+    especial = any(s in normal for s in _SITUACOES_ESPECIAIS)
+    comum = any(c in normal for c in _CONTRATO_COMUM)
+    if especial and not comum and not nega:
+        return True
+    if comum and not especial:
+        return False
+    if especial:
+        return None
+    if nega:
+        return None if "sim" in palavras else False
+    return True if "sim" in palavras else None
+
+
 def aceitou(texto: str) -> bool:
     """Resposta à oferta: um sim (ou "quero", "aceito"...) sem negação."""
 

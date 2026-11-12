@@ -24,7 +24,8 @@ mensagens:
     meses, por exemplo: 2 anos.
   triagem_contrato_especial: >-
     Você é estagiário, está em contrato de experiência, tem contrato com data
-    para terminar, está em aviso prévio ou em licença-maternidade?
+    para terminar, está em aviso prévio ou em licença-maternidade? Responda sim
+    ou não.
   triagem_granatech: Você já tem empréstimo com a Granatech?
   triagem_funcionarios: A empresa onde você trabalha tem 30 funcionários ou mais?
   repetir_sim_nao: "Não entendi. Pode responder só com sim ou não?"

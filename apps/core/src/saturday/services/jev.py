@@ -84,7 +84,10 @@ def _perguntas(oferta_pendente: bool) -> dict[str, Any]:
         },
         "publico": {
             "type": "choice",
-            "instructions": "A que público pertence o cliente, segundo a mensagem?",
+            "instructions": (
+                "A que público pertence o cliente, segundo a mensagem? Se o "
+                "cliente diz que NÃO é de um público, não escolha esse público."
+            ),
             "criteria": {
                 "clt": (
                     "Trabalhador com carteira assinada (CLT), ou que pede o Crédito "

@@ -305,3 +305,27 @@ def test_marketing_e_cancelamento() -> None:
     assert leitura.pediu_cancelamento("quero cancelar")
     assert leitura.pediu_cancelamento("desisti")
     assert not leitura.pediu_cancelamento("quando cai o dinheiro?")
+
+
+@pytest.mark.parametrize(
+    ("texto", "esperado"),
+    [
+        # Conversa do dev: "Eu sou efetivado" reprovava como se fosse "sim".
+        ("Eu sou efetivado", False),
+        ("sou efetivo", False),
+        ("sou CLT normal", False),
+        ("não, sou efetivado", False),
+        ("não sou estagiário", False),
+        ("nenhum", False),
+        ("não", False),
+        ("sim", True),
+        ("sou estagiário", True),
+        ("estou em aviso prévio", True),
+        ("sim, estou de licença maternidade", True),
+        ("não sei", None),
+        ("sou", None),
+        ("oi", None),
+    ],
+)
+def test_leitura_do_contrato_especial(texto: str, esperado: bool | None) -> None:
+    assert leitura.contrato_especial(texto) is esperado
