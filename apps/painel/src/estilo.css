@@ -172,7 +172,35 @@ time, small { font-size: 0.8rem; color: var(--suave); }
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--borda);
 }
-.marca-topo { display: flex; align-items: center; gap: 0.75rem; }
+.marca-topo { display: flex; align-items: center; gap: 0.75rem; flex: 1; min-width: 0; }
+.staggered-menu-header .sm-logo { flex: 1; min-width: 0; }
+.nav-topo { display: flex; gap: 0.25rem; margin-left: 1rem; }
+.nav-topo a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--alvo);
+  padding: 0 0.85rem;
+  border-radius: var(--raio-m);
+  color: var(--suave);
+  font-weight: 500;
+  text-decoration: none;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.nav-topo a:hover { background: var(--superficie-2); color: var(--texto); }
+.nav-topo a[aria-current="page"] { background: var(--destaque-suave); color: var(--destaque); }
+.conta-topo { margin-left: auto; display: flex; align-items: center; gap: 1rem; }
+/* Desktop: tudo no topo, sem o menu; celular: só marca, selo e o botão Menu. */
+.selo-alertas, .conta-topo .cota { white-space: nowrap; }
+@media (min-width: 1024px) {
+  .sm-toggle, .staggered-menu-panel, .sm-prelayers { display: none; }
+}
+@media (max-width: 1023px) {
+  .nav-topo, .conta-topo { display: none; }
+}
+/* O e-mail é o que sai primeiro quando falta espaço; ele continua no menu. */
+@media (max-width: 1279px) {
+  .conta-topo .quem { display: none; }
+}
 .selo-alertas {
   display: inline-flex;
   align-items: center;

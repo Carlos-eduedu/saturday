@@ -86,6 +86,21 @@ function Logado({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
               Saturday
             </Link>
             <SeloAlertas />
+            {/* Desktop: navegação e conta à vista; o menu animado fica só no celular. */}
+            <nav className="nav-topo" aria-label="Principal">
+              {itens.map((it) => (
+                <Link key={it.link} to={it.link} aria-current={it.ativo ? "page" : undefined}>
+                  {it.label}
+                </Link>
+              ))}
+            </nav>
+            <div className="conta-topo">
+              <ContadorCota />
+              <span className="quem">{eu.email}</span>
+              <button type="button" onClick={aoSair}>
+                Sair
+              </button>
+            </div>
           </div>
         }
         rodape={
