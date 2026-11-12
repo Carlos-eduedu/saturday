@@ -139,6 +139,11 @@ label { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.875rem
 }
 
 .centro, .vazio { text-align: center; color: var(--suave); padding: 2.5rem 1rem; }
+.vazio p { margin: 0.25rem 0; }
+.vazio .vazio-titulo { font-family: var(--fonte-titulo); font-size: 1.1rem; font-weight: 500; color: var(--texto); }
+.titulo-tela { font-size: 1.6rem; margin: 0 0 1.25rem; }
+.titulo-tela .contagem { color: var(--suave); font-weight: 400; font-size: 1.1rem; }
+.status.falhou { color: var(--erro); font-weight: 600; }
 .erro { color: var(--erro); }
 .aviso, .nota { color: var(--suave); font-size: 0.875rem; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
@@ -147,13 +152,15 @@ time, small { font-size: 0.8rem; color: var(--suave); }
 /* ---------------------------------------------------------------- login */
 .login {
   width: min(24rem, calc(100% - 2rem));
-  margin: 14vh auto;
+  /* Centro óptico: um pouco acima do meio da tela. */
+  margin: max(2rem, calc(42vh - 12rem)) auto 2rem;
   padding: 2rem;
   display: flex;
   flex-direction: column;
   gap: 1.1rem;
 }
-.login h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
+.login h1 { font-size: 1.6rem; font-weight: 600; letter-spacing: -0.02em; margin: 0; }
+.login h1 + .nota { margin: -0.75rem 0 0.5rem; }
 
 /* ---------------------------------------------------------------- topo e menu */
 /* StaggeredMenu (React Bits) fixo: o cabeçalho dele é a barra do topo, e o
@@ -165,6 +172,21 @@ time, small { font-size: 0.8rem; color: var(--suave); }
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--borda);
 }
+.marca-topo { display: flex; align-items: center; gap: 0.75rem; }
+.selo-alertas {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 0.75rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--handoff) 14%, transparent);
+  color: var(--handoff);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform 120ms ease, background-color 120ms ease;
+}
+.selo-alertas:hover { transform: translateY(-1px); background: color-mix(in srgb, var(--handoff) 22%, transparent); }
 .marca {
   font-family: var(--fonte-titulo);
   font-weight: 600;
@@ -297,7 +319,7 @@ main {
   background: var(--fundo);
   border-bottom: 1px solid var(--borda);
 }
-.historico h2 { font-size: 1.15rem; margin: 0; font-family: var(--fonte-mono); font-weight: 500; letter-spacing: 0; }
+.historico h1 { font-size: 1.15rem; margin: 0; font-family: var(--fonte-mono); font-weight: 500; letter-spacing: 0; }
 .acoes { display: flex; gap: 0.5rem; align-items: end; flex-wrap: wrap; margin-left: auto; }
 .transferir { display: flex; gap: 0.5rem; align-items: end; }
 .mensagens { display: flex; flex-direction: column; gap: 0.6rem; margin: 1.25rem 0; }
@@ -373,6 +395,10 @@ main {
   .canais td:first-child { font-weight: 600; }
   .canais td.acoes { justify-content: flex-start; flex-wrap: wrap; padding-top: 0.5rem; }
   .nova-instancia { flex-direction: column; align-items: stretch; }
+}
+
+@media (prefers-color-scheme: dark) {
+  .filtros [role="tablist"] button.ativo { background: var(--destaque-suave); color: var(--destaque); box-shadow: inset 0 0 0 1px var(--destaque); }
 }
 
 @media (prefers-reduced-motion: reduce) {

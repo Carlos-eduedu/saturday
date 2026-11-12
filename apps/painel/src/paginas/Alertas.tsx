@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { type Alerta, api } from "../api";
+import { Vazio } from "../componentes/Vazio";
 import { useAvisos } from "../tempoReal";
 import { formatarHora } from "./Inbox";
 
@@ -19,7 +20,10 @@ const ROTULOS: Record<string, string> = {
 export function Alertas() {
   const [alertas, setAlertas] = useState<Alerta[]>([]);
   const carregar = useCallback(() => {
-    api.alertas().then(setAlertas).catch(() => undefined);
+    api
+      .alertas()
+      .then(setAlertas)
+      .catch(() => undefined);
   }, []);
   useEffect(carregar, [carregar]);
   useAvisos(useCallback((aviso) => aviso.tipo !== "mensagem" && carregar(), [carregar]));
@@ -29,20 +33,31 @@ export function Alertas() {
     carregar();
   }
 
-  if (alertas.length === 0) return <p className="vazio">Nenhum alerta aberto.</p>;
   return (
-    <ul className="alertas">
-      {alertas.map((a) => (
-        <li key={a.id}>
-          <strong>{ROTULOS[a.tipo] ?? a.tipo}</strong>
-          {typeof a.detalhe?.instancia === "string" && <span>{a.detalhe.instancia}</span>}
-          <time>{formatarHora(a.criado_em)}</time>
-          {a.conversa_id && <Link to={`/conversas/${a.conversa_id}`}>Abrir conversa</Link>}
-          <button type="button" onClick={() => resolver(a.id)}>
-            Resolver
-          </button>
-        </li>
-      ))}
-    </ul>
+    <section>
+      <h1 className="titulo-tela">
+        Alertas <span className="contagem">· {alertas.length}</span>
+      </h1>
+      {alertas.length === 0 ? (
+        <Vazio
+          titulo="Nenhum alerta aberto."
+          texto="Handoffs, envios que falharam e instâncias que caíram aparecem aqui."
+        />
+      ) : (
+        <ul className="alertas">
+          {alertas.map((a) => (
+            <li key={a.id}>
+              <strong>{ROTULOS[a.tipo] ?? a.tipo}</strong>
+              {typeof a.detalhe?.instancia === "string" && <span>{a.detalhe.instancia}</span>}
+              <time>{formatarHora(a.criado_em)}</time>
+              {a.conversa_id && <Link to={`/conversas/${a.conversa_id}`}>Abrir conversa</Link>}
+              <button type="button" onClick={() => resolver(a.id)}>
+                Resolver
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

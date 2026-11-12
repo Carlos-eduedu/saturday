@@ -19,6 +19,13 @@ const CAMPOS: Record<CampoSensivel, string> = {
   data_nascimento: "Nascimento",
 };
 
+const STATUS_ENTREGA: Record<string, string> = {
+  sent: "enviada",
+  delivered: "entregue",
+  read: "lida",
+  failed: "falhou",
+};
+
 export function Conversa({ eu }: { eu: Eu }) {
   const { id = "" } = useParams();
   const [conversa, setConversa] = useState<Detalhe | null>(null);
@@ -55,7 +62,7 @@ export function Conversa({ eu }: { eu: Eu }) {
     <div className="conversa">
       <section className="historico">
         <header>
-          <h2>{conversa.telefone ?? conversa.canal}</h2>
+          <h1>{conversa.telefone ?? conversa.canal}</h1>
           <span className={`selo selo-${conversa.atendimento}`}>
             {ROTULO_ATENDIMENTO[conversa.atendimento]}
             {minha ? " (você)" : ""}
@@ -79,7 +86,12 @@ export function Conversa({ eu }: { eu: Eu }) {
               ))}
               <small>
                 {formatarHora(m.criada_em)}
-                {m.status_entrega ? ` · ${m.status_entrega}` : ""}
+                {m.status_entrega && (
+                  <span className={m.status_entrega === "failed" ? "status falhou" : "status"}>
+                    {" · "}
+                    {STATUS_ENTREGA[m.status_entrega] ?? m.status_entrega}
+                  </span>
+                )}
               </small>
             </li>
           ))}
@@ -114,7 +126,11 @@ function Acoes({
   const podeMexer = minha || eu.perfil === "gestor";
 
   useEffect(() => {
-    if (podeMexer) api.usuarios().then(setUsuarios).catch(() => undefined);
+    if (podeMexer)
+      api
+        .usuarios()
+        .then(setUsuarios)
+        .catch(() => undefined);
   }, [podeMexer]);
 
   return (
@@ -221,7 +237,10 @@ function FichaCliente({ id }: { id: string }) {
 
   useEffect(() => {
     setRevelados({});
-    api.ficha(id).then(setFicha).catch(() => setFicha(null));
+    api
+      .ficha(id)
+      .then(setFicha)
+      .catch(() => setFicha(null));
   }, [id]);
 
   async function revelar(campo: CampoSensivel) {
@@ -232,7 +251,7 @@ function FichaCliente({ id }: { id: string }) {
   if (!ficha) return <aside className="ficha" />;
   return (
     <aside className="ficha">
-      <h3>Ficha</h3>
+      <h2>Ficha</h2>
       <dl>
         {(Object.keys(CAMPOS) as CampoSensivel[])
           .filter((campo) => ficha.dados[campo])

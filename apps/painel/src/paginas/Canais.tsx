@@ -1,4 +1,5 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { Vazio } from "../componentes/Vazio";
 import { api, type Canais as DadosCanais, ErroApi, type InstanciaEvolution, type Qr } from "../api";
 
 // Tela Canais (decisão 0010), só para gestor: números da Meta para consulta e
@@ -44,6 +45,7 @@ export function Canais() {
 
   return (
     <div className="canais">
+      <h1 className="titulo-tela">Canais</h1>
       {erro && <p className="erro">{erro}</p>}
 
       <section>
@@ -102,7 +104,10 @@ function TabelaInstancias({
   agir: (acao: () => Promise<unknown>) => Promise<void>;
   mostrarQr: (nome: string, qr: Qr) => void;
 }) {
-  if (instancias.length === 0) return <p className="vazio">Nenhuma instância.</p>;
+  if (instancias.length === 0)
+    return (
+      <Vazio titulo="Nenhuma instância." texto="Crie a primeira abaixo e leia o QR no celular." />
+    );
 
   function confirmar(verbo: string, i: InstanciaEvolution): boolean {
     return window.confirm(

@@ -12,6 +12,7 @@ import { api, type Eu, type Resumo } from "../api";
 import { AiChat02Icon, UserCheck01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import SwipeRow, { type SwipeAction } from "../componentes/SwipeRow";
+import { Vazio } from "../componentes/Vazio";
 import { useAvisos } from "../tempoReal";
 
 // Cores do SwipeRow pelas variáveis do painel: seguem o tema claro e o escuro.
@@ -56,6 +57,29 @@ const FILAS = [
   { valor: "assumida", rotulo: "Com humano" },
   { valor: "minhas", rotulo: "Minhas" },
 ];
+
+const VAZIOS: Record<string, { titulo: string; texto: string }> = {
+  "": {
+    titulo: "Nenhuma conversa ainda.",
+    texto: "As conversas aparecem aqui assim que um cliente escrever.",
+  },
+  ia: {
+    titulo: "Nenhuma conversa com a IA.",
+    texto: "Conversas que a IA está atendendo sozinha aparecem aqui.",
+  },
+  handoff: {
+    titulo: "Ninguém aguardando.",
+    texto: "Quando a IA passar uma conversa para a equipe, ela aparece aqui.",
+  },
+  assumida: {
+    titulo: "Nenhuma conversa com a equipe.",
+    texto: "Conversas assumidas por alguém da equipe aparecem aqui.",
+  },
+  minhas: {
+    titulo: "Nenhuma conversa sua.",
+    texto: "Arraste uma conversa para a esquerda para assumir; ela passa a aparecer aqui.",
+  },
+};
 
 export const ROTULO_ATENDIMENTO = { ia: "IA", handoff: "Handoff", assumida: "Assumida" } as const;
 
@@ -106,8 +130,22 @@ export function Inbox({ eu }: { eu: Eu }) {
     carregar();
   }
 
+  const rotuloFila = FILAS.find((f) => f.valor === fila)?.rotulo ?? "Todas";
+  const vazio = busca
+    ? {
+        titulo: "Nenhum telefone encontrado.",
+        texto: "Confira os últimos dígitos ou troque de fila.",
+      }
+    : (VAZIOS[fila] ?? VAZIOS[""]);
+
   return (
     <section>
+      <h1 className="titulo-tela">
+        Conversas{" "}
+        <span className="contagem">
+          · {rotuloFila} · {conversas.length}
+        </span>
+      </h1>
       <div className="filtros">
         <div role="tablist" aria-label="Filas">
           {FILAS.map((f) => (
@@ -135,7 +173,7 @@ export function Inbox({ eu }: { eu: Eu }) {
       </div>
       {erro && <p className="erro">{erro}</p>}
       {conversas.length === 0 ? (
-        <p className="vazio">Nenhuma conversa nesta fila.</p>
+        <Vazio titulo={vazio.titulo} texto={vazio.texto} />
       ) : (
         <ul className="inbox">
           {conversas.map((c) => (

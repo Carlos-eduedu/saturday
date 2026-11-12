@@ -74,9 +74,12 @@ function Logado({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
         openMenuButtonColor="var(--texto)"
         changeMenuColorOnOpen={false}
         logo={
-          <Link to="/" className="marca">
-            Saturday
-          </Link>
+          <div className="marca-topo">
+            <Link to="/" className="marca">
+              Saturday
+            </Link>
+            <SeloAlertas />
+          </div>
         }
         rodape={
           <div className="conta">
@@ -123,5 +126,30 @@ function ContadorCota() {
     <span className={alerta ? "cota cota-alerta" : "cota"} title="Consultas Granatech">
       Cota: {cota.dia.usadas}/{cota.dia.teto} hoje · {cota.mes.usadas}/{cota.mes.teto} no mês
     </span>
+  );
+}
+
+// Com a navegação dentro do menu, os alertas abertos ficam à vista no topo.
+function SeloAlertas() {
+  const [total, setTotal] = useState(0);
+  const carregar = useCallback(() => {
+    api
+      .alertas()
+      .then((lista) => setTotal(lista.length))
+      .catch(() => undefined);
+  }, []);
+  useEffect(carregar, [carregar]);
+  useAvisos(
+    useCallback(
+      (aviso) => (aviso.tipo === "alerta" || aviso.tipo === "reconectado") && carregar(),
+      [carregar],
+    ),
+  );
+
+  if (total === 0) return null;
+  return (
+    <Link to="/alertas" className="selo-alertas">
+      {total} {total === 1 ? "alerta" : "alertas"}
+    </Link>
   );
 }
