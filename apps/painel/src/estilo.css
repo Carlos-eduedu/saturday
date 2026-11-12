@@ -317,7 +317,35 @@ main {
 .inbox .swipe-row a:hover { transform: none; box-shadow: none; background: var(--superficie-2); }
 .inbox .swipe-row__action--commit { font-weight: 600; }
 
+/* Botão de ação na linha (desktop); no celular, o gesto é o caminho. */
+.linha-com-acao { display: flex; align-items: center; width: 100%; height: 100%; }
+.linha-com-acao > a { flex: 1; min-width: 0; }
+.acao-linha { margin-right: 1rem; flex: none; }
+/* Com o botão visível, o atalho de teclado do SwipeRow só duplicaria a ação. */
+.inbox .swipe-row__toggle { display: none; }
+
+.aviso-flutuante {
+  position: fixed;
+  left: 50%;
+  bottom: 1.5rem;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 0.5rem 0.5rem 1.1rem;
+  max-width: calc(100% - 2rem);
+  background: var(--texto);
+  color: var(--fundo);
+  border-radius: var(--raio-l);
+  box-shadow: var(--sombra-alta);
+}
+.aviso-flutuante button { background: transparent; color: inherit; border-color: color-mix(in srgb, var(--fundo) 40%, transparent); }
+.aviso-flutuante button:hover:not(:disabled) { border-color: var(--fundo); box-shadow: none; }
+
 @media (max-width: 599px) {
+  .acao-linha { display: none; }
+  .inbox .swipe-row__toggle { display: inline-flex; }
   .inbox li a { grid-template-columns: minmax(0, 1fr); align-content: center; }
   .linha-meta { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; }
   .linha-meta .atencao { order: -1; width: 100%; text-align: left; }

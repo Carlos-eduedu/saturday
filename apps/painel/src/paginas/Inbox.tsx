@@ -8,7 +8,7 @@ import {
   useState,
 } from "react";
 import { Link, useNavigate } from "react-router";
-import { api, type Eu, type Resumo } from "../api";
+import { api, type Eu, type Resumo, type Usuario } from "../api";
 import { AiChat02Icon, UserCheck01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import SwipeRow, { type SwipeAction } from "../componentes/SwipeRow";
@@ -26,6 +26,20 @@ const CORES_SWIPE = {
 } as CSSProperties;
 
 type Acao = "assumir" | "devolver";
+
+// Tempo para desfazer: a ação só vai para a API depois disso.
+const DESFAZER_MS = 5000;
+
+interface Pendente {
+  id: string;
+  acao: Acao;
+  rotulo: string;
+  timer: number;
+}
+
+function chamarApi(p: Pendente) {
+  return p.acao === "assumir" ? api.assumir(p.id) : api.devolver(p.id);
+}
 
 // Com 60% da linha (padrão), no desktop seria preciso arrastar mais de 1200 px.
 // shortcut: lido uma vez ao carregar; girar ou redimensionar a janela não muda.
@@ -139,13 +153,83 @@ export function Inbox({ eu }: { eu: Eu }) {
     navegar(`/conversas/${id}`);
   };
 
-  async function agir(id: string, acao: Acao) {
-    try {
-      await (acao === "assumir" ? api.assumir(id) : api.devolver(id));
-    } catch (e) {
-      setErro(e instanceof Error ? e.message : "falha ao agir na conversa");
+  // Quem é o dono atual, para a confirmação de tomar a conversa de outra pessoa.
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  useEffect(() => {
+    api
+      .usuarios()
+      .then(setUsuarios)
+      .catch(() => undefined);
+  }, []);
+  const nomeDe = (id: string | null) => usuarios.find((u) => u.id === id)?.email ?? "outra pessoa";
+
+  // Assumir e devolver esperam 5 s antes de ir para a API: dá para desfazer
+  // sem endpoint novo e sem adivinhar o estado anterior (IA, handoff ou dono).
+  const [pendente, setPendente] = useState<Pendente | null>(null);
+  const pendenteRef = useRef<Pendente | null>(null);
+  // O SwipeRow que dobrou só volta remontado: a versão entra na chave.
+  const [versao, setVersao] = useState(0);
+
+  const executar = useCallback(
+    async (p: Pendente) => {
+      try {
+        await chamarApi(p);
+      } catch (e) {
+        setErro(e instanceof Error ? e.message : "Não deu para concluir a ação. Tente de novo.");
+        setVersao((v) => v + 1);
+      }
+      carregar();
+    },
+    [carregar],
+  );
+
+  // Saiu da tela com uma ação esperando: ela vale na hora, não se perde.
+  useEffect(
+    () => () => {
+      const p = pendenteRef.current;
+      if (p) {
+        window.clearTimeout(p.timer);
+        void chamarApi(p).catch(() => undefined);
+      }
+    },
+    [],
+  );
+
+  function agir(c: Resumo, acao: Acao) {
+    if (pendenteRef.current?.id === c.id) return;
+    const deOutro = acao === "assumir" && c.atendimento === "assumida" && c.atendente_id !== eu.id;
+    if (
+      deOutro &&
+      !window.confirm(
+        `Assumir a conversa que está com ${nomeDe(c.atendente_id)}? Essa pessoa deixa de ser a dona dela.`,
+      )
+    ) {
+      setVersao((v) => v + 1);
+      return;
     }
-    carregar();
+    // Uma ação esperando por vez: a anterior vale na hora.
+    const anterior = pendenteRef.current;
+    if (anterior) {
+      window.clearTimeout(anterior.timer);
+      void executar(anterior);
+    }
+    const p: Pendente = { id: c.id, acao, rotulo: c.telefone ?? c.canal, timer: 0 };
+    p.timer = window.setTimeout(() => {
+      pendenteRef.current = null;
+      setPendente(null);
+      void executar(p);
+    }, DESFAZER_MS);
+    pendenteRef.current = p;
+    setPendente(p);
+  }
+
+  function desfazer() {
+    const p = pendenteRef.current;
+    if (!p) return;
+    window.clearTimeout(p.timer);
+    pendenteRef.current = null;
+    setPendente(null);
+    setVersao((v) => v + 1);
   }
 
   const rotuloFila = FILAS.find((f) => f.valor === fila)?.rotulo ?? "Todas";
@@ -190,14 +274,18 @@ export function Inbox({ eu }: { eu: Eu }) {
           />
         </label>
       </div>
-      {erro && <p className="erro">{erro}</p>}
+      {erro && (
+        <p className="erro" role="alert">
+          {erro}
+        </p>
+      )}
       {conversas.length === 0 ? (
         <Vazio titulo={vazio.titulo} texto={vazio.texto} />
       ) : (
         <ul className="inbox">
           {conversas.map((c) => (
             <li
-              key={c.id}
+              key={`${c.id}-${versao}`}
               className={[c.nao_lida && "nao-lida", c.atencao.length > 0 && "pede-atencao"]
                 .filter(Boolean)
                 .join(" ")}
@@ -266,10 +354,11 @@ export function Inbox({ eu }: { eu: Eu }) {
                 );
                 const acao = acaoDa(c, eu);
                 if (!acao) return linha;
+                const esperando = pendente?.id === c.id;
                 return (
                   <SwipeRow
                     actions={[ACOES[acao]]}
-                    onCommit={() => agir(c.id, acao)}
+                    onCommit={() => agir(c, acao)}
                     actionColor={acao === "assumir" ? "var(--destaque)" : "var(--ia)"}
                     commitAt={commitAt}
                     height={altura}
@@ -277,13 +366,33 @@ export function Inbox({ eu }: { eu: Eu }) {
                     label={`Conversa ${c.telefone ?? c.canal}`}
                     style={CORES_SWIPE}
                   >
-                    {linha}
+                    <span className="linha-com-acao">
+                      {linha}
+                      <button
+                        type="button"
+                        className={acao === "assumir" ? "acao-linha principal" : "acao-linha"}
+                        disabled={esperando}
+                        onClick={() => agir(c, acao)}
+                      >
+                        {esperando ? "Aguarde…" : ACOES[acao].label}
+                      </button>
+                    </span>
                   </SwipeRow>
                 );
               })()}
             </li>
           ))}
         </ul>
+      )}
+      {pendente && (
+        <div className="aviso-flutuante" role="status">
+          <span>
+            {pendente.acao === "assumir" ? "Assumindo" : "Devolvendo para a IA"} {pendente.rotulo}
+          </span>
+          <button type="button" onClick={desfazer}>
+            Desfazer
+          </button>
+        </div>
       )}
     </section>
   );
