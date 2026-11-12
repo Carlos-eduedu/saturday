@@ -206,6 +206,7 @@ class AgentService:
             "aguardando": None,
             "tentativas_coleta": 0,
             "tentativas_extrato": 0,
+            "tentativas_resposta": 0,
             "handoff_em": None,
         }
 

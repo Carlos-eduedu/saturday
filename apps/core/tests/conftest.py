@@ -52,6 +52,7 @@ def resultado_jev(
                 "duvida": 0.9 if intent == "duvida" else 0.0,
                 "suporte": 0.0,
                 "humano": 0.9 if intent == "humano" else 0.0,
+                "saudacao": 0.9 if intent == "saudacao" else 0.0,
             },
             "publico": {publico: 0.9},
         }

@@ -42,6 +42,8 @@ class AgentState(MessagesState, total=False):
     aguardando: Literal["data_nascimento", "uf"] | None
     tentativas_coleta: int
     tentativas_extrato: int
+    # Respostas seguidas sem FAQ fora de jornada: a 2ª vai para a equipe.
+    tentativas_resposta: int
     portability_result: dict[str, Any] | None
     oferta_pendente: bool
     # Jornada CLT: etapa, passo, dados informados e oferta (ver agent/clt).

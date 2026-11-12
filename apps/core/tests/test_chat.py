@@ -9,6 +9,7 @@ import httpx
 import pytest
 from conftest import Fakes, resposta_llm, resultado_jev
 
+from saturday.agent.textos import MENSAGEM_BOAS_VINDAS, MENSAGEM_NAO_ENTENDI
 from saturday.services.jev import JevClient, JevError
 from saturday.services.webhook import WebhookClient
 from saturday.settings import Settings
@@ -53,18 +54,49 @@ def test_2_pedido_humano_vai_para_handoff(client, fakes: Fakes):
     assert body["handoff_reason"] == "pediu_humano"
 
 
-def test_3_llm_sem_resposta_vai_para_handoff(client, fakes: Fakes):
+def test_3_llm_sem_resposta_duas_vezes_vai_para_handoff(client, fakes: Fakes):
     fakes.jev.resultado = resultado_jev()
     fakes.llm.resposta = resposta_llm("", False)
+    conversa = cid()
 
-    r = client.post(
-        "/chat",
-        json={"conversation_id": cid(), "message": "Pergunta fora da FAQ"},
-    )
+    def perguntar() -> dict:
+        return client.post(
+            "/chat", json={"conversation_id": conversa, "message": "Pergunta fora da FAQ"}
+        ).json()
 
-    body = r.json()
-    assert body["status"] == "handoff"
-    assert body["handoff_reason"] == "sem_resposta"
+    primeira = perguntar()
+    assert primeira["status"] == "answered"
+    assert primeira["answer"] == MENSAGEM_NAO_ENTENDI
+
+    segunda = perguntar()
+    assert segunda["status"] == "handoff"
+    assert segunda["handoff_reason"] == "sem_resposta"
+
+
+def test_3b_resposta_da_faq_zera_a_contagem(client, fakes: Fakes):
+    fakes.jev.resultado = resultado_jev()
+    conversa = cid()
+
+    def perguntar(resolvido: bool) -> dict:
+        fakes.llm.resposta = resposta_llm("Da FAQ" if resolvido else "", resolvido)
+        return client.post(
+            "/chat", json={"conversation_id": conversa, "message": "Pergunta"}
+        ).json()
+
+    assert perguntar(False)["answer"] == MENSAGEM_NAO_ENTENDI
+    assert perguntar(True)["answer"] == "Da FAQ"
+    assert perguntar(False)["answer"] == MENSAGEM_NAO_ENTENDI
+
+
+def test_3c_saudacao_sem_jornada_recebe_boas_vindas_sem_llm(client, fakes: Fakes):
+    fakes.jev.resultado = resultado_jev("saudacao", publico="indefinido")
+
+    r = client.post("/chat", json={"conversation_id": cid(), "message": "Oi"}).json()
+
+    assert r["status"] == "answered"
+    assert r["answer"] == MENSAGEM_BOAS_VINDAS
+    assert r["intent"] == "saudacao"
+    assert fakes.llm.chamadas_responder == []
 
 
 def test_4_erro_do_jev_segue_para_llm(client, fakes: Fakes):
@@ -189,3 +221,17 @@ def test_jev_usa_decisions_api_e_pergunta_aceite():
     assert capturado["corpo"]["questions"]["intent"]["type"] == "choice"
     assert capturado["corpo"]["questions"]["publico"]["type"] == "choice"
     assert capturado["corpo"]["questions"]["resposta_oferta"]["type"] == "choice"
+
+
+def test_3d_saudacao_no_meio_da_jornada_segue_o_caminho_de_hoje(client, service, fakes: Fakes):
+    conversa = cid()
+    fakes.jev.resultado = resultado_jev()
+    client.post("/chat", json={"conversation_id": conversa, "message": "Vocês atendem INSS?"})
+    service.graph.update_state(service.config(conversa), {"oferta_pendente": True})
+    fakes.jev.resultado = resultado_jev("saudacao", publico="indefinido")
+    fakes.llm.resposta = resposta_llm("Resposta sobre a oferta")
+
+    r = client.post("/chat", json={"conversation_id": conversa, "message": "oi"}).json()
+
+    assert r["answer"] == "Resposta sobre a oferta"
+    assert r["intent"] != "saudacao"

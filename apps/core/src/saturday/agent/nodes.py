@@ -13,9 +13,11 @@ from saturday.agent.coleta import hoje_operacao, normalizar_uf, parse_data_nasci
 from saturday.agent.context import AgentContext
 from saturday.agent.state import AgentState
 from saturday.agent.textos import (
+    MENSAGEM_BOAS_VINDAS,
     MENSAGEM_EXTRATO_ILEGIVEL,
     MENSAGEM_EXTRATO_INCORRETO,
     MENSAGEM_EXTRATO_MES_ERRADO,
+    MENSAGEM_NAO_ENTENDI,
     MENSAGEM_RECUSA,
     MENSAGEM_SEM_TEXTO,
     MENSAGENS_FALHA_CALCULO,
@@ -112,17 +114,21 @@ def pedir_texto(state: AgentState) -> dict[str, Any]:
     }
 
 
-def _entra_no_clt(state: AgentState, publico: str, contexto: AgentContext) -> bool:
-    """CLT com a Granatech ligada e nenhuma jornada (CLT ou INSS) em curso."""
+def _sem_jornada(state: AgentState) -> bool:
+    """Nenhuma jornada (CLT ou INSS) em curso."""
 
     return (
-        publico == "clt"
-        and contexto.granatech is not None
-        and not (state.get("clt") or {}).get("etapa")
+        not (state.get("clt") or {}).get("etapa")
         and not state.get("hiscon")
         and not state.get("oferta_pendente")
         and not state.get("aguardando")
     )
+
+
+def _entra_no_clt(state: AgentState, publico: str, contexto: AgentContext) -> bool:
+    """CLT com a Granatech ligada e nenhuma jornada em curso."""
+
+    return publico == "clt" and contexto.granatech is not None and _sem_jornada(state)
 
 
 def classify_intent(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
@@ -141,6 +147,12 @@ def classify_intent(state: AgentState, runtime: Runtime[AgentContext]) -> dict[s
     if pediu_humano:
         intent = "humano"
     elif intent == "humano":
+        intent = "duvida"
+    elif resultado.saudou and _sem_jornada(state):
+        # Cumprimento sem jornada: boas-vindas fixas, sem LLM.
+        intent = "saudacao"
+    elif intent == "saudacao":
+        # Abaixo do limiar ou no meio de uma jornada: segue como dúvida.
         intent = "duvida"
 
     publico = resultado.publico
@@ -186,16 +198,37 @@ def generate_answer(state: AgentState, runtime: Runtime[AgentContext]) -> dict[s
         }
 
     if not resposta.resolvido or not resposta.resposta:
+        tentativas = int(state.get("tentativas_resposta") or 0) + 1
+        if tentativas < 2 and _sem_jornada(state):
+            # Primeira sem FAQ fora de jornada: o cliente reformula antes da equipe.
+            return {
+                "status": "answered",
+                "answer": MENSAGEM_NAO_ENTENDI,
+                "tentativas_resposta": tentativas,
+                "messages": [AIMessage(content=MENSAGEM_NAO_ENTENDI)],
+            }
         return {
             "status": "in_progress",
             "needs_human": True,
             "handoff_reason": "sem_resposta",
+            "tentativas_resposta": 0,
         }
 
     return {
         "status": "answered",
         "answer": resposta.resposta,
+        "tentativas_resposta": 0,
         "messages": [AIMessage(content=resposta.resposta)],
+    }
+
+
+def boas_vindas(state: AgentState) -> dict[str, Any]:
+    return {
+        "status": "answered",
+        "answer": MENSAGEM_BOAS_VINDAS,
+        "needs_human": False,
+        "tentativas_resposta": 0,
+        "messages": [AIMessage(content=MENSAGEM_BOAS_VINDAS)],
     }
 
 

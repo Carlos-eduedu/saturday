@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 OPENROUTER_DECISIONS_URL = "https://openrouter.ai/api/alpha/decisions"
 
-INTENTS = ("duvida", "suporte", "humano")
+INTENTS = ("duvida", "suporte", "humano", "saudacao")
 PUBLICOS = ("clt", "inss", "servidor_publico", "autonomo", "indefinido")
 RESPOSTAS_OFERTA = ("aceita", "recusa", "duvida")
 
@@ -42,6 +42,10 @@ class JevResult:
     @property
     def pediu_humano(self) -> bool:
         return self.probabilidade("intent", "humano") >= JEV_INTENT_THRESHOLD
+
+    @property
+    def saudou(self) -> bool:
+        return self.probabilidade("intent", "saudacao") >= JEV_INTENT_THRESHOLD
 
     @property
     def aceitou_oferta(self) -> bool:
@@ -72,13 +76,20 @@ def _perguntas(oferta_pendente: bool) -> dict[str, Any]:
                     "uma pessoa, reclamar sem pedir uma pessoa, ou citar "
                     '"atendente" em outro contexto.'
                 ),
+                "saudacao": (
+                    "Só cumprimenta ou puxa conversa, sem pedido nem pergunta "
+                    "(ex.: 'oi', 'bom dia', 'tudo bem?')."
+                ),
             },
         },
         "publico": {
             "type": "choice",
             "instructions": "A que público pertence o cliente, segundo a mensagem?",
             "criteria": {
-                "clt": "Trabalhador com carteira assinada.",
+                "clt": (
+                    "Trabalhador com carteira assinada (CLT), ou que pede o Crédito "
+                    "do Trabalhador, empréstimo CLT ou consignado privado."
+                ),
                 "inss": "Aposentado ou pensionista do INSS.",
                 "servidor_publico": "Servidor público.",
                 "autonomo": "Trabalhador autônomo.",

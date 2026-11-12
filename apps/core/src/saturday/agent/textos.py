@@ -58,6 +58,18 @@ MENSAGEM_FORA_HORARIO = (
 
 MENSAGEM_RECUSA = "Tudo bem! Se mudar de ideia, é só me chamar. Obrigado pelo contato."
 
+MENSAGEM_BOAS_VINDAS = (
+    "Oi! Sou o assistente virtual da MEX. Para eu te ajudar, me conta: você "
+    "trabalha de carteira assinada (CLT), é aposentado ou pensionista do INSS, ou "
+    "é servidor público?"
+)
+
+MENSAGEM_NAO_ENTENDI = (
+    "Não entendi bem. Posso te ajudar com o Crédito do Trabalhador (para quem "
+    "trabalha de carteira assinada) e com a portabilidade de consignado do INSS. "
+    "Me conta com qual deles, ou escreva a sua dúvida de outro jeito."
+)
+
 MENSAGEM_SEM_TEXTO = "Não consegui ver a sua mensagem. Pode escrever o que você precisa?"
 
 PERGUNTA_DATA = "Para continuar, me informe a sua data de nascimento (dd/mm/aaaa)."

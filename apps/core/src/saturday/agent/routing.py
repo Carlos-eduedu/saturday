@@ -36,6 +36,8 @@ def after_classify(state: AgentState) -> str:
         return "handoff"
     if _etapa_clt(state):
         return "clt"
+    if state.get("intent") == "saudacao":
+        return "boas_vindas"
     if state.get("aguardando"):
         return "collect_customer_data"
     if state.get("oferta_pendente"):

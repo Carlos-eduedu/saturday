@@ -9,6 +9,7 @@ from langgraph.graph import END, START, StateGraph
 from saturday.agent.clt.nos import clt
 from saturday.agent.context import AgentContext
 from saturday.agent.nodes import (
+    boas_vindas,
     calculate_portability,
     check_customer_data,
     classify_intent,
@@ -39,6 +40,7 @@ def build_graph(checkpointer: Any = None) -> Any:
     builder = StateGraph(AgentState, context_schema=AgentContext)
 
     builder.add_node("pedir_texto", pedir_texto)
+    builder.add_node("boas_vindas", boas_vindas)
     builder.add_node("classify_intent", classify_intent)
     builder.add_node("generate_answer", generate_answer)
     builder.add_node("handoff", handoff)
@@ -70,6 +72,7 @@ def build_graph(checkpointer: Any = None) -> Any:
             "collect_customer_data": "collect_customer_data",
             "generate_answer": "generate_answer",
             "clt": "clt",
+            "boas_vindas": "boas_vindas",
         },
     )
     builder.add_conditional_edges(
@@ -124,6 +127,7 @@ def build_graph(checkpointer: Any = None) -> Any:
         },
     )
     builder.add_edge("pedir_texto", END)
+    builder.add_edge("boas_vindas", END)
     builder.add_edge("present_offer", END)
     builder.add_edge("decline_offer", END)
     builder.add_edge("handoff", END)

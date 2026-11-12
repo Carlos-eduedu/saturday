@@ -55,7 +55,7 @@ UFS = frozenset(
     }
 )
 
-Intent = Literal["duvida", "suporte", "humano"]
+Intent = Literal["duvida", "suporte", "humano", "saudacao"]
 Publico = Literal["clt", "inss", "servidor_publico", "autonomo", "indefinido"]
 HandoffReason = Literal[
     "pediu_humano",
