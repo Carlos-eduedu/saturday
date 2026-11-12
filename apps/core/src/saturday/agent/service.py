@@ -32,6 +32,18 @@ from saturday.storage.base import Storage
 # Quantos pares mensagem/resposta ficam no checkpoint para idempotência.
 JANELA_IDEMPOTENCIA = 50
 
+
+def etapa_do_estado(estado: dict[str, Any]) -> str | None:
+    """Etapa CLT em curso; `inss` na jornada de portabilidade; senão nada."""
+
+    clt = estado.get("clt")
+    if isinstance(clt, dict) and clt.get("etapa"):
+        return str(clt["etapa"])[:32]
+    if estado.get("publico") == "inss" or estado.get("hiscon"):
+        return "inss"
+    return None
+
+
 logger = logging.getLogger(__name__)
 
 StatusReply = Literal["answered", "handoff", "with_human", "duplicate"]
@@ -226,6 +238,12 @@ class AgentService:
         if estado.get("status") != "handoff":
             return False
         return self._expirou(self._parse_iso(estado.get("handoff_em")))
+
+    @staticmethod
+    def _registrar_turno(conversa: Conversa, estado: dict[str, Any]) -> None:
+        """Copia para a conversa o que o painel lista sem ler o checkpoint."""
+
+        conversa.etapa = etapa_do_estado(estado)
 
     def _log_turno(
         self,
@@ -502,6 +520,8 @@ class AgentService:
             inicio,
             metricas,
         )
+        if conversa is not None:
+            self._registrar_turno(conversa, final)
         resposta = self.evento(payload.conversation_id, final)
 
         if payload.message_id and resposta.answer:
@@ -560,6 +580,8 @@ class AgentService:
             self._stream(entrada, config, caminho)
             final = dict(self.graph.get_state(config).values or {})
             self._log_turno(conversation_id, final, caminho, inicio, metricas)
+            if conversa is not None:
+                self._registrar_turno(conversa, final)
             resposta = self.evento(conversation_id, final)
             if sessao is not None and conversa is not None:
                 if resposta.status == "handoff":

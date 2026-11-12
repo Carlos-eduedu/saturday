@@ -251,17 +251,44 @@ main {
 .inbox { display: flex; flex-direction: column; gap: 0.5rem; }
 .inbox li a {
   display: grid;
-  grid-template-columns: 1fr auto auto auto;
-  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.35rem 1.25rem;
   align-items: center;
-  min-height: 56px;
-  padding: 0.75rem 1.1rem;
+  min-height: 76px;
+  padding: 0.7rem 1.1rem;
   text-decoration: none;
   color: var(--texto);
   transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
 }
 .inbox li a:hover { transform: translateY(-2px); box-shadow: var(--sombra-alta); border-color: var(--suave); }
-.inbox li.nao-lida a { font-weight: 600; box-shadow: inset 4px 0 0 var(--destaque), var(--sombra); }
+.inbox li.nao-lida .previa { font-weight: 600; }
+
+/* A fala é o conteúdo da linha; telefone e canal ficam em segundo plano. */
+.linha-conteudo { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
+.previa { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.autor-previa { font-weight: 600; color: var(--suave); }
+.autor-ia { color: var(--ia); }
+.autor-atendente { color: var(--destaque); }
+.sem-previa { color: var(--suave); }
+.linha-detalhe { display: flex; flex-wrap: wrap; gap: 0.15rem 0.75rem; font-size: 0.8rem; color: var(--suave); }
+.linha-detalhe .telefone { font-size: 0.8rem; }
+.linha-detalhe .motivo { color: var(--handoff); font-weight: 500; }
+.linha-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 0.3rem; }
+.linha-estado { display: flex; align-items: center; gap: 0.5rem; }
+.etapa { font-size: 0.8rem; font-weight: 500; color: var(--texto); }
+.linha-meta time { font-family: var(--fonte-texto); font-variant-numeric: tabular-nums; }
+.linha-meta time.espera { color: var(--texto); font-weight: 500; }
+/* Quem pede atenção: rótulo com o porquê e fundo tingido, nunca só cor. */
+.atencao {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  color: var(--handoff);
+  background: color-mix(in srgb, var(--handoff) 13%, transparent);
+}
+.inbox li.pede-atencao a,
+.inbox li.pede-atencao .swipe-row__surface { background: color-mix(in srgb, var(--handoff) 5%, var(--superficie)); }
 .selo {
   font-size: 0.78rem;
   font-weight: 500;
@@ -274,11 +301,11 @@ main {
 .selo-assumida { color: var(--assumida); }
 .janela { font-size: 0.8rem; color: var(--suave); }
 .janela.fechada { color: var(--handoff); }
+
 /* Linha que arrasta (SwipeRow): o cartão é o recorte do componente, e o link
    preenche a superfície sem subir no hover (o recorte cortaria a sombra). */
 .inbox .swipe-row__clip { border: 1px solid var(--borda); box-shadow: var(--sombra); }
 .inbox .swipe-row__surface { padding: 0; }
-.inbox .swipe-row li a,
 .inbox .swipe-row a {
   width: 100%;
   height: 100%;
@@ -288,14 +315,12 @@ main {
   background: none;
 }
 .inbox .swipe-row a:hover { transform: none; box-shadow: none; background: var(--superficie-2); }
-.inbox li.nao-lida .swipe-row a { box-shadow: inset 4px 0 0 var(--destaque); }
 .inbox .swipe-row__action--commit { font-weight: 600; }
 
 @media (max-width: 599px) {
-  /* Duas linhas de conteúdo no celular: a linha que arrasta cresce junto. */
-  .inbox .swipe-row { --sr-h: 76px !important; }
-  .inbox li a { grid-template-columns: 1fr auto; row-gap: 0.35rem; }
-  .inbox .selo { justify-self: end; }
+  .inbox li a { grid-template-columns: minmax(0, 1fr); align-content: center; }
+  .linha-meta { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+  .linha-meta .atencao { order: -1; width: 100%; text-align: left; }
   .filtros > label { width: 100%; }
 }
 

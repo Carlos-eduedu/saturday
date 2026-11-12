@@ -59,6 +59,9 @@ class Conversa(Base):
         ForeignKey("usuarios_painel.id", ondelete="SET NULL")
     )
     atendimento_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Etapa da jornada no fim do último turno (`triagem`, `oferta`, `inss`...):
+    # cópia do estado do grafo para a lista do painel não ler checkpoint.
+    etapa: Mapped[str | None] = mapped_column(String(32))
     # Mensagens de marketing: `opt_in`, `opt_out` ou nada (nunca perguntado).
     marketing: Mapped[str | None] = mapped_column(String(8))
     # Último "visto" de qualquer usuário do painel: base do "não lida".

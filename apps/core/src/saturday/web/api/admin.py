@@ -23,7 +23,7 @@ from saturday.canais.whatsapp.janela import janela_aberta
 from saturday.dados import repositorios
 from saturday.dados.modelos import Alerta, Conversa, Cota, Mensagem, UsuarioPainel
 from saturday.dados.sessao import sessao as abrir_sessao
-from saturday.painel import acoes, sessoes
+from saturday.painel import acoes, sessoes, supervisao
 from saturday.painel.auditoria import auditar
 from saturday.privacidade import MASCARAS
 from saturday.settings import TZ_OPERACAO
@@ -174,7 +174,20 @@ def listar_conversas(
     ).limit(LIMITE_INBOX)
     agora = datetime.now(UTC)
     with abrir_sessao(fabrica) as sessao:
-        return [_resumo(conversa, agora) for conversa in sessao.scalars(consulta)]
+        conversas = list(sessao.scalars(consulta))
+        campos = supervisao.supervisao(sessao, conversas, agora)
+        resumos = []
+        for conversa in conversas:
+            extra = campos[conversa.id]
+            ultima = extra["ultima_mensagem"]
+            resumos.append(
+                {
+                    **_resumo(conversa, agora),
+                    **extra,
+                    "ultima_atividade": ultima["em"] if ultima else conversa.criada_em,
+                }
+            )
+        return supervisao.ordenar(resumos)
 
 
 @router.get("/conversas/{conversa_id}")

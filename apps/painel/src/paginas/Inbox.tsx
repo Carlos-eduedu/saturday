@@ -13,6 +13,7 @@ import { AiChat02Icon, UserCheck01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import SwipeRow, { type SwipeAction } from "../componentes/SwipeRow";
 import { Vazio } from "../componentes/Vazio";
+import { ATENCAO, AUTORES, ETAPAS, MOTIVOS_HANDOFF, relativo, rotulo } from "../rotulos";
 import { useAvisos } from "../tempoReal";
 
 // Cores do SwipeRow pelas variáveis do painel: seguem o tema claro e o escuro.
@@ -28,7 +29,10 @@ type Acao = "assumir" | "devolver";
 
 // Com 60% da linha (padrão), no desktop seria preciso arrastar mais de 1200 px.
 // shortcut: lido uma vez ao carregar; girar ou redimensionar a janela não muda.
-const commitAt = typeof window !== "undefined" && window.innerWidth >= 600 ? 0.35 : 0.6;
+const largo = typeof window !== "undefined" && window.innerWidth >= 600;
+const commitAt = largo ? 0.35 : 0.6;
+// Duas linhas de conteúdo; no celular a meta desce para uma terceira.
+const altura = largo ? 76 : 112;
 
 // A ação que arrastar faz numa linha; nenhuma quando quem vê não pode agir.
 function acaoDa(c: Resumo, eu: Eu): Acao | null {
@@ -81,10 +85,16 @@ const VAZIOS: Record<string, { titulo: string; texto: string }> = {
   },
 };
 
+function textoDaEspera(c: Resumo, agora: number): string {
+  if (!c.aguardando_desde) return relativo(c.ultima_atividade, agora);
+  const quanto = relativo(c.aguardando_desde, agora);
+  return quanto === "agora" ? "cliente acabou de escrever" : `cliente espera ${quanto}`;
+}
+
 export const ROTULO_ATENDIMENTO = { ia: "IA", handoff: "Handoff", assumida: "Assumida" } as const;
 
 export function Inbox({ eu }: { eu: Eu }) {
-  const [fila, setFila] = useState("handoff");
+  const [fila, setFila] = useState("");
   const [busca, setBusca] = useState("");
   const [conversas, setConversas] = useState<Resumo[]>([]);
   const [erro, setErro] = useState("");
@@ -101,6 +111,14 @@ export function Inbox({ eu }: { eu: Eu }) {
 
   useEffect(carregar, [carregar]);
   useAvisos(carregar);
+
+  // A espera relativa ("há 3 min") anda sozinha, sem recarregar a lista.
+  const [agora, setAgora] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setAgora(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+  const pedemAtencao = conversas.filter((c) => c.atencao.length > 0).length;
 
   // Soltar depois de arrastar não abre a conversa; o clique simples abre.
   const inicio = useRef<{ x: number; y: number } | null>(null);
@@ -144,6 +162,7 @@ export function Inbox({ eu }: { eu: Eu }) {
         Conversas{" "}
         <span className="contagem">
           · {rotuloFila} · {conversas.length}
+          {pedemAtencao > 0 && ` · ${pedemAtencao} pedem atenção`}
         </span>
       </h1>
       <div className="filtros">
@@ -179,7 +198,9 @@ export function Inbox({ eu }: { eu: Eu }) {
           {conversas.map((c) => (
             <li
               key={c.id}
-              className={c.nao_lida ? "nao-lida" : ""}
+              className={[c.nao_lida && "nao-lida", c.atencao.length > 0 && "pede-atencao"]
+                .filter(Boolean)
+                .join(" ")}
               onPointerDown={guardarInicio}
               onClick={(e) => abrirPelaSuperficie(e, c.id)}
             >
@@ -191,18 +212,56 @@ export function Inbox({ eu }: { eu: Eu }) {
                     draggable={false}
                     onClick={ignorarSeArrastou}
                   >
-                    <span className="telefone">{c.telefone ?? c.canal}</span>
-                    <span className={`selo selo-${c.atendimento}`}>
-                      {ROTULO_ATENDIMENTO[c.atendimento]}
-                      {c.atendente_id === eu.id ? " (você)" : ""}
-                    </span>
-                    {c.canal === "whatsapp" && (
-                      <span className={c.janela_aberta ? "janela aberta" : "janela fechada"}>
-                        {c.janela_aberta ? "janela aberta" : "janela fechada"}
+                    <span className="linha-conteudo">
+                      <span className="previa">
+                        {c.ultima_mensagem ? (
+                          <>
+                            <span className={`autor-previa autor-${c.ultima_mensagem.autor}`}>
+                              {rotulo(AUTORES, c.ultima_mensagem.autor)}:
+                            </span>{" "}
+                            {c.ultima_mensagem.texto || "—"}
+                          </>
+                        ) : (
+                          <span className="sem-previa">Sem mensagens ainda</span>
+                        )}
                       </span>
-                    )}
+                      <span className="linha-detalhe">
+                        <span className="telefone">{c.telefone ?? c.canal}</span>
+                        {c.canal === "evolution" && <span>Evolution</span>}
+                        {c.canal === "whatsapp" && (
+                          <span className={c.janela_aberta ? "janela aberta" : "janela fechada"}>
+                            {c.janela_aberta ? "janela aberta" : "janela fechada"}
+                          </span>
+                        )}
+                        {c.motivo_handoff && (
+                          <span className="motivo">
+                            {rotulo(MOTIVOS_HANDOFF, c.motivo_handoff)}
+                          </span>
+                        )}
+                      </span>
+                    </span>
+                    <span className="linha-meta">
+                      {c.atencao.length > 0 && (
+                        <span className="atencao">
+                          {c.atencao.map((a) => rotulo(ATENCAO, a)).join(" · ")}
+                        </span>
+                      )}
+                      <span className="linha-estado">
+                        {c.etapa && <span className="etapa">{rotulo(ETAPAS, c.etapa)}</span>}
+                        <span className={`selo selo-${c.atendimento}`}>
+                          {ROTULO_ATENDIMENTO[c.atendimento]}
+                          {c.atendente_id === eu.id ? " (você)" : ""}
+                        </span>
+                        <time
+                          dateTime={c.aguardando_desde ?? c.ultima_atividade}
+                          title={formatarHora(c.aguardando_desde ?? c.ultima_atividade)}
+                          className={c.aguardando_desde ? "espera" : ""}
+                        >
+                          {textoDaEspera(c, agora)}
+                        </time>
+                      </span>
+                    </span>
                     {c.nao_lida && <span className="sr">não lida</span>}
-                    <time>{c.ultima_entrada_em ? formatarHora(c.ultima_entrada_em) : ""}</time>
                   </Link>
                 );
                 const acao = acaoDa(c, eu);
@@ -213,7 +272,7 @@ export function Inbox({ eu }: { eu: Eu }) {
                     onCommit={() => agir(c.id, acao)}
                     actionColor={acao === "assumir" ? "var(--destaque)" : "var(--ia)"}
                     commitAt={commitAt}
-                    height={64}
+                    height={altura}
                     radius={14}
                     label={`Conversa ${c.telefone ?? c.canal}`}
                     style={CORES_SWIPE}

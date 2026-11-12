@@ -20,6 +20,13 @@ export interface Resumo {
   ultima_entrada_em: string | null;
   nao_lida: boolean;
   janela_aberta: boolean;
+  ultima_mensagem: { autor: string; texto: string; em: string } | null;
+  etapa: string | null;
+  motivo_handoff: string | null;
+  aguardando_desde: string | null;
+  envio_falhou: boolean;
+  atencao: string[];
+  ultima_atividade: string;
 }
 
 export interface Mensagem {
