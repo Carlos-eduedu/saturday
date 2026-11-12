@@ -6,6 +6,7 @@ import {
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { Link, useNavigate } from "react-router";
 import { api, type Eu, type Resumo, type Usuario } from "../api";
@@ -47,6 +48,20 @@ const largo = typeof window !== "undefined" && window.innerWidth >= 600;
 const commitAt = largo ? 0.35 : 0.6;
 // Duas linhas de conteúdo; no celular a meta desce para uma terceira.
 const altura = largo ? 76 : 112;
+
+// Uma forma de agir por tela: a partir de 600 px, o botão da linha; abaixo,
+// arrastar (o mesmo corte do CSS que esconde o botão).
+const COM_BOTAO = "(min-width: 600px)";
+function useComBotao(): boolean {
+  return useSyncExternalStore(
+    (avisar) => {
+      const m = window.matchMedia(COM_BOTAO);
+      m.addEventListener("change", avisar);
+      return () => m.removeEventListener("change", avisar);
+    },
+    () => window.matchMedia(COM_BOTAO).matches,
+  );
+}
 
 // A ação que arrastar faz numa linha; nenhuma quando quem vê não pode agir.
 function acaoDa(c: Resumo, eu: Eu): Acao | null {
@@ -108,6 +123,7 @@ function textoDaEspera(c: Resumo, agora: number): string {
 export const ROTULO_ATENDIMENTO = { ia: "IA", handoff: "Handoff", assumida: "Assumida" } as const;
 
 export function Inbox({ eu }: { eu: Eu }) {
+  const comBotao = useComBotao();
   const [fila, setFila] = useState("");
   const [busca, setBusca] = useState("");
   const [conversas, setConversas] = useState<Resumo[]>([]);
@@ -357,7 +373,7 @@ export function Inbox({ eu }: { eu: Eu }) {
                 const esperando = pendente?.id === c.id;
                 return (
                   <SwipeRow
-                    actions={[ACOES[acao]]}
+                    actions={comBotao ? [] : [ACOES[acao]]}
                     onCommit={() => agir(c, acao)}
                     actionColor={acao === "assumir" ? "var(--destaque)" : "var(--ia)"}
                     commitAt={commitAt}
