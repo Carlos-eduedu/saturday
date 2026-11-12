@@ -62,6 +62,14 @@ class Settings(BaseSettings):
     whatsapp_graph_url: str = "https://graph.facebook.com/v23.0"
     whatsapp_limite_midia_mb: int = 50
 
+    # Evolution API (WhatsApp Web, não oficial): segundo canal, decisão 0009.
+    # `instancias` faz o papel do `phone_number_id`; evento de outra é ignorado.
+    evolution_ativo: bool = False
+    evolution_url: str = "http://evolution:8080"
+    evolution_api_key: SecretStr = SecretStr("")
+    evolution_webhook_token: SecretStr = SecretStr("")
+    evolution_instancias: Annotated[list[str], NoDecode] = Field(default_factory=list)
+
     # Transcrição de áudio: endpoint compatível com OpenAI (`/audio/transcriptions`).
     transcricao_api_key: SecretStr = SecretStr("")
     transcricao_modelo: str = ""
@@ -94,7 +102,7 @@ class Settings(BaseSettings):
     # proposta ligada.
     dominio_publico: str = ""
 
-    @field_validator("anexo_dominios", "whatsapp_numeros", mode="before")
+    @field_validator("anexo_dominios", "whatsapp_numeros", "evolution_instancias", mode="before")
     @classmethod
     def _lista_por_virgula(cls, valor: object) -> object:
         if isinstance(valor, str):
@@ -160,6 +168,23 @@ class Settings(BaseSettings):
             if faltando:
                 raise RuntimeError(
                     "SATURDAY_GRANATECH_ATIVO=true exige " + ", ".join(faltando) + "."
+                )
+
+        if self.evolution_ativo and self.environment != "pytest":
+            faltando = [
+                nome
+                for nome, valor in {
+                    "SATURDAY_EVOLUTION_API_KEY": self.evolution_api_key.get_secret_value(),
+                    "SATURDAY_EVOLUTION_WEBHOOK_TOKEN": (
+                        self.evolution_webhook_token.get_secret_value()
+                    ),
+                    "SATURDAY_EVOLUTION_INSTANCIAS": ",".join(self.evolution_instancias),
+                }.items()
+                if not valor
+            ]
+            if faltando:
+                raise RuntimeError(
+                    "SATURDAY_EVOLUTION_ATIVO=true exige " + ", ".join(faltando) + "."
                 )
 
         if (

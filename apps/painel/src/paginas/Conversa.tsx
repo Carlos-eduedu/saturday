@@ -84,7 +84,7 @@ export function Conversa({ eu }: { eu: Eu }) {
             </li>
           ))}
         </ol>
-        {conversa.canal === "whatsapp" &&
+        {(conversa.canal === "whatsapp" || conversa.canal === "evolution") &&
           (minha ? (
             <Envio conversa={conversa} agir={agir} />
           ) : (
@@ -178,7 +178,8 @@ function Envio({
 
   return (
     <div className="envio">
-      {conversa.janela_aberta ? (
+      {/* Evolution não tem janela nem modelo: sempre texto (decisão 0009). */}
+      {conversa.janela_aberta || conversa.canal === "evolution" ? (
         <form onSubmit={enviarTexto}>
           <label>
             Mensagem
@@ -189,25 +190,27 @@ function Envio({
       ) : (
         <p className="aviso">Janela de 24 h fechada: só é possível enviar um modelo.</p>
       )}
-      <div className="modelo">
-        <label>
-          Modelo
-          <select value={modelo} onChange={(e) => setModelo(e.target.value)}>
-            {conversa.modelos.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          type="button"
-          disabled={!modelo}
-          onClick={() => agir(() => api.enviar(conversa.id, { modelo }))}
-        >
-          Enviar modelo
-        </button>
-      </div>
+      {conversa.modelos.length > 0 && (
+        <div className="modelo">
+          <label>
+            Modelo
+            <select value={modelo} onChange={(e) => setModelo(e.target.value)}>
+              {conversa.modelos.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            disabled={!modelo}
+            onClick={() => agir(() => api.enviar(conversa.id, { modelo }))}
+          >
+            Enviar modelo
+          </button>
+        </div>
+      )}
     </div>
   );
 }

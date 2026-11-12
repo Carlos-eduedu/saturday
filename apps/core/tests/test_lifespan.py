@@ -99,3 +99,15 @@ def test_granatech_ativa_exige_chave_e_token() -> None:
 
     with pytest.raises(RuntimeError, match="SATURDAY_GRANATECH_CHAVE_API"):
         settings.validar_para_subir()
+
+
+def test_evolution_ligada_exige_chave_token_e_instancias() -> None:
+    with pytest.raises(RuntimeError, match="SATURDAY_EVOLUTION_API_KEY"):
+        _completo(environment="dev", evolution_ativo=True).validar_para_subir()
+    _completo(
+        environment="dev",
+        evolution_ativo=True,
+        evolution_api_key=SecretStr("chave"),
+        evolution_webhook_token=SecretStr("token"),
+        evolution_instancias=["mex"],
+    ).validar_para_subir()

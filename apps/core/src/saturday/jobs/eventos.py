@@ -28,8 +28,8 @@ from saturday.settings import Settings
 
 logger = logging.getLogger(__name__)
 
-CANAL = "whatsapp"
 ORIGEM_GRANATECH = "granatech"
+ORIGEM_EVOLUTION = "evolution"
 
 
 def processar(
@@ -38,6 +38,7 @@ def processar(
     entrada: EntradaWhatsApp,
     settings: Settings,
     granatech: ClienteGranatech | None = None,
+    evolution: EntradaWhatsApp | None = None,
 ) -> int:
     """Reivindica um lote de eventos e processa. Devolve quantos tentou."""
 
@@ -51,6 +52,10 @@ def processar(
         try:
             if linha.origem == ORIGEM_GRANATECH:
                 eventos_granatech.aplicar(fabrica, granatech, linha.payload or {}, servico)
+            elif linha.origem == ORIGEM_EVOLUTION:
+                if evolution is None:
+                    raise RuntimeError("evento da Evolution com o canal desligado")
+                _processar_um(fabrica, servico, evolution, linha)
             else:
                 _processar_um(fabrica, servico, entrada, linha)
         except Exception as exc:  # noqa: BLE001 - o erro fica na linha, não derruba o laço
@@ -107,7 +112,7 @@ def _processar_um(
     entrada.marcar_lida(evento)
     preparada = entrada.preparar(evento)
     if preparada.resposta_local is not None:
-        _enfileirar_resposta(fabrica, evento, preparada.resposta_local)
+        _enfileirar_resposta(fabrica, entrada.canal, evento, preparada.resposta_local)
         return
     if preparada.pedido is None:
         # Tipo só registrado (localização, figurinha, reação…).
@@ -116,7 +121,7 @@ def _processar_um(
     servico.process_message(
         preparada.pedido,
         OrigemCanal(
-            canal=CANAL,
+            canal=entrada.canal,
             telefone=evento.numero,
             phone_number_id=evento.phone_number_id,
         ),
@@ -135,6 +140,7 @@ def _aplicar_status(fabrica: sessionmaker[Session], payload: dict[str, Any]) -> 
 
 def _enfileirar_resposta(
     fabrica: sessionmaker[Session],
+    canal: str,
     evento: parser.Evento,
     texto: str,
 ) -> None:
@@ -143,8 +149,8 @@ def _enfileirar_resposta(
     with abrir_sessao(fabrica) as sessao:
         conversa = repositorios.obter_ou_criar_conversa(
             sessao,
-            prefixo_do_canal(evento.numero),
-            canal=CANAL,
+            prefixo_do_canal(evento.numero, canal),
+            canal=canal,
             telefone=evento.numero,
             phone_number_id=evento.phone_number_id,
         )
@@ -155,7 +161,7 @@ def _enfileirar_resposta(
         enfileirar(
             sessao,
             conversa_id=conversa.id,
-            canal=CANAL,
+            canal=canal,
             payload={
                 "conversation_id": conversa.conversation_id,
                 "numero": evento.numero,

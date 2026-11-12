@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from saturday.agent.context import AgentContext
 from saturday.agent.state import turno_inicial
 from saturday.agent.textos import mensagem_handoff
-from saturday.canais.base import OrigemCanal
+from saturday.canais.base import CANAIS_WHATSAPP, OrigemCanal
 from saturday.dados import repositorios
 from saturday.dados.modelos import Conversa
 from saturday.dados.outbox import enfileirar
@@ -640,7 +640,7 @@ class AgentService:
         # status de entrega quando a Meta confirmar.
         payload = self._payload_de_saida(conversa, resposta, canal)
         payload["mensagem_id"] = mensagem_id
-        if canal == "whatsapp":
+        if canal in CANAIS_WHATSAPP:
             for chave, destino in (
                 ("modelo_envio", "modelo"),
                 ("modelo_aviso", "modelo_aviso"),
@@ -653,15 +653,15 @@ class AgentService:
     def _canal_de_saida(self, conversa: Conversa, resposta: AgentReply) -> str | None:
         """Quem entrega esta resposta.
 
-        No WhatsApp a resposta sempre passa pelo outbox, inclusive no handoff —
+        No WhatsApp (Meta ou Evolution) a resposta sempre passa pelo outbox, inclusive no handoff —
         o cliente precisa saber que a conversa foi para uma pessoa. No webhook,
         o handoff continua não gerando envio, como antes.
         """
 
         if resposta.status == "duplicate":
             return None
-        if conversa.canal == "whatsapp":
-            return "whatsapp"
+        if conversa.canal in CANAIS_WHATSAPP:
+            return conversa.canal
         if self.webhook.configurado and resposta.status != "with_human":
             return "webhook"
         return None
@@ -673,7 +673,7 @@ class AgentService:
         canal: str,
     ) -> dict[str, Any]:
         payload = resposta.model_dump(mode="json")
-        if canal == "whatsapp":
+        if canal in CANAIS_WHATSAPP:
             payload["numero"] = conversa.telefone
             payload["phone_number_id"] = conversa.phone_number_id
         return payload

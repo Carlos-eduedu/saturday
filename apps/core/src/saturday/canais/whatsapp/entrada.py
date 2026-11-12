@@ -8,10 +8,11 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import Protocol
 
 from saturday.agent.textos import mensagem_audio_ilegivel, mensagem_midia_ilegivel
 from saturday.canais.whatsapp import webhook as parser
-from saturday.canais.whatsapp.cliente import ErroWhatsApp, WhatsAppClient
+from saturday.canais.whatsapp.cliente import ErroWhatsApp
 from saturday.schemas import Attachment, ChatRequest
 from saturday.services.transcricao import Transcritor
 from saturday.storage.base import Storage
@@ -36,10 +37,25 @@ EXTENSAO_POR_MIME = {
 MAXIMO_TEXTO = 4000
 
 
-def prefixo_do_canal(numero: str) -> str:
-    """`conversation_id` do WhatsApp: estável por telefone."""
+def prefixo_do_canal(numero: str, canal: str = "whatsapp") -> str:
+    """`conversation_id` do canal: estável por telefone.
 
-    return f"whatsapp:{numero}"
+    O mesmo celular em dois canais são duas conversas (decisão 0009).
+    """
+
+    return f"{canal}:{numero}"
+
+
+class ClienteDeEntrada(Protocol):
+    """O que a entrada precisa do provedor: Cloud API da Meta ou Evolution.
+
+    ``instancia`` é o ``phone_number_id`` na Meta e o nome da instância na
+    Evolution; os erros seguem a hierarquia de ``ErroWhatsApp``.
+    """
+
+    def marcar_lida(self, instancia: str, wamid: str) -> None: ...
+
+    def baixar_midia(self, media_id: str, instancia: str) -> tuple[bytes, str]: ...
 
 
 def _mime_limpo(mime: str) -> str:
@@ -57,12 +73,17 @@ class Entrada:
 
 
 class EntradaWhatsApp:
+    """Evento de WhatsApp (de qualquer canal) em turno."""
+
     def __init__(
         self,
-        cliente: WhatsAppClient,
+        cliente: ClienteDeEntrada,
         storage: Storage,
         transcritor: Transcritor,
+        *,
+        canal: str = "whatsapp",
     ) -> None:
+        self.canal = canal
         self._cliente = cliente
         self._storage = storage
         self._transcritor = transcritor
@@ -78,7 +99,7 @@ class EntradaWhatsApp:
             self._cliente.marcar_lida(evento.phone_number_id, evento.wamid)
 
     def preparar(self, evento: parser.Evento) -> Entrada:
-        conversa = prefixo_do_canal(evento.numero)
+        conversa = prefixo_do_canal(evento.numero, self.canal)
         if not evento.roda_turno:
             # Localização, contato, figurinha e reação: só registro.
             return Entrada()
@@ -88,9 +109,13 @@ class EntradaWhatsApp:
 
         if evento.midia is not None:
             try:
-                dados, mime_bruto = self._cliente.baixar_midia(evento.midia.id)
+                dados, mime_bruto = self._cliente.baixar_midia(
+                    evento.midia.id, evento.phone_number_id
+                )
             except ErroWhatsApp as exc:
-                logger.warning("whatsapp_midia_falhou id=%s erro=%s", evento.midia.id, exc)
+                logger.warning(
+                    "midia_falhou canal=%s id=%s erro=%s", self.canal, evento.midia.id, exc
+                )
                 return Entrada(resposta_local=mensagem_midia_ilegivel())
 
             mime = _mime_limpo(mime_bruto)
@@ -115,5 +140,5 @@ class EntradaWhatsApp:
 
     def _arquivar(self, evento: parser.Evento, dados: bytes, mime: str) -> str:
         extensao = EXTENSAO_POR_MIME.get(mime, "bin")
-        chave = f"whatsapp/{evento.numero}/{evento.evento_id}.{extensao}"
+        chave = f"{self.canal}/{evento.numero}/{evento.evento_id}.{extensao}"
         return self._storage.salvar(dados, mime_type=mime, chave=chave)

@@ -12,6 +12,10 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Protocol
 
+# Canais que entregam por WhatsApp, cada um com o seu provedor (decisão 0009):
+# a Cloud API da Meta e a Evolution. Os dois guardam telefone e instância.
+CANAIS_WHATSAPP = frozenset({"whatsapp", "evolution"})
+
 
 class Resultado(StrEnum):
     """O que o canal sabe sobre uma tentativa de entrega.

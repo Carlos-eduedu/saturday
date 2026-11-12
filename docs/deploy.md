@@ -35,6 +35,11 @@ nginx que serve o build do Vite e repassa `/admin` para a API na mesma origem.
 - `COMPOSE_PROFILES` vazio: o banco é o Postgres do Dokploy e o storage é um
   bucket externo, então `SATURDAY_DATABASE_URL` e `SATURDAY_S3_*` são
   obrigatórias.
+- Canal Evolution (opcional, [docs/evolution.md](evolution.md)): `evolution`
+  em `COMPOSE_PROFILES` sobe a Evolution com Postgres e Redis próprios, só na
+  rede interna do stack (sem domínio); exige `EVOLUTION_POSTGRES_SENHA` e as
+  `SATURDAY_EVOLUTION_*`. Os volumes `evolution_*` guardam a sessão do
+  WhatsApp: perdê-los obriga a ler o QR de novo.
 - Domínios pela aba Domains do stack (o Dokploy injeta os labels do Traefik),
   com HTTPS e certificado Let's Encrypt.
 - Com `SATURDAY_GRANATECH_PROPOSTA_ATIVA=true`, `SATURDAY_DOMINIO_PUBLICO` é

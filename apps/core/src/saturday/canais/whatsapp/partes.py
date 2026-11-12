@@ -8,6 +8,15 @@ parte é fatiada também por tamanho.
 from __future__ import annotations
 
 import re
+import time
+from collections.abc import Callable
+
+from sqlalchemy.orm import Session, sessionmaker
+
+from saturday.dados import outbox as fila
+from saturday.dados import repositorios
+from saturday.dados.modelos import Outbox
+from saturday.dados.sessao import sessao as abrir_sessao
 
 MAX_PARTES = 5
 MAX_CARACTERES = 4000
@@ -52,3 +61,30 @@ def dividir(texto: str) -> list[str]:
         blocos = [*blocos[: MAX_PARTES - 1], "\n\n".join(blocos[MAX_PARTES - 1 :])]
 
     return [pedaco for bloco in blocos for pedaco in _fatiar(bloco)]
+
+
+def enviar_em_partes(
+    fabrica: sessionmaker[Session],
+    linha: Outbox,
+    texto: str,
+    enviar: Callable[[str], str | None],
+) -> None:
+    """Envia as partes que faltam e grava o progresso a cada uma.
+
+    Sem isso, uma falha na parte 3 faria a nova tentativa repetir as partes 1 e
+    2 no celular do cliente. ``enviar`` devolve o id da mensagem no provedor.
+    """
+
+    payload = linha.payload or {}
+    partes = dividir(texto)
+    inicio = int(payload.get("partes_enviadas") or 0)
+    for indice in range(inicio, len(partes)):
+        if indice > inicio:
+            time.sleep(INTERVALO_ENTRE_PARTES_S)
+        wamid = enviar(partes[indice])
+        with abrir_sessao(fabrica) as sessao:
+            fila.registrar_partes_enviadas(sessao, linha.id, indice + 1)
+            mensagem_id = payload.get("mensagem_id")
+            # O id da primeira parte identifica a mensagem nos status.
+            if indice == 0 and isinstance(mensagem_id, int):
+                repositorios.marcar_envio(sessao, mensagem_id, wamid=wamid, status="sent")

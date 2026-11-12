@@ -14,7 +14,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.canais.base import Resultado
-from saturday.canais.whatsapp import saida as modulo_saida
+from saturday.canais.whatsapp import partes as modulo_partes
 from saturday.canais.whatsapp.cliente import ErroTemporario
 from saturday.canais.whatsapp.saida import SaidaWhatsApp
 from saturday.dados import outbox as fila
@@ -341,7 +341,7 @@ def test_nova_tentativa_nao_repete_partes_ja_enviadas(
     conversa: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(modulo_saida, "INTERVALO_ENTRE_PARTES_S", 0)
+    monkeypatch.setattr(modulo_partes, "INTERVALO_ENTRE_PARTES_S", 0)
     linha_id = _enfileirar_whatsapp(fabrica, conversa, "um\n\ndois\n\ntrês")
     _cliente_escreveu(fabrica, conversa)
     cliente = ClienteGraphFalso(falhar_em={2})

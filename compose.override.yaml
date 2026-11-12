@@ -12,11 +12,13 @@ services:
     environment:
       SATURDAY_WHATSAPP_GRAPH_URL: http://meta:8100
       SATURDAY_GRANATECH_BASE_URL: http://granatech:8200
+      SATURDAY_EVOLUTION_URL: http://evolution-sim:8300
 
   worker:
     environment:
       SATURDAY_WHATSAPP_GRAPH_URL: http://meta:8100
       SATURDAY_GRANATECH_BASE_URL: http://granatech:8200
+      SATURDAY_EVOLUTION_URL: http://evolution-sim:8300
 
   painel:
     ports:
@@ -95,6 +97,38 @@ services:
       SATURDAY_HEALTH_URL: http://127.0.0.1:8200/admin/estado
     ports:
       - "8200:8200"
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
+
+  # Simulador da Evolution API, no mesmo molde. A chave e o token precisam ser
+  # os mesmos do Saturday; a instância precisa estar em SATURDAY_EVOLUTION_INSTANCIAS.
+  evolution-sim:
+    image: saturday-api:${SATURDAY_IMAGEM_TAG:-local}
+    healthcheck:
+      test: ["CMD", "saturday-health", "api"]
+      interval: 30s
+      timeout: 5s
+    working_dir: /app
+    volumes:
+      - ./simuladores:/simuladores:ro
+    command:
+      - uvicorn
+      - app:app
+      - --app-dir
+      - /simuladores/evolution
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8300"
+    environment:
+      SIMULADOR_SATURDAY_URL: http://api:8000
+      SATURDAY_EVOLUTION_API_KEY: ${SATURDAY_EVOLUTION_API_KEY:-chave-do-simulador}
+      SATURDAY_EVOLUTION_WEBHOOK_TOKEN: ${SATURDAY_EVOLUTION_WEBHOOK_TOKEN:-token-do-simulador}
+      SIMULADOR_EVOLUTION_INSTANCIA: mex-sim
+      SATURDAY_HEALTH_URL: http://127.0.0.1:8300/admin/enviadas
+    ports:
+      - "8300:8300"
     restart: unless-stopped
     mem_limit: 256m
     cpus: 0.5
