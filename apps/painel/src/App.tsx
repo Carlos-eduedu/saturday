@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, Navigate, Route, Routes } from "react-router";
+import { Link, Navigate, NavLink, Route, Routes, useLocation } from "react-router";
 import { api, type Cota, type Eu, ErroApi, guardarCsrf } from "./api";
 import { Alertas } from "./paginas/Alertas";
 import { Canais } from "./paginas/Canais";
@@ -37,25 +37,43 @@ export function App() {
 
 function Logado({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
   useEffect(() => iniciarTempoReal(), []);
+  const { pathname } = useLocation();
+  const [menuAberto, setMenuAberto] = useState(false);
+  // Abaixo de 768 px a navegação vira menu; trocar de página o fecha.
+  useEffect(() => setMenuAberto(false), [pathname]);
+  const emConversas = pathname === "/" || pathname.startsWith("/conversas");
 
   return (
     <div className="app">
-      <header className="topo">
+      <header className={menuAberto ? "topo aberto" : "topo"}>
         <Link to="/" className="marca">
           Saturday
         </Link>
-        <nav>
-          <Link to="/">Conversas</Link>
-          <Link to="/alertas">Alertas</Link>
-          {eu.perfil === "gestor" && <Link to="/canais">Canais</Link>}
-        </nav>
-        <ContadorCota />
-        <span className="quem">
-          {eu.email} ({eu.perfil})
-        </span>
-        <button type="button" onClick={aoSair}>
-          Sair
+        <button
+          type="button"
+          className="menu"
+          aria-expanded={menuAberto}
+          aria-controls="navegacao"
+          onClick={() => setMenuAberto(!menuAberto)}
+        >
+          {menuAberto ? "Fechar menu" : "Menu"}
         </button>
+        <nav id="navegacao" aria-label="Principal">
+          <NavLink to="/" className={emConversas ? "active" : ""} end>
+            Conversas
+          </NavLink>
+          <NavLink to="/alertas">Alertas</NavLink>
+          {eu.perfil === "gestor" && <NavLink to="/canais">Canais</NavLink>}
+        </nav>
+        <div className="conta">
+          <ContadorCota />
+          <span className="quem">
+            {eu.email} ({eu.perfil})
+          </span>
+          <button type="button" onClick={aoSair}>
+            Sair
+          </button>
+        </div>
       </header>
       <main>
         <Routes>

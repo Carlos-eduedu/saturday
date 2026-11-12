@@ -126,9 +126,9 @@ function TabelaInstancias({
         {instancias.map((i) => (
           <tr key={i.nome}>
             <td>{i.nome}</td>
-            <td>{ROTULO_ESTADO[i.estado] ?? i.estado}</td>
-            <td>{i.telefone}</td>
-            <td>{i.conversas_7_dias}</td>
+            <td data-rotulo="Estado">{ROTULO_ESTADO[i.estado] ?? i.estado}</td>
+            <td data-rotulo="Telefone">{i.telefone}</td>
+            <td data-rotulo="Conversas (7 dias)">{i.conversas_7_dias}</td>
             <td className="acoes">
               {i.estado !== "open" && (
                 <button
@@ -152,6 +152,7 @@ function TabelaInstancias({
               )}
               <button
                 type="button"
+                className="perigo"
                 onClick={() => confirmar("Apagar", i) && agir(() => api.apagarInstancia(i.nome))}
               >
                 Apagar
