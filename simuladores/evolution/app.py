@@ -35,6 +35,42 @@ CONFIGURACOES = (
     "readStatus",
     "syncFullHistory",
 )
+# `EventController.events` da 2.3.7 (os que o simulador aceita no webhook).
+EVENTOS = frozenset(
+    [
+        "APPLICATION_STARTUP",
+        "QRCODE_UPDATED",
+        "MESSAGES_SET",
+        "MESSAGES_UPSERT",
+        "MESSAGES_EDITED",
+        "MESSAGES_UPDATE",
+        "MESSAGES_DELETE",
+        "SEND_MESSAGE",
+        "SEND_MESSAGE_UPDATE",
+        "CONTACTS_SET",
+        "CONTACTS_UPSERT",
+        "CONTACTS_UPDATE",
+        "PRESENCE_UPDATE",
+        "CHATS_SET",
+        "CHATS_UPSERT",
+        "CHATS_UPDATE",
+        "CHATS_DELETE",
+        "GROUPS_UPSERT",
+        "GROUP_UPDATE",
+        "GROUP_PARTICIPANTS_UPDATE",
+        "CONNECTION_UPDATE",
+        "LABELS_EDIT",
+        "LABELS_ASSOCIATION",
+        "CALL",
+        "TYPEBOT_START",
+        "TYPEBOT_CHANGE_STATUS",
+        "REMOVE_INSTANCE",
+        "LOGOUT_INSTANCE",
+        "INSTANCE_CREATE",
+        "INSTANCE_DELETE",
+        "STATUS_INSTANCE",
+    ]
+)
 QR_FALSO = "data:image/png;base64,iVBORw0KGgo="
 
 SATURDAY_URL = os.environ.get("SIMULADOR_SATURDAY_URL", "http://api:8000")
@@ -275,7 +311,10 @@ async def configurar_webhook(nome: str, request: Request) -> Any:
         return _erro(401, "Unauthorized")
     if nome not in INSTANCIAS:
         return _erro(404, [f'The "{nome}" instance does not exist'])
-    INSTANCIAS[nome]["webhook"] = (await request.json()).get("webhook")
+    webhook = (await request.json()).get("webhook") or {}
+    if not set(webhook.get("events") or []) <= EVENTOS:
+        return _erro(400, ["webhook.events[0] must be equal to one of the allowed values"])
+    INSTANCIAS[nome]["webhook"] = webhook
     return JSONResponse(status_code=201, content={"webhook": INSTANCIAS[nome]["webhook"]})
 
 

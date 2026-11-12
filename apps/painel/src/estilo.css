@@ -616,10 +616,12 @@ main {
 .campos dd { margin: 0; overflow-wrap: anywhere; }
 .campos .esperado { display: block; }
 .esperado { color: var(--handoff); }
-.eventos { list-style: none; padding: 0 !important; display: flex; flex-direction: column; gap: 0.3rem; }
-.evento span { font-size: 0.85rem; color: var(--suave); }
-.evento-usado span { color: var(--ia); }
-.evento-falta span { color: var(--erro); font-weight: 600; }
+.configuracoes fieldset { border: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+.configuracoes legend { font-size: 0.875rem; font-weight: 500; color: var(--suave); padding: 0; margin-bottom: 0.25rem; }
+.configuracoes .opcao code { font-size: 0.85rem; overflow-wrap: anywhere; }
+.configuracoes .opcao input:disabled { opacity: 0.7; }
+.grade-eventos { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0 1rem; }
+.evento-falta { color: var(--erro); font-weight: 600; }
 .qr img { display: block; margin: 0.75rem 0; background: #fff; padding: 8px; border-radius: var(--raio-m); }
 @media (max-width: 767px) {
   .canais thead { display: none; }

@@ -341,6 +341,13 @@ function PainelDetalhes({ nome, fechar }: { nome: string; fechar: () => void }) 
             detalhes={detalhes}
             reaplicar={() => agir(() => api.reaplicarWebhook(nome), "Webhook do Saturday regravado.")}
           />
+          <FormEventos
+            key={detalhes.webhook.eventos.join()}
+            detalhes={detalhes}
+            salvar={(eventos) =>
+              agir(() => api.escolherEventos(nome, eventos), "Eventos salvos na Evolution.")
+            }
+          />
           <FormConfiguracoes
             key={JSON.stringify(detalhes.configuracoes) + detalhes.mensagem_chamada}
             detalhes={detalhes}
@@ -365,11 +372,6 @@ function SecaoWebhook({
   reaplicar: () => void;
 }) {
   const { webhook, divergencias } = detalhes;
-  // Esperados primeiro, depois o que a instância manda a mais.
-  const eventos = [
-    ...webhook.eventos_esperados,
-    ...webhook.eventos.filter((e) => !webhook.eventos_esperados.includes(e)),
-  ];
 
   return (
     <>
@@ -413,25 +415,70 @@ function SecaoWebhook({
         </dl>
       )}
 
-      <h3>Eventos</h3>
-      <ul className="eventos">
-        {eventos.map((e) => {
-          const usado = webhook.eventos_esperados.includes(e);
-          const ligado = webhook.eventos.includes(e);
-          const situacao = !ligado ? "falta" : usado ? "usado" : "ignorado";
-          const texto = {
-            falta: "falta",
-            usado: "usado pelo Saturday",
-            ignorado: "chega, mas o Saturday ignora",
-          }[situacao];
-          return (
-            <li key={e} className={`evento evento-${situacao}`}>
-              <code>{e}</code> <span>{texto}</span>
-            </li>
-          );
-        })}
-      </ul>
     </>
+  );
+}
+
+function FormEventos({
+  detalhes,
+  salvar,
+}: {
+  detalhes: DetalhesInstancia;
+  salvar: (eventos: string[]) => void;
+}) {
+  const { eventos, eventos_esperados: doSaturday, eventos_disponiveis } = detalhes.webhook;
+  const inicial = eventos.filter((e) => !doSaturday.includes(e));
+  const [extras, setExtras] = useState<string[]>(inicial);
+  const mudou = [...extras].sort().join() !== [...inicial].sort().join();
+  const faltando = doSaturday.filter((e) => !eventos.includes(e));
+  const outros = eventos_disponiveis.filter((e) => !doSaturday.includes(e));
+
+  function alternar(evento: string, ligado: boolean) {
+    setExtras(ligado ? [...extras, evento] : extras.filter((e) => e !== evento));
+  }
+
+  function enviar(evento: FormEvent) {
+    evento.preventDefault();
+    salvar(extras);
+  }
+
+  return (
+    <form className="configuracoes" onSubmit={enviar}>
+      <h3>Eventos</h3>
+      <fieldset>
+        <legend>Usados pelo Saturday (sempre ligados)</legend>
+        {doSaturday.map((e) => (
+          <label key={e} className="opcao">
+            <input type="checkbox" checked disabled />
+            <code>{e}</code>
+            {faltando.includes(e) && <small className="evento-falta">falta na instância</small>}
+          </label>
+        ))}
+      </fieldset>
+      <fieldset>
+        <legend>Outros eventos</legend>
+        <p className="nota">
+          Chegam ao webhook, mas o Saturday ainda não faz nada com eles: ligue só o que for usar.
+        </p>
+        <div className="grade-eventos">
+          {outros.map((e) => (
+            <label key={e} className="opcao">
+              <input
+                type="checkbox"
+                checked={extras.includes(e)}
+                onChange={(ev) => alternar(e, ev.target.checked)}
+              />
+              <code>{e}</code>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <div className="acoes-form">
+        <button type="submit" disabled={!mudou && faltando.length === 0}>
+          Salvar eventos na Evolution
+        </button>
+      </div>
+    </form>
   );
 }
 

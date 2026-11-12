@@ -94,6 +94,7 @@ export interface DetalhesInstancia {
     url_esperada: string;
     eventos: string[];
     eventos_esperados: string[];
+    eventos_disponiveis: string[];
     por_evento: boolean;
     base64: boolean;
     autenticacao: "confere" | "diferente" | "ausente";
@@ -239,6 +240,8 @@ export const api = {
     chamar<DetalhesInstancia>("GET", `/canais/evolution/${nome}/detalhes`),
   configurarInstancia: (nome: string, valores: ConfiguracoesInstancia) =>
     chamar<void>("PUT", `/canais/evolution/${nome}/configuracoes`, valores),
+  escolherEventos: (nome: string, eventos: string[]) =>
+    chamar<void>("PUT", `/canais/evolution/${nome}/eventos`, { eventos }),
   reaplicarWebhook: (nome: string) => chamar<void>("POST", `/canais/evolution/${nome}/webhook`),
   desconectarInstancia: (nome: string) =>
     chamar<void>("POST", `/canais/evolution/${nome}/desconectar`),

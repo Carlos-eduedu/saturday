@@ -334,6 +334,54 @@ def test_reaplicar_webhook_com_a_instancia_conectada(
         assert "canal_webhook" in acoes
 
 
+def test_gestor_liga_eventos_a_mais_sem_perder_os_do_saturday(
+    api: TestClient, fabrica: sessionmaker[Session], simulador: tuple[str, ModuleType]
+) -> None:
+    cabecalhos = _entrar(api, fabrica, "gestor")
+    api.post("/admin/canais/evolution", json={"nome": "mex-vendas"}, headers=cabecalhos)
+    _, modulo = simulador
+    rota = "/admin/canais/evolution/mex-vendas/eventos"
+
+    # Mesmo pedindo sem os do Saturday, eles continuam ligados.
+    resposta = api.put(rota, json={"eventos": ["CALL", "QRCODE_UPDATED"]}, headers=cabecalhos)
+    assert resposta.status_code == 204
+    assert modulo.INSTANCIAS["mex-vendas"]["webhook"]["events"] == [
+        "MESSAGES_UPSERT",
+        "MESSAGES_UPDATE",
+        "CONNECTION_UPDATE",
+        "QRCODE_UPDATED",
+        "CALL",
+    ]
+    detalhes = api.get("/admin/canais/evolution/mex-vendas/detalhes").json()
+    assert detalhes["divergencias"] == []
+    assert len(detalhes["webhook"]["eventos_disponiveis"]) == 31
+
+    # Regravar o webhook mantém os extras escolhidos.
+    api.post("/admin/canais/evolution/mex-vendas/webhook", headers=cabecalhos)
+    assert "CALL" in modulo.INSTANCIAS["mex-vendas"]["webhook"]["events"]
+
+    with abrir_sessao(fabrica) as sessao:
+        detalhe = sessao.scalars(
+            select(Auditoria.detalhe).where(Auditoria.acao == "canal_eventos")
+        ).one()
+        assert detalhe == {"eventos": ["CALL", "QRCODE_UPDATED"]}
+
+
+def test_evento_desconhecido_e_recusado(
+    api: TestClient, fabrica: sessionmaker[Session], simulador: tuple[str, ModuleType]
+) -> None:
+    cabecalhos = _entrar(api, fabrica, "gestor")
+    api.post("/admin/canais/evolution", json={"nome": "mex-vendas"}, headers=cabecalhos)
+
+    resposta = api.put(
+        "/admin/canais/evolution/mex-vendas/eventos",
+        json={"eventos": ["CALL", "INVENTADO"]},
+        headers=cabecalhos,
+    )
+    assert resposta.status_code == 422
+    assert "INVENTADO" in resposta.json()["detail"]
+
+
 def test_conectar_fixa_o_telefone(fabrica: sessionmaker[Session], cliente: EvolutionClient) -> None:
     eventos_instancias.aplicar(fabrica, cliente, _conexao("open"))
     eventos_instancias.aplicar(fabrica, cliente, _conexao("open"))

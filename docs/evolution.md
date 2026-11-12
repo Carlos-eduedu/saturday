@@ -65,7 +65,10 @@ subida.
    sai da API, o painel vê só se ele confere, difere ou falta. As configurações
    (recusar chamadas e a mensagem, ignorar grupos, sempre online, marcar como
    lida, ler status, sincronizar histórico) são editáveis e mostram o padrão do
-   Saturday. **Reconectar** regrava só o webhook: as configurações ficam como
+   Saturday. Os eventos a mais (qualquer um dos 31 da 2.3.7) também são
+   escolhidos ali; os três do Saturday ficam sempre ligados, e o Saturday
+   descarta os que não trata. **Reconectar** regrava só o webhook, com os
+   extras escolhidos: as configurações ficam como
    o gestor deixou ([decisão 0011](decisoes/0011-configuracoes-da-instancia-pelo-painel.md)).
 
 ## Desenvolvimento

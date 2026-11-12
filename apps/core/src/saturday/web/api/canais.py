@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.canais.evolution.cliente import (
     CONFIGURACOES,
+    EVENTOS_DISPONIVEIS,
     EVENTOS_WEBHOOK,
     EvolutionClient,
     Qr,
@@ -73,6 +74,12 @@ Evolution = Annotated[EvolutionClient, Depends(get_cliente_evolution)]
 
 class NovaInstancia(BaseModel):
     nome: str = Field(min_length=3, max_length=32)
+
+
+class Eventos(BaseModel):
+    """Eventos a mais do webhook; os do Saturday entram sempre."""
+
+    eventos: list[str] = Field(max_length=len(EVENTOS_DISPONIVEIS))
 
 
 class Configuracoes(BaseModel):
@@ -248,6 +255,7 @@ def _detalhes(
             "url_esperada": url_esperada,
             "eventos": eventos,
             "eventos_esperados": EVENTOS_WEBHOOK,
+            "eventos_disponiveis": list(EVENTOS_DISPONIVEIS),
             "por_evento": webhook.get("webhookByEvents") is True,
             "base64": webhook.get("webhookBase64") is True,
             "autenticacao": conferencia,
@@ -274,7 +282,10 @@ def detalhes(nome: str, request: Request, _usuario: Gestor, cliente: Evolution) 
 def reaplicar_webhook(
     nome: str, usuario: GestorCsrf, fabrica: Fabrica, cliente: Evolution
 ) -> Response:
-    """Regrava o webhook do Saturday; funciona com a instância conectada."""
+    """Regrava o webhook do Saturday, com os eventos a mais que já tinha.
+
+    Funciona com a instância conectada.
+    """
 
     try:
         cliente.aplicar_webhook(nome)
@@ -282,6 +293,26 @@ def reaplicar_webhook(
         raise _falha(exc) from exc
     with abrir_sessao(fabrica) as sessao:
         auditar(sessao, usuario.id, "canal_webhook", nome)
+    return Response(status_code=204)
+
+
+@router.put("/evolution/{nome}/eventos", status_code=204)
+def escolher_eventos(
+    nome: str, dados: Eventos, usuario: GestorCsrf, fabrica: Fabrica, cliente: Evolution
+) -> Response:
+    """Regrava o webhook do Saturday com os eventos a mais escolhidos."""
+
+    desconhecidos = sorted(set(dados.eventos) - set(EVENTOS_DISPONIVEIS))
+    if desconhecidos:
+        raise HTTPException(
+            status_code=422, detail=f"eventos desconhecidos: {', '.join(desconhecidos)}"
+        )
+    try:
+        cliente.aplicar_webhook(nome, dados.eventos)
+    except ErroWhatsApp as exc:
+        raise _falha(exc) from exc
+    with abrir_sessao(fabrica) as sessao:
+        auditar(sessao, usuario.id, "canal_eventos", nome, detalhe={"eventos": dados.eventos})
     return Response(status_code=204)
 
 

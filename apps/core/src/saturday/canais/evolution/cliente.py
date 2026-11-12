@@ -31,6 +31,40 @@ DDI_BRASIL = "55"
 JID_TELEFONE = "@s.whatsapp.net"
 INTEGRACAO = "WHATSAPP-BAILEYS"
 EVENTOS_WEBHOOK = ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "CONNECTION_UPDATE"]
+# `EventController.events` da tag 2.3.7: o `/webhook/set` recusa qualquer outro.
+EVENTOS_DISPONIVEIS = (
+    "APPLICATION_STARTUP",
+    "QRCODE_UPDATED",
+    "MESSAGES_SET",
+    "MESSAGES_UPSERT",
+    "MESSAGES_EDITED",
+    "MESSAGES_UPDATE",
+    "MESSAGES_DELETE",
+    "SEND_MESSAGE",
+    "SEND_MESSAGE_UPDATE",
+    "CONTACTS_SET",
+    "CONTACTS_UPSERT",
+    "CONTACTS_UPDATE",
+    "PRESENCE_UPDATE",
+    "CHATS_SET",
+    "CHATS_UPSERT",
+    "CHATS_UPDATE",
+    "CHATS_DELETE",
+    "GROUPS_UPSERT",
+    "GROUP_UPDATE",
+    "GROUP_PARTICIPANTS_UPDATE",
+    "CONNECTION_UPDATE",
+    "LABELS_EDIT",
+    "LABELS_ASSOCIATION",
+    "CALL",
+    "TYPEBOT_START",
+    "TYPEBOT_CHANGE_STATUS",
+    "REMOVE_INSTANCE",
+    "LOGOUT_INSTANCE",
+    "INSTANCE_CREATE",
+    "INSTANCE_DELETE",
+    "STATUS_INSTANCE",
+)
 # O que o Saturday aplica em `/settings/set`; a tela Canais compara com o atual.
 CONFIGURACOES = {
     "rejectCall": False,
@@ -186,14 +220,18 @@ class EvolutionClient:
 
     # ------------------------------------------------------- instâncias (0010)
 
-    def _webhook(self) -> dict[str, Any]:
+    def _webhook(self, extras: list[str] | None = None) -> dict[str, Any]:
+        """Webhook do Saturday; os eventos dele vão sempre, os extras por escolha."""
+
+        escolhidos = set(extras or []) - set(EVENTOS_WEBHOOK)
+        a_mais = [e for e in EVENTOS_DISPONIVEIS if e in escolhidos]
         return {
             "enabled": True,
             "url": self._webhook_url,
             "headers": {"x-webhook-token": self._webhook_token},
             "byEvents": False,
             "base64": False,
-            "events": EVENTOS_WEBHOOK,
+            "events": EVENTOS_WEBHOOK + a_mais,
         }
 
     @staticmethod
@@ -226,10 +264,16 @@ class EvolutionClient:
         )
         return self._qr(dados)
 
-    def aplicar_webhook(self, nome: str) -> None:
-        """Grava na instância o webhook do Saturday (URL, token e eventos)."""
+    def aplicar_webhook(self, nome: str, extras: list[str] | None = None) -> None:
+        """Grava na instância o webhook do Saturday (URL, token e eventos).
 
-        self._objeto("POST", f"/webhook/set/{nome}", {"webhook": self._webhook()})
+        Sem `extras`, mantém os eventos a mais que o gestor já tinha ligado.
+        """
+
+        if extras is None:
+            atuais = self.webhook_atual(nome).get("events")
+            extras = [str(e) for e in atuais] if isinstance(atuais, list) else []
+        self._objeto("POST", f"/webhook/set/{nome}", {"webhook": self._webhook(extras)})
 
     def aplicar_configuracoes(self, nome: str, valores: dict[str, Any]) -> None:
         """Grava as configurações por cima das atuais.

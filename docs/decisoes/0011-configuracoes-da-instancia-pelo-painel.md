@@ -26,14 +26,20 @@ que apagaria qualquer ajuste feito pela equipe.
 - Salvar parte do que está gravado: o `/settings/set` da 2.3.7 exige os seis
   booleanos e tira da memória da instância o que não vier (`msgCall`,
   `wavoipToken`). O `wavoipToken` nunca passa pelo painel.
-- Cada ajuste grava `auditoria` (`canal_configurar`, com os valores;
-  `canal_webhook`).
+- **Eventos a mais:** o gestor liga qualquer evento da lista da 2.3.7
+  (`EventController.events`, 31 nomes). Os três do Saturday
+  (`MESSAGES_UPSERT`, `MESSAGES_UPDATE`, `CONNECTION_UPDATE`) vão sempre.
+  Regravar o webhook ou reconectar mantém os extras. O Saturday responde 200 e
+  descarta os eventos que não trata: ligar um evento não faz nada por si.
+- Cada ajuste grava `auditoria` (`canal_configurar` com os valores,
+  `canal_eventos` com os eventos, `canal_webhook`).
 - Contrato somado ao da 0010, conferido no código da tag 2.3.7:
   `GET /webhook/find/{instancia}` e `GET /settings/find/{instancia}`.
 
 ## Alternativas descartadas
 
-- **Editar URL, token e eventos do webhook.** Qualquer valor diferente do do
-  Saturday só quebra a entrada; basta regravar o certo.
+- **Editar URL e token do webhook, ou desligar os eventos do Saturday.**
+  Qualquer valor diferente do do Saturday só quebra a entrada; basta regravar
+  o certo.
 - **Guardar as configurações no Saturday e reaplicar a cada reconexão.**
   Duplicaria o que a Evolution já guarda e teria de ficar em sincronia.
