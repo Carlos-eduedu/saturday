@@ -46,7 +46,7 @@ ComCsrf = Annotated[UsuarioLogado, Depends(exigir_csrf)]
 Servico = Annotated[AgentService, Depends(get_agent_service)]
 
 LIMITE_INBOX = 200
-CampoSensivel = Literal["cpf", "telefone", "data_nascimento"]
+CampoSensivel = Literal["cpf", "telefone", "data_nascimento", "email"]
 
 
 class Login(BaseModel):
@@ -291,12 +291,20 @@ def _estado(conversa: Conversa, service: AgentService) -> dict[str, Any]:
     return service.estado_atual(service.config(conversa.conversation_id))
 
 
+def _dados_clt(estado: dict[str, Any]) -> dict[str, Any]:
+    """O que o ramo CLT coletou; o INSS guarda em ``cliente``."""
+
+    return dict((estado.get("clt") or {}).get("dados") or {})
+
+
 def _dados_sensiveis(conversa: Conversa, estado: dict[str, Any]) -> dict[str, str]:
     cliente = estado.get("cliente") or {}
+    clt = _dados_clt(estado)
     valores = {
         "telefone": conversa.telefone,
-        "cpf": cliente.get("cpf"),
-        "data_nascimento": cliente.get("data_nascimento"),
+        "cpf": cliente.get("cpf") or clt.get("cpf"),
+        "data_nascimento": cliente.get("data_nascimento") or clt.get("nascimento"),
+        "email": clt.get("email"),
     }
     return {campo: str(valor) for campo, valor in valores.items() if valor}
 
@@ -313,6 +321,7 @@ def ficha(
         sensiveis = _dados_sensiveis(conversa, estado)
     cliente = estado.get("cliente") or {}
     return {
+        "nome": cliente.get("nome") or _dados_clt(estado).get("nome"),
         "dados": {campo: MASCARAS[campo](valor) for campo, valor in sensiveis.items()},
         "uf": cliente.get("uf"),
         "publico": estado.get("publico"),

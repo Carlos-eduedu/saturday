@@ -47,6 +47,7 @@ export interface Detalhe extends Resumo {
 }
 
 export interface Ficha {
+  nome: string | null;
   dados: Partial<Record<CampoSensivel, string>>;
   uf: string | null;
   publico: string | null;
@@ -54,7 +55,7 @@ export interface Ficha {
   portabilidade: unknown;
 }
 
-export type CampoSensivel = "cpf" | "telefone" | "data_nascimento";
+export type CampoSensivel = "cpf" | "telefone" | "data_nascimento" | "email";
 
 export interface Alerta {
   id: number;

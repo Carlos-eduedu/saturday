@@ -222,6 +222,29 @@ def test_inbox_filtra_por_fila_e_marca_lida(client_pg, service_pg, fabrica, ana,
 # ------------------------------------------------------------------ aceite 2
 
 
+def test_ficha_mostra_os_dados_do_ramo_clt(client_pg, service_pg, fabrica, ana, conversa):
+    _cliente_escreve(service_pg, conversa, "oi")
+    dados = {
+        "cpf": "00189004967",
+        "nome": "Maria da Silva",
+        "nascimento": "1990-05-15",
+        "email": "maria@exemplo.test",
+    }
+    service_pg.graph.update_state(service_pg.config(conversa), {"clt": {"dados": dados}})
+    alvo = _conversa_id(fabrica, conversa)
+    csrf = _entrar(client_pg, "ana@exemplo.test")
+
+    ficha = client_pg.get(f"/admin/conversas/{alvo}/ficha").json()
+    assert ficha["nome"] == "Maria da Silva"
+    assert ficha["dados"]["cpf"] == "***.***.***-67"
+    assert ficha["dados"]["data_nascimento"] == "**/**/1990"
+    assert ficha["dados"]["email"] == "m***@exemplo.test"
+    revelado = client_pg.post(
+        f"/admin/conversas/{alvo}/revelar", headers=csrf, json={"campo": "email"}
+    )
+    assert revelado.json() == {"campo": "email", "valor": "maria@exemplo.test"}
+
+
 def test_revelar_cpf_grava_auditoria(client_pg, service_pg, fabrica, ana, conversa):
     _cliente_escreve(service_pg, conversa, "oi")
     service_pg.graph.update_state(service_pg.config(conversa), {"cliente": {"cpf": "00189004967"}})

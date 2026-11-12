@@ -30,6 +30,7 @@ const CAMPOS: Record<CampoSensivel, string> = {
   telefone: "Telefone",
   cpf: "CPF",
   data_nascimento: "Nascimento",
+  email: "E-mail",
 };
 
 const STATUS_ENTREGA: Record<string, string> = {
@@ -463,6 +464,12 @@ function FichaCliente({ id }: { id: string }) {
     <div className="ficha">
       <h2>Ficha</h2>
       <dl>
+        {ficha.nome && (
+          <div>
+            <dt>Nome</dt>
+            <dd>{ficha.nome}</dd>
+          </div>
+        )}
         {(Object.keys(CAMPOS) as CampoSensivel[])
           .filter((campo) => ficha.dados[campo])
           .map((campo) => (

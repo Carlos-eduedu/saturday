@@ -27,8 +27,16 @@ def mascarar_data(data: str) -> str:
     return f"**/**/{data[:4]}" if re.fullmatch(r"\d{4}-\d{2}-\d{2}", data) else "***"
 
 
+def mascarar_email(email: str) -> str:
+    """`fulana@exemplo.com` → `f***@exemplo.com`: o domínio ajuda a conferir."""
+
+    usuario, arroba, dominio = email.partition("@")
+    return f"{usuario[:1]}***@{dominio}" if arroba and usuario and dominio else "***"
+
+
 MASCARAS = {
     "cpf": mascarar_cpf,
+    "email": mascarar_email,
     "telefone": mascarar_telefone,
     "data_nascimento": mascarar_data,
 }
