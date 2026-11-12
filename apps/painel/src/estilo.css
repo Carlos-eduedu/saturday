@@ -337,7 +337,15 @@ main {
 
 /* Linha que arrasta (SwipeRow): o cartão é o recorte do componente, e o link
    preenche a superfície sem subir no hover (o recorte cortaria a sombra). */
-.inbox .swipe-row__clip { border: 1px solid var(--borda); box-shadow: var(--sombra); }
+.inbox .swipe-row__clip {
+  border: 1px solid var(--borda);
+  box-shadow: var(--sombra);
+  transition: box-shadow 150ms ease, border-color 150ms ease;
+}
+.inbox .swipe-row__clip:hover { box-shadow: var(--sombra-alta); border-color: var(--suave); }
+/* O SwipeRow esconde o que passa da altura para poder recolher; fora disso, a
+   sombra do cartão precisa aparecer. */
+.inbox .swipe-row:not([data-phase="collapsing"]) { overflow: visible; }
 .inbox .swipe-row__surface { padding: 0; }
 .inbox .swipe-row a {
   width: 100%;
@@ -347,7 +355,10 @@ main {
   box-shadow: none;
   background: none;
 }
-.inbox .swipe-row a:hover { transform: none; box-shadow: none; background: var(--superficie-2); }
+.inbox .swipe-row a:hover { transform: none; box-shadow: none; }
+/* O hover pinta a linha inteira, botão incluído, e não só o link. */
+.inbox .swipe-row__clip:hover .swipe-row__surface { background: var(--superficie-2); }
+.inbox li.pede-atencao .swipe-row a { background: none; }
 .inbox .swipe-row__action--commit { font-weight: 600; }
 
 /* Botão de ação na linha (desktop); no celular, o gesto é o caminho. */
