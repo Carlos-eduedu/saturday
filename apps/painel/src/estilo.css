@@ -372,7 +372,17 @@ main {
   background: var(--fundo);
   border-bottom: 1px solid var(--borda);
 }
-.historico h1 { font-size: 1.15rem; margin: 0; font-family: var(--fonte-mono); font-weight: 500; letter-spacing: 0; }
+.identidade { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
+.historico h1 { font-size: 1.45rem; margin: 0; font-family: var(--fonte-mono); font-weight: 500; letter-spacing: 0; }
+.identidade p { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; font-size: 0.85rem; color: var(--suave); }
+/* Por que a conversa pede atenção, antes da primeira mensagem. */
+.faixa-atencao {
+  margin: 1rem 0 0;
+  padding: 0.7rem 1rem;
+  border-radius: var(--raio-m);
+  color: var(--handoff);
+  background: color-mix(in srgb, var(--handoff) 11%, var(--superficie));
+}
 .acoes { display: flex; gap: 0.5rem; align-items: end; flex-wrap: wrap; margin-left: auto; }
 .transferir { display: flex; gap: 0.5rem; align-items: end; }
 .mensagens { display: flex; flex-direction: column; gap: 0.6rem; margin: 1.25rem 0; }
@@ -388,9 +398,24 @@ main {
 .msg-saida {
   align-self: flex-end;
   border-radius: var(--raio-l) var(--raio-l) var(--raio-s) var(--raio-l);
-  background: var(--destaque-suave);
-  border-color: transparent;
 }
+/* Quem falou muda a cor: a fala da IA é a que a equipe precisa auditar. */
+.msg-ia { background: color-mix(in srgb, var(--ia) 10%, var(--superficie)); border-color: color-mix(in srgb, var(--ia) 28%, transparent); }
+.msg-ia .autor { color: var(--ia); }
+.msg-atendente { background: var(--destaque-suave); border-color: transparent; }
+.msg-atendente .autor { color: var(--destaque); }
+/* Sistema é evento, não fala: centrado, sem balão. */
+.msg-sistema {
+  align-self: center;
+  max-width: min(90%, 36rem);
+  text-align: center;
+  background: none;
+  border: none;
+  padding: 0.25rem 0.5rem;
+  color: var(--suave);
+  font-size: 0.85rem;
+}
+.msg-sistema .autor { display: none; }
 .autor { font-size: 0.75rem; font-weight: 600; color: var(--suave); }
 .envio {
   position: sticky;

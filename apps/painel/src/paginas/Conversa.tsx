@@ -1,4 +1,4 @@
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router";
 import {
   api,
@@ -11,11 +11,21 @@ import {
   type Usuario,
 } from "../api";
 import { Vazio } from "../componentes/Vazio";
-import { CHAMADAS, dolar, ETAPAS, MOTIVOS_HANDOFF, NOS, rotulo, tokens } from "../rotulos";
+import {
+  ATENCAO,
+  CHAMADAS,
+  PUBLICOS,
+  dolar,
+  ETAPAS,
+  MOTIVOS_HANDOFF,
+  NOS,
+  rotulo,
+  tokens,
+} from "../rotulos";
 import { useAvisos } from "../tempoReal";
 import { formatarHora, ROTULO_ATENDIMENTO } from "./Inbox";
 
-const AUTOR = { cliente: "Cliente", ia: "IA", atendente: "Atendente", sistema: "Sistema" };
+const AUTOR = { cliente: "Cliente", ia: "IA", atendente: "Equipe", sistema: "Sistema" };
 const CAMPOS: Record<CampoSensivel, string> = {
   telefone: "Telefone",
   cpf: "CPF",
@@ -58,6 +68,15 @@ export function Conversa({ eu }: { eu: Eu }) {
     }
   }
 
+  // Ao abrir uma conversa, a leitura começa pela última mensagem.
+  const fim = useRef<HTMLLIElement | null>(null);
+  const rolouPara = useRef("");
+  useEffect(() => {
+    if (!conversa || rolouPara.current === conversa.id) return;
+    rolouPara.current = conversa.id;
+    fim.current?.scrollIntoView({ block: "end" });
+  }, [conversa]);
+
   if (!conversa) return <p className="centro">{erro || "Carregando…"}</p>;
   const minha = conversa.atendimento === "assumida" && conversa.atendente_id === eu.id;
 
@@ -65,21 +84,37 @@ export function Conversa({ eu }: { eu: Eu }) {
     <div className="conversa">
       <section className="historico">
         <header>
-          <h1>{conversa.telefone ?? conversa.canal}</h1>
-          <span className={`selo selo-${conversa.atendimento}`}>
-            {ROTULO_ATENDIMENTO[conversa.atendimento]}
-            {minha ? " (você)" : ""}
-          </span>
+          <div className="identidade">
+            <h1>{conversa.telefone ?? conversa.canal}</h1>
+            <p>
+              <span className={`selo selo-${conversa.atendimento}`}>
+                {ROTULO_ATENDIMENTO[conversa.atendimento]}
+                {minha ? " (você)" : ""}
+              </span>
+              <span>{conversa.canal === "evolution" ? "Evolution" : "WhatsApp oficial"}</span>
+              {conversa.etapa && <span>{rotulo(ETAPAS, conversa.etapa)}</span>}
+            </p>
+          </div>
           <Acoes conversa={conversa} eu={eu} minha={minha} agir={agir} />
         </header>
+        {conversa.atencao.length > 0 && (
+          <p className="faixa-atencao">
+            <strong>{conversa.atencao.map((a) => rotulo(ATENCAO, a)).join(" · ")}</strong>
+            {conversa.motivo_handoff && ` — ${rotulo(MOTIVOS_HANDOFF, conversa.motivo_handoff)}`}
+          </p>
+        )}
         {erro && (
           <p className="erro" role="alert">
             {erro}
           </p>
         )}
         <ol className="mensagens">
-          {conversa.mensagens.map((m) => (
-            <li key={m.id} className={`msg msg-${m.direcao}`}>
+          {conversa.mensagens.map((m, i) => (
+            <li
+              key={m.id}
+              ref={i === conversa.mensagens.length - 1 ? fim : undefined}
+              className={`msg msg-${m.direcao} msg-${m.autor}`}
+            >
               <span className="autor">{AUTOR[m.autor]}</span>
               <p>{m.conteudo}</p>
               {m.anexos.map((anexo, indice) => (
@@ -399,13 +434,13 @@ function FichaCliente({ id }: { id: string }) {
         {ficha.publico && (
           <div>
             <dt>Público</dt>
-            <dd>{ficha.publico}</dd>
+            <dd>{rotulo(PUBLICOS, ficha.publico)}</dd>
           </div>
         )}
         {ficha.handoff_reason && (
           <div>
             <dt>Motivo do handoff</dt>
-            <dd>{ficha.handoff_reason}</dd>
+            <dd>{rotulo(MOTIVOS_HANDOFF, ficha.handoff_reason)}</dd>
           </div>
         )}
       </dl>

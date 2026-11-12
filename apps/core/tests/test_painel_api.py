@@ -210,7 +210,9 @@ def test_inbox_filtra_por_fila_e_marca_lida(client_pg, service_pg, fabrica, ana,
     assert item["telefone"] == "(11) *****-4321"
     assert client_pg.get("/admin/conversas", params={"fila": "minhas"}).json() == []
 
-    client_pg.get(f"/admin/conversas/{alvo}")
+    detalhe = client_pg.get(f"/admin/conversas/{alvo}").json()
+    assert detalhe["ultima_mensagem"]["autor"] in {"ia", "cliente"}
+    assert "motivo_handoff" in detalhe and "atencao" in detalhe
     client_pg.post(f"/admin/conversas/{alvo}/assumir", headers=csrf)
     [item] = client_pg.get("/admin/conversas", params={"fila": "minhas"}).json()
     assert item["nao_lida"] is False

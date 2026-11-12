@@ -62,6 +62,12 @@ export const ATENCAO: Record<string, string> = {
   envio_falhou: "Envio falhou",
 };
 
+export const PUBLICOS: Record<string, string> = {
+  clt: "Crédito do Trabalhador (CLT)",
+  inss: "Portabilidade INSS",
+  indefinido: "Ainda não identificado",
+};
+
 export const AUTORES: Record<string, string> = {
   cliente: "Cliente",
   ia: "IA",

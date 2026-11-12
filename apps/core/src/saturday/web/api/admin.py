@@ -201,7 +201,11 @@ def ver_conversa(conversa_id: uuid.UUID, _usuario: Logado, fabrica: Fabrica) -> 
             .where(Mensagem.conversa_id == conversa_id)
             .order_by(Mensagem.criada_em, Mensagem.id)
         ).all()
-        resumo = _resumo(conversa, datetime.now(UTC))
+        agora = datetime.now(UTC)
+        resumo = {
+            **_resumo(conversa, agora),
+            **supervisao.supervisao(sessao, [conversa], agora)[conversa.id],
+        }
         historico = [
             {
                 "id": m.id,
