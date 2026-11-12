@@ -580,12 +580,16 @@ class AgentService:
             return {}
         return {"conversa_ref": str(conversa.id), "telefone": conversa.telefone}
 
-    def continuar(self, conversation_id: str, evento: str) -> AgentReply | None:
+    def continuar(
+        self, conversation_id: str, evento: str, *, forcar: bool = False
+    ) -> AgentReply | None:
         """Turno de sistema: segue a jornada sem mensagem do cliente.
 
         Usado quando a Granatech avisa que a consulta mudou e pelo recontato. Com
         a conversa em handoff ou assumida, a IA não fala: vira alerta para quem
-        está com ela. Devolve ``None`` quando nada rodou.
+        está com ela. ``forcar`` é o gestor pedindo pelo painel (reenviar o link
+        de biometria): o turno roda mesmo com humano. Devolve ``None`` quando
+        nada rodou.
         """
 
         with self._trava(conversation_id) as sessao:
@@ -593,7 +597,7 @@ class AgentService:
             estado = self.estado_atual(config)
             conversa = repositorios.buscar_conversa(sessao, conversation_id) if sessao else None
             if sessao is not None and conversa is not None:
-                if conversa.atendimento != "ia":
+                if conversa.atendimento != "ia" and not forcar:
                     repositorios.abrir_alerta(
                         sessao,
                         "evento_com_humano",
@@ -601,7 +605,7 @@ class AgentService:
                         detalhe={"evento": evento},
                     )
                     return None
-            elif estado.get("status") == "handoff":
+            elif estado.get("status") == "handoff" and not forcar:
                 return None
 
             entrada = turno_inicial(user_message="", attachments=[])
@@ -616,6 +620,15 @@ class AgentService:
                 self._registrar_turno(sessao, conversa, final, caminho, metricas)
             resposta = self.evento(conversation_id, final)
             if sessao is not None and conversa is not None:
+                if forcar and conversa.atendimento != "ia" and resposta.status == "handoff":
+                    # A conversa já está com humano: o aviso de handoff não vai ao cliente.
+                    repositorios.abrir_alerta(
+                        sessao,
+                        "evento_com_humano",
+                        conversa_id=conversa.id,
+                        detalhe={"evento": evento, "motivo": resposta.handoff_reason},
+                    )
+                    return resposta
                 if resposta.status == "handoff":
                     self._abrir_handoff(
                         sessao,

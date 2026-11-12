@@ -84,6 +84,7 @@ def _consulta(
 
         # Reatribuir a lista inteira: o JSONB não acompanha `append`.
         linha.historico = [*linha.historico, {"status": novo, "recebido_em": _agora()}]
+        repositorios.notificar(sessao, "granatech", consulta=linha.id)
         if novo not in ordem.CONSULTA:
             _alertar(
                 sessao, linha.conversa_id, motivo="status_desconhecido", id=id_externo, status=novo
@@ -156,6 +157,7 @@ def _proposta(
                 "recebido_em": _agora(),
             },
         ]
+        repositorios.notificar(sessao, "granatech", proposta=linha.id)
         conversation_id = _conversation_id(sessao, linha.conversa_id)
         if not novo or novo not in ordem.PROPOSTA:
             # Grava o alerta com os ids e faz handoff na conversa (abaixo).

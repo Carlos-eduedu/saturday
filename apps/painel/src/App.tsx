@@ -4,6 +4,7 @@ import { api, type Cota, type Eu, ErroApi, guardarCsrf } from "./api";
 import { Alertas } from "./paginas/Alertas";
 import { Canais } from "./paginas/Canais";
 import { Custos } from "./paginas/Custos";
+import { Granatech } from "./paginas/Granatech";
 import StaggeredMenu from "./componentes/StaggeredMenu";
 import { Caixa } from "./paginas/Caixa";
 import { Login } from "./paginas/Login";
@@ -48,6 +49,12 @@ function Logado({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
       ariaLabel: "Ir para os alertas",
       link: "/alertas",
       ativo: pathname === "/alertas",
+    },
+    {
+      label: "Granatech",
+      ariaLabel: "Ir para a Granatech",
+      link: "/granatech",
+      ativo: pathname === "/granatech",
     },
     ...(eu.perfil === "gestor"
       ? [
@@ -126,6 +133,7 @@ function Logado({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
           <Route path="/" element={<Caixa eu={eu} />} />
           <Route path="/conversas/:id" element={<Caixa eu={eu} />} />
           <Route path="/alertas" element={<Alertas />} />
+          <Route path="/granatech" element={<Granatech eu={eu} />} />
           {eu.perfil === "gestor" && <Route path="/canais" element={<Canais />} />}
           {eu.perfil === "gestor" && <Route path="/usuarios" element={<Usuarios eu={eu} />} />}
           {eu.perfil === "gestor" && <Route path="/custos" element={<Custos />} />}

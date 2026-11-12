@@ -5,7 +5,7 @@
 import { useEffect } from "react";
 
 export interface Aviso {
-  tipo: "mensagem" | "conversa" | "alerta" | "reconectado";
+  tipo: "mensagem" | "conversa" | "alerta" | "granatech" | "reconectado";
   conversa?: string;
   alerta?: string;
 }

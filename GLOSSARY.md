@@ -122,6 +122,11 @@ Voltar a falar com o cliente numa data marcada, porque algo o impediu de seguir
 agora (tempo de casa curto, cota esgotada).
 _Evitar_: follow-up, retorno
 
+**Reconciliar**:
+Procurar no banco uma proposta cujo envio teve resultado incerto, antes de
+qualquer nova tentativa; nunca cria outra proposta.
+_Evitar_: reenviar, tentar de novo
+
 ## Equipe
 
 **Atendente**:

@@ -71,7 +71,11 @@ automaticamente e é o que publica a porta no ambiente local.
   e responder; ficha mascarada com revelar auditado; alertas; contador de cota;
   tempo real por `pg_notify` + SSE. Depois, fora das fases: aba Usuários (só
   gestor) para cadastrar, editar, redefinir senha, desbloquear, desativar e
-  reativar; excluir é desativar (docs/decisoes/0012).
+  reativar; excluir é desativar (docs/decisoes/0012). Aba Granatech para
+  todos (consultas, propostas, linha do tempo, cota) com ações só do gestor:
+  reconciliar, reenviar link, cancelar, corrigir conta e atualizar detalhe;
+  abrir consulta, simular e criar proposta ficam só na conversa
+  (docs/decisoes/0013).
 - **Fase 4 concluída:** cliente Granatech em `bancos/granatech/` (token em cache,
   retry só em GET, normalização em `Decimal`, teto, proposta única com
   reconciliação pela listagem), cota com trava e alerta a 80%, reaproveitamento

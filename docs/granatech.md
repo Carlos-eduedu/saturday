@@ -140,6 +140,28 @@ ele, o detalhe fica pronto `atraso_detalhe_s` depois do termo (8 s por padrão).
 Nos testes do core, o simulador roda em processo pelo `TestClient`
 (`tests/conftest.py`, fixtures `simulador_granatech` e `http_granatech`).
 
+## Aba Granatech do painel
+
+A tela `/granatech` do painel ([decisão 0013](decisoes/0013-acoes-do-painel-na-granatech-por-turno-de-sistema.md))
+lista consultas e propostas (filtro por status, período e CPF completo; CPF
+mascarado, revelar com auditoria), mostra o detalhe com vínculos, linha do
+tempo do `historico` e a cota, e se atualiza pelo SSE (aviso `granatech`).
+Atendente e gestor veem; só o gestor age, e cada ação grava a auditoria antes
+de chamar o banco. A API fica em `web/api/granatech_admin.py`
+(`/admin/granatech/*`), e quem decide se uma ação cabe é
+`acoes_da_consulta`/`acoes_da_proposta`.
+
+| Ação | O que faz |
+| --- | --- |
+| Reconciliar | Proposta com envio `incerta`: procura na listagem. Achada, devolve a conversa à IA e roda o turno `painel:reconciliar`, que segue do aceite sem novo POST (dados do tomador e aviso). Não achada, nada muda |
+| Reenviar link | Proposta em formalização: turno `proposta:formalizar`/`refazer` com `forcar=True`, que fala com o cliente mesmo com a conversa com humano |
+| Cancelar | `POST /propostas/{id}/cancelar` com motivo na auditoria; o cliente é avisado quando o webhook `CANCELED` chegar |
+| Corrigir conta | Só com `SATURDAY_GRANATECH_DADOS_BANCARIOS_ATIVO`; banco da lista `GET /bancos`; a auditoria guarda só o banco e os 2 últimos dígitos |
+| Atualizar detalhe | Consulta sem detalhe: relê o `GET /consulta-saldo/{id}`; com margens, marca `SUCCESS` e roda `consulta_pronta` |
+
+Abrir consulta, simular e criar proposta não existem no painel: dependem do SIM
+do cliente. Item sem conversa fica só para leitura.
+
 ## Pendências com a Granatech
 
 Cada uma está no código como `TODO(granatech)`:
@@ -157,6 +179,8 @@ Cada uma está no código como `TODO(granatech)`:
 - corpo do `PATCH /propostas/{id}/dados-bancarios` (atrás de
   `SATURDAY_GRANATECH_DADOS_BANCARIOS_ATIVO`, desligada; até lá, a equipe
   corrige a conta);
+- em que campo o `GET /propostas/{id}` devolve o status (por isso a aba não tem
+  "atualizar status"; o status chega só pelo webhook);
 - valores aceitos de `estado_civil` nos dados do tomador (enviamos SOLTEIRO,
   CASADO, DIVORCIADO, VIUVO, UNIAO_ESTAVEL ou SEPARADO).
 

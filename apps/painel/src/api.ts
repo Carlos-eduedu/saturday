@@ -188,6 +188,84 @@ export interface Custos {
   conversas_mais_caras: { id: string; telefone: string | null; canal: string; custo_usd: number }[];
 }
 
+// Aba Granatech (decisão 0013): consulta para todos, ações só para gestor.
+export type Acoes = Record<string, string | null>; // null = pode; texto = motivo de não poder
+
+export interface EventoGranatech {
+  status: string | null;
+  tipo_notificacao?: string | null;
+  informacoes?: unknown;
+  origem?: string;
+  recebido_em: string;
+}
+
+export interface ConsultaGranatech {
+  id: number;
+  id_externo: string;
+  cpf: string;
+  status: string;
+  conversa_id: string | null;
+  tem_detalhe: boolean;
+  criada_em: string;
+  atualizada_em: string;
+}
+
+export interface ConsultaGranatechDetalhe extends ConsultaGranatech {
+  historico: EventoGranatech[];
+  vinculos: {
+    id?: string;
+    margem?: string | number;
+    nome_empregador?: string;
+    documento_empregador?: string;
+    elegivel_empregador?: boolean;
+    produtos?: { id?: string; nome?: string; parcelas?: unknown; taxa_mensal?: unknown }[];
+  }[];
+  idade: number | null;
+  sexo: string | null;
+  propostas: number[];
+  etapa: string | null;
+  acoes: Acoes;
+}
+
+export interface PropostaGranatech {
+  id: number;
+  id_externo: string | null;
+  consulta_id: number;
+  cpf: string;
+  estado_envio: string;
+  status: string | null;
+  tipo_notificacao: string | null;
+  valor_parcela: string;
+  numero_parcelas: number;
+  conversa_id: string | null;
+  intencao_em: string;
+  atualizada_em: string;
+}
+
+export interface PropostaGranatechDetalhe extends PropostaGranatech {
+  historico: EventoGranatech[];
+  etapa: string | null;
+  oferta: Record<string, unknown> | null;
+  conta_ativa: boolean;
+  acoes: Acoes;
+}
+
+export interface FiltroGranatech {
+  status?: string;
+  desde?: string;
+  ate?: string;
+  cpf?: string;
+}
+
+export interface ContaNova {
+  banco_codigo: string;
+  agencia: string;
+  digito_agencia: string;
+  numero_conta: string;
+  digito_conta: string;
+  tipo_conta: "conta_corrente" | "conta_poupanca";
+}
+
 export class ErroApi extends Error {
   constructor(
     readonly status: number,
@@ -277,7 +355,33 @@ export const api = {
   desconectarInstancia: (nome: string) =>
     chamar<void>("POST", `/canais/evolution/${nome}/desconectar`),
   apagarInstancia: (nome: string) => chamar<void>("DELETE", `/canais/evolution/${nome}`),
+  consultasGranatech: (filtro: FiltroGranatech) =>
+    chamar<ConsultaGranatech[]>("GET", `/granatech/consultas?${parametros(filtro)}`),
+  propostasGranatech: (filtro: FiltroGranatech) =>
+    chamar<PropostaGranatech[]>("GET", `/granatech/propostas?${parametros(filtro)}`),
+  consultaGranatech: (id: number) =>
+    chamar<ConsultaGranatechDetalhe>("GET", `/granatech/consultas/${id}`),
+  propostaGranatech: (id: number) =>
+    chamar<PropostaGranatechDetalhe>("GET", `/granatech/propostas/${id}`),
+  revelarCpfGranatech: (consultaId: number) =>
+    chamar<{ campo: "cpf"; valor: string }>("POST", `/granatech/consultas/${consultaId}/revelar`),
+  bancosGranatech: () => chamar<{ codigo: string; nome: string }[]>("GET", "/granatech/bancos"),
+  reconciliar: (id: number) =>
+    chamar<{ achada: boolean; id_externo?: string }>("POST", `/granatech/propostas/${id}/reconciliar`),
+  reenviarLink: (id: number) => chamar<void>("POST", `/granatech/propostas/${id}/reenviar-link`),
+  cancelarProposta: (id: number, motivo: string) =>
+    chamar<void>("POST", `/granatech/propostas/${id}/cancelar`, { motivo }),
+  corrigirConta: (id: number, conta: ContaNova) =>
+    chamar<void>("POST", `/granatech/propostas/${id}/conta`, conta),
+  atualizarDetalhe: (id: number) =>
+    chamar<{ pronto: boolean }>("POST", `/granatech/consultas/${id}/atualizar-detalhe`),
 };
+
+function parametros(filtro: FiltroGranatech): URLSearchParams {
+  const params = new URLSearchParams();
+  for (const [chave, valor] of Object.entries(filtro)) if (valor) params.set(chave, valor);
+  return params;
+}
 
 export const midiaUrl = (mensagemId: number, indice: number) =>
   `/admin/midia/${mensagemId}/${indice}`;

@@ -662,3 +662,14 @@ main {
 .estado-open { color: var(--ia); }
 .estado-connecting { color: var(--handoff); }
 .estado-close, .estado-refused { color: var(--erro); }
+
+/* Aba Granatech */
+.granatech .filtros .form-usuario { margin-top: 0; }
+.granatech .acoes { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+.granatech .acoes button small { font-weight: 400; color: var(--suave); }
+.ficha-granatech { display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 1rem; margin: 0 0 1rem; }
+.ficha-granatech dt { color: var(--suave); font-size: 0.85rem; }
+.ficha-granatech dd { margin: 0; display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.historico-granatech { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.historico-granatech time { font-family: var(--fonte-mono); font-size: 0.8rem; color: var(--suave); }
+.granatech pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0.25rem 0 0; }

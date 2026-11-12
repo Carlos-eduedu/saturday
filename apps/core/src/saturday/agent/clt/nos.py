@@ -515,6 +515,11 @@ def _evento(t: Turno, evento: str) -> dict[str, Any]:
     nome, _, detalhe = evento.partition(":")
     if nome == "proposta":
         return proposta.evento(t, detalhe)
+    if nome == "painel" and detalhe == "reconciliar":
+        # O gestor achou na listagem a proposta incerta: a jornada segue do aceite.
+        if etapa != "aceite":
+            return t.responder()
+        return proposta.seguir_proposta(t)
     if nome == "recontato_tempo_casa":
         return _recontato_tempo_casa_vencido(t)
     if nome == "recontato":

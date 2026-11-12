@@ -258,6 +258,16 @@ def _criar_proposta(t: Turno) -> dict[str, Any]:
         wamid=t.state.get("message_id"),
         cpf=t.dados["cpf"],
     )
+    return seguir_proposta(t)
+
+
+def seguir_proposta(t: Turno) -> dict[str, Any]:
+    """Cria (ou reencontra) a proposta e envia os dados do tomador.
+
+    Depois do SIM gravado, ou pelo painel ao reconciliar uma proposta incerta:
+    ``criar_proposta`` nunca repete um POST incerto, só procura na listagem.
+    """
+
     detalhe = _detalhe(t)
     oferta = t.clt["oferta"]
     vinculo = next(v for v in detalhe.vinculos if v.id_margem == oferta["id_margem"])
