@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from saturday.agent.service import AgentService
 from saturday.bancos.granatech.cliente import ClienteGranatech
 from saturday.canais.base import OrigemCanal
+from saturday.canais.evolution.cliente import EvolutionClient
 from saturday.canais.whatsapp import webhook as parser
 from saturday.canais.whatsapp.entrada import EntradaWhatsApp, prefixo_do_canal
 from saturday.dados import eventos as fila
@@ -24,6 +25,7 @@ from saturday.dados.modelos import EventoRecebido
 from saturday.dados.outbox import enfileirar
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.jobs import granatech as eventos_granatech
+from saturday.jobs import instancias as eventos_instancias
 from saturday.settings import Settings
 
 logger = logging.getLogger(__name__)
@@ -39,6 +41,7 @@ def processar(
     settings: Settings,
     granatech: ClienteGranatech | None = None,
     evolution: EntradaWhatsApp | None = None,
+    cliente_evolution: EvolutionClient | None = None,
 ) -> int:
     """Reivindica um lote de eventos e processa. Devolve quantos tentou."""
 
@@ -52,6 +55,10 @@ def processar(
         try:
             if linha.origem == ORIGEM_GRANATECH:
                 eventos_granatech.aplicar(fabrica, granatech, linha.payload or {}, servico)
+            elif (
+                linha.origem == ORIGEM_EVOLUTION and (linha.payload or {}).get("tipo") == "conexao"
+            ):
+                eventos_instancias.aplicar(fabrica, cliente_evolution, linha.payload or {})
             elif linha.origem == ORIGEM_EVOLUTION:
                 if evolution is None:
                     raise RuntimeError("evento da Evolution com o canal desligado")
@@ -70,6 +77,10 @@ def processar(
             _registrar_resultado(fabrica, linha.id, erro="", settings=settings)
 
     return len(linhas)
+
+
+def _tipo(linha: EventoRecebido) -> object:
+    return (linha.payload or {}).get("tipo")
 
 
 def _registrar_resultado(

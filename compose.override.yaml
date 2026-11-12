@@ -102,7 +102,7 @@ services:
     cpus: 0.5
 
   # Simulador da Evolution API, no mesmo molde. A chave e o token precisam ser
-  # os mesmos do Saturday; a instância precisa estar em SATURDAY_EVOLUTION_INSTANCIAS.
+  # os mesmos do Saturday; as instâncias são criadas pela tela Canais.
   evolution-sim:
     image: saturday-api:${SATURDAY_IMAGEM_TAG:-local}
     healthcheck:

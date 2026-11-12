@@ -11,6 +11,12 @@ Por onde a conversa entra e sai: a Cloud API da Meta (`whatsapp`), a Evolution
 o mesmo celular em dois canais são duas conversas.
 _Evitar_: provedor, integração
 
+**Instância**:
+Um número de WhatsApp conectado à Evolution pelo QR. O Saturday atende toda
+instância da sua própria Evolution; o gestor cria, reconecta, desconecta e
+apaga instâncias na tela Canais.
+_Evitar_: conexão, sessão, número (para a instância)
+
 **Janela**:
 As 24 h desde a última mensagem do cliente em que a Meta aceita texto livre;
 fora dela, só modelo. Só existe no canal `whatsapp`.

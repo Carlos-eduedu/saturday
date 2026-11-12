@@ -7,6 +7,7 @@ mesmas peças por este arquivo.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
@@ -101,20 +102,30 @@ def criar_canal_whatsapp(
     )
 
 
+@dataclass(frozen=True)
+class CanalEvolution:
+    """Entrada, saída e o cliente (gestão das instâncias) da Evolution."""
+
+    entrada: EntradaWhatsApp
+    saida: SaidaEvolution
+    cliente: EvolutionClient
+
+
 def criar_canal_evolution(
     http: httpx.Client,
     settings: Settings,
     fabrica: Any,
     storage: Storage,
-) -> tuple[EntradaWhatsApp, SaidaEvolution] | None:
-    """Entrada e saída da Evolution, ou ``None`` com ``SATURDAY_EVOLUTION_ATIVO`` desligado."""
+) -> CanalEvolution | None:
+    """Canal da Evolution, ou ``None`` com ``SATURDAY_EVOLUTION_ATIVO`` desligado."""
 
     if not settings.evolution_ativo:
         return None
     cliente = EvolutionClient(http, settings)
-    return (
-        EntradaWhatsApp(cliente, storage, Transcritor(http, settings), canal="evolution"),
-        SaidaEvolution(cliente, fabrica),
+    return CanalEvolution(
+        entrada=EntradaWhatsApp(cliente, storage, Transcritor(http, settings), canal="evolution"),
+        saida=SaidaEvolution(cliente, fabrica),
+        cliente=cliente,
     )
 
 

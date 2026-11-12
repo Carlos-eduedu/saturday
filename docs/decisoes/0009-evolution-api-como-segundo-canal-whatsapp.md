@@ -1,7 +1,8 @@
 # 0009 — Evolution API como segundo canal de WhatsApp
 
 - **Data:** 2026-11-12
-- **Status:** aceita
+- **Status:** aceita; a lista de instâncias e a gestão delas mudaram na
+  [decisão 0010](0010-instancias-da-evolution-geridas-pelo-painel.md)
 - **Desvia de:** `AGENTS.md`, regra 1 (parceiros externos: só Meta, Granatech,
   BrasilAPI, OpenRouter) e regra 12 (contratos de API descritos no documento)
 

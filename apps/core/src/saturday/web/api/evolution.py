@@ -5,7 +5,8 @@ domínio público, com um token longo no header (`x-webhook-token`, configurado
 em `webhook.headers` da instância), comparado em tempo constante.
 
 Como o webhook da Meta: grava, responde 200 e deixa o worker processar. A
-deduplicação usa o id da mensagem (`key.id`) e, no status, o id com a situação.
+deduplicação usa o id da mensagem (`key.id`), no status o id com a situação e,
+na conexão, o hash do corpo.
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ from saturday.canais.evolution import webhook as parser
 from saturday.dados.eventos import enfileirar
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.settings import Settings
-from saturday.web.api.granatech import token_recebido
+from saturday.web.api.granatech import evento_id, token_recebido
 from saturday.web.api.whatsapp import para_dict
 from saturday.web.dependencies import get_fabrica, get_settings
 
@@ -59,19 +60,18 @@ async def receber(
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="corpo inválido")
 
-    ativas = set(settings.evolution_instancias)
-    # Evento de outra instância é ignorado, não é erro.
-    aceitos = [e for e in parser.eventos(payload) if e.phone_number_id in ativas]
+    # Toda instância da Evolution do Saturday é atendida (decisão 0010): o token
+    # já prova que o evento veio dela.
+    linhas = [(evento.evento_id, para_dict(evento)) for evento in parser.eventos(payload)]
+    conexao = parser.conexao(payload)
+    if conexao is not None:
+        # Sem id no evento de conexão: o hash do JSON separa reenvio de evento novo.
+        linhas.append((evento_id(payload), conexao))
 
-    if fabrica is not None and aceitos:
+    if fabrica is not None and linhas:
         with abrir_sessao(fabrica) as sessao:
-            for evento in aceitos:
-                enfileirar(
-                    sessao,
-                    origem=ORIGEM,
-                    evento_id=evento.evento_id,
-                    payload=para_dict(evento),
-                )
+            for identificador, dados in linhas:
+                enfileirar(sessao, origem=ORIGEM, evento_id=identificador, payload=dados)
 
     # 200 mesmo sem evento: a Evolution não deve reenviar por falta de interesse nosso.
     return Response(status_code=200)

@@ -67,6 +67,23 @@ export interface Usuario {
   perfil: Perfil;
 }
 
+export interface InstanciaEvolution {
+  nome: string;
+  estado: "open" | "connecting" | "close" | "refused" | string;
+  telefone: string;
+  conversas_7_dias: number;
+}
+
+export interface Canais {
+  meta: { phone_number_id: string }[];
+  evolution: { ativo: boolean; instancias: InstanciaEvolution[]; erro: string | null };
+}
+
+export interface Qr {
+  qr: string | null;
+  estado: string;
+}
+
 export class ErroApi extends Error {
   constructor(
     readonly status: number,
@@ -130,6 +147,13 @@ export const api = {
   alertas: () => chamar<Alerta[]>("GET", "/alertas"),
   resolverAlerta: (id: number) => chamar<void>("POST", `/alertas/${id}/resolver`),
   cota: () => chamar<Cota>("GET", "/cota"),
+  canais: () => chamar<Canais>("GET", "/canais"),
+  criarInstancia: (nome: string) => chamar<Qr>("POST", "/canais/evolution", { nome }),
+  conectarInstancia: (nome: string) => chamar<Qr>("POST", `/canais/evolution/${nome}/conectar`),
+  qrInstancia: (nome: string) => chamar<Qr>("GET", `/canais/evolution/${nome}/qr`),
+  desconectarInstancia: (nome: string) =>
+    chamar<void>("POST", `/canais/evolution/${nome}/desconectar`),
+  apagarInstancia: (nome: string) => chamar<void>("DELETE", `/canais/evolution/${nome}`),
 };
 
 export const midiaUrl = (mensagemId: number, indice: number) =>

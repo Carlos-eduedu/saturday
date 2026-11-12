@@ -12,6 +12,8 @@ const ROTULOS: Record<string, string> = {
   cota_80: "Cota da Granatech passou de 80% do mês",
   consulta_parada: "Consulta da Granatech sem resposta há mais de 15 min",
   granatech_evento: "Evento da Granatech pede atenção",
+  instancia_desconectada: "Instância da Evolution desconectada",
+  instancia_numero_trocado: "Instância reconectada com outro celular (desconectada)",
 };
 
 export function Alertas() {
@@ -33,6 +35,7 @@ export function Alertas() {
       {alertas.map((a) => (
         <li key={a.id}>
           <strong>{ROTULOS[a.tipo] ?? a.tipo}</strong>
+          {typeof a.detalhe?.instancia === "string" && <span>{a.detalhe.instancia}</span>}
           <time>{formatarHora(a.criado_em)}</time>
           {a.conversa_id && <Link to={`/conversas/${a.conversa_id}`}>Abrir conversa</Link>}
           <button type="button" onClick={() => resolver(a.id)}>

@@ -1,6 +1,7 @@
 """Cliente HTTP da Evolution API (v2.3.7).
 
-Só as rotas da decisão 0009: envio de texto e download de mídia. Os erros
+Só as rotas das decisões 0009 (envio de texto e download de mídia) e 0010
+(gestão das instâncias pelo painel). Os erros
 seguem a hierarquia do WhatsApp da Meta, porque a saída e a entrada já sabem
 classificá-los; repetir é só do outbox (decisão 0001).
 """
@@ -10,6 +11,7 @@ from __future__ import annotations
 import base64
 import binascii
 import logging
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
@@ -20,11 +22,42 @@ from saturday.canais.whatsapp.cliente import (
     ErroTemporario,
     ErroWhatsApp,
 )
+from saturday.canais.whatsapp.telefone import normalizar_telefone
 from saturday.settings import Settings
 
 logger = logging.getLogger(__name__)
 
 DDI_BRASIL = "55"
+JID_TELEFONE = "@s.whatsapp.net"
+INTEGRACAO = "WHATSAPP-BAILEYS"
+EVENTOS_WEBHOOK = ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "CONNECTION_UPDATE"]
+
+
+@dataclass(frozen=True)
+class EstadoInstancia:
+    """O que o painel mostra de uma instância."""
+
+    nome: str
+    # `open`, `connecting`, `close` ou `refused`.
+    estado: str
+    # DDD + número, vazio enquanto não conectou.
+    telefone: str
+
+
+@dataclass(frozen=True)
+class Qr:
+    """QR para ler no celular, ou ``None`` com a instância já conectada."""
+
+    imagem: str | None
+    estado: str
+
+
+def telefone_do_jid(jid: object) -> str:
+    """`5511987654321@s.whatsapp.net` → `11987654321`; vazio se não for telefone."""
+
+    if isinstance(jid, str) and jid.endswith(JID_TELEFONE):
+        return normalizar_telefone(jid.removesuffix(JID_TELEFONE))
+    return ""
 
 
 def _numero_inexistente(corpo: dict[str, Any]) -> bool:
@@ -60,11 +93,19 @@ class EvolutionClient:
         self._base = settings.evolution_url.rstrip("/")
         self._chave = settings.evolution_api_key.get_secret_value()
         self._limite_midia = settings.whatsapp_limite_midia_mb * 1024 * 1024
+        self._webhook_url = settings.evolution_webhook_url
+        self._webhook_token = settings.evolution_webhook_token.get_secret_value()
 
-    def _post(self, rota: str, corpo: dict[str, Any]) -> dict[str, Any]:
+    def _objeto(
+        self, metodo: str, rota: str, corpo: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        dados = self._pedir(metodo, rota, corpo)
+        return dados if isinstance(dados, dict) else {}
+
+    def _pedir(self, metodo: str, rota: str, corpo: dict[str, Any] | None = None) -> Any:
         try:
-            resposta = self._http.post(
-                f"{self._base}{rota}", json=corpo, headers={"apikey": self._chave}
+            resposta = self._http.request(
+                metodo, f"{self._base}{rota}", json=corpo, headers={"apikey": self._chave}
             )
         except (httpx.ReadTimeout, httpx.ReadError, httpx.RemoteProtocolError) as exc:
             # A conexão caiu depois do envio: não dá para saber se saiu.
@@ -76,11 +117,9 @@ class EvolutionClient:
             dados = resposta.json()
         except ValueError:
             dados = {}
-        if not isinstance(dados, dict):
-            dados = {}
 
         if resposta.status_code >= 400:
-            erro = classificar(resposta.status_code, dados)
+            erro = classificar(resposta.status_code, dados if isinstance(dados, dict) else {})
             logger.warning(
                 "evolution_falhou rota=%s status=%s tipo=%s",
                 rota.split("/")[1],
@@ -88,12 +127,16 @@ class EvolutionClient:
                 type(erro).__name__,
             )
             raise erro
+        # `connect` devolve erro com 200 e `error: true`.
+        if isinstance(dados, dict) and dados.get("error") is True:
+            raise ErroPermanente(f"evolution rota={rota.split('/')[1]} error=true")
         return dados
 
     def enviar_texto(self, instancia: str, numero: str, texto: str) -> str | None:
         """Devolve o id da mensagem (`key.id`), que os status usam."""
 
-        dados = self._post(
+        dados = self._objeto(
+            "POST",
             f"/message/sendText/{instancia}",
             {"number": f"{DDI_BRASIL}{numero}", "text": texto},
         )
@@ -115,7 +158,8 @@ class EvolutionClient:
         Exige `DATABASE_SAVE_DATA_NEW_MESSAGE=true` na instância.
         """
 
-        dados = self._post(
+        dados = self._objeto(
+            "POST",
             f"/chat/getBase64FromMediaMessage/{instancia}",
             {"message": {"key": {"id": media_id}}},
         )
@@ -130,3 +174,84 @@ class EvolutionClient:
         except (binascii.Error, ValueError) as exc:
             raise ErroPermanente("midia_base64_invalido") from exc
         return conteudo, str(dados.get("mimetype") or "application/octet-stream")
+
+    # ------------------------------------------------------- instâncias (0010)
+
+    def _webhook(self) -> dict[str, Any]:
+        return {
+            "enabled": True,
+            "url": self._webhook_url,
+            "headers": {"x-webhook-token": self._webhook_token},
+            "byEvents": False,
+            "base64": False,
+            "events": EVENTOS_WEBHOOK,
+        }
+
+    @staticmethod
+    def _qr(dados: dict[str, Any]) -> Qr:
+        """QR do `connect`/`create`, ou o estado quando já conectou."""
+
+        instancia = dados.get("instance")
+        if isinstance(instancia, dict) and instancia.get("state"):
+            return Qr(imagem=None, estado=str(instancia["state"]))
+        qrcode = dados.get("qrcode") if "qrcode" in dados else dados
+        imagem = qrcode.get("base64") if isinstance(qrcode, dict) else None
+        return Qr(
+            imagem=imagem if isinstance(imagem, str) and imagem else None, estado="connecting"
+        )
+
+    def criar_instancia(self, nome: str) -> Qr:
+        """Cria já com webhook e leitura automática; devolve o primeiro QR."""
+
+        dados = self._objeto(
+            "POST",
+            "/instance/create",
+            {
+                "instanceName": nome,
+                "integration": INTEGRACAO,
+                "qrcode": True,
+                "readMessages": True,
+                "groupsIgnore": True,
+                "webhook": self._webhook(),
+            },
+        )
+        return self._qr(dados)
+
+    def configurar(self, nome: str) -> None:
+        """Reaplica webhook e configurações (instância criada fora do painel)."""
+
+        self._objeto("POST", f"/webhook/set/{nome}", {"webhook": self._webhook()})
+        self._objeto(
+            "POST",
+            f"/settings/set/{nome}",
+            {
+                "rejectCall": False,
+                "groupsIgnore": True,
+                "alwaysOnline": False,
+                "readMessages": True,
+                "readStatus": False,
+                "syncFullHistory": False,
+            },
+        )
+
+    def conectar(self, nome: str) -> Qr:
+        return self._qr(self._objeto("GET", f"/instance/connect/{nome}"))
+
+    def listar(self) -> list[EstadoInstancia]:
+        dados = self._pedir("GET", "/instance/fetchInstances")
+        linhas = dados if isinstance(dados, list) else []
+        return [
+            EstadoInstancia(
+                nome=str(linha.get("name") or ""),
+                estado=str(linha.get("connectionStatus") or "close"),
+                telefone=telefone_do_jid(linha.get("ownerJid")),
+            )
+            for linha in linhas
+            if isinstance(linha, dict) and linha.get("name")
+        ]
+
+    def desconectar(self, nome: str) -> None:
+        self._objeto("DELETE", f"/instance/logout/{nome}")
+
+    def apagar(self, nome: str) -> None:
+        self._objeto("DELETE", f"/instance/delete/{nome}")

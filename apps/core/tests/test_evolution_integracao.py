@@ -97,7 +97,6 @@ def settings(settings: Settings, simulador: tuple[str, ModuleType]) -> Settings:
             "evolution_url": base,
             "evolution_api_key": SecretStr("chave-do-simulador"),
             "evolution_webhook_token": SecretStr(TOKEN),
-            "evolution_instancias": [INSTANCIA],
         }
     )
 
@@ -223,15 +222,13 @@ def test_status_de_entrega_atualiza_a_mensagem(
         assert linha.status_entrega == "delivered"
 
 
-def test_webhook_recusa_token_errado_ignora_outra_instancia_e_deduplica(
+def test_webhook_recusa_token_errado_e_deduplica(
     client_pg: TestClient,
     fabrica: sessionmaker[Session],
 ) -> None:
     payload = _upsert("3EB0D1", "conversation", {"conversation": "Oi"})
     assert _webhook(client_pg, payload, token="errado") == 401  # noqa: S106
 
-    outra = {**payload, "instance": "outra"}
-    assert _webhook(client_pg, outra) == 200
     assert _webhook(client_pg, payload) == 200
     assert _webhook(client_pg, payload) == 200
 
