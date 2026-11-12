@@ -1,7 +1,7 @@
 # 0010 — Instâncias da Evolution geridas pelo painel
 
 - **Data:** 2026-11-12
-- **Status:** aceita
+- **Status:** aceita; alterada pela [0011](0011-configuracoes-da-instancia-pelo-painel.md)
 - **Complementa:** [decisão 0009](0009-evolution-api-como-segundo-canal-whatsapp.md)
   (contrato permitido, regra 12)
 

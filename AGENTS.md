@@ -113,7 +113,8 @@ automaticamente e é o que publica a porta no ambiente local.
   webhook pela rede interna com token, simulador em `simuladores/evolution/` e
   tudo atrás de `SATURDAY_EVOLUTION_ATIVO`. Instâncias geridas pela tela Canais
   do painel, só gestor, com telefone fixado e alerta de queda
-  (docs/decisoes/0010). Ver `docs/evolution.md`.
+  (docs/decisoes/0010); webhook conferido e configurações da instância
+  ajustadas pelo painel (docs/decisoes/0011). Ver `docs/evolution.md`.
 - `migrations/` fica em `apps/core/migrations/`, não na raiz: as migrações
   descrevem os modelos daquele pacote e precisam do ambiente `uv` dele para
   importar. Desvio consciente da árvore desenhada acima.

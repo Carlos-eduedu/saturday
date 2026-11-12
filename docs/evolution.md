@@ -1,8 +1,9 @@
 # Canal Evolution (WhatsApp Web)
 
 Segundo canal de WhatsApp, ao lado da Cloud API da Meta. As decisões e os seus
-limites estão em [decisoes/0009](decisoes/0009-evolution-api-como-segundo-canal-whatsapp.md)
-e [decisoes/0010](decisoes/0010-instancias-da-evolution-geridas-pelo-painel.md).
+limites estão em [decisoes/0009](decisoes/0009-evolution-api-como-segundo-canal-whatsapp.md),
+[decisoes/0010](decisoes/0010-instancias-da-evolution-geridas-pelo-painel.md)
+e [decisoes/0011](decisoes/0011-configuracoes-da-instancia-pelo-painel.md).
 
 ## Como funciona
 
@@ -55,13 +56,17 @@ subida.
    celular (WhatsApp, Aparelhos conectados). O Saturday já configura o webhook
    (`MESSAGES_UPSERT`, `MESSAGES_UPDATE`, `CONNECTION_UPDATE`, com o token no
    header) e o `readMessages`.
-3. Instância criada fora do painel (ou antes da tela existir): desconecte e
-   clique **Reconectar**, que reaplica a configuração antes do QR.
-4. Para conferir uma instância, clique **Detalhes**. A tela lê
-   `GET /webhook/find/{instancia}` e `GET /settings/find/{instancia}` e mostra
-   o webhook (ligado, URL, eventos, URL por evento, base64), as configurações
-   e as diferenças em relação ao que o Saturday aplica. O token não sai da API:
-   o painel vê só se ele confere, difere ou falta.
+3. Instância criada fora do painel (ou antes da tela existir): clique
+   **Detalhes** e **Regravar o webhook do Saturday**; ajuste as configurações
+   ali mesmo (ou **Usar o padrão do Saturday**). Não precisa desconectar.
+4. **Detalhes** lê `GET /webhook/find/{instancia}` e
+   `GET /settings/find/{instancia}`. Mostra o webhook (ligado, URL, eventos, URL
+   por evento, base64) e as diferenças em relação ao do Saturday; o token não
+   sai da API, o painel vê só se ele confere, difere ou falta. As configurações
+   (recusar chamadas e a mensagem, ignorar grupos, sempre online, marcar como
+   lida, ler status, sincronizar histórico) são editáveis e mostram o padrão do
+   Saturday. **Reconectar** regrava só o webhook: as configurações ficam como
+   o gestor deixou ([decisão 0011](decisoes/0011-configuracoes-da-instancia-pelo-painel.md)).
 
 ## Desenvolvimento
 

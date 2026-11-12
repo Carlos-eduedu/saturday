@@ -3,6 +3,7 @@ import { Vazio } from "../componentes/Vazio";
 import {
   api,
   type Canais as DadosCanais,
+  type ConfiguracoesInstancia,
   type DetalhesInstancia,
   ErroApi,
   type InstanciaEvolution,
@@ -12,7 +13,8 @@ import {
 // Tela Canais (decisão 0010), só para gestor: números da Meta para consulta e
 // instâncias da Evolution geridas aqui. O QR se renova sozinho até conectar.
 // Detalhes mostram o webhook e as configurações gravados na Evolution, lado a
-// lado com o que o Saturday aplica; o token nunca chega ao navegador.
+// lado com o que o Saturday aplica; o token nunca chega ao navegador. O gestor
+// regrava o webhook e ajusta as configurações aqui (decisão 0011).
 
 const RENOVAR_QR_MS = 5000;
 
@@ -301,13 +303,27 @@ function PainelQr({ nome, inicial, fechar }: { nome: string; inicial: Qr; fechar
 function PainelDetalhes({ nome, fechar }: { nome: string; fechar: () => void }) {
   const [detalhes, setDetalhes] = useState<DetalhesInstancia | null>(null);
   const [erro, setErro] = useState("");
+  const [aviso, setAviso] = useState("");
 
-  useEffect(() => {
+  const carregar = useCallback(() => {
     api
       .detalhesInstancia(nome)
       .then(setDetalhes)
       .catch((e: unknown) => setErro(mensagemDe(e)));
   }, [nome]);
+  useEffect(carregar, [carregar]);
+
+  async function agir(acao: () => Promise<unknown>, feito: string) {
+    setErro("");
+    setAviso("");
+    try {
+      await acao();
+      setAviso(feito);
+    } catch (e) {
+      setErro(mensagemDe(e));
+    }
+    carregar();
+  }
 
   return (
     <section className="detalhes-instancia" aria-live="polite">
@@ -317,8 +333,23 @@ function PainelDetalhes({ nome, fechar }: { nome: string; fechar: () => void }) 
           {erro}
         </p>
       )}
+      {aviso && <p className="confere">{aviso}</p>}
       {!detalhes && !erro && <p className="nota">Consultando a Evolution…</p>}
-      {detalhes && <ConteudoDetalhes detalhes={detalhes} />}
+      {detalhes && (
+        <>
+          <SecaoWebhook
+            detalhes={detalhes}
+            reaplicar={() => agir(() => api.reaplicarWebhook(nome), "Webhook do Saturday regravado.")}
+          />
+          <FormConfiguracoes
+            key={JSON.stringify(detalhes.configuracoes) + detalhes.mensagem_chamada}
+            detalhes={detalhes}
+            salvar={(valores) =>
+              agir(() => api.configurarInstancia(nome, valores), "Configurações salvas na Evolution.")
+            }
+          />
+        </>
+      )}
       <button type="button" onClick={fechar}>
         Fechar
       </button>
@@ -326,8 +357,14 @@ function PainelDetalhes({ nome, fechar }: { nome: string; fechar: () => void }) 
   );
 }
 
-function ConteudoDetalhes({ detalhes }: { detalhes: DetalhesInstancia }) {
-  const { webhook, configuracoes, divergencias } = detalhes;
+function SecaoWebhook({
+  detalhes,
+  reaplicar,
+}: {
+  detalhes: DetalhesInstancia;
+  reaplicar: () => void;
+}) {
+  const { webhook, divergencias } = detalhes;
   // Esperados primeiro, depois o que a instância manda a mais.
   const eventos = [
     ...webhook.eventos_esperados,
@@ -336,28 +373,25 @@ function ConteudoDetalhes({ detalhes }: { detalhes: DetalhesInstancia }) {
 
   return (
     <>
+      <h3>Webhook</h3>
       {divergencias.length === 0 ? (
-        <p className="confere">Tudo confere com o que o Saturday aplica.</p>
+        <p className="confere">O webhook confere com o do Saturday.</p>
       ) : (
         <div className="divergencias" role="status">
-          <p>
-            {divergencias.length} diferença(s) em relação ao que o Saturday aplica:
-          </p>
+          <p>{divergencias.length} diferença(s) em relação ao webhook do Saturday:</p>
           <ul>
             {divergencias.map((d) => (
               <li key={d}>{d}</li>
             ))}
           </ul>
-          <p className="nota">
-            Para reaplicar a configuração: desconecte a instância e clique em Reconectar.
-          </p>
+          <button type="button" onClick={reaplicar}>
+            Regravar o webhook do Saturday
+          </button>
+          <p className="nota">Não desconecta a instância.</p>
         </div>
       )}
 
-      <h3>Webhook</h3>
-      {!webhook.configurado ? (
-        <p className="vazio">A instância não tem webhook.</p>
-      ) : (
+      {webhook.configurado && (
         <dl className="campos">
           <dt>Ligado</dt>
           <dd>{simNao(webhook.ativo)}</dd>
@@ -382,9 +416,9 @@ function ConteudoDetalhes({ detalhes }: { detalhes: DetalhesInstancia }) {
       <h3>Eventos</h3>
       <ul className="eventos">
         {eventos.map((e) => {
-          const esperado = webhook.eventos_esperados.includes(e);
+          const usado = webhook.eventos_esperados.includes(e);
           const ligado = webhook.eventos.includes(e);
-          const situacao = !ligado ? "falta" : esperado ? "usado" : "ignorado";
+          const situacao = !ligado ? "falta" : usado ? "usado" : "ignorado";
           const texto = {
             falta: "falta",
             usado: "usado pelo Saturday",
@@ -397,32 +431,85 @@ function ConteudoDetalhes({ detalhes }: { detalhes: DetalhesInstancia }) {
           );
         })}
       </ul>
-
-      <h3>Configurações da instância</h3>
-      {configuracoes.length === 0 ? (
-        <p className="vazio">A Evolution não devolveu configurações.</p>
-      ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Configuração</th>
-              <th>Atual</th>
-              <th>Esperado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {configuracoes.map((c) => (
-              <tr key={c.nome} className={c.atual === c.esperado ? undefined : "diverge"}>
-                <td>
-                  {ROTULO_CONFIGURACAO[c.nome] ?? c.nome} <small>{c.nome}</small>
-                </td>
-                <td data-rotulo="Atual">{simNao(c.atual)}</td>
-                <td data-rotulo="Esperado">{simNao(c.esperado)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
     </>
+  );
+}
+
+type Booleanas = Exclude<keyof ConfiguracoesInstancia, "msgCall">;
+
+function FormConfiguracoes({
+  detalhes,
+  salvar,
+}: {
+  detalhes: DetalhesInstancia;
+  salvar: (valores: ConfiguracoesInstancia) => void;
+}) {
+  const padrao = Object.fromEntries(
+    detalhes.configuracoes.map((c) => [c.nome, c.padrao]),
+  ) as Record<Booleanas, boolean>;
+  const inicial: ConfiguracoesInstancia = {
+    ...padrao,
+    ...Object.fromEntries(
+      detalhes.configuracoes.filter((c) => c.atual !== null).map((c) => [c.nome, c.atual]),
+    ),
+    msgCall: detalhes.mensagem_chamada,
+  };
+  const [valores, setValores] = useState<ConfiguracoesInstancia>(inicial);
+  const mudou = JSON.stringify(valores) !== JSON.stringify(inicial);
+
+  if (detalhes.configuracoes.length === 0)
+    return (
+      <>
+        <h3>Configurações da instância</h3>
+        <p className="vazio">A Evolution não devolveu configurações.</p>
+      </>
+    );
+
+  function enviar(evento: FormEvent) {
+    evento.preventDefault();
+    salvar(valores);
+  }
+
+  return (
+    <form className="configuracoes" onSubmit={enviar}>
+      <h3>Configurações da instância</h3>
+      {detalhes.configuracoes.map((c) => {
+        const nome = c.nome as Booleanas;
+        return (
+          <label key={nome} className="opcao">
+            <input
+              type="checkbox"
+              checked={valores[nome]}
+              onChange={(e) => setValores({ ...valores, [nome]: e.target.checked })}
+            />
+            <span>
+              {ROTULO_CONFIGURACAO[nome] ?? nome}
+              {valores[nome] !== c.padrao && (
+                <small className="esperado"> padrão do Saturday: {simNao(c.padrao)}</small>
+              )}
+            </span>
+          </label>
+        );
+      })}
+      {valores.rejectCall && (
+        <label>
+          Mensagem para quem ligar (opcional)
+          <textarea
+            value={valores.msgCall}
+            maxLength={500}
+            rows={2}
+            onChange={(e) => setValores({ ...valores, msgCall: e.target.value })}
+          />
+        </label>
+      )}
+      <div className="acoes-form">
+        <button type="submit" disabled={!mudou}>
+          Salvar na Evolution
+        </button>
+        <button type="button" onClick={() => setValores({ ...valores, ...padrao })}>
+          Usar o padrão do Saturday
+        </button>
+      </div>
+    </form>
   );
 }

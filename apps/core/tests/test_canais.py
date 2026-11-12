@@ -229,7 +229,10 @@ def test_detalhes_apontam_o_que_diverge(
     assert "URL do webhook" in texto
     assert "MESSAGES_UPDATE, CONNECTION_UPDATE" in texto
     assert "Token do webhook diferente" in texto
-    assert "readMessages" in texto
+    # Configuração é escolha do gestor: mostra o padrão, não vira divergência.
+    assert "readMessages" not in texto
+    [ler] = [c for c in detalhes["configuracoes"] if c["nome"] == "readMessages"]
+    assert ler == {"nome": "readMessages", "atual": False, "padrao": True}
     assert "segredo-errado" not in str(detalhes)
 
 
@@ -248,6 +251,87 @@ def test_detalhes_sem_webhook_e_so_para_gestor(
     assert detalhes["configuracoes"] == []
     assert detalhes["divergencias"] == ["Nenhum webhook configurado na instância."]
     assert api.get("/admin/canais/evolution/nao-existe/detalhes").status_code == 409
+
+
+def test_gestor_ajusta_configuracoes_sem_perder_o_que_nao_passa_pelo_painel(
+    api: TestClient, fabrica: sessionmaker[Session], simulador: tuple[str, ModuleType]
+) -> None:
+    cabecalhos = _entrar(api, fabrica, "gestor")
+    _, modulo = simulador
+    modulo.INSTANCIAS["mex-dev"] = {
+        "estado": "open",
+        "telefone": TELEFONE,
+        "webhook": None,
+        "configuracoes": {"readMessages": True, "wavoipToken": "fica-na-evolution"},
+    }
+    corpo = {
+        "rejectCall": True,
+        "groupsIgnore": True,
+        "alwaysOnline": True,
+        "readMessages": False,
+        "readStatus": False,
+        "syncFullHistory": False,
+        "msgCall": "Não atendemos ligações; mande mensagem.",
+    }
+
+    resposta = api.put(
+        "/admin/canais/evolution/mex-dev/configuracoes", json=corpo, headers=cabecalhos
+    )
+    assert resposta.status_code == 204
+    gravado = modulo.INSTANCIAS["mex-dev"]["configuracoes"]
+    assert {k: gravado[k] for k in corpo} == corpo
+    assert gravado["wavoipToken"] == "fica-na-evolution"
+
+    detalhes = api.get("/admin/canais/evolution/mex-dev/detalhes").json()
+    assert detalhes["mensagem_chamada"] == corpo["msgCall"]
+    assert "fica-na-evolution" not in str(detalhes)
+    with abrir_sessao(fabrica) as sessao:
+        detalhe = sessao.scalars(
+            select(Auditoria.detalhe).where(
+                Auditoria.alvo == "mex-dev", Auditoria.acao == "canal_configurar"
+            )
+        ).one()
+        assert detalhe == corpo
+
+    # Reconectar regrava só o webhook: as escolhas do gestor ficam.
+    modulo.INSTANCIAS["mex-dev"]["estado"] = "close"
+    api.post("/admin/canais/evolution/mex-dev/conectar", headers=cabecalhos)
+    assert modulo.INSTANCIAS["mex-dev"]["configuracoes"]["alwaysOnline"] is True
+
+
+def test_configuracoes_exigem_os_seis_campos_e_gestor(
+    api: TestClient, fabrica: sessionmaker[Session], simulador: tuple[str, ModuleType]
+) -> None:
+    _, modulo = simulador
+    modulo.INSTANCIAS["mex-dev"] = {"estado": "open", "telefone": TELEFONE, "webhook": None}
+
+    cabecalhos = _entrar(api, fabrica, "atendente")
+    rota = "/admin/canais/evolution/mex-dev/configuracoes"
+    assert api.put(rota, json={}, headers=cabecalhos).status_code == 403
+
+    cabecalhos = _entrar(api, fabrica, "gestor")
+    assert api.put(rota, json={"readMessages": True}, headers=cabecalhos).status_code == 422
+
+
+def test_reaplicar_webhook_com_a_instancia_conectada(
+    api: TestClient, fabrica: sessionmaker[Session], simulador: tuple[str, ModuleType]
+) -> None:
+    cabecalhos = _entrar(api, fabrica, "gestor")
+    _, modulo = simulador
+    modulo.INSTANCIAS["mex-dev"] = {
+        "estado": "open",
+        "telefone": TELEFONE,
+        "webhook": {"enabled": False, "url": "http://outro", "events": []},
+    }
+
+    resposta = api.post("/admin/canais/evolution/mex-dev/webhook", headers=cabecalhos)
+    assert resposta.status_code == 204
+    assert modulo.INSTANCIAS["mex-dev"]["estado"] == "open"
+    detalhes = api.get("/admin/canais/evolution/mex-dev/detalhes").json()
+    assert detalhes["divergencias"] == []
+    with abrir_sessao(fabrica) as sessao:
+        acoes = sessao.scalars(select(Auditoria.acao).where(Auditoria.alvo == "mex-dev")).all()
+        assert "canal_webhook" in acoes
 
 
 def test_conectar_fixa_o_telefone(fabrica: sessionmaker[Session], cliente: EvolutionClient) -> None:

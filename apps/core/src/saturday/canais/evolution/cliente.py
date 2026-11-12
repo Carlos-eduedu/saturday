@@ -226,11 +226,23 @@ class EvolutionClient:
         )
         return self._qr(dados)
 
-    def configurar(self, nome: str) -> None:
-        """Reaplica webhook e configurações (instância criada fora do painel)."""
+    def aplicar_webhook(self, nome: str) -> None:
+        """Grava na instância o webhook do Saturday (URL, token e eventos)."""
 
         self._objeto("POST", f"/webhook/set/{nome}", {"webhook": self._webhook()})
-        self._objeto("POST", f"/settings/set/{nome}", CONFIGURACOES)
+
+    def aplicar_configuracoes(self, nome: str, valores: dict[str, Any]) -> None:
+        """Grava as configurações por cima das atuais.
+
+        O `/settings/set` da 2.3.7 exige os seis booleanos e tira da memória da
+        instância o que não vier (`msgCall`, `wavoipToken`): por isso parte do
+        que está gravado, e esses campos nunca passam pelo painel.
+        """
+
+        atuais = self.configuracoes_atuais(nome)
+        corpo = {**CONFIGURACOES, **atuais, **valores}
+        corpo = {campo: valor for campo, valor in corpo.items() if valor is not None}
+        self._objeto("POST", f"/settings/set/{nome}", corpo)
 
     def webhook_atual(self, nome: str) -> dict[str, Any]:
         """Webhook gravado na instância; vazio se não houver nenhum."""

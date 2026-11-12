@@ -98,8 +98,19 @@ export interface DetalhesInstancia {
     base64: boolean;
     autenticacao: "confere" | "diferente" | "ausente";
   };
-  configuracoes: { nome: string; atual: boolean | null; esperado: boolean }[];
+  configuracoes: { nome: string; atual: boolean | null; padrao: boolean }[];
+  mensagem_chamada: string;
   divergencias: string[];
+}
+
+export interface ConfiguracoesInstancia {
+  rejectCall: boolean;
+  groupsIgnore: boolean;
+  alwaysOnline: boolean;
+  readMessages: boolean;
+  readStatus: boolean;
+  syncFullHistory: boolean;
+  msgCall: string;
 }
 
 export interface Qr {
@@ -226,6 +237,9 @@ export const api = {
   qrInstancia: (nome: string) => chamar<Qr>("GET", `/canais/evolution/${nome}/qr`),
   detalhesInstancia: (nome: string) =>
     chamar<DetalhesInstancia>("GET", `/canais/evolution/${nome}/detalhes`),
+  configurarInstancia: (nome: string, valores: ConfiguracoesInstancia) =>
+    chamar<void>("PUT", `/canais/evolution/${nome}/configuracoes`, valores),
+  reaplicarWebhook: (nome: string) => chamar<void>("POST", `/canais/evolution/${nome}/webhook`),
   desconectarInstancia: (nome: string) =>
     chamar<void>("POST", `/canais/evolution/${nome}/desconectar`),
   apagarInstancia: (nome: string) => chamar<void>("DELETE", `/canais/evolution/${nome}`),

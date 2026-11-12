@@ -602,15 +602,20 @@ main {
 .detalhes-instancia { display: flex; flex-direction: column; gap: 0.75rem; align-items: flex-start; }
 .detalhes-instancia > * { margin: 0; }
 .detalhes-instancia h3 { font-size: 0.95rem; margin-top: 0.5rem; }
-.detalhes-instancia table { width: 100%; }
-.detalhes-instancia tr.diverge td:nth-child(2) { color: var(--handoff); font-weight: 600; }
+.configuracoes { display: flex; flex-direction: column; gap: 0.5rem; width: 100%; }
+.configuracoes h3 { margin: 0.5rem 0 0; }
+.configuracoes .opcao { flex-direction: row; align-items: center; gap: 0.6rem; color: var(--texto); font-weight: 400; min-height: var(--alvo); }
+.configuracoes .opcao input { min-height: 0; width: 1.15rem; height: 1.15rem; accent-color: var(--destaque); }
+.configuracoes .opcao small { display: inline; margin-left: 0.4rem; }
+.acoes-form { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .confere { color: var(--ia); font-weight: 500; }
 .divergencias { color: var(--handoff); }
 .divergencias p, .divergencias ul { margin: 0.25rem 0; }
 .campos { display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 1rem; margin: 0; }
 .campos dt { color: var(--suave); font-size: 0.875rem; }
 .campos dd { margin: 0; overflow-wrap: anywhere; }
-.campos .esperado { display: block; color: var(--handoff); }
+.campos .esperado { display: block; }
+.esperado { color: var(--handoff); }
 .eventos { list-style: none; padding: 0 !important; display: flex; flex-direction: column; gap: 0.3rem; }
 .evento span { font-size: 0.85rem; color: var(--suave); }
 .evento-usado span { color: var(--ia); }

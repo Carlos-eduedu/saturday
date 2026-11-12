@@ -75,6 +75,18 @@ class NovaInstancia(BaseModel):
     nome: str = Field(min_length=3, max_length=32)
 
 
+class Configuracoes(BaseModel):
+    """As seis opções que o `/settings/set` exige, mais a mensagem da chamada."""
+
+    rejectCall: bool  # noqa: N815 - nomes da Evolution
+    groupsIgnore: bool  # noqa: N815
+    alwaysOnline: bool  # noqa: N815
+    readMessages: bool  # noqa: N815
+    readStatus: bool  # noqa: N815
+    syncFullHistory: bool  # noqa: N815
+    msgCall: str = Field(default="", max_length=500)  # noqa: N815
+
+
 def _qr(qr: Qr) -> dict[str, Any]:
     return {"qr": qr.imagem, "estado": qr.estado}
 
@@ -151,12 +163,15 @@ def criar(
 def conectar(
     nome: str, usuario: GestorCsrf, fabrica: Fabrica, cliente: Evolution
 ) -> dict[str, Any]:
-    """Reaplica webhook e configurações e devolve o QR; recusa se já conectada."""
+    """Reaplica o webhook e devolve o QR; recusa se já conectada.
+
+    As configurações ficam como o gestor deixou (decisão 0011).
+    """
 
     try:
         if any(e.nome == nome and e.estado == "open" for e in cliente.listar()):
             raise HTTPException(status_code=409, detail="instância já conectada")
-        cliente.configurar(nome)
+        cliente.aplicar_webhook(nome)
         qr = cliente.conectar(nome)
     except ErroWhatsApp as exc:
         raise _falha(exc) from exc
@@ -193,7 +208,9 @@ def _detalhes(
 ) -> dict[str, Any]:
     """Webhook e configurações da instância ao lado do que o Saturday aplica.
 
-    Só campos conhecidos saem para o painel: os cabeçalhos levam o token, e as
+    Divergência é só do webhook, sem o qual o Saturday não recebe nada; as
+    configurações são escolha do gestor e só mostram o padrão. Só campos
+    conhecidos saem para o painel: os cabeçalhos levam o token, e as
     configurações da Evolution têm campos que não nos dizem respeito.
     """
 
@@ -203,8 +220,8 @@ def _detalhes(
         webhook.get("headers"), settings.evolution_webhook_token.get_secret_value()
     )
     configuracoes = [
-        {"nome": nome, "atual": atuais.get(nome), "esperado": esperado}
-        for nome, esperado in CONFIGURACOES.items()
+        {"nome": nome, "atual": atuais.get(nome), "padrao": padrao}
+        for nome, padrao in CONFIGURACOES.items()
     ]
 
     divergencias: list[str] = []
@@ -222,11 +239,6 @@ def _detalhes(
             divergencias.append(f"Token do webhook {conferencia}.")
         if webhook.get("webhookByEvents") is True:
             divergencias.append("Webhook por evento ligado: a Evolution muda a URL por evento.")
-    divergencias += [
-        f"Configuração {c['nome']} diferente da esperada."
-        for c in configuracoes
-        if atuais and c["atual"] != c["esperado"]
-    ]
 
     return {
         "webhook": {
@@ -241,6 +253,7 @@ def _detalhes(
             "autenticacao": conferencia,
         },
         "configuracoes": configuracoes if atuais else [],
+        "mensagem_chamada": str(atuais.get("msgCall") or ""),
         "divergencias": divergencias,
     }
 
@@ -255,6 +268,35 @@ def detalhes(nome: str, request: Request, _usuario: Gestor, cliente: Evolution) 
     except ErroWhatsApp as exc:
         raise _falha(exc) from exc
     return _detalhes(webhook, atuais, get_settings(request))
+
+
+@router.post("/evolution/{nome}/webhook", status_code=204)
+def reaplicar_webhook(
+    nome: str, usuario: GestorCsrf, fabrica: Fabrica, cliente: Evolution
+) -> Response:
+    """Regrava o webhook do Saturday; funciona com a instância conectada."""
+
+    try:
+        cliente.aplicar_webhook(nome)
+    except ErroWhatsApp as exc:
+        raise _falha(exc) from exc
+    with abrir_sessao(fabrica) as sessao:
+        auditar(sessao, usuario.id, "canal_webhook", nome)
+    return Response(status_code=204)
+
+
+@router.put("/evolution/{nome}/configuracoes", status_code=204)
+def configurar(
+    nome: str, dados: Configuracoes, usuario: GestorCsrf, fabrica: Fabrica, cliente: Evolution
+) -> Response:
+    valores = dados.model_dump()
+    try:
+        cliente.aplicar_configuracoes(nome, valores)
+    except ErroWhatsApp as exc:
+        raise _falha(exc) from exc
+    with abrir_sessao(fabrica) as sessao:
+        auditar(sessao, usuario.id, "canal_configurar", nome, detalhe=valores)
+    return Response(status_code=204)
 
 
 @router.post("/evolution/{nome}/desconectar", status_code=204)
