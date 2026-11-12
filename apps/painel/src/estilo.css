@@ -270,6 +270,26 @@ main {
   border-bottom: 1px solid var(--borda);
   overflow-x: auto;
   scrollbar-width: none;
+  /* Esmaecido nas bordas avisa que há mais abas na rolagem. */
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 var(--esmaecer-ini),
+    #000 calc(100% - var(--esmaecer-fim)),
+    transparent
+  );
+}
+/* Onde dá, o esmaecido acompanha a rolagem: some na borda já alcançada. */
+@supports (animation-timeline: scroll()) {
+  .filtros [role="tablist"] { animation: abas-esmaecer linear both; animation-timeline: scroll(self inline); }
+}
+@property --esmaecer-ini { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --esmaecer-fim { syntax: "<length>"; inherits: false; initial-value: 2rem; }
+@keyframes abas-esmaecer {
+  from { --esmaecer-ini: 0px; --esmaecer-fim: 2rem; }
+  15% { --esmaecer-ini: 2rem; }
+  85% { --esmaecer-fim: 2rem; }
+  to { --esmaecer-ini: 2rem; --esmaecer-fim: 0px; }
 }
 .filtros [role="tablist"] button {
   min-height: 40px;
