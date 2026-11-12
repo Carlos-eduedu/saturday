@@ -67,6 +67,7 @@ def exigir_fabrica(request: Request) -> sessionmaker[Session]:
 class UsuarioLogado:
     id: uuid.UUID
     email: str
+    nome: str
     perfil: str
     token: str
 
@@ -85,7 +86,7 @@ def usuario_logado(
         usuario = sessoes.usuario_da_sessao(sessao, token)
         if usuario is None:
             raise HTTPException(status_code=401, detail="não autenticado")
-        return UsuarioLogado(usuario.id, usuario.email, usuario.perfil, token)
+        return UsuarioLogado(usuario.id, usuario.email, usuario.nome, usuario.perfil, token)
 
 
 def exigir_csrf(
@@ -99,3 +100,21 @@ def exigir_csrf(
     if not sessoes.csrf_confere(segredo, usuario.token, recebido):
         raise HTTPException(status_code=403, detail="CSRF inválido")
     return usuario
+
+
+def _gestor(usuario: UsuarioLogado) -> UsuarioLogado:
+    if not usuario.gestor:
+        raise HTTPException(status_code=403, detail="só gestor")
+    return usuario
+
+
+def gestor_logado(usuario: Annotated[UsuarioLogado, Depends(usuario_logado)]) -> UsuarioLogado:
+    """Telas de gestão (Canais, Usuários): só leitura."""
+
+    return _gestor(usuario)
+
+
+def gestor_com_csrf(usuario: Annotated[UsuarioLogado, Depends(exigir_csrf)]) -> UsuarioLogado:
+    """Telas de gestão (Canais, Usuários): ações que mudam estado."""
+
+    return _gestor(usuario)

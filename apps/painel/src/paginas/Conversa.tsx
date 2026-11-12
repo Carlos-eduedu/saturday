@@ -220,7 +220,7 @@ function Acoes({
                 .filter((u) => u.id !== conversa.atendente_id)
                 .map((u) => (
                   <option key={u.id} value={u.id}>
-                    {u.email}
+                    {u.nome}
                   </option>
                 ))}
             </select>

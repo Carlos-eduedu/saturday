@@ -106,7 +106,7 @@ Os logs saem em JSON, uma linha por registro.
 O painel roda à parte, com o Vite fazendo proxy de `/admin` para a API local:
 
 ```bash
-uv run --project apps/core saturday criar-usuario --email voce@mex.com.br --perfil gestor
+uv run --project apps/core saturday criar-usuario --email voce@mex.com.br --perfil gestor --nome "Seu Nome"
 cd apps/painel && npm ci && npm run dev            # http://localhost:5173
 ```
 
@@ -130,7 +130,9 @@ O compose constrói a imagem a partir da raiz (`apps/core/Dockerfile`) e sobe, e
 ordem: `postgres` → `migrate` (roda o Alembic e termina) → `api`, `worker` e
 `painel`. O `compose.override.yaml` publica as portas `8000` (API), `5173`
 (painel), `5432` (Postgres), `9000`/`9001` (MinIO e console). Crie o primeiro
-gestor com `docker compose exec api saturday criar-usuario --email ... --perfil gestor`.
+gestor com `docker compose exec api saturday criar-usuario --email ... --perfil gestor`;
+os demais usuários, o gestor cadastra na aba **Usuários** do painel
+(docs/decisoes/0012).
 
 O contêiner `painel` (nginx) serve o build do Vite e faz proxy de `/admin/` para
 a `api`: painel e API ficam na mesma origem, sem CORS, e o cookie de sessão é

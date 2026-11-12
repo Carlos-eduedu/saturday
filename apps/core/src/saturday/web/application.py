@@ -18,6 +18,7 @@ from saturday.web.api import (
     ia,
     links,
     monitoring,
+    usuarios,
     webhooks,
     whatsapp,
 )
@@ -52,6 +53,7 @@ def get_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(links.router)
     app.include_router(admin.router)
     app.include_router(canais.router)
+    app.include_router(usuarios.router)
     app.include_router(ia.router)
     webhooks.documentar_webhook(app)
 

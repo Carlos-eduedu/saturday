@@ -7,6 +7,7 @@ import { Custos } from "./paginas/Custos";
 import StaggeredMenu from "./componentes/StaggeredMenu";
 import { Caixa } from "./paginas/Caixa";
 import { Login } from "./paginas/Login";
+import { Usuarios } from "./paginas/Usuarios";
 import { iniciarTempoReal, useAvisos } from "./tempoReal";
 
 export function App() {
@@ -57,6 +58,12 @@ function Logado({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
             ativo: pathname === "/canais",
           },
           {
+            label: "Usuários",
+            ariaLabel: "Ir para os usuários",
+            link: "/usuarios",
+            ativo: pathname === "/usuarios",
+          },
+          {
             label: "Custos",
             ariaLabel: "Ir para os custos",
             link: "/custos",
@@ -95,7 +102,7 @@ function Logado({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
             </nav>
             <div className="conta-topo">
               <ContadorCota />
-              <span className="quem">{eu.email}</span>
+              <span className="quem">{eu.nome}</span>
               <button type="button" onClick={aoSair}>
                 Sair
               </button>
@@ -106,7 +113,7 @@ function Logado({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
           <div className="conta">
             <ContadorCota />
             <span className="quem">
-              {eu.email} ({eu.perfil})
+              {eu.nome} ({eu.perfil})
             </span>
             <button type="button" onClick={aoSair}>
               Sair
@@ -120,6 +127,7 @@ function Logado({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
           <Route path="/conversas/:id" element={<Caixa eu={eu} />} />
           <Route path="/alertas" element={<Alertas />} />
           {eu.perfil === "gestor" && <Route path="/canais" element={<Canais />} />}
+          {eu.perfil === "gestor" && <Route path="/usuarios" element={<Usuarios eu={eu} />} />}
           {eu.perfil === "gestor" && <Route path="/custos" element={<Custos />} />}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>

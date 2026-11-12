@@ -23,6 +23,7 @@ DURACAO_SESSAO = timedelta(hours=8)
 MAX_TENTATIVAS = 5
 BLOQUEIO = timedelta(minutes=15)
 PERFIS = ("atendente", "gestor")
+TAMANHO_MINIMO_SENHA = 12
 
 # Parâmetros padrão do argon2-cffi, que já usa a variante argon2id.
 _hasher = PasswordHasher()
@@ -54,11 +55,22 @@ def normalizar_email(email: str) -> str:
     return email.strip().lower()
 
 
-def criar_usuario(sessao: Session, email: str, senha: str, perfil: str) -> UsuarioPainel:
+def nome_padrao(email: str) -> str:
+    """Trecho do e-mail antes do `@`, para quem foi criado sem nome."""
+
+    return normalizar_email(email).split("@", 1)[0][:80]
+
+
+def criar_usuario(
+    sessao: Session, email: str, senha: str, perfil: str, nome: str | None = None
+) -> UsuarioPainel:
     if perfil not in PERFIS:
         raise ValueError(f"perfil inválido: {perfil}")
     usuario = UsuarioPainel(
-        email=normalizar_email(email), senha_hash=gerar_hash(senha), perfil=perfil
+        email=normalizar_email(email),
+        nome=(nome or "").strip() or nome_padrao(email),
+        senha_hash=gerar_hash(senha),
+        perfil=perfil,
     )
     sessao.add(usuario)
     sessao.flush()
@@ -68,7 +80,8 @@ def criar_usuario(sessao: Session, email: str, senha: str, perfil: str) -> Usuar
 def autenticar(sessao: Session, email: str, senha: str) -> UsuarioPainel | None:
     """Confere a senha e conta a falha. ``None`` para qualquer recusa.
 
-    E-mail inexistente, senha errada e conta bloqueada recebem a mesma resposta.
+    E-mail inexistente, senha errada, conta bloqueada e conta desativada recebem
+    a mesma resposta.
     A 5ª falha bloqueia por 15 min e derruba as sessões abertas.
     """
 
@@ -77,7 +90,7 @@ def autenticar(sessao: Session, email: str, senha: str) -> UsuarioPainel | None:
         .where(UsuarioPainel.email == normalizar_email(email))
         .with_for_update()
     )
-    if usuario is None:
+    if usuario is None or not usuario.ativo:
         _senha_confere(_HASH_FALSO, senha)
         return None
 
@@ -122,7 +135,11 @@ def usuario_da_sessao(sessao: Session, token: str) -> UsuarioPainel | None:
     return sessao.scalar(
         select(UsuarioPainel)
         .join(SessaoPainel, SessaoPainel.usuario_id == UsuarioPainel.id)
-        .where(SessaoPainel.token_hash == _hash_token(token), SessaoPainel.expira_em > agora())
+        .where(
+            SessaoPainel.token_hash == _hash_token(token),
+            SessaoPainel.expira_em > agora(),
+            UsuarioPainel.ativo.is_(True),
+        )
     )
 
 

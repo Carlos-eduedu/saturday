@@ -108,7 +108,8 @@ def transferir(
     if conversa.atendimento != "assumida":
         raise AcaoRecusada(409, "só conversa assumida pode ser transferida")
     _exigir_dono(conversa, usuario_id, gestor)
-    if sessao.get(UsuarioPainel, destino_id) is None:
+    destino = sessao.get(UsuarioPainel, destino_id)
+    if destino is None or not destino.ativo:
         raise AcaoRecusada(404, "atendente de destino não encontrado")
     anterior = conversa.atendente_id
     repositorios.mudar_atendimento(sessao, conversa, "assumida", atendente_id=destino_id)

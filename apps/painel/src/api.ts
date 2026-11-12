@@ -7,6 +7,7 @@ export type Atendimento = "ia" | "handoff" | "assumida";
 export interface Eu {
   id: string;
   email: string;
+  nome: string;
   perfil: Perfil;
   csrf: string;
 }
@@ -70,8 +71,28 @@ export interface Cota {
 
 export interface Usuario {
   id: string;
+  nome: string;
   email: string;
   perfil: Perfil;
+}
+
+// Linha da aba Usuários (só gestor).
+export interface UsuarioGestao {
+  id: string;
+  nome: string;
+  email: string;
+  perfil: Perfil;
+  situacao: "ativo" | "bloqueado" | "desativado";
+  bloqueado_ate: string | null;
+  criado_em: string;
+  conversas_assumidas: number;
+}
+
+export interface NovoUsuario {
+  nome: string;
+  email: string;
+  perfil: Perfil;
+  senha: string;
 }
 
 export interface InstanciaEvolution {
@@ -231,6 +252,16 @@ export const api = {
   resolverAlerta: (id: number) => chamar<void>("POST", `/alertas/${id}/resolver`),
   cota: () => chamar<Cota>("GET", "/cota"),
   canais: () => chamar<Canais>("GET", "/canais"),
+  gestaoUsuarios: () => chamar<UsuarioGestao[]>("GET", "/gestao/usuarios"),
+  criarUsuario: (dados: NovoUsuario) => chamar<{ id: string }>("POST", "/gestao/usuarios", dados),
+  editarUsuario: (id: string, dados: { nome: string; email: string; perfil: Perfil }) =>
+    chamar<void>("PATCH", `/gestao/usuarios/${id}`, dados),
+  redefinirSenha: (id: string, senha: string) =>
+    chamar<void>("POST", `/gestao/usuarios/${id}/senha`, { senha }),
+  desbloquearUsuario: (id: string) => chamar<void>("POST", `/gestao/usuarios/${id}/desbloquear`),
+  desativarUsuario: (id: string) =>
+    chamar<{ conversas_devolvidas: number }>("POST", `/gestao/usuarios/${id}/desativar`),
+  reativarUsuario: (id: string) => chamar<void>("POST", `/gestao/usuarios/${id}/reativar`),
   turnos: (id: string) => chamar<Trilha>("GET", `/conversas/${id}/turnos`),
   custos: () => chamar<Custos>("GET", "/custos"),
   criarInstancia: (nome: string) => chamar<Qr>("POST", "/canais/evolution", { nome }),

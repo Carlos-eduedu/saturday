@@ -641,6 +641,21 @@ main {
   button:hover:not(:disabled), .inbox li a:hover { transform: none; }
 }
 
+/* ---------------------------------------------------------------- usuários (decisão 0012) */
+.form-usuario { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: 0.75rem; align-items: end; margin-top: 1.25rem; }
+.form-usuario h3, .form-usuario > .nota { grid-column: 1 / -1; margin: 0; }
+.form-usuario h3 { font-size: 0.95rem; }
+.form-usuario small { font-weight: 400; }
+.form-usuario button { justify-self: start; }
+.edicao-usuario { display: flex; flex-direction: column; gap: 0.75rem; align-items: stretch; }
+.edicao-usuario > h2 { margin: 0; }
+.edicao-usuario > button, .edicao-usuario > div > button { align-self: flex-start; }
+.usuarios tr.desativado td { color: var(--suave); }
+.situacao-usuario { font-weight: 500; }
+.situacao-ativo { color: var(--ia); }
+.situacao-bloqueado { color: var(--handoff); }
+.situacao-desativado { color: var(--suave); }
+
 /* Estado da instância: cor e texto juntos, nunca só cor. */
 .estado-instancia { display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 500; }
 .estado-instancia::before { content: ""; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: currentColor; }

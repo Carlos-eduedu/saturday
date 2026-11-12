@@ -171,7 +171,7 @@ export function Inbox({
       .then(setUsuarios)
       .catch(() => undefined);
   }, []);
-  const nomeDe = (id: string | null) => usuarios.find((u) => u.id === id)?.email ?? "outra pessoa";
+  const nomeDe = (id: string | null) => usuarios.find((u) => u.id === id)?.nome ?? "outra pessoa";
 
   // Assumir e devolver esperam 5 s antes de ir para a API: dá para desfazer
   // sem endpoint novo e sem adivinhar o estado anterior (IA, handoff ou dono).

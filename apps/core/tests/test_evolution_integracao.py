@@ -315,7 +315,9 @@ def test_falha_da_evolution_e_classificada(
 def test_painel_envia_texto_sem_janela_e_recusa_modelo(fabrica: sessionmaker[Session]) -> None:
     conversa_id = _conversa_evolution(fabrica, dias_sem_escrever=5)
     with abrir_sessao(fabrica) as sessao:
-        usuario = UsuarioPainel(email="evolution@exemplo.com", senha_hash="x", perfil="atendente")
+        usuario = UsuarioPainel(
+            email="evolution@exemplo.com", nome="Evolution", senha_hash="x", perfil="atendente"
+        )
         sessao.add(usuario)
         sessao.flush()
         conversa = sessao.get(Conversa, conversa_id)

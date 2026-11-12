@@ -72,6 +72,7 @@ def _eu(request: Request, usuario: UsuarioLogado) -> dict[str, Any]:
     return {
         "id": str(usuario.id),
         "email": usuario.email,
+        "nome": usuario.nome,
         "perfil": usuario.perfil,
         "csrf": sessoes.token_csrf(segredo, usuario.token),
     }
@@ -90,7 +91,7 @@ def login(dados: Login, request: Request, response: Response, fabrica: Fabrica) 
         usuario = sessoes.autenticar(sessao, dados.email, dados.senha)
         token = sessoes.abrir_sessao(sessao, usuario) if usuario else None
         logado = (
-            UsuarioLogado(usuario.id, usuario.email, usuario.perfil, token)
+            UsuarioLogado(usuario.id, usuario.email, usuario.nome, usuario.perfil, token)
             if usuario and token
             else None
         )
@@ -125,11 +126,15 @@ def eu(request: Request, usuario: Logado) -> dict[str, Any]:
 
 @router.get("/usuarios")
 def usuarios(_usuario: Logado, fabrica: Fabrica) -> list[dict[str, Any]]:
-    """Destinos possíveis de uma transferência."""
+    """Destinos possíveis de uma transferência: só quem está ativo."""
 
     with abrir_sessao(fabrica) as sessao:
-        linhas = sessao.scalars(select(UsuarioPainel).order_by(UsuarioPainel.email)).all()
-        return [{"id": str(u.id), "email": u.email, "perfil": u.perfil} for u in linhas]
+        linhas = sessao.scalars(
+            select(UsuarioPainel).where(UsuarioPainel.ativo.is_(True)).order_by(UsuarioPainel.nome)
+        ).all()
+        return [
+            {"id": str(u.id), "nome": u.nome, "email": u.email, "perfil": u.perfil} for u in linhas
+        ]
 
 
 # ------------------------------------------------------------------ conversas

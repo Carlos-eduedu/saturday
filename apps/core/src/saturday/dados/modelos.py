@@ -16,6 +16,7 @@ from typing import Any
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     Date,
     DateTime,
     Float,
@@ -28,6 +29,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
+from sqlalchemy import true as sa_true
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -218,8 +220,14 @@ class UsuarioPainel(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String(254), unique=True, nullable=False)
+    nome: Mapped[str] = mapped_column(String(80), nullable=False)
     senha_hash: Mapped[str] = mapped_column(Text, nullable=False)
     perfil: Mapped[str] = mapped_column(String(16), nullable=False, default="atendente")
+    # Desativado não entra nem recebe conversa; a linha fica para a auditoria
+    # continuar dizendo quem fez o quê (decisão 0012).
+    ativo: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=sa_true()
+    )
     tentativas_falhas: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     bloqueado_ate: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)

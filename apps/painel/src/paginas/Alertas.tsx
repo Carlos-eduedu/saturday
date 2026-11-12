@@ -7,6 +7,7 @@ import { formatarHora } from "./Inbox";
 
 const ROTULOS: Record<string, string> = {
   handoff: "Conversa aguardando humano",
+  atendente_desativado: "Atendente desativado: conversa voltou para a fila",
   erro_interno: "Erro interno no atendimento",
   envio_falhou: "Mensagem não entregue",
   sem_resposta: "Cliente sem resposta há mais de 10 min",

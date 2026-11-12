@@ -33,10 +33,10 @@ from saturday.privacidade import mascarar_telefone
 from saturday.settings import Settings
 from saturday.web.dependencies import (
     UsuarioLogado,
-    exigir_csrf,
     exigir_fabrica,
+    gestor_com_csrf,
+    gestor_logado,
     get_settings,
-    usuario_logado,
 )
 
 router = APIRouter(prefix="/admin/canais", tags=["painel"])
@@ -50,20 +50,6 @@ def get_cliente_evolution(request: Request) -> EvolutionClient:
     if not settings.evolution_ativo:
         raise HTTPException(status_code=404, detail="canal Evolution desligado")
     return EvolutionClient(request.app.state.http, settings)
-
-
-def _gestor(usuario: UsuarioLogado) -> UsuarioLogado:
-    if not usuario.gestor:
-        raise HTTPException(status_code=403, detail="só gestor")
-    return usuario
-
-
-def gestor_logado(usuario: Annotated[UsuarioLogado, Depends(usuario_logado)]) -> UsuarioLogado:
-    return _gestor(usuario)
-
-
-def gestor_com_csrf(usuario: Annotated[UsuarioLogado, Depends(exigir_csrf)]) -> UsuarioLogado:
-    return _gestor(usuario)
 
 
 Fabrica = Annotated[sessionmaker[Session], Depends(exigir_fabrica)]

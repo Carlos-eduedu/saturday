@@ -26,7 +26,7 @@ def _conversa(fabrica, conversation_id):
 
 def _atendente(fabrica, email="ana@exemplo.test"):
     with abrir_sessao(fabrica) as sessao:
-        usuario = UsuarioPainel(email=email, senha_hash="x", perfil="atendente")
+        usuario = UsuarioPainel(email=email, nome="Atendente", senha_hash="x", perfil="atendente")
         sessao.add(usuario)
         sessao.flush()
         return usuario.id

@@ -69,7 +69,9 @@ automaticamente e é o que publica a porta no ambiente local.
   bloqueio, sessão no banco e CSRF; estado de atendimento (`ia`, `handoff`,
   `assumida`) em `conversas` (docs/decisoes/0003); assumir, devolver, transferir
   e responder; ficha mascarada com revelar auditado; alertas; contador de cota;
-  tempo real por `pg_notify` + SSE.
+  tempo real por `pg_notify` + SSE. Depois, fora das fases: aba Usuários (só
+  gestor) para cadastrar, editar, redefinir senha, desbloquear, desativar e
+  reativar; excluir é desativar (docs/decisoes/0012).
 - **Fase 4 concluída:** cliente Granatech em `bancos/granatech/` (token em cache,
   retry só em GET, normalização em `Decimal`, teto, proposta única com
   reconciliação pela listagem), cota com trava e alerta a 80%, reaproveitamento

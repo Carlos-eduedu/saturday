@@ -136,7 +136,8 @@ Na ordem. Cada passo de escrita no Dokploy (criar, editar, deploy) segue a
    - log do `migrate` com `Running upgrade` até a head e saída 0;
    - log do `worker` com `worker_iniciado` e container saudável;
    - primeiro gestor, no terminal do container `api`:
-     `saturday criar-usuario --email <email> --perfil gestor`;
+     `saturday criar-usuario --email <email> --perfil gestor --nome "<nome>"`
+     (os demais, pela aba Usuários do painel);
    - login no painel.
 10. **Webhooks dos parceiros:**
     - Meta: callback `https://<api>/webhooks/whatsapp` com o
