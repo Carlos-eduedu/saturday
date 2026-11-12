@@ -100,6 +100,11 @@ button[type="submit"]:hover:not(:disabled), button.principal:hover:not(:disabled
 }
 button.perigo { color: var(--erro); }
 button.perigo:hover:not(:disabled) { border-color: var(--erro); }
+button[type="submit"].perigo, button[type="submit"].perigo:hover:not(:disabled) {
+  background: var(--erro);
+  border-color: var(--erro);
+  color: var(--destaque-texto);
+}
 button.ativo { background: var(--destaque-suave); border-color: var(--destaque); color: var(--destaque); }
 button.link {
   font-family: var(--fonte-texto);
@@ -673,3 +678,5 @@ main {
 .historico-granatech { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
 .historico-granatech time { font-family: var(--fonte-mono); font-size: 0.8rem; color: var(--suave); }
 .granatech pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0.25rem 0 0; }
+.granatech > section { scroll-margin-top: 5rem; }
+.granatech section > ul { margin: 0 0 1rem; padding-left: 1.25rem; display: flex; flex-direction: column; gap: 0.3rem; }

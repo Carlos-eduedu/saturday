@@ -1,4 +1,4 @@
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { Vazio } from "../componentes/Vazio";
 import {
@@ -7,7 +7,6 @@ import {
   type ConsultaGranatech,
   type ConsultaGranatechDetalhe,
   type ContaNova,
-  type Cota,
   ErroApi,
   type Eu,
   type EventoGranatech,
@@ -29,6 +28,13 @@ type Agir = (acao: () => Promise<unknown>, feito: string | ((r: unknown) => stri
 
 function mensagemDe(erro: unknown): string {
   return erro instanceof ErroApi ? erro.message : "falha inesperada";
+}
+
+// A margem vem do detalhe gravado como a Granatech mandou (pode ser "1.500,00").
+function reais(valor: string | number | undefined): string {
+  const numero = Number(valor);
+  if (valor === undefined || valor === "" || Number.isNaN(numero)) return `R$ ${valor ?? "—"}`;
+  return numero.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 const dataHora = (iso: string | null) =>
@@ -86,7 +92,6 @@ export function Granatech({ eu }: { eu: Eu }) {
   return (
     <div className="canais granatech">
       <h1 className="titulo-tela">Granatech</h1>
-      <CotaGranatech versao={versao} />
       {erro && (
         <p className="erro" role="alert">
           {erro}
@@ -152,18 +157,6 @@ export function Granatech({ eu }: { eu: Eu }) {
   );
 }
 
-function CotaGranatech({ versao }: { versao: number }) {
-  const [cota, setCota] = useState<Cota | null>(null);
-  useEffect(() => {
-    api.cota().then(setCota).catch(() => setCota(null));
-  }, [versao]);
-  if (!cota) return null;
-  return (
-    <p className="cota">
-      Cota hoje {cota.dia.usadas}/{cota.dia.teto} · no mês {cota.mes.usadas}/{cota.mes.teto}
-    </p>
-  );
-}
 
 function Filtros({ aoFiltrar }: { aoFiltrar: (f: FiltroGranatech) => void }) {
   const [status, setStatus] = useState("");
@@ -288,7 +281,7 @@ function ListaPropostas({
               {p.tipo_notificacao && <small> ({p.tipo_notificacao})</small>}
             </td>
             <td data-rotulo="Parcelas">
-              {p.numero_parcelas} × R$ {p.valor_parcela}
+              {p.numero_parcelas} × {reais(p.valor_parcela)}
             </td>
             <td data-rotulo="Conversa">
               <SemConversa conversa={p.conversa_id} />
@@ -303,6 +296,15 @@ function ListaPropostas({
       </tbody>
     </table>
   );
+}
+
+// O detalhe abre abaixo da lista: leva a tela até ele quando outro item é aberto.
+function useAoAbrir(id: number | undefined) {
+  const ref = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (id !== undefined) ref.current?.scrollIntoView({ block: "start" });
+  }, [id]);
+  return ref;
 }
 
 function Historico({ eventos }: { eventos: EventoGranatech[] }) {
@@ -332,6 +334,7 @@ function Cpf({ consultaId, mascarado }: { consultaId: number; mascarado: string 
       {valor === null && (
         <button
           type="button"
+          className="link"
           onClick={() =>
             api
               .revelarCpfGranatech(consultaId)
@@ -388,13 +391,14 @@ function DetalheConsulta({
   abrirProposta: (id: number) => void;
 }) {
   const [c, setC] = useState<ConsultaGranatechDetalhe | null>(null);
+  const secao = useAoAbrir(c?.id);
   useEffect(() => {
     api.consultaGranatech(id).then(setC).catch(() => setC(null));
   }, [id, versao]);
   if (!c) return null;
 
   return (
-    <section>
+    <section ref={secao}>
       <h2>Consulta {c.id_externo}</h2>
       <dl className="ficha-granatech">
         <dt>CPF</dt>
@@ -418,7 +422,7 @@ function DetalheConsulta({
           {c.propostas.length === 0
             ? "—"
             : c.propostas.map((p) => (
-                <button key={p} type="button" onClick={() => abrirProposta(p)}>
+                <button key={p} type="button" className="link" onClick={() => abrirProposta(p)}>
                   #{p}
                 </button>
               ))}
@@ -432,8 +436,7 @@ function DetalheConsulta({
         <ul>
           {c.vinculos.map((v, i) => (
             <li key={i}>
-              {v.nome_empregador ?? "—"} ({v.documento_empregador ?? "—"}) · margem R${" "}
-              {String(v.margem ?? "—")}
+              {v.nome_empregador ?? "—"} ({v.documento_empregador ?? "—"}) · margem {reais(v.margem)}
               {v.elegivel_empregador === false && <small> · empregador não elegível</small>}
               {v.produtos && v.produtos.length > 0 && (
                 <small> · produtos: {v.produtos.map((p) => p.nome ?? p.id).join(", ")}</small>
@@ -483,13 +486,14 @@ function DetalheProposta({
 }) {
   const [p, setP] = useState<PropostaGranatechDetalhe | null>(null);
   const [painel, setPainel] = useState<"cancelar" | "conta" | null>(null);
+  const secao = useAoAbrir(p?.id);
   useEffect(() => {
     api.propostaGranatech(id).then(setP).catch(() => setP(null));
   }, [id, versao]);
   if (!p) return null;
 
   return (
-    <section>
+    <section ref={secao}>
       <h2>Proposta {p.id_externo ?? `#${p.id} (sem id na Granatech)`}</h2>
       <dl className="ficha-granatech">
         <dt>CPF</dt>
@@ -505,13 +509,13 @@ function DetalheProposta({
         </dd>
         <dt>Parcelas</dt>
         <dd>
-          {p.numero_parcelas} × R$ {p.valor_parcela}
+          {p.numero_parcelas} × {reais(p.valor_parcela)}
         </dd>
         <dt>Etapa da conversa</dt>
         <dd>{p.etapa ? rotulo(ETAPAS, p.etapa) : "—"}</dd>
         <dt>Consulta</dt>
         <dd>
-          <button type="button" onClick={() => abrirConsulta(p.consulta_id)}>
+          <button type="button" className="link" onClick={() => abrirConsulta(p.consulta_id)}>
             #{p.consulta_id}
           </button>
         </dd>
