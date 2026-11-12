@@ -298,9 +298,14 @@ main {
 .autor-ia { color: var(--ia); }
 .autor-atendente { color: var(--destaque); }
 .sem-previa { color: var(--suave); }
-.linha-detalhe { display: flex; flex-wrap: wrap; gap: 0.15rem 0.75rem; font-size: 0.8rem; color: var(--suave); }
-.linha-detalhe .telefone { font-size: 0.8rem; }
-.linha-detalhe .motivo { color: var(--handoff); font-weight: 500; }
+/* Quem é o cliente à esquerda (telefone, canal, janela); o que foi dito à direita. */
+.inbox .linha-conteudo { display: grid; grid-template-columns: 10.5rem minmax(0, 1fr); align-items: center; column-gap: 1.25rem; }
+.linha-identidade { display: flex; flex-direction: column; gap: 0.15rem; padding-right: 1.25rem; border-right: 1px solid var(--borda); }
+.linha-identidade .telefone { font-size: 0.95rem; font-weight: 500; color: var(--texto); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.linha-canal { display: flex; flex-wrap: wrap; gap: 0 0.5rem; font-size: 0.75rem; color: var(--suave); }
+.linha-canal .janela { font-size: 0.75rem; }
+.fala { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.fala .motivo { font-size: 0.78rem; color: var(--handoff); font-weight: 500; }
 .linha-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 0.3rem; }
 .linha-estado { display: flex; align-items: center; gap: 0.5rem; }
 .etapa { font-size: 0.8rem; font-weight: 500; color: var(--texto); }
@@ -375,6 +380,8 @@ main {
   .acao-linha { display: none; }
   .inbox .swipe-row__toggle { display: inline-flex; }
   .inbox li a { grid-template-columns: minmax(0, 1fr); align-content: center; }
+  .inbox .linha-conteudo { grid-template-columns: minmax(0, 1fr); row-gap: 0.2rem; }
+  .linha-identidade { flex-direction: row; gap: 0.6rem; align-items: baseline; padding-right: 0; border-right: 0; }
   .linha-meta { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; }
   .linha-meta .atencao { order: -1; width: 100%; text-align: left; }
   .filtros > label { width: 100%; }

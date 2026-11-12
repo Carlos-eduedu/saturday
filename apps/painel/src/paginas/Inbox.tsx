@@ -46,8 +46,8 @@ function chamarApi(p: Pendente) {
 // shortcut: lido uma vez ao carregar; girar ou redimensionar a janela não muda.
 const largo = typeof window !== "undefined" && window.innerWidth >= 600;
 const commitAt = largo ? 0.35 : 0.6;
-// Duas linhas de conteúdo; no celular a meta desce para uma terceira.
-const altura = largo ? 76 : 112;
+// Duas linhas de conteúdo; no celular, identidade, fala e meta ficam em linhas próprias.
+const altura = largo ? 76 : 136;
 
 // Uma forma de agir por tela: a partir de 600 px, o botão da linha; abaixo,
 // arrastar (o mesmo corte do CSS que esconde o botão).
@@ -317,30 +317,32 @@ export function Inbox({ eu }: { eu: Eu }) {
                     onClick={ignorarSeArrastou}
                   >
                     <span className="linha-conteudo">
-                      <span className="previa">
-                        {c.ultima_mensagem ? (
-                          <>
-                            <span className={`autor-previa autor-${c.ultima_mensagem.autor}`}>
-                              {rotulo(AUTORES, c.ultima_mensagem.autor)}:
-                            </span>{" "}
-                            {c.ultima_mensagem.texto || "—"}
-                          </>
-                        ) : (
-                          <span className="sem-previa">Sem mensagens ainda</span>
-                        )}
-                      </span>
-                      <span className="linha-detalhe">
+                      <span className="linha-identidade">
                         <span className="telefone">{c.telefone ?? c.canal}</span>
-                        {c.canal === "evolution" && <span>Evolution</span>}
-                        {c.canal === "whatsapp" && (
-                          <span className={c.janela_aberta ? "janela aberta" : "janela fechada"}>
-                            {c.janela_aberta ? "janela aberta" : "janela fechada"}
-                          </span>
-                        )}
+                        <span className="linha-canal">
+                          <span>{c.canal === "evolution" ? "Evolution" : "WhatsApp"}</span>
+                          {c.canal === "whatsapp" && (
+                            <span className={c.janela_aberta ? "janela aberta" : "janela fechada"}>
+                              {c.janela_aberta ? "janela aberta" : "janela fechada"}
+                            </span>
+                          )}
+                        </span>
+                      </span>
+                      <span className="fala">
+                        <span className="previa">
+                          {c.ultima_mensagem ? (
+                            <>
+                              <span className={`autor-previa autor-${c.ultima_mensagem.autor}`}>
+                                {rotulo(AUTORES, c.ultima_mensagem.autor)}:
+                              </span>{" "}
+                              {c.ultima_mensagem.texto || "—"}
+                            </>
+                          ) : (
+                            <span className="sem-previa">Sem mensagens ainda</span>
+                          )}
+                        </span>
                         {c.motivo_handoff && (
-                          <span className="motivo">
-                            {rotulo(MOTIVOS_HANDOFF, c.motivo_handoff)}
-                          </span>
+                          <span className="motivo">{rotulo(MOTIVOS_HANDOFF, c.motivo_handoff)}</span>
                         )}
                       </span>
                     </span>
