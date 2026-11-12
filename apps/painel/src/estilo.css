@@ -72,8 +72,10 @@ code, .telefone, time, small { font-family: var(--fonte-mono); }
 html { scroll-padding-top: calc(var(--topo) + 1rem); }
 
 /* ---------------------------------------------------------------- botões */
-/* Três papéis: principal (submit ou .principal), secundário (padrão) e link. */
-button {
+/* Três papéis: principal (submit ou .principal), secundário (padrão) e link.
+   `a.botao` é o link de download (exportar a conversa) com o peso de botão. */
+button,
+a.botao {
   font: inherit;
   font-weight: 500;
   min-height: var(--alvo);
@@ -86,8 +88,11 @@ button {
   transition: transform 120ms ease, background-color 120ms ease, border-color 120ms ease,
     box-shadow 120ms ease;
 }
-button:hover:not(:disabled) { transform: translateY(-1px); border-color: var(--suave); box-shadow: var(--sombra); }
-button:active:not(:disabled) { transform: translateY(0) scale(0.98); box-shadow: none; }
+button:hover:not(:disabled),
+a.botao:hover { transform: translateY(-1px); border-color: var(--suave); box-shadow: var(--sombra); }
+button:active:not(:disabled),
+a.botao:active { transform: translateY(0) scale(0.98); box-shadow: none; }
+a.botao { display: inline-flex; align-items: center; text-decoration: none; }
 button:disabled { opacity: 0.5; cursor: default; }
 button[type="submit"], button.principal {
   background: var(--destaque);

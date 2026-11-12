@@ -386,3 +386,7 @@ function parametros(filtro: FiltroGranatech): URLSearchParams {
 
 export const midiaUrl = (mensagemId: number, indice: number) =>
   `/admin/midia/${mensagemId}/${indice}`;
+
+// Download navegando: o cookie da sessão vai junto e o nome do arquivo vem do
+// `Content-Disposition` da resposta.
+export const exportarUrl = (conversaId: string) => `/admin/conversas/${conversaId}/exportar`;

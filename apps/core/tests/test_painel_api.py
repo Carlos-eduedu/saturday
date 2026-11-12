@@ -116,6 +116,7 @@ def test_atendente_assume_responde_e_ia_cala_ate_devolver(
     assert enviada.status_code == 201
     with abrir(fabrica) as s:
         linha = s.scalars(select(Outbox).order_by(Outbox.id.desc())).first()
+        assert linha is not None
         assert linha.payload["answer"] == "Oi, sou a Ana."
         assert linha.payload["mensagem_id"] == enviada.json()["mensagem_id"]
 
@@ -151,6 +152,7 @@ def test_janela_fechada_so_aceita_modelo(client_pg, service_pg, fabrica, ana, co
     alvo = _conversa_id(fabrica, conversa)
     with abrir(fabrica) as s:
         conversa_db = s.get(Conversa, uuid.UUID(alvo))
+        assert conversa_db is not None
         conversa_db.ultima_entrada_em = conversa_db.criada_em.replace(year=2020)
     csrf = _entrar(client_pg, "ana@exemplo.test")
     client_pg.post(f"/admin/conversas/{alvo}/assumir", headers=csrf)
@@ -171,6 +173,7 @@ def test_janela_fechada_so_aceita_modelo(client_pg, service_pg, fabrica, ana, co
     assert modelo.status_code == 201
     with abrir(fabrica) as s:
         linha = s.scalars(select(Outbox).order_by(Outbox.id.desc())).first()
+        assert linha is not None
         assert linha.payload["modelo"] == "atualizacao_pedido"
 
 
@@ -275,6 +278,35 @@ def test_revelar_exige_csrf(client_pg, service_pg, fabrica, ana, conversa):
     assert resposta.status_code == 403
 
 
+# ------------------------------------------------------------------ exportação
+
+
+def test_exportar_devolve_a_conversa_em_markdown(client_pg, service_pg, fabrica, ana, conversa):
+    _cliente_escreve(service_pg, conversa, "oi, quero simular")
+    alvo = _conversa_id(fabrica, conversa)
+    _entrar(client_pg, "ana@exemplo.test")
+
+    resposta = client_pg.get(f"/admin/conversas/{alvo}/exportar")
+
+    assert resposta.status_code == 200
+    assert resposta.headers["content-type"].startswith("text/markdown")
+    assert resposta.headers["content-disposition"] == f'attachment; filename="conversa-{alvo}.md"'
+    assert resposta.headers["cache-control"] == "private, no-store"
+    assert resposta.text.startswith("# Conversa — WhatsApp oficial")
+    assert "## Mensagens" in resposta.text
+    assert "oi, quero simular" in resposta.text
+    # O arquivo leva a conversa para fora do painel: fica registrado quem levou.
+    with abrir(fabrica) as s:
+        assert [a.acao for a in s.scalars(select(Auditoria))] == ["exportar"]
+
+
+def test_exportar_exige_sessao(client_pg, service_pg, fabrica, conversa):
+    _cliente_escreve(service_pg, conversa, "oi")
+    alvo = _conversa_id(fabrica, conversa)
+    client_pg.cookies.clear()
+    assert client_pg.get(f"/admin/conversas/{alvo}/exportar").status_code == 401
+
+
 # ------------------------------------------------------------------ alertas, cota, mídia
 
 
@@ -308,6 +340,7 @@ def test_midia_passa_pela_api_com_sessao(client_pg, service_pg, fabrica, storage
     _cliente_escreve(service_pg, conversa, "oi")
     with abrir(fabrica) as s:
         mensagem = s.scalars(select(Mensagem).where(Mensagem.direcao == "entrada")).first()
+        assert mensagem is not None
         mensagem.anexos = [{"chave": chave, "mime_type": "application/pdf"}]
         mensagem_id = mensagem.id
 

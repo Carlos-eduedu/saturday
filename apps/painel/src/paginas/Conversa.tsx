@@ -5,6 +5,7 @@ import {
   type CampoSensivel,
   type Detalhe,
   type Eu,
+  exportarUrl,
   type Ficha,
   midiaUrl,
   type Trilha,
@@ -201,6 +202,9 @@ function Acoes({
 
   return (
     <div className="acoes">
+      <a className="botao" href={exportarUrl(conversa.id)}>
+        Exportar .md
+      </a>
       {!minha && (conversa.atendimento !== "assumida" || eu.perfil === "gestor") && (
         <button type="button" onClick={() => agir(() => api.assumir(conversa.id))}>
           Assumir

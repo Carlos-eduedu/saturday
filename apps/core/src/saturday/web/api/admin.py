@@ -8,6 +8,7 @@ conversas são identificadas pelo `id` interno (UUID), nunca pelo
 from __future__ import annotations
 
 import uuid
+from collections.abc import AsyncIterator
 from datetime import UTC, date, datetime
 from typing import Annotated, Any, Literal
 from zoneinfo import ZoneInfo
@@ -23,7 +24,7 @@ from saturday.canais.whatsapp.janela import janela_aberta
 from saturday.dados import repositorios
 from saturday.dados.modelos import Alerta, Conversa, Cota, Mensagem, UsuarioPainel
 from saturday.dados.sessao import sessao as abrir_sessao
-from saturday.painel import acoes, sessoes, supervisao
+from saturday.painel import acoes, exportacao, sessoes, supervisao
 from saturday.painel.auditoria import auditar
 from saturday.privacidade import MASCARAS
 from saturday.settings import TZ_OPERACAO
@@ -230,6 +231,39 @@ def ver_conversa(conversa_id: uuid.UUID, _usuario: Logado, fabrica: Fabrica) -> 
     return {**resumo, "mensagens": historico, "modelos": modelos}
 
 
+@router.get("/conversas/{conversa_id}/exportar")
+def exportar(
+    conversa_id: uuid.UUID, usuario: Logado, fabrica: Fabrica, service: Servico
+) -> Response:
+    """A conversa inteira em Markdown, para levar a outro lugar (inclusive a uma IA)."""
+
+    agora = datetime.now(UTC)
+    with abrir_sessao(fabrica) as sessao:
+        conversa = sessao.get(Conversa, conversa_id)
+        if conversa is None:
+            raise HTTPException(status_code=404, detail="conversa não encontrada")
+        supervisionado = supervisao.supervisao(sessao, [conversa], agora)[conversa.id]
+        retrato = exportacao.carregar(
+            sessao,
+            conversa,
+            ficha=_ficha(conversa, _estado(conversa, service)),
+            supervisao=supervisionado,
+            gestor=usuario.gestor,
+            agora=agora,
+            exportado_por=usuario.email,
+        )
+        # O arquivo leva a conversa para fora do painel: fica registrado quem levou.
+        auditar(sessao, usuario.id, "exportar", str(conversa_id))
+    return Response(
+        content=exportacao.conversa_em_markdown(retrato),
+        media_type="text/markdown; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="conversa-{conversa_id}.md"',
+            "Cache-Control": "private, no-store",
+        },
+    )
+
+
 def _executar(
     fabrica: sessionmaker[Session],
     conversa_id: uuid.UUID,
@@ -309,17 +343,11 @@ def _dados_sensiveis(conversa: Conversa, estado: dict[str, Any]) -> dict[str, st
     return {campo: str(valor) for campo, valor in valores.items() if valor}
 
 
-@router.get("/conversas/{conversa_id}/ficha")
-def ficha(
-    conversa_id: uuid.UUID, _usuario: Logado, fabrica: Fabrica, service: Servico
-) -> dict[str, Any]:
-    with abrir_sessao(fabrica) as sessao:
-        conversa = sessao.get(Conversa, conversa_id)
-        if conversa is None:
-            raise HTTPException(status_code=404, detail="conversa não encontrada")
-        estado = _estado(conversa, service)
-        sensiveis = _dados_sensiveis(conversa, estado)
+def _ficha(conversa: Conversa, estado: dict[str, Any]) -> dict[str, Any]:
+    """A ficha como a tela e a exportação a mostram: só com dado mascarado."""
+
     cliente = estado.get("cliente") or {}
+    sensiveis = _dados_sensiveis(conversa, estado)
     return {
         "nome": cliente.get("nome") or _dados_clt(estado).get("nome"),
         "dados": {campo: MASCARAS[campo](valor) for campo, valor in sensiveis.items()},
@@ -328,6 +356,17 @@ def ficha(
         "handoff_reason": estado.get("handoff_reason"),
         "portabilidade": estado.get("portability_result"),
     }
+
+
+@router.get("/conversas/{conversa_id}/ficha")
+def ficha(
+    conversa_id: uuid.UUID, _usuario: Logado, fabrica: Fabrica, service: Servico
+) -> dict[str, Any]:
+    with abrir_sessao(fabrica) as sessao:
+        conversa = sessao.get(Conversa, conversa_id)
+        if conversa is None:
+            raise HTTPException(status_code=404, detail="conversa não encontrada")
+        return _ficha(conversa, _estado(conversa, service))
 
 
 @router.post("/conversas/{conversa_id}/revelar")
@@ -438,7 +477,7 @@ async def eventos(request: Request, _usuario: Logado) -> StreamingResponse:
         raise HTTPException(status_code=503, detail="tempo real indisponível")
     fila = difusor.assinar()
 
-    async def corpo() -> Any:
+    async def corpo() -> AsyncIterator[str]:
         try:
             async for evento in fluxo_sse(fila):
                 if await request.is_disconnected():
