@@ -97,9 +97,9 @@ export function Conversa({ eu }: { eu: Eu }) {
           </div>
           <Acoes conversa={conversa} eu={eu} minha={minha} agir={agir} />
         </header>
-        {conversa.atencao.length > 0 && (
+        {(conversa.atencao ?? []).length > 0 && (
           <p className="faixa-atencao">
-            <strong>{conversa.atencao.map((a) => rotulo(ATENCAO, a)).join(" · ")}</strong>
+            <strong>{(conversa.atencao ?? []).map((a) => rotulo(ATENCAO, a)).join(" · ")}</strong>
             {conversa.motivo_handoff && ` — ${rotulo(MOTIVOS_HANDOFF, conversa.motivo_handoff)}`}
           </p>
         )}
@@ -188,7 +188,7 @@ function Acoes({
           <label>
             Transferir para
             <select value={destino} onChange={(e) => setDestino(e.target.value)}>
-              <option value="">—</option>
+              <option value="">Escolha a pessoa</option>
               {usuarios
                 .filter((u) => u.id !== conversa.atendente_id)
                 .map((u) => (
@@ -400,9 +400,17 @@ function FichaCliente({ id }: { id: string }) {
       .catch(() => setFicha(null));
   }, [id]);
 
+  const [erroRevelar, setErroRevelar] = useState("");
   async function revelar(campo: CampoSensivel) {
-    const { valor } = await api.revelar(id, campo);
-    setRevelados((atual) => ({ ...atual, [campo]: valor }));
+    setErroRevelar("");
+    try {
+      const { valor } = await api.revelar(id, campo);
+      setRevelados((atual) => ({ ...atual, [campo]: valor }));
+    } catch (e) {
+      setErroRevelar(
+        e instanceof Error ? `Não deu para revelar: ${e.message}` : "Não deu para revelar.",
+      );
+    }
   }
 
   if (!ficha) return <div className="ficha" />;
@@ -418,7 +426,12 @@ function FichaCliente({ id }: { id: string }) {
               <dd>
                 {revelados[campo] ?? ficha.dados[campo]}
                 {!revelados[campo] && (
-                  <button type="button" className="link" onClick={() => revelar(campo)}>
+                  <button
+                    type="button"
+                    className="link"
+                    aria-describedby="aviso-auditoria"
+                    onClick={() => revelar(campo)}
+                  >
                     Revelar
                   </button>
                 )}
@@ -444,7 +457,14 @@ function FichaCliente({ id }: { id: string }) {
           </div>
         )}
       </dl>
-      <p className="nota">Revelar um dado fica registrado na auditoria.</p>
+      {erroRevelar && (
+        <p className="erro" role="alert">
+          {erroRevelar}
+        </p>
+      )}
+      <p className="nota" id="aviso-auditoria">
+        Revelar um dado fica registrado na auditoria, em seu nome.
+      </p>
     </div>
   );
 }

@@ -523,7 +523,8 @@ main {
 }
 .canais td { padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--borda); }
 .canais tbody tr:last-child td { border-bottom: none; }
-.canais td.acoes { display: flex; gap: 0.4rem; justify-content: flex-end; margin: 0; }
+.canais td.acoes { display: table-cell; text-align: right; white-space: nowrap; }
+.canais td.acoes button + button { margin-left: 0.4rem; }
 .nova-instancia { display: flex; gap: 0.5rem; align-items: end; margin-top: 1.25rem; }
 .qr { padding: 1.25rem; border-color: var(--destaque); }
 .qr img { display: block; margin: 0.75rem 0; background: #fff; padding: 8px; border-radius: var(--raio-m); }
@@ -535,7 +536,8 @@ main {
   .canais td { border: none; padding: 0.15rem 0; }
   .canais td[data-rotulo]::before { content: attr(data-rotulo) ": "; color: var(--suave); font-size: 0.85rem; }
   .canais td:first-child { font-weight: 600; }
-  .canais td.acoes { justify-content: flex-start; flex-wrap: wrap; padding-top: 0.5rem; }
+  .canais td.acoes { display: flex; gap: 0.4rem; justify-content: flex-start; flex-wrap: wrap; padding-top: 0.5rem; white-space: normal; }
+  .canais td.acoes button + button { margin-left: 0; }
   .nova-instancia { flex-direction: column; align-items: stretch; }
 }
 
@@ -546,4 +548,16 @@ main {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
   button:hover:not(:disabled), .inbox li a:hover { transform: none; }
+}
+
+/* Estado da instância: cor e texto juntos, nunca só cor. */
+.estado-instancia { display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 500; }
+.estado-instancia::before { content: ""; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: currentColor; }
+.estado-open { color: var(--ia); }
+.estado-connecting { color: var(--handoff); }
+.estado-close, .estado-refused { color: var(--erro); }
+
+/* Abas de fila no celular quebram linha: nenhuma fica escondida na rolagem. */
+@media (max-width: 599px) {
+  .filtros [role="tablist"] { flex-wrap: wrap; overflow-x: visible; }
 }

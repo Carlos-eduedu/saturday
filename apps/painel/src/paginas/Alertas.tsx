@@ -19,17 +19,29 @@ const ROTULOS: Record<string, string> = {
 
 export function Alertas() {
   const [alertas, setAlertas] = useState<Alerta[]>([]);
+  const [erro, setErro] = useState("");
   const carregar = useCallback(() => {
     api
       .alertas()
-      .then(setAlertas)
-      .catch(() => undefined);
+      .then((lista) => {
+        setAlertas(lista);
+        setErro("");
+      })
+      .catch((e: unknown) =>
+        setErro(e instanceof Error ? `Não deu para carregar os alertas: ${e.message}` : "Falha."),
+      );
   }, []);
   useEffect(carregar, [carregar]);
   useAvisos(useCallback((aviso) => aviso.tipo !== "mensagem" && carregar(), [carregar]));
 
   async function resolver(id: number) {
-    await api.resolverAlerta(id);
+    try {
+      await api.resolverAlerta(id);
+    } catch (e) {
+      setErro(
+        e instanceof Error ? `Não deu para resolver: ${e.message}` : "Não deu para resolver.",
+      );
+    }
     carregar();
   }
 
@@ -38,6 +50,11 @@ export function Alertas() {
       <h1 className="titulo-tela">
         Alertas <span className="contagem">· {alertas.length}</span>
       </h1>
+      {erro && (
+        <p className="erro" role="alert">
+          {erro}
+        </p>
+      )}
       {alertas.length === 0 ? (
         <Vazio
           titulo="Nenhum alerta aberto."

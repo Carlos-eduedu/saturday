@@ -399,5 +399,14 @@ export function Inbox({ eu }: { eu: Eu }) {
 }
 
 export function formatarHora(iso: string): string {
-  return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+  const data = new Date(iso);
+  const agora = new Date();
+  const hora = data.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  if (data.toDateString() === agora.toDateString()) return hora;
+  const dia = data.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    ...(data.getFullYear() === agora.getFullYear() ? {} : { year: "numeric" }),
+  });
+  return `${dia}, ${hora}`;
 }

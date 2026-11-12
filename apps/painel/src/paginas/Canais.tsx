@@ -46,7 +46,11 @@ export function Canais() {
   return (
     <div className="canais">
       <h1 className="titulo-tela">Canais</h1>
-      {erro && <p className="erro">{erro}</p>}
+      {erro && (
+        <p className="erro" role="alert">
+          {erro}
+        </p>
+      )}
 
       <section>
         <h2>WhatsApp oficial (Meta)</h2>
@@ -70,7 +74,11 @@ export function Canais() {
           <p className="vazio">Canal desligado (SATURDAY_EVOLUTION_ATIVO).</p>
         ) : (
           <>
-            {canais.evolution.erro && <p className="erro">{canais.evolution.erro}</p>}
+            {canais.evolution.erro && (
+              <p className="erro" role="alert">
+                {canais.evolution.erro}
+              </p>
+            )}
             <TabelaInstancias
               instancias={canais.evolution.instancias}
               agir={agir}
@@ -131,7 +139,11 @@ function TabelaInstancias({
         {instancias.map((i) => (
           <tr key={i.nome}>
             <td>{i.nome}</td>
-            <td data-rotulo="Estado">{ROTULO_ESTADO[i.estado] ?? i.estado}</td>
+            <td data-rotulo="Estado">
+              <span className={`estado-instancia estado-${i.estado}`}>
+                {ROTULO_ESTADO[i.estado] ?? i.estado}
+              </span>
+            </td>
             <td data-rotulo="Telefone">{i.telefone}</td>
             <td data-rotulo="Conversas (7 dias)">{i.conversas_7_dias}</td>
             <td className="acoes">
@@ -198,7 +210,7 @@ function NovaInstancia({
           onChange={(e) => setNome(e.target.value)}
           pattern="[a-z0-9-]{3,32}"
           title="De 3 a 32 letras minúsculas, números ou hífen"
-          placeholder="mex-vendas"
+          placeholder="ex.: mex-atendimento"
         />
       </label>
       <button type="submit">Criar e mostrar QR</button>
@@ -234,7 +246,11 @@ function PainelQr({ nome, inicial, fechar }: { nome: string; inicial: Qr; fechar
       ) : (
         <p className="aviso">QR indisponível. Feche e clique em Reconectar.</p>
       )}
-      {erro && <p className="erro">{erro}</p>}
+      {erro && (
+        <p className="erro" role="alert">
+          {erro}
+        </p>
+      )}
       <button type="button" onClick={fechar}>
         Fechar
       </button>
