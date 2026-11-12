@@ -177,8 +177,11 @@ class WhatsAppClient:
         except httpx.HTTPError as exc:
             logger.info("whatsapp_marcar_lida_falhou erro=%s", type(exc).__name__)
 
-    def baixar_midia(self, media_id: str) -> tuple[bytes, str]:
+    def baixar_midia(self, media_id: str, instancia: str = "") -> tuple[bytes, str]:
         """Dois passos: metadados no Graph, bytes na URL devolvida.
+
+        ``instancia`` (o ``phone_number_id``) não entra: o ``media_id`` basta
+        na Meta. Existe para a entrada tratar a Meta e a Evolution igual.
 
         A URL de mídia da Meta fica em outro host (`lookaside.fbsbx.com`), então
         ela não passa pela lista de domínios permitidos dos anexos: a origem é

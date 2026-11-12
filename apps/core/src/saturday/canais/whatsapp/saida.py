@@ -13,7 +13,6 @@ quebra de linha) e fica na linha do outbox até o cliente escrever de novo.
 from __future__ import annotations
 
 import logging
-import time
 from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session, sessionmaker
@@ -28,7 +27,7 @@ from saturday.canais.whatsapp.cliente import (
 )
 from saturday.canais.whatsapp.janela import janela_aberta
 from saturday.canais.whatsapp.modelos import MODELOS, Modelo
-from saturday.canais.whatsapp.partes import INTERVALO_ENTRE_PARTES_S, dividir
+from saturday.canais.whatsapp.partes import enviar_em_partes
 from saturday.dados import outbox as fila
 from saturday.dados import repositorios
 from saturday.dados.modelos import Outbox
@@ -107,25 +106,12 @@ class SaidaWhatsApp:
         phone_number_id: str,
         texto: str,
     ) -> None:
-        """Envia as partes que faltam e grava o progresso a cada uma.
-
-        Sem isso, uma falha na parte 3 faria a nova tentativa repetir as
-        partes 1 e 2 no celular do cliente.
-        """
-
-        payload = linha.payload or {}
-        partes = dividir(texto)
-        inicio = int(payload.get("partes_enviadas") or 0)
-        for indice in range(inicio, len(partes)):
-            if indice > inicio:
-                time.sleep(INTERVALO_ENTRE_PARTES_S)
-            wamid = self._cliente.enviar_texto(phone_number_id, numero, partes[indice])
-            with abrir_sessao(self._fabrica) as sessao:
-                fila.registrar_partes_enviadas(sessao, linha.id, indice + 1)
-                mensagem_id = payload.get("mensagem_id")
-                # O `wamid` da primeira parte identifica a mensagem nos status.
-                if indice == 0 and isinstance(mensagem_id, int):
-                    repositorios.marcar_envio(sessao, mensagem_id, wamid=wamid, status="sent")
+        enviar_em_partes(
+            self._fabrica,
+            linha,
+            texto,
+            lambda parte: self._cliente.enviar_texto(phone_number_id, numero, parte),
+        )
 
     def _enviar_modelo_do_painel(
         self,

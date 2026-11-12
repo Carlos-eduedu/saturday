@@ -143,6 +143,73 @@ services:
     mem_limit: 128m
     cpus: 0.25
 
+  # Evolution API (WhatsApp Web, não oficial; docs/decisoes/0009). Opcional:
+  # sobe com `evolution` em COMPOSE_PROFILES. Fica só na rede interna, sem
+  # domínio: o Saturday chama `http://evolution:8080` e ela chama o webhook em
+  # `http://api:8000/webhooks/evolution`. Postgres e Redis próprios.
+  evolution:
+    image: evoapicloud/evolution-api:v2.3.7
+    profiles: ["evolution"]
+    depends_on:
+      evolution-postgres:
+        condition: service_healthy
+      evolution-redis:
+        condition: service_started
+    environment:
+      SERVER_TYPE: http
+      SERVER_PORT: "8080"
+      SERVER_URL: http://evolution:8080
+      AUTHENTICATION_API_KEY: ${SATURDAY_EVOLUTION_API_KEY:-}
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://evolution:${EVOLUTION_POSTGRES_SENHA:-}@evolution-postgres:5432/evolution
+      DATABASE_CONNECTION_CLIENT_NAME: saturday
+      # O download de mídia procura a mensagem na base da Evolution.
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "true"
+      DATABASE_SAVE_MESSAGE_UPDATE: "true"
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://evolution-redis:6379/0
+      CACHE_REDIS_PREFIX_KEY: evolution
+      CACHE_LOCAL_ENABLED: "false"
+    volumes:
+      - evolution_instancias:/evolution/instances
+    restart: unless-stopped
+    mem_limit: 768m
+    cpus: 1.0
+
+  evolution-postgres:
+    image: postgres:17-alpine
+    profiles: ["evolution"]
+    environment:
+      POSTGRES_DB: evolution
+      POSTGRES_USER: evolution
+      POSTGRES_PASSWORD: ${EVOLUTION_POSTGRES_SENHA:-}
+    volumes:
+      - evolution_postgres_dados:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evolution -d evolution"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
+
+  evolution-redis:
+    image: redis:7-alpine
+    profiles: ["evolution"]
+    volumes:
+      - evolution_redis_dados:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+    restart: unless-stopped
+    mem_limit: 128m
+    cpus: 0.25
+
 volumes:
   postgres_dados:
   minio_dados:
+  evolution_instancias:
+  evolution_postgres_dados:
+  evolution_redis_dados:

@@ -203,7 +203,9 @@ def ver_conversa(conversa_id: uuid.UUID, _usuario: Logado, fabrica: Fabrica) -> 
             for m in mensagens
         ]
         conversa.vista_em = func.now()
-    return {**resumo, "mensagens": historico, "modelos": list(acoes.MODELOS_DO_PAINEL)}
+    # Modelo é da Meta; a Evolution só manda texto (decisão 0009).
+    modelos = list(acoes.MODELOS_DO_PAINEL) if conversa.canal == "whatsapp" else []
+    return {**resumo, "mensagens": historico, "modelos": modelos}
 
 
 def _executar(

@@ -204,6 +204,11 @@ mensagens:
   recontato_tempo_casa: >-
     Esse crédito pede pelo menos 12 meses na empresa atual. Você completa 12
     meses por volta de {data}. Posso te avisar nessa época? Responda sim ou não.
+  # Texto do modelo `recontato_tempo_casa` no canal sem modelos (Evolution).
+  recontato_tempo_casa_texto: >-
+    Oi! Você já deve ter completado 12 meses na empresa atual, então agora
+    posso ver o Crédito do Trabalhador para você. Quer seguir? É só me
+    responder aqui.
   optin_confirmado: Combinado! Te aviso por volta de {data}.
   optin_recusado: Tudo bem, não vou te avisar.
   optout: Tudo bem, você não vai mais receber esse tipo de mensagem.

@@ -18,11 +18,12 @@ from saturday.dados.sessao import criar_engine, criar_factory
 from saturday.health import registrar_batimento
 from saturday.jobs import alertas, recontatos
 from saturday.jobs.eventos import processar
-from saturday.jobs.outbox import EntregadorPorCanal, EntregadorWebhook, drenar
+from saturday.jobs.outbox import Entregador, EntregadorPorCanal, EntregadorWebhook, drenar
 from saturday.log import configurar_logging
 from saturday.settings import Settings, get_settings
 from saturday.storage.base import criar_storage
 from saturday.web.composicao import (
+    criar_canal_evolution,
     criar_canal_whatsapp,
     criar_checkpointer,
     criar_cliente_granatech,
@@ -60,12 +61,15 @@ def rodar(settings: Settings, parar: threading.Event) -> None:
         )
         entrada_whatsapp, saida_whatsapp = criar_canal_whatsapp(http, settings, fabrica, storage)
         granatech = criar_cliente_granatech(http, settings, fabrica)
-        entregador = EntregadorPorCanal(
-            {
-                "webhook": EntregadorWebhook(http, settings),
-                "whatsapp": saida_whatsapp,
-            }
-        )
+        entregadores: dict[str, Entregador] = {
+            "webhook": EntregadorWebhook(http, settings),
+            "whatsapp": saida_whatsapp,
+        }
+        evolution = criar_canal_evolution(http, settings, fabrica, storage)
+        entrada_evolution = None
+        if evolution is not None:
+            entrada_evolution, entregadores["evolution"] = evolution
+        entregador = EntregadorPorCanal(entregadores)
 
         logger.info("worker_iniciado")
         proxima_verificacao = 0.0
@@ -74,7 +78,9 @@ def rodar(settings: Settings, parar: threading.Event) -> None:
             # não pode continuar parecendo saudável.
             registrar_batimento()
             try:
-                eventos = processar(fabrica, servico, entrada_whatsapp, settings, granatech)
+                eventos = processar(
+                    fabrica, servico, entrada_whatsapp, settings, granatech, entrada_evolution
+                )
                 entregues = drenar(fabrica, entregador, settings)
                 if time.monotonic() >= proxima_verificacao:
                     alertas.verificar(fabrica, servico)

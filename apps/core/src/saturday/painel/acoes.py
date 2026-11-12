@@ -15,6 +15,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from saturday.canais.base import CANAIS_WHATSAPP
 from saturday.canais.whatsapp.janela import janela_aberta
 from saturday.canais.whatsapp.modelos import MODELOS
 from saturday.dados import repositorios
@@ -132,13 +133,23 @@ def enviar(
 
     if conversa.atendimento != "assumida" or conversa.atendente_id != usuario_id:
         raise AcaoRecusada(409, "assuma a conversa antes de responder")
-    if conversa.canal != "whatsapp" or not conversa.telefone or not conversa.phone_number_id:
+    if (
+        conversa.canal not in CANAIS_WHATSAPP
+        or not conversa.telefone
+        or not conversa.phone_number_id
+    ):
         raise AcaoRecusada(409, "o painel só envia pelo WhatsApp")
     if (texto is None) == (modelo is None):
         raise AcaoRecusada(422, "envie texto ou modelo")
-    if modelo is not None and modelo not in MODELOS_DO_PAINEL:
+    # Janela e modelos são da Meta; a Evolution só manda texto (decisão 0009).
+    meta = conversa.canal == "whatsapp"
+    if modelo is not None and (not meta or modelo not in MODELOS_DO_PAINEL):
         raise AcaoRecusada(422, "modelo indisponível no painel")
-    if texto is not None and not janela_aberta(conversa.ultima_entrada_em, datetime.now(UTC)):
+    if (
+        meta
+        and texto is not None
+        and not janela_aberta(conversa.ultima_entrada_em, datetime.now(UTC))
+    ):
         raise AcaoRecusada(409, "janela de 24 h fechada: envie um modelo")
 
     mensagem_id = repositorios.registrar_saida(
@@ -157,7 +168,7 @@ def enviar(
     }
     if modelo is not None:
         payload["modelo"] = modelo
-    enfileirar(sessao, conversa_id=conversa.id, canal="whatsapp", payload=payload)
+    enfileirar(sessao, conversa_id=conversa.id, canal=conversa.canal, payload=payload)
     auditar(
         sessao,
         usuario_id,

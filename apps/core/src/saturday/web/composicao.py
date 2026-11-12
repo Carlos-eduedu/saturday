@@ -20,6 +20,8 @@ from saturday.agent.context import AgentContext
 from saturday.agent.graph import build_graph
 from saturday.agent.service import AgentService
 from saturday.bancos.granatech.cliente import ClienteGranatech
+from saturday.canais.evolution.cliente import EvolutionClient
+from saturday.canais.evolution.saida import SaidaEvolution
 from saturday.canais.whatsapp.cliente import WhatsAppClient
 from saturday.canais.whatsapp.entrada import EntradaWhatsApp
 from saturday.canais.whatsapp.saida import SaidaWhatsApp
@@ -96,6 +98,23 @@ def criar_canal_whatsapp(
     return (
         EntradaWhatsApp(cliente, storage, Transcritor(http, settings)),
         SaidaWhatsApp(cliente, fabrica, settings),
+    )
+
+
+def criar_canal_evolution(
+    http: httpx.Client,
+    settings: Settings,
+    fabrica: Any,
+    storage: Storage,
+) -> tuple[EntradaWhatsApp, SaidaEvolution] | None:
+    """Entrada e saída da Evolution, ou ``None`` com ``SATURDAY_EVOLUTION_ATIVO`` desligado."""
+
+    if not settings.evolution_ativo:
+        return None
+    cliente = EvolutionClient(http, settings)
+    return (
+        EntradaWhatsApp(cliente, storage, Transcritor(http, settings), canal="evolution"),
+        SaidaEvolution(cliente, fabrica),
     )
 
 

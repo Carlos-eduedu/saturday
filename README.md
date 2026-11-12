@@ -49,6 +49,12 @@ prova, consulta, escolha de vínculo e oferta; desde a Fase 6, também dados da
 proposta, aceite, criação da proposta, formalização e pagamento. Os textos ficam em
 `conhecimento/clt/mensagens.yaml`. Ver [`docs/clt.md`](docs/clt.md).
 
+Fora das fases, o **canal Evolution** (`canais/evolution/`): números de WhatsApp
+Web pela Evolution API, ao lado da Meta, sem janela nem modelos e desligado por
+padrão (`SATURDAY_EVOLUTION_ATIVO`). Simulador em `simuladores/evolution/`. Ver
+[`docs/evolution.md`](docs/evolution.md) e a
+[decisão 0009](docs/decisoes/0009-evolution-api-como-segundo-canal-whatsapp.md).
+
 Desde a Fase 7: guia de deploy completo em [`docs/deploy.md`](docs/deploy.md)
 (ambiente do zero, backup e restauração), `infra/testar_restauracao.sh` e
 `scripts/homologacao_granatech.py`, que gera as evidências da homologação com a
@@ -78,6 +84,16 @@ O da Granatech segue o mesmo molde (o compose local já sobe os dois):
 uv run --project simuladores uvicorn app:app --app-dir simuladores/granatech --port 8200
 # SATURDAY_GRANATECH_BASE_URL=http://127.0.0.1:8200 e
 # SATURDAY_GRANATECH_CHAVE_API=chave-do-simulador no .env
+```
+
+E o da Evolution (instância `mex-sim`):
+
+```bash
+uv run --project simuladores uvicorn app:app --app-dir simuladores/evolution --port 8300
+# SATURDAY_EVOLUTION_ATIVO=true, SATURDAY_EVOLUTION_URL=http://127.0.0.1:8300,
+# SATURDAY_EVOLUTION_API_KEY=chave-do-simulador,
+# SATURDAY_EVOLUTION_WEBHOOK_TOKEN=token-do-simulador e
+# SATURDAY_EVOLUTION_INSTANCIAS=mex-sim no .env
 ```
 
 Rode **da raiz**: o `pydantic-settings` lê o `.env` do diretório atual, então de

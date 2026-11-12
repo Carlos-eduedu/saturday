@@ -12,6 +12,7 @@ from saturday.web.api import (
     admin,
     chat,
     conversas,
+    evolution,
     granatech,
     links,
     monitoring,
@@ -45,6 +46,7 @@ def get_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(conversas.router)
     app.include_router(whatsapp.router)
     app.include_router(granatech.router)
+    app.include_router(evolution.router)
     app.include_router(links.router)
     app.include_router(admin.router)
     webhooks.documentar_webhook(app)

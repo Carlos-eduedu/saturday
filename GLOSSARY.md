@@ -5,6 +5,17 @@ acompanhar e assumir conversas.
 
 ## Atendimento
 
+**Canal**:
+Por onde a conversa entra e sai: a Cloud API da Meta (`whatsapp`), a Evolution
+(`evolution`) ou o contrato HTTP (`chat`). Uma conversa pertence a um canal só;
+o mesmo celular em dois canais são duas conversas.
+_Evitar_: provedor, integração
+
+**Janela**:
+As 24 h desde a última mensagem do cliente em que a Meta aceita texto livre;
+fora dela, só modelo. Só existe no canal `whatsapp`.
+_Evitar_: sessão
+
 **Estado de atendimento**:
 Quem responde a conversa naquele momento: a IA, ninguém (handoff) ou um
 atendente (assumida).

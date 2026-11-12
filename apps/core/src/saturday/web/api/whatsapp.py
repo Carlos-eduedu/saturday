@@ -116,11 +116,11 @@ def _gravar(fabrica: sessionmaker[Session], aceitos: list[parser.Evento]) -> Non
                 sessao,
                 origem=ORIGEM,
                 evento_id=evento.evento_id,
-                payload=_para_dict(evento),
+                payload=para_dict(evento),
             )
 
 
-def _para_dict(evento: parser.Evento) -> dict[str, Any]:
+def para_dict(evento: parser.Evento) -> dict[str, Any]:
     midia = None
     if evento.midia is not None:
         midia = {"id": evento.midia.id, "mime_type": evento.midia.mime_type}
