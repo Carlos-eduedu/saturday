@@ -355,3 +355,40 @@ def test_secoes_seguem_a_ordem_da_leitura():
         "## Consentimentos",
         "## Mensagens",
     ]
+
+
+def test_trilha_avisa_quando_comeca_depois_da_conversa():
+    texto = exportacao.conversa_em_markdown(
+        _retrato(
+            mensagens=(_mensagem("cliente", "oi", 1),),
+            turnos=(
+                Turno(
+                    criado_em=datetime(2025, 3, 12, 15, 0, tzinfo=UTC),
+                    caminho=["roteador"],
+                    chamadas=[],
+                ),
+            ),
+        )
+    )
+
+    # Sem o aviso, o buraco parece conversa sem turno nenhum.
+    assert (
+        "_A trilha começa em 2025-03-12 12:00; os turnos anteriores não foram gravados._" in texto
+    )
+
+
+def test_trilha_sem_buraco_nao_avisa():
+    texto = exportacao.conversa_em_markdown(
+        _retrato(
+            mensagens=(_mensagem("cliente", "oi", 1),),
+            turnos=(
+                Turno(
+                    criado_em=datetime(2025, 3, 12, 12, 1, tzinfo=UTC),
+                    caminho=["roteador"],
+                    chamadas=[],
+                ),
+            ),
+        )
+    )
+
+    assert "não foram gravados" not in texto

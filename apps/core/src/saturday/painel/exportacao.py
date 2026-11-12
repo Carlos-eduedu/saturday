@@ -124,7 +124,7 @@ def conversa_em_markdown(retrato: Retrato) -> str:
         _secao_ficha(retrato.ficha),
         _secao_consentimentos(retrato.consentimentos),
         _secao_granatech(retrato.consultas, retrato.propostas),
-        _secao_trilha(retrato.turnos, gestor=retrato.gestor),
+        _secao_trilha(retrato.turnos, retrato.mensagens, gestor=retrato.gestor),
         _secao_mensagens(retrato.mensagens),
     ]
     return "\n\n".join(parte for parte in partes if parte) + "\n"
@@ -307,10 +307,17 @@ def _proposta(linha: PropostaGranatech) -> str:
     )
 
 
-def _secao_trilha(turnos: Sequence[Turno], *, gestor: bool) -> str:
+def _secao_trilha(turnos: Sequence[Turno], mensagens: Sequence[Mensagem], *, gestor: bool) -> str:
     if not turnos:
         return ""
     blocos = ["## Trilha da IA"]
+    if mensagens and turnos[0].criado_em > mensagens[0].criada_em:
+        # A trilha nasceu depois da conversa: sem o aviso, o buraco parece
+        # conversa sem turno (e uma IA lendo o arquivo conclui errado).
+        blocos.append(
+            f"_A trilha começa em {_quando(turnos[0].criado_em)}; "
+            "os turnos anteriores não foram gravados._"
+        )
     if gestor:
         tokens = f"{sum(turno.tokens for turno in turnos):,}".replace(",", ".")
         blocos.append(
