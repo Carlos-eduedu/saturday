@@ -1,9 +1,18 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { Vazio } from "../componentes/Vazio";
-import { api, type Canais as DadosCanais, ErroApi, type InstanciaEvolution, type Qr } from "../api";
+import {
+  api,
+  type Canais as DadosCanais,
+  type DetalhesInstancia,
+  ErroApi,
+  type InstanciaEvolution,
+  type Qr,
+} from "../api";
 
 // Tela Canais (decisão 0010), só para gestor: números da Meta para consulta e
 // instâncias da Evolution geridas aqui. O QR se renova sozinho até conectar.
+// Detalhes mostram o webhook e as configurações gravados na Evolution, lado a
+// lado com o que o Saturday aplica; o token nunca chega ao navegador.
 
 const RENOVAR_QR_MS = 5000;
 
@@ -14,6 +23,26 @@ const ROTULO_ESTADO: Record<string, string> = {
   refused: "QR esgotado",
 };
 
+const ROTULO_AUTENTICACAO: Record<DetalhesInstancia["webhook"]["autenticacao"], string> = {
+  confere: "token confere",
+  diferente: "token diferente",
+  ausente: "sem token",
+};
+
+// O que cada configuração da Evolution faz, para quem lê a tela.
+const ROTULO_CONFIGURACAO: Record<string, string> = {
+  rejectCall: "Recusar chamadas",
+  groupsIgnore: "Ignorar grupos",
+  alwaysOnline: "Sempre online",
+  readMessages: "Marcar mensagens como lidas",
+  readStatus: "Ler status (stories)",
+  syncFullHistory: "Sincronizar histórico completo",
+};
+
+function simNao(valor: boolean | null): string {
+  return valor === null ? "—" : valor ? "sim" : "não";
+}
+
 function mensagemDe(erro: unknown): string {
   return erro instanceof ErroApi ? erro.message : "falha inesperada";
 }
@@ -22,6 +51,7 @@ export function Canais() {
   const [canais, setCanais] = useState<DadosCanais | null>(null);
   const [erro, setErro] = useState("");
   const [qrDe, setQrDe] = useState<{ nome: string; qr: Qr } | null>(null);
+  const [detalhesDe, setDetalhesDe] = useState<string | null>(null);
 
   const carregar = useCallback(() => {
     api
@@ -83,11 +113,16 @@ export function Canais() {
               instancias={canais.evolution.instancias}
               agir={agir}
               mostrarQr={(nome, qr) => setQrDe({ nome, qr })}
+              detalhar={setDetalhesDe}
             />
             <NovaInstancia agir={agir} mostrarQr={(nome, qr) => setQrDe({ nome, qr })} />
           </>
         )}
       </section>
+
+      {detalhesDe && (
+        <PainelDetalhes key={detalhesDe} nome={detalhesDe} fechar={() => setDetalhesDe(null)} />
+      )}
 
       {qrDe && (
         <PainelQr
@@ -107,10 +142,12 @@ function TabelaInstancias({
   instancias,
   agir,
   mostrarQr,
+  detalhar,
 }: {
   instancias: InstanciaEvolution[];
   agir: (acao: () => Promise<unknown>) => Promise<void>;
   mostrarQr: (nome: string, qr: Qr) => void;
+  detalhar: (nome: string) => void;
 }) {
   if (instancias.length === 0)
     return (
@@ -147,6 +184,9 @@ function TabelaInstancias({
             <td data-rotulo="Telefone">{i.telefone}</td>
             <td data-rotulo="Conversas (7 dias)">{i.conversas_7_dias}</td>
             <td className="acoes">
+              <button type="button" onClick={() => detalhar(i.nome)}>
+                Detalhes
+              </button>
               {i.estado !== "open" && (
                 <button
                   type="button"
@@ -255,5 +295,134 @@ function PainelQr({ nome, inicial, fechar }: { nome: string; inicial: Qr; fechar
         Fechar
       </button>
     </section>
+  );
+}
+
+function PainelDetalhes({ nome, fechar }: { nome: string; fechar: () => void }) {
+  const [detalhes, setDetalhes] = useState<DetalhesInstancia | null>(null);
+  const [erro, setErro] = useState("");
+
+  useEffect(() => {
+    api
+      .detalhesInstancia(nome)
+      .then(setDetalhes)
+      .catch((e: unknown) => setErro(mensagemDe(e)));
+  }, [nome]);
+
+  return (
+    <section className="detalhes-instancia" aria-live="polite">
+      <h2>Detalhes de {nome}</h2>
+      {erro && (
+        <p className="erro" role="alert">
+          {erro}
+        </p>
+      )}
+      {!detalhes && !erro && <p className="nota">Consultando a Evolution…</p>}
+      {detalhes && <ConteudoDetalhes detalhes={detalhes} />}
+      <button type="button" onClick={fechar}>
+        Fechar
+      </button>
+    </section>
+  );
+}
+
+function ConteudoDetalhes({ detalhes }: { detalhes: DetalhesInstancia }) {
+  const { webhook, configuracoes, divergencias } = detalhes;
+  // Esperados primeiro, depois o que a instância manda a mais.
+  const eventos = [
+    ...webhook.eventos_esperados,
+    ...webhook.eventos.filter((e) => !webhook.eventos_esperados.includes(e)),
+  ];
+
+  return (
+    <>
+      {divergencias.length === 0 ? (
+        <p className="confere">Tudo confere com o que o Saturday aplica.</p>
+      ) : (
+        <div className="divergencias" role="status">
+          <p>
+            {divergencias.length} diferença(s) em relação ao que o Saturday aplica:
+          </p>
+          <ul>
+            {divergencias.map((d) => (
+              <li key={d}>{d}</li>
+            ))}
+          </ul>
+          <p className="nota">
+            Para reaplicar a configuração: desconecte a instância e clique em Reconectar.
+          </p>
+        </div>
+      )}
+
+      <h3>Webhook</h3>
+      {!webhook.configurado ? (
+        <p className="vazio">A instância não tem webhook.</p>
+      ) : (
+        <dl className="campos">
+          <dt>Ligado</dt>
+          <dd>{simNao(webhook.ativo)}</dd>
+          <dt>URL</dt>
+          <dd>
+            <code>{webhook.url || "—"}</code>
+            {webhook.url !== webhook.url_esperada && (
+              <small className="esperado">
+                esperada: <code>{webhook.url_esperada}</code>
+              </small>
+            )}
+          </dd>
+          <dt>Autenticação</dt>
+          <dd>{ROTULO_AUTENTICACAO[webhook.autenticacao]}</dd>
+          <dt>URL por evento</dt>
+          <dd>{simNao(webhook.por_evento)}</dd>
+          <dt>Mídia em base64</dt>
+          <dd>{simNao(webhook.base64)}</dd>
+        </dl>
+      )}
+
+      <h3>Eventos</h3>
+      <ul className="eventos">
+        {eventos.map((e) => {
+          const esperado = webhook.eventos_esperados.includes(e);
+          const ligado = webhook.eventos.includes(e);
+          const situacao = !ligado ? "falta" : esperado ? "usado" : "ignorado";
+          const texto = {
+            falta: "falta",
+            usado: "usado pelo Saturday",
+            ignorado: "chega, mas o Saturday ignora",
+          }[situacao];
+          return (
+            <li key={e} className={`evento evento-${situacao}`}>
+              <code>{e}</code> <span>{texto}</span>
+            </li>
+          );
+        })}
+      </ul>
+
+      <h3>Configurações da instância</h3>
+      {configuracoes.length === 0 ? (
+        <p className="vazio">A Evolution não devolveu configurações.</p>
+      ) : (
+        <table>
+          <thead>
+            <tr>
+              <th>Configuração</th>
+              <th>Atual</th>
+              <th>Esperado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {configuracoes.map((c) => (
+              <tr key={c.nome} className={c.atual === c.esperado ? undefined : "diverge"}>
+                <td>
+                  {ROTULO_CONFIGURACAO[c.nome] ?? c.nome} <small>{c.nome}</small>
+                </td>
+                <td data-rotulo="Atual">{simNao(c.atual)}</td>
+                <td data-rotulo="Esperado">{simNao(c.esperado)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </>
   );
 }

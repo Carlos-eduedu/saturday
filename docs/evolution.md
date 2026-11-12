@@ -57,6 +57,11 @@ subida.
    header) e o `readMessages`.
 3. Instância criada fora do painel (ou antes da tela existir): desconecte e
    clique **Reconectar**, que reaplica a configuração antes do QR.
+4. Para conferir uma instância, clique **Detalhes**. A tela lê
+   `GET /webhook/find/{instancia}` e `GET /settings/find/{instancia}` e mostra
+   o webhook (ligado, URL, eventos, URL por evento, base64), as configurações
+   e as diferenças em relação ao que o Saturday aplica. O token não sai da API:
+   o painel vê só se ele confere, difere ou falta.
 
 ## Desenvolvimento
 

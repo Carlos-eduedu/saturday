@@ -31,6 +31,15 @@ DDI_BRASIL = "55"
 JID_TELEFONE = "@s.whatsapp.net"
 INTEGRACAO = "WHATSAPP-BAILEYS"
 EVENTOS_WEBHOOK = ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "CONNECTION_UPDATE"]
+# O que o Saturday aplica em `/settings/set`; a tela Canais compara com o atual.
+CONFIGURACOES = {
+    "rejectCall": False,
+    "groupsIgnore": True,
+    "alwaysOnline": False,
+    "readMessages": True,
+    "readStatus": False,
+    "syncFullHistory": False,
+}
 
 
 @dataclass(frozen=True)
@@ -221,18 +230,15 @@ class EvolutionClient:
         """Reaplica webhook e configurações (instância criada fora do painel)."""
 
         self._objeto("POST", f"/webhook/set/{nome}", {"webhook": self._webhook()})
-        self._objeto(
-            "POST",
-            f"/settings/set/{nome}",
-            {
-                "rejectCall": False,
-                "groupsIgnore": True,
-                "alwaysOnline": False,
-                "readMessages": True,
-                "readStatus": False,
-                "syncFullHistory": False,
-            },
-        )
+        self._objeto("POST", f"/settings/set/{nome}", CONFIGURACOES)
+
+    def webhook_atual(self, nome: str) -> dict[str, Any]:
+        """Webhook gravado na instância; vazio se não houver nenhum."""
+
+        return self._objeto("GET", f"/webhook/find/{nome}")
+
+    def configuracoes_atuais(self, nome: str) -> dict[str, Any]:
+        return self._objeto("GET", f"/settings/find/{nome}")
 
     def conectar(self, nome: str) -> Qr:
         return self._qr(self._objeto("GET", f"/instance/connect/{nome}"))

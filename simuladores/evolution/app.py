@@ -27,6 +27,14 @@ MIDIAS: dict[str, tuple[bytes, str]] = {}
 FALHAS: list[dict[str, Any]] = []
 # nome → {"estado": open|connecting|close, "telefone": "55...", "webhook": {...}}
 INSTANCIAS: dict[str, dict[str, Any]] = {}
+CONFIGURACOES = (
+    "rejectCall",
+    "groupsIgnore",
+    "alwaysOnline",
+    "readMessages",
+    "readStatus",
+    "syncFullHistory",
+)
 QR_FALSO = "data:image/png;base64,iVBORw0KGgo="
 
 SATURDAY_URL = os.environ.get("SIMULADOR_SATURDAY_URL", "http://api:8000")
@@ -198,7 +206,13 @@ async def criar_instancia(request: Request) -> Any:
         return _erro(400, ["Invalid integration"])
     if nome in INSTANCIAS:
         return _erro(403, [f'This name "{nome}" is already in use.'])
-    INSTANCIAS[nome] = {"estado": "connecting", "telefone": "", "webhook": corpo.get("webhook")}
+    INSTANCIAS[nome] = {
+        "estado": "connecting",
+        "telefone": "",
+        "webhook": corpo.get("webhook"),
+        # A Evolution grava tudo desligado e aplica o que veio na criação.
+        "configuracoes": {campo: bool(corpo.get(campo, False)) for campo in CONFIGURACOES},
+    }
     return JSONResponse(
         status_code=201,
         content={
@@ -270,18 +284,41 @@ async def configurar(nome: str, request: Request) -> Any:
     if not _autorizado(request):
         return _erro(401, "Unauthorized")
     corpo = await request.json()
-    obrigatorios = (
-        "rejectCall",
-        "groupsIgnore",
-        "alwaysOnline",
-        "readMessages",
-        "readStatus",
-        "syncFullHistory",
-    )
-    faltando = [campo for campo in obrigatorios if campo not in corpo]
+    faltando = [campo for campo in CONFIGURACOES if campo not in corpo]
     if faltando:
         return _erro(400, [f"{campo} is required" for campo in faltando])
+    INSTANCIAS.get(nome, {})["configuracoes"] = corpo
     return JSONResponse(status_code=201, content={"settings": corpo})
+
+
+@app.get("/webhook/find/{nome}")
+def ver_webhook(nome: str, request: Request) -> Any:
+    """Forma da Evolution: o registro gravado, ou `null` sem webhook."""
+
+    if not _autorizado(request):
+        return _erro(401, "Unauthorized")
+    if nome not in INSTANCIAS:
+        return _erro(404, [f'The "{nome}" instance does not exist'])
+    webhook = INSTANCIAS[nome].get("webhook")
+    if not webhook:
+        return None
+    return {
+        "url": webhook.get("url"),
+        "enabled": webhook.get("enabled", False),
+        "events": webhook.get("events", []),
+        "headers": webhook.get("headers"),
+        "webhookByEvents": webhook.get("byEvents", False),
+        "webhookBase64": webhook.get("base64", False),
+    }
+
+
+@app.get("/settings/find/{nome}")
+def ver_configuracoes(nome: str, request: Request) -> Any:
+    if not _autorizado(request):
+        return _erro(401, "Unauthorized")
+    if nome not in INSTANCIAS:
+        return _erro(404, [f'The "{nome}" instance does not exist'])
+    return INSTANCIAS[nome].get("configuracoes") or None
 
 
 @app.post("/admin/conexao")

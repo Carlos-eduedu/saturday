@@ -7,6 +7,7 @@ Toda ação exige CSRF e, quando a Evolution aceita, grava `auditoria`.
 
 from __future__ import annotations
 
+import hmac
 import re
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
@@ -16,13 +17,19 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from saturday.canais.evolution.cliente import EvolutionClient, Qr
+from saturday.canais.evolution.cliente import (
+    CONFIGURACOES,
+    EVENTOS_WEBHOOK,
+    EvolutionClient,
+    Qr,
+)
 from saturday.canais.whatsapp.cliente import ErroPermanente, ErroWhatsApp
 from saturday.dados import instancias
 from saturday.dados.modelos import Conversa
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.painel.auditoria import auditar
 from saturday.privacidade import mascarar_telefone
+from saturday.settings import Settings
 from saturday.web.dependencies import (
     UsuarioLogado,
     exigir_csrf,
@@ -166,6 +173,88 @@ def qr_atual(nome: str, _usuario: Gestor, cliente: Evolution) -> dict[str, Any]:
         return _qr(cliente.conectar(nome))
     except ErroWhatsApp as exc:
         raise _falha(exc) from exc
+
+
+def _situacao_do_token(cabecalhos: Any, esperado: str) -> str:
+    """`confere`, `diferente` ou `ausente`; o valor nunca sai daqui."""
+
+    if not isinstance(cabecalhos, dict):
+        return "ausente"
+    recebido = next(
+        (str(v) for k, v in cabecalhos.items() if str(k).lower() == "x-webhook-token"), ""
+    )
+    if not recebido:
+        return "ausente"
+    return "confere" if hmac.compare_digest(recebido, esperado) else "diferente"
+
+
+def _detalhes(
+    webhook: dict[str, Any], atuais: dict[str, Any], settings: Settings
+) -> dict[str, Any]:
+    """Webhook e configurações da instância ao lado do que o Saturday aplica.
+
+    Só campos conhecidos saem para o painel: os cabeçalhos levam o token, e as
+    configurações da Evolution têm campos que não nos dizem respeito.
+    """
+
+    eventos = [str(e) for e in webhook.get("events") or [] if isinstance(e, str)]
+    url_esperada = settings.evolution_webhook_url
+    conferencia = _situacao_do_token(
+        webhook.get("headers"), settings.evolution_webhook_token.get_secret_value()
+    )
+    configuracoes = [
+        {"nome": nome, "atual": atuais.get(nome), "esperado": esperado}
+        for nome, esperado in CONFIGURACOES.items()
+    ]
+
+    divergencias: list[str] = []
+    if not webhook:
+        divergencias.append("Nenhum webhook configurado na instância.")
+    else:
+        if webhook.get("enabled") is not True:
+            divergencias.append("Webhook desligado.")
+        if webhook.get("url") != url_esperada:
+            divergencias.append("URL do webhook diferente da esperada.")
+        faltando = [e for e in EVENTOS_WEBHOOK if e not in eventos]
+        if faltando:
+            divergencias.append(f"Eventos que faltam: {', '.join(faltando)}.")
+        if conferencia != "confere":
+            divergencias.append(f"Token do webhook {conferencia}.")
+        if webhook.get("webhookByEvents") is True:
+            divergencias.append("Webhook por evento ligado: a Evolution muda a URL por evento.")
+    divergencias += [
+        f"Configuração {c['nome']} diferente da esperada."
+        for c in configuracoes
+        if atuais and c["atual"] != c["esperado"]
+    ]
+
+    return {
+        "webhook": {
+            "configurado": bool(webhook),
+            "ativo": webhook.get("enabled") is True,
+            "url": webhook.get("url") or "",
+            "url_esperada": url_esperada,
+            "eventos": eventos,
+            "eventos_esperados": EVENTOS_WEBHOOK,
+            "por_evento": webhook.get("webhookByEvents") is True,
+            "base64": webhook.get("webhookBase64") is True,
+            "autenticacao": conferencia,
+        },
+        "configuracoes": configuracoes if atuais else [],
+        "divergencias": divergencias,
+    }
+
+
+@router.get("/evolution/{nome}/detalhes")
+def detalhes(nome: str, request: Request, _usuario: Gestor, cliente: Evolution) -> dict[str, Any]:
+    """O que a Evolution tem gravado para a instância, comparado com o esperado."""
+
+    try:
+        webhook = cliente.webhook_atual(nome)
+        atuais = cliente.configuracoes_atuais(nome)
+    except ErroWhatsApp as exc:
+        raise _falha(exc) from exc
+    return _detalhes(webhook, atuais, get_settings(request))
 
 
 @router.post("/evolution/{nome}/desconectar", status_code=204)

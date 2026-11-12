@@ -86,6 +86,22 @@ export interface Canais {
   evolution: { ativo: boolean; instancias: InstanciaEvolution[]; erro: string | null };
 }
 
+export interface DetalhesInstancia {
+  webhook: {
+    configurado: boolean;
+    ativo: boolean;
+    url: string;
+    url_esperada: string;
+    eventos: string[];
+    eventos_esperados: string[];
+    por_evento: boolean;
+    base64: boolean;
+    autenticacao: "confere" | "diferente" | "ausente";
+  };
+  configuracoes: { nome: string; atual: boolean | null; esperado: boolean }[];
+  divergencias: string[];
+}
+
 export interface Qr {
   qr: string | null;
   estado: string;
@@ -208,6 +224,8 @@ export const api = {
   criarInstancia: (nome: string) => chamar<Qr>("POST", "/canais/evolution", { nome }),
   conectarInstancia: (nome: string) => chamar<Qr>("POST", `/canais/evolution/${nome}/conectar`),
   qrInstancia: (nome: string) => chamar<Qr>("GET", `/canais/evolution/${nome}/qr`),
+  detalhesInstancia: (nome: string) =>
+    chamar<DetalhesInstancia>("GET", `/canais/evolution/${nome}/detalhes`),
   desconectarInstancia: (nome: string) =>
     chamar<void>("POST", `/canais/evolution/${nome}/desconectar`),
   apagarInstancia: (nome: string) => chamar<void>("DELETE", `/canais/evolution/${nome}`),

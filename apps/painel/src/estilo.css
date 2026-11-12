@@ -599,6 +599,22 @@ main {
 .canais td.acoes button + button { margin-left: 0.4rem; }
 .nova-instancia { display: flex; gap: 0.5rem; align-items: end; margin-top: 1.25rem; }
 .qr { padding: 1.25rem; border-color: var(--destaque); }
+.detalhes-instancia { display: flex; flex-direction: column; gap: 0.75rem; align-items: flex-start; }
+.detalhes-instancia > * { margin: 0; }
+.detalhes-instancia h3 { font-size: 0.95rem; margin-top: 0.5rem; }
+.detalhes-instancia table { width: 100%; }
+.detalhes-instancia tr.diverge td:nth-child(2) { color: var(--handoff); font-weight: 600; }
+.confere { color: var(--ia); font-weight: 500; }
+.divergencias { color: var(--handoff); }
+.divergencias p, .divergencias ul { margin: 0.25rem 0; }
+.campos { display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 1rem; margin: 0; }
+.campos dt { color: var(--suave); font-size: 0.875rem; }
+.campos dd { margin: 0; overflow-wrap: anywhere; }
+.campos .esperado { display: block; color: var(--handoff); }
+.eventos { list-style: none; padding: 0 !important; display: flex; flex-direction: column; gap: 0.3rem; }
+.evento span { font-size: 0.85rem; color: var(--suave); }
+.evento-usado span { color: var(--ia); }
+.evento-falta span { color: var(--erro); font-weight: 600; }
 .qr img { display: block; margin: 0.75rem 0; background: #fff; padding: 8px; border-radius: var(--raio-m); }
 @media (max-width: 767px) {
   .canais thead { display: none; }

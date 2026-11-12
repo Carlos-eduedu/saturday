@@ -185,6 +185,71 @@ def test_reconectar_reaplica_configuracao_e_devolve_qr(
     assert modulo.INSTANCIAS["mex-dev"]["webhook"]["enabled"] is True
 
 
+def test_detalhes_de_instancia_criada_pelo_painel_conferem(
+    api: TestClient, fabrica: sessionmaker[Session], settings: Settings
+) -> None:
+    cabecalhos = _entrar(api, fabrica, "gestor")
+    api.post("/admin/canais/evolution", json={"nome": "mex-vendas"}, headers=cabecalhos)
+
+    resposta = api.get("/admin/canais/evolution/mex-vendas/detalhes")
+    assert resposta.status_code == 200
+    detalhes = resposta.json()
+    assert detalhes["divergencias"] == []
+    webhook = detalhes["webhook"]
+    assert webhook["ativo"] is True
+    assert webhook["url"] == settings.evolution_webhook_url
+    assert webhook["autenticacao"] == "confere"
+    assert set(webhook["eventos_esperados"]) <= set(webhook["eventos"])
+    # O valor do token nunca sai para o painel.
+    assert "token-do-simulador" not in resposta.text
+
+
+def test_detalhes_apontam_o_que_diverge(
+    api: TestClient, fabrica: sessionmaker[Session], simulador: tuple[str, ModuleType]
+) -> None:
+    _entrar(api, fabrica, "gestor")
+    _, modulo = simulador
+    # Criada fora do painel: outro token, faltando eventos, sem ler mensagens.
+    modulo.INSTANCIAS["mex-dev"] = {
+        "estado": "open",
+        "telefone": TELEFONE,
+        "webhook": {
+            "enabled": True,
+            "url": "http://outro:8000/webhooks/evolution",
+            "events": ["MESSAGES_UPSERT", "QRCODE_UPDATED"],
+            "headers": {"x-webhook-token": "segredo-errado"},
+        },
+        "configuracoes": {"readMessages": False, "groupsIgnore": True},
+    }
+
+    detalhes = api.get("/admin/canais/evolution/mex-dev/detalhes").json()
+    assert detalhes["webhook"]["autenticacao"] == "diferente"
+    assert "QRCODE_UPDATED" in detalhes["webhook"]["eventos"]
+    texto = " ".join(detalhes["divergencias"])
+    assert "URL do webhook" in texto
+    assert "MESSAGES_UPDATE, CONNECTION_UPDATE" in texto
+    assert "Token do webhook diferente" in texto
+    assert "readMessages" in texto
+    assert "segredo-errado" not in str(detalhes)
+
+
+def test_detalhes_sem_webhook_e_so_para_gestor(
+    api: TestClient, fabrica: sessionmaker[Session], simulador: tuple[str, ModuleType]
+) -> None:
+    _, modulo = simulador
+    modulo.INSTANCIAS["mex-crua"] = {"estado": "close", "telefone": "", "webhook": None}
+
+    _entrar(api, fabrica, "atendente")
+    assert api.get("/admin/canais/evolution/mex-crua/detalhes").status_code == 403
+
+    _entrar(api, fabrica, "gestor")
+    detalhes = api.get("/admin/canais/evolution/mex-crua/detalhes").json()
+    assert detalhes["webhook"]["configurado"] is False
+    assert detalhes["configuracoes"] == []
+    assert detalhes["divergencias"] == ["Nenhum webhook configurado na instância."]
+    assert api.get("/admin/canais/evolution/nao-existe/detalhes").status_code == 409
+
+
 def test_conectar_fixa_o_telefone(fabrica: sessionmaker[Session], cliente: EvolutionClient) -> None:
     eventos_instancias.aplicar(fabrica, cliente, _conexao("open"))
     eventos_instancias.aplicar(fabrica, cliente, _conexao("open"))
