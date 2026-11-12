@@ -88,7 +88,7 @@ export function Conversa({ eu }: { eu: Eu }) {
           (minha ? (
             <Envio conversa={conversa} agir={agir} />
           ) : (
-            <button type="button" onClick={() => agir(() => api.assumir(id))}>
+            <button type="button" className="principal" onClick={() => agir(() => api.assumir(id))}>
               Assumir e responder
             </button>
           ))}

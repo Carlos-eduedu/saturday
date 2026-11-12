@@ -22,7 +22,8 @@ export function Login({ aoEntrar }: { aoEntrar: (eu: Eu) => void }) {
 
   return (
     <form className="login" onSubmit={enviar}>
-      <h1>Saturday · Painel</h1>
+      <h1>Saturday</h1>
+      <p className="nota">Painel da equipe de atendimento</p>
       <label>
         E-mail
         <input
