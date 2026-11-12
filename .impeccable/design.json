@@ -1,0 +1,268 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-12T19:11:23.160338+00:00",
+  "title": "Design System: Saturday · Painel",
+  "extensions": {
+    "colorMeta": {
+      "cobalto-de-acao": {
+        "role": "primary",
+        "displayName": "Cobalto de Ação",
+        "canonical": "#1f2de6",
+        "tonalRamp": [
+          "#0a1170",
+          "#111ba0",
+          "#1f2de6",
+          "#4a56ec",
+          "#7a83f1",
+          "#a8aef6",
+          "#d0d3fa",
+          "#eceefe"
+        ]
+      },
+      "verde-ia": {
+        "role": "secondary",
+        "displayName": "Verde IA",
+        "canonical": "#1e6b40",
+        "tonalRamp": [
+          "#0b2a19",
+          "#134427",
+          "#1e6b40",
+          "#2f8f59",
+          "#56b07c",
+          "#8fcfa8",
+          "#c4e8d2",
+          "#e9f6ee"
+        ]
+      },
+      "ambar-de-atencao": {
+        "role": "secondary",
+        "displayName": "Âmbar de Atenção",
+        "canonical": "#9a4a00",
+        "tonalRamp": [
+          "#3a1c00",
+          "#5e2e00",
+          "#9a4a00",
+          "#c26510",
+          "#e08a3d",
+          "#efb27a",
+          "#f7d6b6",
+          "#fcefe2"
+        ]
+      },
+      "vermelho-de-erro": {
+        "role": "tertiary",
+        "displayName": "Vermelho de Erro",
+        "canonical": "#b3261e",
+        "tonalRamp": [
+          "#430d0a",
+          "#6e1712",
+          "#b3261e",
+          "#d4483f",
+          "#e57a73",
+          "#f0a9a4",
+          "#f8d4d1",
+          "#fdeeed"
+        ]
+      },
+      "tinta": {
+        "role": "neutral",
+        "displayName": "Tinta",
+        "canonical": "#0b0c0e"
+      },
+      "grafite-suave": {
+        "role": "neutral",
+        "displayName": "Grafite Suave",
+        "canonical": "#5d6470"
+      },
+      "cinza-frio-fundo": {
+        "role": "neutral",
+        "displayName": "Cinza Frio de Fundo",
+        "canonical": "#eef0f3"
+      },
+      "superficie": {
+        "role": "neutral",
+        "displayName": "Superfície",
+        "canonical": "#ffffff"
+      },
+      "superficie-recuada": {
+        "role": "neutral",
+        "displayName": "Superfície Recuada",
+        "canonical": "#e2e5ea"
+      },
+      "borda": {
+        "role": "neutral",
+        "displayName": "Borda",
+        "canonical": "#d3d7de"
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Título de cada tela, com a contagem ao lado."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Títulos de seção e de cartão."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Falas, prévias e textos de tela vazia."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Rótulos, selos e metadados."
+      },
+      "data": {
+        "displayName": "Data",
+        "purpose": "Telefones, horas, custos e IDs, em números tabulares."
+      }
+    },
+    "shadows": [
+      {
+        "name": "repouso",
+        "value": "0 1px 2px rgb(11 12 14 / 6%), 0 4px 12px rgb(11 12 14 / 4%)",
+        "purpose": "Cartões, linhas e aba ativa em repouso."
+      },
+      {
+        "name": "elevada",
+        "value": "0 2px 4px rgb(11 12 14 / 8%), 0 10px 24px rgb(11 12 14 / 8%)",
+        "purpose": "Hover de linha clicável e aviso flutuante."
+      }
+    ],
+    "motion": [
+      {
+        "name": "estado",
+        "value": "120ms ease",
+        "purpose": "Hover e press de botões e campos."
+      },
+      {
+        "name": "linha",
+        "value": "150ms ease",
+        "purpose": "Linha da lista sobe 2px no hover."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "celular",
+        "value": "599px"
+      },
+      {
+        "name": "tablet",
+        "value": "767px"
+      },
+      {
+        "name": "desktop",
+        "value": "1024px"
+      },
+      {
+        "name": "largo",
+        "value": "1280px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Botão principal",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Uma ação principal por área.",
+      "html": "<button class=\"ds-btn-principal\">Assumir</button>",
+      "css": ".ds-btn-principal{font:500 15px 'Red Hat Text Variable',system-ui,sans-serif;min-height:44px;padding:0 1rem;border:1px solid #1f2de6;border-radius:10px;background:#1f2de6;color:#fff;cursor:pointer;transition:transform 120ms ease,box-shadow 120ms ease,filter 120ms ease}.ds-btn-principal:hover{transform:translateY(-1px);filter:brightness(1.08);box-shadow:0 1px 2px rgb(11 12 14/6%),0 4px 12px rgb(11 12 14/4%)}.ds-btn-principal:active{transform:scale(.98)}.ds-btn-principal:focus-visible{outline:2px solid #1f2de6;outline-offset:2px}"
+    },
+    {
+      "name": "Botão secundário",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Ações de apoio.",
+      "html": "<button class=\"ds-btn-sec\">Devolver para a IA</button>",
+      "css": ".ds-btn-sec{font:500 15px 'Red Hat Text Variable',system-ui,sans-serif;min-height:44px;padding:0 1rem;border:1px solid #d3d7de;border-radius:10px;background:#fff;color:#0b0c0e;cursor:pointer;transition:transform 120ms ease,border-color 120ms ease,box-shadow 120ms ease}.ds-btn-sec:hover{transform:translateY(-1px);border-color:#5d6470;box-shadow:0 1px 2px rgb(11 12 14/6%),0 4px 12px rgb(11 12 14/4%)}.ds-btn-sec:active{transform:scale(.98)}.ds-btn-sec:focus-visible{outline:2px solid #1f2de6;outline-offset:2px}"
+    },
+    {
+      "name": "Botão de perigo",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Ação destrutiva, sempre com confirmação.",
+      "html": "<button class=\"ds-btn-perigo\">Apagar</button>",
+      "css": ".ds-btn-perigo{font:500 15px 'Red Hat Text Variable',system-ui,sans-serif;min-height:44px;padding:0 1rem;border:1px solid #d3d7de;border-radius:10px;background:#fff;color:#b3261e;cursor:pointer}.ds-btn-perigo:hover{border-color:#b3261e}.ds-btn-perigo:focus-visible{outline:2px solid #1f2de6;outline-offset:2px}"
+    },
+    {
+      "name": "Campo",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Campo com rótulo visível.",
+      "html": "<label class=\"ds-campo\">Buscar telefone<input type=\"search\"></label>",
+      "css": ".ds-campo{display:flex;flex-direction:column;gap:.35rem;font:500 .875rem 'Red Hat Text Variable',system-ui,sans-serif;color:#5d6470}.ds-campo input{font:400 15px 'Red Hat Text Variable',system-ui,sans-serif;min-height:44px;padding:.5rem .75rem;border:1px solid #d3d7de;border-radius:10px;background:#fff;color:#0b0c0e}.ds-campo input:hover{border-color:#5d6470}.ds-campo input:focus{outline:none;border-color:#1f2de6;box-shadow:0 0 0 3px #e4e6fc}"
+    },
+    {
+      "name": "Selos de estado",
+      "kind": "chip",
+      "refersTo": "chip-estado",
+      "description": "Estado de atendimento da conversa.",
+      "html": "<span class=\"ds-selo ds-ia\">IA</span> <span class=\"ds-selo ds-handoff\">Handoff</span> <span class=\"ds-selo ds-assumida\">Assumida</span>",
+      "css": ".ds-selo{display:inline-block;font:500 .78rem 'Red Hat Text Variable',system-ui,sans-serif;padding:.15rem .6rem;border-radius:999px;background:color-mix(in srgb,currentColor 12%,transparent)}.ds-ia{color:#1e6b40}.ds-handoff{color:#9a4a00}.ds-assumida{color:#1f2de6}"
+    },
+    {
+      "name": "Navegação do topo",
+      "kind": "nav",
+      "refersTo": "nav-item-ativo",
+      "description": "Links do desktop com a página atual marcada.",
+      "html": "<nav class=\"ds-nav\"><a href=\"#\">Conversas</a><a href=\"#\" aria-current=\"page\">Alertas</a><a href=\"#\">Canais</a></nav>",
+      "css": ".ds-nav{display:flex;gap:.25rem;font:500 15px 'Red Hat Text Variable',system-ui,sans-serif}.ds-nav a{display:inline-flex;align-items:center;min-height:44px;padding:0 .85rem;border-radius:10px;color:#5d6470;text-decoration:none;transition:background-color 120ms ease,color 120ms ease}.ds-nav a:hover{background:#e2e5ea;color:#0b0c0e}.ds-nav a[aria-current=page]{background:#e4e6fc;color:#1f2de6}.ds-nav a:focus-visible{outline:2px solid #1f2de6;outline-offset:2px}"
+    },
+    {
+      "name": "Linha de conversa",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "A fala é o conteúdo; atenção com texto.",
+      "html": "<a class=\"ds-linha ds-atencao\" href=\"#\"><span class=\"ds-conteudo\"><span class=\"ds-previa\"><b class=\"ds-autor\">Cliente:</b> Ainda estou esperando a resposta sobre a parcela</span><span class=\"ds-det\">(31) *****-5555 · janela aberta</span></span><span class=\"ds-meta\"><span class=\"ds-rotulo\">Sem resposta · Falando de valores</span><span class=\"ds-det\">Oferta · cliente espera há 12 min</span></span></a>",
+      "css": ".ds-linha{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.35rem 1.25rem;align-items:center;padding:.7rem 1.1rem;border:1px solid #d3d7de;border-radius:14px;background:#fff;color:#0b0c0e;text-decoration:none;font:400 15px 'Red Hat Text Variable',system-ui,sans-serif;box-shadow:0 1px 2px rgb(11 12 14/6%),0 4px 12px rgb(11 12 14/4%);transition:transform 150ms ease,box-shadow 150ms ease}.ds-linha:hover{transform:translateY(-2px);box-shadow:0 2px 4px rgb(11 12 14/8%),0 10px 24px rgb(11 12 14/8%)}.ds-atencao{background:color-mix(in srgb,#9a4a00 5%,#fff)}.ds-conteudo{display:flex;flex-direction:column;gap:.2rem;min-width:0}.ds-previa{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}.ds-autor{color:#5d6470}.ds-det{font-size:.8rem;color:#5d6470}.ds-meta{display:flex;flex-direction:column;align-items:flex-end;gap:.3rem}.ds-rotulo{font-size:.75rem;font-weight:600;padding:.1rem .55rem;border-radius:999px;color:#9a4a00;background:color-mix(in srgb,#9a4a00 13%,transparent)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "A Torre de Controle",
+    "overview": "O painel é uma torre de controle sobre a IA que atende os clientes da MEX: tudo fica em vista, e só o que pede ação se destaca. A base é calma (cinza frio, branco, texto quase preto); a cor aparece para dizer algo, nunca para enfeitar. A atenção da equipe é o recurso escasso, e o sistema existe para gastá-la só onde importa: a conversa sem resposta, o handoff, a IA falando de valores, o envio que falhou.\n\nA densidade é de ferramenta de turno, usada no desktop e no celular com o mesmo peso. Componentes são precisos e calmos: pouco ornamento, estados claros, resposta discreta ao ponteiro. Dados (telefones, horas, IDs, custos) vão em fonte mono e números tabulares; o resto é texto humanista. Há tema claro e escuro, decididos pelo sistema.",
+    "keyCharacteristics": [
+      "Base neutra e calma; cor só com significado (ação, IA, atenção, erro).",
+      "Quem fala na conversa muda a cor: IA em verde, equipe em cobalto, sistema sem balão.",
+      "Atenção sempre com texto, nunca só com cor.",
+      "Alvos de toque de 44 px e foco visível em tudo.",
+      "Movimento curto (120–150 ms) e desligado com redução de movimento."
+    ],
+    "rules": [
+      {
+        "name": "The Cor Com Motivo Rule",
+        "body": "Cada cor de estado tem um significado só (verde = IA, âmbar = atenção, vermelho = erro, cobalto = ação ou equipe). Não use essas cores para decorar.",
+        "section": "colors"
+      },
+      {
+        "name": "The Nunca Só Cor Rule",
+        "body": "Todo estado colorido vem com texto (\"Sem resposta\", \"desconectada\", \"falhou\"). Contraste AA nos dois temas.",
+        "section": "colors"
+      },
+      {
+        "name": "The Mono É Dado Rule",
+        "body": "Fonte mono só para dados e medidas (telefone, hora, custo, ID), nunca como enfeite \"técnico\".",
+        "section": "typography"
+      },
+      {
+        "name": "The Sombra É Resposta Rule",
+        "body": "Em repouso, a profundidade é quase plana; sombra maior só em hover ou em algo que flutua sobre a página.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do usar o Cobalto de Ação só para ação, página atual e a fala da equipe.",
+      "Do mostrar o porquê da atenção em texto (\"Sem resposta · Falando de valores\").",
+      "Do usar mono e números tabulares para telefone, hora, custo e tokens.",
+      "Do manter alvos de 44px e foco visível de 2px em cobalto.",
+      "Do desligar movimento com prefers-reduced-motion."
+    ],
+    "donts": [
+      "Don't usar verde, âmbar ou vermelho como decoração.",
+      "Don't usar barra lateral colorida de mais de 1px em cartões ou linhas.",
+      "Don't mostrar dado pessoal sem máscara fora do \"Revelar\" auditado.",
+      "Don't usar violeta ou lilás.",
+      "Don't criar uma segunda cor de ação."
+    ]
+  }
+}
