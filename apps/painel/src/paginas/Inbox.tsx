@@ -42,13 +42,6 @@ function chamarApi(p: Pendente) {
   return p.acao === "assumir" ? api.assumir(p.id) : api.devolver(p.id);
 }
 
-// Com 60% da linha (padrão), no desktop seria preciso arrastar mais de 1200 px.
-// shortcut: lido uma vez ao carregar; girar ou redimensionar a janela não muda.
-const largo = typeof window !== "undefined" && window.innerWidth >= 600;
-const commitAt = largo ? 0.35 : 0.6;
-// Duas linhas de conteúdo; no celular, identidade, fala e meta ficam em linhas próprias.
-const altura = largo ? 76 : 136;
-
 // Uma forma de agir por tela: a partir de 600 px, o botão da linha; abaixo,
 // arrastar (o mesmo corte do CSS que esconde o botão).
 const COM_BOTAO = "(min-width: 600px)";
@@ -378,8 +371,8 @@ export function Inbox({ eu }: { eu: Eu }) {
                     actions={comBotao ? [] : [ACOES[acao]]}
                     onCommit={() => agir(c, acao)}
                     actionColor={acao === "assumir" ? "var(--destaque)" : "var(--ia)"}
-                    commitAt={commitAt}
-                    height={altura}
+                    // Duas linhas de conteúdo; no celular, identidade, fala e meta ficam em linhas próprias.
+                    height={comBotao ? 76 : 136}
                     radius={14}
                     label={`Conversa ${c.telefone ?? c.canal}`}
                     style={CORES_SWIPE}
