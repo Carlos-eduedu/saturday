@@ -110,6 +110,11 @@ uv run --project apps/core saturday criar-usuario --email voce@mex.com.br --perf
 cd apps/painel && npm ci && npm run dev            # http://localhost:5173
 ```
 
+Para mexer só no painel com os dados do dev, sem subir a API local, aponte o
+proxy para ele: `PAINEL_API=https://saturday-dev.dynatech.systems npm run dev`.
+Entre com a sua conta do dev, no Chrome ou no Firefox, que aceitam o cookie
+`Secure` em `localhost`.
+
 O primeiro gestor só nasce pelo comando; a senha é pedida no terminal (mínimo
 de 12 caracteres) e nunca passa por argumento.
 
