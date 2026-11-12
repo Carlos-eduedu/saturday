@@ -144,11 +144,20 @@ def _quando(valor: object) -> str:
             return valor
     if isinstance(momento, datetime):
         return momento.astimezone(FUSO).strftime("%Y-%m-%d %H:%M")
-    return "—"
+    return ""
 
 
 def _reais(valor: Decimal) -> str:
     return "R$ " + f"{valor:,.2f}".translate(str.maketrans(",.", ".,"))
+
+
+def _dolar(valor: float) -> str:
+    """Igual à aba IA: um turno custa frações de centavo, então quatro casas."""
+
+    if 0 < valor < 0.0001:
+        return "< US$ 0,0001"
+    casas = 4 if valor != 0 and abs(valor) < 1 else 2
+    return "US$ " + f"{valor:,.{casas}f}".translate(str.maketrans(",.", ".,"))
 
 
 def _texto(valor: object) -> str:
@@ -158,9 +167,15 @@ def _texto(valor: object) -> str:
 
 
 def _campo(rotulo: str, valor: object) -> str:
+    """Campo sem valor não vira linha: ausência já diz o que falta."""
+
     if valor is None or valor == "":
-        return f"- **{rotulo}:** —"
+        return ""
     return f"- **{rotulo}:** {valor}"
+
+
+def _lista(campos: Sequence[str]) -> str:
+    return "\n".join(campo for campo in campos if campo)
 
 
 def _cabecalho(retrato: Retrato) -> str:
@@ -186,7 +201,7 @@ def _cabecalho(retrato: Retrato) -> str:
         _campo("Exportado em", f"{_quando(retrato.exportado_em)} por {retrato.exportado_por}"),
     ]
     nota = "_A ficha sai mascarada, como na tela; o texto das mensagens é o original._"
-    return "\n".join([titulo, "", *linhas, "", nota])
+    return "\n".join([titulo, "", _lista(linhas), "", nota])
 
 
 def _secao_ficha(ficha: Mapping[str, Any]) -> str:
@@ -202,7 +217,7 @@ def _secao_ficha(ficha: Mapping[str, Any]) -> str:
         _campo("Público", ficha.get("publico")),
         _campo("Saída para a equipe", ficha.get("handoff_reason")),
     ]
-    return "\n".join(["## Ficha do cliente", "", *linhas])
+    return "\n".join(["## Ficha do cliente", "", _lista(linhas)])
 
 
 def _secao_consentimentos(consentimentos: Sequence[Consentimento]) -> str:
@@ -220,11 +235,16 @@ def _secao_consentimentos(consentimentos: Sequence[Consentimento]) -> str:
                     "",
                     *[f"> {linha}" for linha in (texto.splitlines() or [""])],
                     "",
-                    _campo("Resposta literal", f'"{consentimento.resposta_literal}"'),
-                    _campo("Versão", consentimento.versao),
-                    _campo("wamid", consentimento.wamid),
-                    _campo(
-                        "CPF", MASCARAS["cpf"](consentimento.cpf) if consentimento.cpf else None
+                    _lista(
+                        [
+                            _campo("Resposta literal", f'"{consentimento.resposta_literal}"'),
+                            _campo("Versão", consentimento.versao),
+                            _campo("wamid", consentimento.wamid),
+                            _campo(
+                                "CPF",
+                                MASCARAS["cpf"](consentimento.cpf) if consentimento.cpf else None,
+                            ),
+                        ]
                     ),
                 ]
             )
@@ -254,11 +274,11 @@ def _consulta(linha: ConsultaGranatech) -> str:
     ]
     if linha.historico:
         linhas.append("- **Eventos recebidos:**")
-        linhas += [
-            f"  - {evento.get('status', '?')} · {_quando(evento.get('recebido_em'))}"
-            for evento in linha.historico
-        ]
-    return "\n".join([f"### Consulta {linha.id_externo} · {linha.status}", "", *linhas])
+        for evento in linha.historico:
+            quando = _quando(evento.get("recebido_em"))
+            status = str(evento.get("status") or "?")
+            linhas.append(f"  - {status}{f' · {quando}' if quando else ''}")
+    return "\n".join([f"### Consulta {linha.id_externo} · {linha.status}", "", _lista(linhas)])
 
 
 def _proposta(linha: PropostaGranatech) -> str:
@@ -282,7 +302,9 @@ def _proposta(linha: PropostaGranatech) -> str:
                 texto += f" — {_texto(evento['informacoes'])}"
             linhas.append(f"  - {texto}")
     nome = linha.id_externo or f"interna {linha.id}"
-    return "\n".join([f"### Proposta {nome} · {linha.status or linha.estado_envio}", "", *linhas])
+    return "\n".join(
+        [f"### Proposta {nome} · {linha.status or linha.estado_envio}", "", _lista(linhas)]
+    )
 
 
 def _secao_trilha(turnos: Sequence[Turno], *, gestor: bool) -> str:
@@ -295,7 +317,7 @@ def _secao_trilha(turnos: Sequence[Turno], *, gestor: bool) -> str:
             "\n".join(
                 [
                     f"- **Turnos:** {len(turnos)}",
-                    f"- **Custo:** US$ {sum(turno.custo_usd for turno in turnos):.4f}",
+                    f"- **Custo:** {_dolar(sum(turno.custo_usd for turno in turnos))}",
                     f"- **Tokens:** {tokens}",
                 ]
             )
@@ -319,9 +341,10 @@ def _secao_trilha(turnos: Sequence[Turno], *, gestor: bool) -> str:
         if turno.chamadas:
             linhas.append("- **Chamadas:**")
             linhas += [f"  - {_chamada(chamada, gestor)}" for chamada in turno.chamadas]
-        blocos.append(
-            "\n".join([f"### {_quando(turno.criado_em)} · {turno.etapa or '—'}", "", *linhas])
-        )
+        titulo = f"### {_quando(turno.criado_em)}"
+        if turno.etapa:
+            titulo += f" · {turno.etapa}"
+        blocos.append("\n".join([titulo, "", _lista(linhas)]))
     return "\n\n".join(blocos)
 
 
@@ -333,7 +356,7 @@ def _chamada(chamada: Mapping[str, Any], gestor: bool) -> str:
     if gestor:
         custo = chamada.get("custo_usd")
         if custo is not None:
-            partes.append(f"US$ {float(custo):.4f}")
+            partes.append(_dolar(float(custo)))
         entrada = chamada.get("tokens_entrada")
         if entrada is not None:
             partes.append(f"{entrada}+{chamada.get('tokens_saida') or 0} tok")

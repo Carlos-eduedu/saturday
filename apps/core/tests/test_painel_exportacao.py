@@ -284,9 +284,52 @@ def test_custo_da_ia_so_aparece_para_gestor():
     assert "US$" not in do_atendente
     assert "tok" not in do_atendente
 
-    assert "- **Custo:** US$ 0.0012" in do_gestor
+    assert "- **Custo:** US$ 0,0012" in do_gestor
     assert "- **Tokens:** 1.020" in do_gestor
-    assert "  - consulta_granatech · 200 · 1240 ms · US$ 0.0012 · 900+120 tok" in do_gestor
+    assert "  - consulta_granatech · 200 · 1240 ms · US$ 0,0012 · 900+120 tok" in do_gestor
+
+
+def test_custo_minusculo_vira_menor_que_o_menor_visivel():
+    turnos = (
+        Turno(
+            criado_em=datetime(2025, 3, 12, 12, 2, tzinfo=UTC),
+            caminho=["roteador"],
+            chamadas=[{"nome": "jev", "status": "ok", "custo_usd": 0.00001}],
+            custo_usd=0.00001,
+            tokens=10,
+        ),
+    )
+
+    texto = exportacao.conversa_em_markdown(_retrato(turnos=turnos, gestor=True))
+
+    # Como na aba IA: fração de centavo não vira "US$ 0,0000".
+    assert "< US$ 0,0001" in texto
+    assert "US$ 0,0000" not in texto
+
+
+def test_campo_sem_valor_nao_vira_linha():
+    texto = exportacao.conversa_em_markdown(
+        _retrato(
+            conversa=_conversa(etapa=None, ultima_entrada_em=None),
+            ficha={"nome": None, "dados": {}, "uf": None, "publico": None},
+            supervisao={"atencao": [], "motivo_handoff": None},
+            turnos=(
+                Turno(
+                    criado_em=datetime(2025, 3, 12, 12, 2, tzinfo=UTC),
+                    caminho=["roteador", "generate_answer"],
+                    chamadas=[],
+                ),
+            ),
+        )
+    )
+
+    # O painel não mostra campo vazio; o arquivo também não inventa um travessão.
+    assert "**Etapa:**" not in texto
+    assert "**Nome:**" not in texto
+    assert "**UF:**" not in texto
+    assert "**Motivo do handoff:**" not in texto
+    assert "Cliente escreveu pela última vez em" not in texto
+    assert "### 2025-03-12 09:02\n" in texto
 
 
 def test_secoes_seguem_a_ordem_da_leitura():
