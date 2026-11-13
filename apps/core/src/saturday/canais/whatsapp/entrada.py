@@ -7,7 +7,7 @@ aproveitar vira resposta local, sem rodar o grafo.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol
 
 from saturday.agent.textos import mensagem_audio_ilegivel, mensagem_midia_ilegivel
@@ -70,6 +70,10 @@ class Entrada:
 
     pedido: ChatRequest | None = None
     resposta_local: str | None = None
+    # A mensagem do cliente como o painel mostra: com resposta local ela não
+    # passa pelo grafo e precisa ser gravada à parte; o áudio vai como anexo.
+    conteudo: str = ""
+    historico: list[dict[str, str]] = field(default_factory=list)
 
 
 class EntradaWhatsApp:
@@ -116,16 +120,36 @@ class EntradaWhatsApp:
                 logger.warning(
                     "midia_falhou canal=%s id=%s erro=%s", self.canal, evento.midia.id, exc
                 )
-                return Entrada(resposta_local=mensagem_midia_ilegivel())
+                return Entrada(
+                    resposta_local=mensagem_midia_ilegivel(),
+                    conteudo=texto or "[mídia que não deu para baixar]",
+                )
 
             mime = _mime_limpo(mime_bruto)
             chave = self._arquivar(evento, dados, mime)
 
             if mime.startswith("audio/"):
+                audio = [{"chave": chave, "mime_type": mime}]
                 transcricao = self._transcritor.transcrever(dados, mime)
                 if not transcricao:
-                    return Entrada(resposta_local=mensagem_audio_ilegivel())
-                texto = transcricao
+                    logger.warning(
+                        "audio_sem_transcricao canal=%s transcritor_ligado=%s",
+                        self.canal,
+                        getattr(self._transcritor, "habilitado", True),
+                    )
+                    return Entrada(
+                        resposta_local=mensagem_audio_ilegivel(),
+                        conteudo="[áudio]",
+                        historico=audio,
+                    )
+                return Entrada(
+                    pedido=ChatRequest(
+                        conversation_id=conversa,
+                        message_id=evento.evento_id,
+                        message=transcricao[:MAXIMO_TEXTO],
+                    ),
+                    historico=audio,
+                )
             elif mime in MIMES_DE_LEITURA and len(dados) <= LIMITE_LEITURA_BYTES:
                 anexos.append(Attachment(chave=chave, mime_type=mime))  # type: ignore[arg-type]
 

@@ -18,7 +18,7 @@ from saturday.bancos.granatech.cliente import ClienteGranatech
 from saturday.canais.base import OrigemCanal
 from saturday.canais.evolution.cliente import EvolutionClient
 from saturday.canais.whatsapp import webhook as parser
-from saturday.canais.whatsapp.entrada import EntradaWhatsApp, prefixo_do_canal
+from saturday.canais.whatsapp.entrada import Entrada, EntradaWhatsApp, prefixo_do_canal
 from saturday.dados import eventos as fila
 from saturday.dados import repositorios
 from saturday.dados.modelos import EventoRecebido
@@ -123,7 +123,7 @@ def _processar_um(
     entrada.marcar_lida(evento)
     preparada = entrada.preparar(evento)
     if preparada.resposta_local is not None:
-        _enfileirar_resposta(fabrica, entrada.canal, evento, preparada.resposta_local)
+        _enfileirar_resposta(fabrica, entrada.canal, evento, preparada)
         return
     if preparada.pedido is None:
         # Tipo só registrado (localização, figurinha, reação…).
@@ -136,6 +136,7 @@ def _processar_um(
             telefone=evento.numero,
             phone_number_id=evento.phone_number_id,
         ),
+        historico=preparada.historico or None,
     )
 
 
@@ -153,9 +154,15 @@ def _enfileirar_resposta(
     fabrica: sessionmaker[Session],
     canal: str,
     evento: parser.Evento,
-    texto: str,
+    preparada: Entrada,
 ) -> None:
-    """Resposta que não passa pelo grafo (áudio ilegível, mídia recusada)."""
+    """Resposta que não passa pelo grafo (áudio ilegível, mídia recusada).
+
+    A mensagem do cliente também é gravada, com o áudio como anexo: sem isso
+    o painel não mostrava o que ele mandou, só a nossa resposta.
+    """
+
+    texto = preparada.resposta_local or ""
 
     with abrir_sessao(fabrica) as sessao:
         conversa = repositorios.obter_ou_criar_conversa(
@@ -168,6 +175,13 @@ def _enfileirar_resposta(
         # O cliente escreveu: a janela reabre mesmo quando a resposta não passa
         # pelo grafo (áudio ilegível, mídia recusada).
         repositorios.marcar_entrada(conversa)
+        repositorios.registrar_entrada(
+            sessao,
+            conversa,
+            message_id=evento.evento_id,
+            conteudo=preparada.conteudo or evento.texto or "[mensagem]",
+            anexos=preparada.historico or None,
+        )
         mensagem_id = repositorios.registrar_saida(sessao, conversa, conteudo=texto)
         enfileirar(
             sessao,

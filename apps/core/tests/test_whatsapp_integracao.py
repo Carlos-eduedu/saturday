@@ -287,6 +287,12 @@ def test_audio_e_transcrito_e_vira_turno(
 
     assert transcritor.chamadas == ["audio/ogg"]
     assert _enviadas(http, simulador)
+    # O painel mostra a transcrição e o áudio para ouvir.
+    entrada_cliente = _entrada_do_cliente(fabrica, "wamid.A1")
+    assert entrada_cliente.conteudo == transcritor.texto
+    assert entrada_cliente.anexos == [
+        {"chave": f"whatsapp/{NUMERO_NORMALIZADO}/wamid.A1.ogg", "mime_type": "audio/ogg"}
+    ]
 
 
 def test_audio_sem_transcricao_pede_texto(
@@ -309,6 +315,19 @@ def test_audio_sem_transcricao_pede_texto(
     enviadas = _enviadas(http, simulador)
     assert enviadas
     assert "texto" in enviadas[-1]["text"]["body"].lower()
+    # Sem transcrição o áudio não passa pelo grafo, mas aparece no painel.
+    entrada_cliente = _entrada_do_cliente(fabrica, "wamid.A2")
+    assert entrada_cliente.conteudo == "[áudio]"
+    assert entrada_cliente.anexos == [
+        {"chave": f"whatsapp/{NUMERO_NORMALIZADO}/wamid.A2.ogg", "mime_type": "audio/ogg"}
+    ]
+
+
+def _entrada_do_cliente(fabrica: sessionmaker[Session], wamid: str) -> Mensagem:
+    with fabrica() as sessao:
+        return sessao.scalars(
+            select(Mensagem).where(Mensagem.direcao == "entrada", Mensagem.message_id == wamid)
+        ).one()
 
 
 def test_janela_fechada_sai_como_modelo(

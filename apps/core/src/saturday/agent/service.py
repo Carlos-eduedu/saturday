@@ -377,6 +377,7 @@ class AgentService:
         payload: ChatRequest,
         sessao: Session | None = None,
         origem: OrigemCanal | None = None,
+        historico: list[dict[str, str]] | None = None,
     ) -> AgentReply:
         """Um turno, em etapas: estado, conversa, dedupe, entrada, grafo, saída."""
 
@@ -391,7 +392,7 @@ class AgentService:
         if duplicada is not None:
             return duplicada
 
-        self._registrar_entrada(sessao, conversa, payload)
+        self._registrar_entrada(sessao, conversa, payload, historico)
 
         if sessao is not None and conversa is not None:
             silencio, estado = self._silencio_pelo_banco(sessao, conversa, config, estado)
@@ -450,6 +451,7 @@ class AgentService:
         sessao: Session | None,
         conversa: Conversa | None,
         payload: ChatRequest,
+        historico: list[dict[str, str]] | None = None,
     ) -> None:
         if sessao is None or conversa is None:
             return
@@ -463,6 +465,7 @@ class AgentService:
                 for anexo in payload.attachments
                 if anexo.chave
             ]
+            + list(historico or [])
             or None,
         )
 
@@ -803,12 +806,18 @@ class AgentService:
         self,
         payload: ChatRequest,
         origem: OrigemCanal | None = None,
+        *,
+        historico: list[dict[str, str]] | None = None,
     ) -> AgentReply:
-        """Roda um turno inteiro sob a trava da conversa."""
+        """Roda um turno inteiro sob a trava da conversa.
+
+        ``historico``: anexos que vão só para a mensagem no painel, não para o
+        grafo (o áudio já transcrito). Só o worker passa; o `/chat` não.
+        """
 
         payload = self._arquivar_anexos(payload)
         with self._trava(payload.conversation_id) as sessao:
-            return self._processar_turno(payload, sessao, origem)
+            return self._processar_turno(payload, sessao, origem, historico)
 
     def _arquivar_anexos(self, payload: ChatRequest) -> ChatRequest:
         """Leva para o storage o que veio por `url` ou `base64`.
