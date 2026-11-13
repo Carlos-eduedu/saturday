@@ -18,7 +18,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.agent.service import AgentService
-from saturday.bancos.granatech.homologacao import Homologacao
+from saturday.bancos.granatech.homologacao import ITENS_POR_FASE, Homologacao
 from saturday.dados.modelos import Alerta, Auditoria, HomologacaoGranatech
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.jobs import granatech as jobs_granatech
@@ -63,6 +63,7 @@ def test_fase1_gera_as_quatro_evidencias(http_granatech: TestClient) -> None:
         ("Simulação com seguro", True),
         ("Simulação sem seguro", True),
     ]
+    assert [e.item for e in homologacao.evidencias] == ITENS_POR_FASE[1]
     # Na dev o "sem seguro" é ignorado; a evidência diz isso.
     assert "devolveu o bloco com seguro" in homologacao.evidencias[-1].observacao
     assert len(homologacao.ids_externos) == 1
@@ -80,6 +81,7 @@ def test_fase2_contrata_duas_vezes_e_registra_o_erro(
         ("Contratação 2 com sucesso", True),
         ("Erro de contratação", True),
     ]
+    assert [e.item for e in homologacao.evidencias] == ITENS_POR_FASE[2]
     assert len(simulador_granatech.PROPOSTAS) == 2
     assert all("dados_tomador" in p for p in simulador_granatech.PROPOSTAS.values())
     # 2 consultas e 2 propostas, para o worker não alertar nos webhooks.
@@ -215,6 +217,8 @@ def test_worker_roda_a_rodada_e_o_zip_traz_o_relatorio(
     assert detalhe["erro"] is None
     assert [i["ok"] for i in detalhe["itens"]] == [True, False, True, True]
     assert detalhe["passos"] and detalhe["terminado_em"]
+    assert detalhe["itens_previstos"] == ITENS_POR_FASE[1]
+    assert detalhe["progresso"] == {"total": 4, "ok": [True, False, True, True]}
 
     resposta = client.get(f"{ROTA}/{rodada_id}/zip")
     assert resposta.status_code == 200

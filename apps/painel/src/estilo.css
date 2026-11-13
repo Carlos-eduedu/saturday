@@ -96,12 +96,13 @@ button:active:not(:disabled),
 a.botao:active { transform: translateY(0) scale(0.98); box-shadow: none; }
 a.botao, .mais > summary { display: inline-flex; align-items: center; text-decoration: none; }
 button:disabled { opacity: 0.5; cursor: default; }
-button[type="submit"], button.principal {
+button[type="submit"], button.principal, a.botao.principal {
   background: var(--destaque);
   border-color: var(--destaque);
   color: var(--destaque-texto);
 }
-button[type="submit"]:hover:not(:disabled), button.principal:hover:not(:disabled) {
+button[type="submit"]:hover:not(:disabled), button.principal:hover:not(:disabled),
+a.botao.principal:hover {
   border-color: var(--destaque);
   filter: brightness(1.08);
 }
@@ -749,3 +750,110 @@ main {
 .granatech pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0.25rem 0 0; }
 .granatech > section { scroll-margin-top: 5rem; }
 .granatech section > ul { margin: 0 0 1rem; padding-left: 1.25rem; display: flex; flex-direction: column; gap: 0.3rem; }
+
+/* Homologação: situação, progresso e o modal da rodada (decisão 0014). */
+.situacao-rodada-pendente { color: var(--suave); }
+.situacao-rodada-em_andamento { color: var(--destaque); }
+.situacao-rodada-concluida { color: var(--ia); }
+.situacao-rodada-falhou { color: var(--erro); }
+.situacao-rodada-interrompida { color: var(--handoff); }
+
+.progresso-rodada { display: inline-flex; align-items: center; gap: 0.6rem; }
+.progresso-rodada small { font-size: 0.8rem; color: var(--suave); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.progresso-rodada .falhas { color: var(--erro); }
+.barra-rodada { display: inline-flex; gap: 3px; width: 6.5rem; }
+.barra-rodada > span { flex: 1; height: 6px; border-radius: 999px; background: var(--superficie-2); }
+.barra-rodada > [data-estado="ok"] { background: var(--ia); }
+.barra-rodada > [data-estado="falhou"] { background: var(--erro); }
+.barra-rodada > [data-estado="atual"] { background: var(--destaque); animation: rodada-pulso 1.4s ease-in-out infinite; }
+.barra-rodada > [data-estado="nao_rodou"] {
+  background: repeating-linear-gradient(-45deg, var(--superficie-2) 0 3px, transparent 3px 6px);
+}
+@keyframes rodada-pulso { 50% { opacity: 0.35; } }
+@keyframes rodada-giro { to { transform: rotate(1turn); } }
+
+.modal-rodada {
+  padding: 0;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-l);
+  background: var(--superficie);
+  color: var(--texto);
+  width: min(46rem, calc(100vw - 2rem));
+  max-height: min(88dvh, 54rem);
+  box-shadow: var(--sombra-alta);
+  overflow: hidden;
+  opacity: 1;
+  transform: none;
+  transition: opacity 150ms cubic-bezier(0.16, 1, 0.3, 1), transform 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+@starting-style {
+  .modal-rodada[open] { opacity: 0; transform: translateY(8px) scale(0.98); }
+}
+.modal-rodada::backdrop { background: rgb(11 12 14 / 45%); }
+.modal-rodada__corpo { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; max-height: inherit; }
+.modal-rodada header,
+.modal-rodada footer { display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem 0.75rem 1.25rem; }
+.modal-rodada header { justify-content: space-between; border-bottom: 1px solid var(--borda); }
+.modal-rodada header h2 { margin: 0; }
+.modal-rodada header .fase { color: var(--suave); }
+.modal-rodada .fechar { width: var(--alvo); padding: 0; display: grid; place-items: center; border-color: transparent; background: none; }
+.modal-rodada footer { justify-content: flex-end; border-top: 1px solid var(--borda); }
+.modal-rodada footer a.botao { gap: 0.4rem; }
+.modal-rodada__conteudo { overflow-y: auto; overscroll-behavior: contain; padding: 1.25rem; display: flex; flex-direction: column; gap: 1.5rem; }
+.modal-rodada__conteudo > * { margin: 0; }
+.modal-rodada .ficha-granatech { margin: 0; }
+.modal-rodada .situacao-ao-vivo { align-self: flex-start; }
+
+.titulo-progresso { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.titulo-progresso h3 { margin: 0; }
+.titulo-progresso .barra-rodada { width: 9rem; }
+.titulo-progresso .barra-rodada > span { height: 8px; }
+
+.etapas-rodada { list-style: none; margin: 0; padding: 0; }
+.etapas-rodada li { position: relative; display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 0.75rem; padding: 0.5rem 0 0.9rem; }
+.etapas-rodada li:not(:last-child)::before {
+  content: ""; position: absolute; left: 10px; top: calc(0.5rem + 26px); bottom: -0.35rem; width: 2px;
+  border-radius: 1px; background: var(--borda);
+}
+.etapas-rodada li[data-estado="ok"]:not(:last-child)::before { background: color-mix(in srgb, var(--ia) 45%, var(--borda)); }
+.etapas-rodada .marcador { width: 22px; height: 22px; display: grid; place-items: center; color: var(--suave); }
+.etapas-rodada li:is([data-estado="atual"], [data-estado="falta"], [data-estado="nao_rodou"]) .marcador::after {
+  content: ""; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--borda);
+}
+.etapas-rodada li[data-estado="nao_rodou"] .marcador::after { border-style: dashed; }
+.etapas-rodada li[data-estado="atual"] .marcador::after {
+  border-color: var(--destaque); border-right-color: transparent; animation: rodada-giro 0.9s linear infinite;
+}
+.etapas-rodada li[data-estado="ok"] .marcador { color: var(--ia); }
+.etapas-rodada li[data-estado="falhou"] .marcador { color: var(--erro); }
+.etapas-rodada p { margin: 0; }
+.etapas-rodada .nome { font-weight: 500; line-height: 22px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 0.5rem; }
+.etapas-rodada .estado { font-size: 0.8rem; color: var(--suave); }
+.etapas-rodada li[data-estado="ok"] .estado { color: var(--ia); }
+.etapas-rodada li[data-estado="falhou"] .estado { color: var(--erro); }
+.etapas-rodada li[data-estado="atual"] .estado { color: var(--destaque); }
+.etapas-rodada li:is([data-estado="falta"], [data-estado="nao_rodou"]) .nome { color: var(--suave); font-weight: 400; }
+.etapas-rodada .nota { font-size: 0.875rem; margin-top: 0.15rem; }
+.etapas-rodada .arquivos { display: block; font-size: 0.8rem; color: var(--suave); overflow-wrap: anywhere; margin-top: 0.2rem; }
+
+.registros-rodada { border-top: 1px solid var(--borda); }
+.registros-rodada details { border-bottom: 1px solid var(--borda); }
+.registros-rodada summary {
+  min-height: var(--alvo); display: flex; align-items: center; gap: 0.75rem; cursor: pointer; padding: 0 0.25rem;
+}
+.registros-rodada summary code { flex: 1; font-size: 0.85rem; overflow-wrap: anywhere; }
+.registros-rodada summary time { font-size: 0.8rem; color: var(--suave); }
+.registros-rodada summary:hover { background: var(--superficie-2); }
+.registros-rodada pre {
+  margin: 0 0 0.75rem; padding: 0.75rem; border-radius: var(--raio-m); background: var(--superficie-2);
+  font-size: 0.8rem; max-height: 20rem; overflow: auto; white-space: pre; overflow-wrap: normal;
+}
+
+@media (max-width: 767px) {
+  .modal-rodada {
+    width: 100%; max-width: 100%; margin: auto 0 0; max-height: 92dvh;
+    border-radius: var(--raio-l) var(--raio-l) 0 0; border-bottom: none;
+  }
+  .modal-rodada footer { padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); }
+  .modal-rodada footer > * { flex: 1; justify-content: center; }
+}

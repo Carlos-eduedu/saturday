@@ -535,6 +535,11 @@ def _linha_rodada(r: HomologacaoGranatech, nome: str | None) -> dict[str, Any]:
         "iniciado_em": _iso(r.iniciado_em),
         "terminado_em": _iso(r.terminado_em),
         "erro": r.erro,
+        # Um booleano por item já anotado, na ordem do roteiro da fase.
+        "progresso": {
+            "total": len(homologacao.ITENS_POR_FASE[r.fase]),
+            "ok": [bool(i["ok"]) for i in r.itens],
+        },
     }
 
 
@@ -600,7 +605,12 @@ def ver_rodada(
     _homologacao_disponivel(request)
     with abrir_sessao(fabrica) as sessao:
         rodada, nome = _rodada(sessao, rodada_id)
-        return {**_linha_rodada(rodada, nome), "itens": rodada.itens, "passos": rodada.passos}
+        return {
+            **_linha_rodada(rodada, nome),
+            "itens_previstos": homologacao.ITENS_POR_FASE[rodada.fase],
+            "itens": rodada.itens,
+            "passos": rodada.passos,
+        }
 
 
 @router.get("/homologacao/{rodada_id}/zip")

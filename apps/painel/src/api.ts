@@ -306,6 +306,7 @@ export type Rodada = {
   iniciado_em: string | null;
   terminado_em: string | null;
   erro: string | null;
+  progresso: { total: number; ok: boolean[] };
 };
 
 export type ItemHomologacao = {
@@ -317,8 +318,9 @@ export type ItemHomologacao = {
 };
 
 export type RodadaDetalhe = Rodada & {
+  itens_previstos: string[];
   itens: ItemHomologacao[];
-  passos: ({ arquivo: string } & Record<string, unknown>)[];
+  passos: ({ arquivo: string; horario?: string } & Record<string, unknown>)[];
 };
 
 export type Homologacao = {

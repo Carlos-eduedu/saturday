@@ -56,6 +56,17 @@ ID_INEXISTENTE = "00000000-0000-0000-0000-000000000000"
 TZ = ZoneInfo("America/Sao_Paulo")
 # Consultas que cada fase abre, para a confirmação do painel.
 CONSULTAS_POR_FASE = {1: 1, 2: 2}
+# Os itens do roteiro, na ordem em que cada fase os anota; o painel mostra o
+# progresso da rodada contra esta lista.
+ITENS_POR_FASE = {
+    1: [
+        "Consulta via resposta direta",
+        "Consulta via notificação do webhook",
+        "Simulação com seguro",
+        "Simulação sem seguro",
+    ],
+    2: ["Contratação 1 com sucesso", "Contratação 2 com sucesso", "Erro de contratação"],
+}
 
 
 def disponivel(settings: Settings) -> bool:

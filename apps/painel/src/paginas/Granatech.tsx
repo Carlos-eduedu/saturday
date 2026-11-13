@@ -1,5 +1,8 @@
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { Cancel01Icon, CancelCircleIcon, CheckmarkCircle02Icon, Download04Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "react-router";
+import LatticeLoader, { type StatusLattice } from "../componentes/LatticeLoader";
 import { Vazio } from "../componentes/Vazio";
 import {
   type Acoes,
@@ -14,6 +17,7 @@ import {
   type Homologacao as DadosHomologacao,
   type PropostaGranatech,
   type PropostaGranatechDetalhe,
+  type Rodada,
   type RodadaDetalhe,
   rodadaZipUrl,
   type SituacaoRodada,
@@ -180,7 +184,6 @@ function Homologacao() {
       .homologacao()
       .then((d) => {
         setDados(d);
-        setAberta((atual) => atual ?? d.rodadas[0]?.id ?? null);
       })
       .catch((e: unknown) => {
         if (e instanceof ErroApi && e.status === 404) setIndisponivel(true);
@@ -248,6 +251,7 @@ function Homologacao() {
               <th>Pedida</th>
               <th>Fase</th>
               <th>Situação</th>
+              <th>Progresso</th>
               <th>Por</th>
               <th>Terminou</th>
               <th />
@@ -258,11 +262,16 @@ function Homologacao() {
               <tr key={r.id}>
                 <td>{dataHora(r.criado_em)}</td>
                 <td data-rotulo="Fase">{r.fase}</td>
-                <td data-rotulo="Situação">{SITUACAO[r.situacao]}</td>
+                <td data-rotulo="Situação">
+                  <SeloRodada situacao={r.situacao} />
+                </td>
+                <td data-rotulo="Progresso">
+                  <ProgressoRodada estados={estadosDaLista(r)} />
+                </td>
                 <td data-rotulo="Por">{r.pedido_por ?? "—"}</td>
                 <td data-rotulo="Terminou">{dataHora(r.terminado_em)}</td>
                 <td className="acoes">
-                  <button type="button" onClick={() => setAberta(r.id)}>
+                  <button type="button" onClick={() => setAberta(r.id)} aria-haspopup="dialog">
                     Ver
                   </button>
                 </td>
@@ -272,14 +281,123 @@ function Homologacao() {
         </table>
       )}
 
-      {aberta !== null && <DetalheRodada key={aberta} id={aberta} versao={versao} />}
+      {aberta !== null && (
+        <DetalheRodada key={aberta} id={aberta} versao={versao} aoFechar={() => setAberta(null)} />
+      )}
     </section>
   );
 }
 
-function DetalheRodada({ id, versao }: { id: number; versao: number }) {
+// Progresso da rodada: um segmento por item do roteiro da fase. Cor e texto
+// juntos (ok, falhou, em curso), nunca só cor.
+type EstadoItem = "ok" | "falhou" | "atual" | "falta" | "nao_rodou";
+
+const ESTADO_ITEM: Record<EstadoItem, string> = {
+  ok: "ok",
+  falhou: "falhou",
+  atual: "em curso",
+  falta: "aguardando",
+  nao_rodou: "não rodou",
+};
+
+const ativa = (s: SituacaoRodada) => s === "pendente" || s === "em_andamento";
+
+function estados(total: number, ok: boolean[], situacao: SituacaoRodada): EstadoItem[] {
+  return Array.from({ length: total }, (_, i) => {
+    if (i < ok.length) return ok[i] ? "ok" : "falhou";
+    if (!ativa(situacao)) return "nao_rodou";
+    return situacao === "em_andamento" && i === ok.length ? "atual" : "falta";
+  });
+}
+
+const estadosDaLista = (r: Rodada) => estados(r.progresso.total, r.progresso.ok, r.situacao);
+
+function SeloRodada({ situacao }: { situacao: SituacaoRodada }) {
+  return <span className={`selo situacao-rodada-${situacao}`}>{SITUACAO[situacao]}</span>;
+}
+
+function ProgressoRodada({ estados }: { estados: EstadoItem[] }) {
+  const feitos = estados.filter((e) => e === "ok" || e === "falhou").length;
+  const falhas = estados.filter((e) => e === "falhou").length;
+  return (
+    <span className="progresso-rodada">
+      <span
+        className="barra-rodada"
+        role="progressbar"
+        aria-label="Itens da rodada"
+        aria-valuemin={0}
+        aria-valuemax={estados.length}
+        aria-valuenow={feitos}
+        aria-valuetext={`${feitos} de ${estados.length} itens${falhas ? `, ${falhas} falhou` : ""}`}
+      >
+        {estados.map((e, i) => (
+          <span key={i} data-estado={e} />
+        ))}
+      </span>
+      <small>
+        {feitos}/{estados.length}
+        {falhas > 0 && <span className="falhas"> · {falhas} falhou</span>}
+      </small>
+    </span>
+  );
+}
+
+const hora = (iso?: string | null) =>
+  iso ? new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "";
+
+// Situação da rodada no LatticeLoader: a grade roda enquanto o worker trabalha
+// e vira check ou cruz no fim; o cronômetro conta desde `iniciado_em`.
+const LATTICE: Record<SituacaoRodada, { status: StatusLattice; texto: string }> = {
+  pendente: { status: "working", texto: "Na fila" },
+  em_andamento: { status: "working", texto: "Rodando" },
+  concluida: { status: "done", texto: "Concluída em" },
+  falhou: { status: "error", texto: "Falhou após" },
+  interrompida: { status: "error", texto: "Interrompida após" },
+};
+
+function SituacaoAoVivo({ rodada }: { rodada: RodadaDetalhe }) {
+  const rodando = rodada.situacao === "em_andamento";
+  const [agora, setAgora] = useState(() => Date.now());
+  useEffect(() => {
+    if (!rodando) return undefined;
+    const id = setInterval(() => setAgora(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [rodando]);
+
+  const { status, texto } = LATTICE[rodada.situacao];
+  const inicio = rodada.iniciado_em ? Date.parse(rodada.iniciado_em) : null;
+  const fim = rodada.terminado_em ? Date.parse(rodada.terminado_em) : agora;
+  const cor = status === "working" ? "var(--destaque)" : status === "done" ? "var(--ia)" : "var(--erro)";
+  return (
+    <LatticeLoader
+      className="situacao-ao-vivo"
+      status={status}
+      label={texto}
+      doneLabel={texto}
+      errorLabel={texto}
+      grid={4}
+      pattern="sweep"
+      shape="round"
+      color={cor}
+      doneColor="var(--ia)"
+      errorColor="var(--erro)"
+      cellSize={6}
+      gap={2}
+      fontSize={16}
+      showTimer={inicio !== null}
+      elapsed={inicio === null ? 0 : Math.max(0, (fim - inicio) / 1000)}
+    />
+  );
+}
+
+function DetalheRodada({ id, versao, aoFechar }: { id: number; versao: number; aoFechar: () => void }) {
+  const dialogo = useRef<HTMLDialogElement>(null);
   const [rodada, setRodada] = useState<RodadaDetalhe | null>(null);
   const [erro, setErro] = useState("");
+
+  useEffect(() => {
+    dialogo.current?.showModal();
+  }, []);
 
   useEffect(() => {
     api
@@ -288,57 +406,141 @@ function DetalheRodada({ id, versao }: { id: number; versao: number }) {
       .catch((e: unknown) => setErro(mensagemDe(e)));
   }, [id, versao]);
 
-  if (erro) return <p className="erro">{erro}</p>;
-  if (!rodada) return <p className="centro">Carregando…</p>;
-  const terminada = rodada.situacao !== "pendente" && rodada.situacao !== "em_andamento";
+  const fechar = () => dialogo.current?.close();
 
   return (
-    <div>
-      <h3>
-        Rodada {rodada.id}, Fase {rodada.fase}: {SITUACAO[rodada.situacao]}
-      </h3>
-      {rodada.erro && <p className="erro">Parou antes do fim: {rodada.erro}</p>}
-      {rodada.itens.length > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th>Item</th>
-              <th>Situação</th>
-              <th>Arquivos</th>
-              <th>Observação</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rodada.itens.map((i) => (
-              <tr key={i.item}>
-                <td>{i.item}</td>
-                <td data-rotulo="Situação">{i.ok ? "ok" : "falhou"}</td>
-                <td data-rotulo="Arquivos">
-                  <code>{i.arquivo}</code>
-                </td>
-                <td data-rotulo="Observação">{i.observacao || "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      {rodada.passos.map((p) => (
-        <details key={p.arquivo}>
-          <summary>
-            <code>{p.arquivo}</code>
-          </summary>
-          <pre className="nota">{JSON.stringify(p, null, 2)}</pre>
-        </details>
-      ))}
-      {terminada && rodada.passos.length > 0 && (
-        <a className="botao" href={rodadaZipUrl(rodada.id)}>
-          Baixar .zip
-        </a>
-      )}
-    </div>
+    // O <dialog> não tem padding: clique direto nele é clique no fundo.
+    <dialog
+      ref={dialogo}
+      className="modal-rodada"
+      aria-labelledby="titulo-rodada"
+      onClose={aoFechar}
+      onClick={(e) => e.target === dialogo.current && fechar()}
+    >
+      <div className="modal-rodada__corpo">
+        <header>
+          <h2 id="titulo-rodada">
+            Rodada {id}
+            {rodada && <span className="fase"> · Fase {rodada.fase}</span>}
+          </h2>
+          <button type="button" className="fechar" onClick={fechar} aria-label="Fechar">
+            <HugeiconsIcon icon={Cancel01Icon} size={20} strokeWidth={2} />
+          </button>
+        </header>
+        <div className="modal-rodada__conteudo">
+          {erro ? (
+            <p className="erro">{erro}</p>
+          ) : !rodada ? (
+            <p className="nota">Carregando…</p>
+          ) : (
+            <ConteudoRodada rodada={rodada} />
+          )}
+        </div>
+        <footer>
+          {rodada && !ativa(rodada.situacao) && rodada.passos.length > 0 && (
+            <a className="botao principal" href={rodadaZipUrl(rodada.id)}>
+              <HugeiconsIcon icon={Download04Icon} size={18} strokeWidth={2} />
+              Baixar .zip
+            </a>
+          )}
+          <button type="button" onClick={fechar}>
+            Fechar
+          </button>
+        </footer>
+      </div>
+    </dialog>
   );
 }
 
+function ConteudoRodada({ rodada }: { rodada: RodadaDetalhe }) {
+  const lista = estados(
+    rodada.itens_previstos.length,
+    rodada.itens.map((i) => i.ok),
+    rodada.situacao,
+  );
+  const ultimo = rodada.passos.at(-1);
+
+  return (
+    <>
+      <SituacaoAoVivo rodada={rodada} />
+      <dl className="ficha-granatech">
+        <dt>Pedida</dt>
+        <dd>
+          {dataHora(rodada.criado_em)}
+          {rodada.pedido_por && ` por ${rodada.pedido_por}`}
+        </dd>
+        {rodada.iniciado_em && (
+          <>
+            <dt>Começou</dt>
+            <dd>{dataHora(rodada.iniciado_em)}</dd>
+          </>
+        )}
+        {rodada.terminado_em && (
+          <>
+            <dt>Terminou</dt>
+            <dd>{dataHora(rodada.terminado_em)}</dd>
+          </>
+        )}
+      </dl>
+
+      {rodada.erro && (
+        <p className="erro" role="alert">
+          Parou antes do fim: {rodada.erro}
+        </p>
+      )}
+
+      <section aria-labelledby="itens-rodada">
+        <div className="titulo-progresso">
+          <h3 id="itens-rodada">Itens do roteiro</h3>
+          <ProgressoRodada estados={lista} />
+        </div>
+        <ol className="etapas-rodada">
+          {rodada.itens_previstos.map((nome, i) => {
+            const item = rodada.itens[i];
+            const estado = lista[i];
+            return (
+              <li key={nome} data-estado={estado}>
+                <span className="marcador" aria-hidden="true">
+                  {estado === "ok" && <HugeiconsIcon icon={CheckmarkCircle02Icon} size={22} strokeWidth={2} />}
+                  {estado === "falhou" && <HugeiconsIcon icon={CancelCircleIcon} size={22} strokeWidth={2} />}
+                </span>
+                <div>
+                  <p className="nome">
+                    {nome} <span className="estado">{ESTADO_ITEM[estado]}</span>
+                  </p>
+                  {item?.observacao && <p className="nota">{item.observacao}</p>}
+                  {item && <code className="arquivos">{item.arquivo}</code>}
+                  {estado === "atual" && ultimo && (
+                    <p className="nota">
+                      Último registro às <time>{hora(ultimo.horario)}</time>: <code>{ultimo.arquivo}</code>
+                    </p>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      </section>
+
+      {rodada.passos.length > 0 && (
+        <section aria-labelledby="registros-rodada">
+          <h3 id="registros-rodada">Registros ({rodada.passos.length})</h3>
+          <div className="registros-rodada">
+            {rodada.passos.map((p) => (
+              <details key={p.arquivo}>
+                <summary>
+                  <code>{p.arquivo}</code>
+                  {p.horario && <time>{hora(p.horario)}</time>}
+                </summary>
+                <pre>{JSON.stringify(p, null, 2)}</pre>
+              </details>
+            ))}
+          </div>
+        </section>
+      )}
+    </>
+  );
+}
 
 function Filtros({ aoFiltrar }: { aoFiltrar: (f: FiltroGranatech) => void }) {
   const [status, setStatus] = useState("");
