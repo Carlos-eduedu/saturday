@@ -430,24 +430,33 @@ main {
 /* Com o botão visível, o atalho de teclado do SwipeRow só duplicaria a ação. */
 .inbox .swipe-row__toggle { display: none; }
 
+/* Pílula de uma linha, como a barra de endereço do Safari: curta, some sozinha
+   e tem fechar, para nunca prender o campo de texto. */
 .aviso-flutuante {
   position: fixed;
   left: 50%;
-  bottom: 1.5rem;
+  bottom: max(1rem, env(safe-area-inset-bottom));
   transform: translateX(-50%);
   z-index: 30;
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 0.5rem 0.5rem 0.5rem 1.1rem;
+  gap: 0.25rem;
+  padding: 0.25rem 0.25rem 0.25rem 1rem;
   max-width: calc(100% - 2rem);
+  font-size: 0.875rem;
   background: var(--texto);
   color: var(--fundo);
-  border-radius: var(--raio-l);
+  border-radius: 999px;
   box-shadow: var(--sombra-alta);
 }
-.aviso-flutuante button { background: transparent; color: inherit; border-color: color-mix(in srgb, var(--fundo) 40%, transparent); }
-.aviso-flutuante button:hover:not(:disabled) { border-color: var(--fundo); box-shadow: none; }
+.aviso-flutuante span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aviso-flutuante button { flex: none; min-height: 2.25rem; padding: 0 0.75rem; border-radius: 999px; background: transparent; color: inherit; border: none; font-weight: 600; }
+.aviso-flutuante button:hover:not(:disabled) { background: color-mix(in srgb, var(--fundo) 15%, transparent); box-shadow: none; }
+.aviso-flutuante .fechar { width: 2.25rem; padding: 0; font-size: 1.25rem; line-height: 1; font-weight: 400; }
+/* Na conversa, fica acima do envio preso embaixo, sem cobrir o campo. */
+@media (max-width: 767px) {
+  body:has(.envio) .aviso-flutuante { bottom: calc(8rem + env(safe-area-inset-bottom)); }
+}
 
 /* Pela largura da lista, não da janela: vale no celular e na lista estreita ao
    lado da conversa aberta. */
@@ -746,9 +755,9 @@ main {
 .form-ficha .erro { margin: 0; }
 .form-ficha__acoes { display: flex; justify-content: flex-end; gap: 0.5rem; position: sticky; bottom: -1.25rem; margin: 0 -1.25rem -1.25rem; padding: 0.75rem 1.25rem; background: var(--superficie); border-top: 1px solid var(--borda); }
 @media (max-width: 767px) {
-  /* No celular, só o envio fica preso embaixo, como num app de chat: com o
-     teclado aberto, cabeçalho e envio fixos não deixariam ver a conversa. */
-  .historico > header { position: static; padding-top: 0.25rem; gap: 0.5rem 0.75rem; }
+  /* No celular, cabeçalho preso em cima e envio preso embaixo, como num app de
+     chat: telefone, estado e ações ficam à vista em qualquer ponto do histórico. */
+  .historico > header { padding-top: 0.25rem; gap: 0.5rem 0.75rem; }
   .envio { padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); }
   .historico .voltar { margin-left: -0.6rem; padding: 0 0.6rem; }
   .voltar-texto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

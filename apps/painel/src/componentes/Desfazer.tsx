@@ -26,7 +26,9 @@ export const confirmarTomada = (dono: string) =>
 
 export function AvisoDesfazer({ children }: { children: ReactNode }) {
   const [aviso, setAviso] = useState<Aviso | null>(null);
-  // Ponteiro ou foco no aviso seguram o relógio: 5 s não bastam no teclado.
+  // Mouse em cima ou foco de teclado seguram o relógio: 5 s não bastam no
+  // teclado. Toque não segura: no celular o pointerleave não chega e o aviso
+  // ficava preso sobre o campo de texto.
   const [seguro, setSeguro] = useState(false);
 
   useEffect(() => {
@@ -54,17 +56,28 @@ export function AvisoDesfazer({ children }: { children: ReactNode }) {
         <div
           className="aviso-flutuante"
           role={aviso.falhou ? "alert" : "status"}
-          onPointerEnter={() => setSeguro(true)}
+          onPointerEnter={(e) => e.pointerType === "mouse" && setSeguro(true)}
           onPointerLeave={() => setSeguro(false)}
-          onFocus={() => setSeguro(true)}
+          onFocus={(e) => e.target.matches(":focus-visible") && setSeguro(true)}
           onBlur={() => setSeguro(false)}
         >
-          <span>{aviso.texto}</span>
+          <span title={aviso.texto}>{aviso.texto}</span>
           {!aviso.falhou && (
             <button type="button" onClick={() => desfazer(aviso)}>
               Desfazer
             </button>
           )}
+          <button
+            type="button"
+            className="fechar"
+            aria-label="Fechar aviso"
+            onClick={() => {
+              setSeguro(false);
+              setAviso(null);
+            }}
+          >
+            ×
+          </button>
         </div>
       )}
     </Contexto.Provider>
