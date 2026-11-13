@@ -274,3 +274,19 @@ def test_ffmpeg_converte_para_ogg_opus():
     assert b"OpusHead" in saida[:200]
     with pytest.raises(ErroConversao):
         para_ogg_opus(b"isto nao e audio")
+
+
+def test_storage_fora_do_ar_responde_503(client_pg, service_pg, fabrica, ana, conversa):
+    alvo, csrf = _assumida(client_pg, service_pg, fabrica, conversa)
+
+    class Quebrado:
+        def salvar(self, *_a, **_k):
+            raise RuntimeError("S3 API Requests must be made to API port.")
+
+    service_pg.storage = Quebrado()
+
+    resposta = _anexar(client_pg, alvo, csrf, PNG, "image/png")
+
+    assert resposta.status_code == 503
+    with abrir(fabrica) as s:
+        assert not [o for o in s.scalars(select(Outbox)) if "midia" in o.payload]

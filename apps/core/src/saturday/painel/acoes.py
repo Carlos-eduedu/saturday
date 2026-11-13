@@ -6,6 +6,7 @@ de atendimento e grava a auditoria na mesma transação.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -32,6 +33,8 @@ from saturday.dados.trava import travar_conversa
 from saturday.painel import midia
 from saturday.painel.auditoria import auditar
 from saturday.storage.base import Storage
+
+logger = logging.getLogger(__name__)
 
 # Modelos que o atendente pode mandar: utilidade e sem botão de link.
 # TODO: variáveis de modelo quando os textos forem cadastrados na Meta; os
@@ -298,11 +301,16 @@ def enviar_anexo(
         raise AcaoRecusada(409, "janela de 24 h fechada: envie um modelo")
 
     extensao = midia.EXTENSAO[mime_type]
-    chave = storage.salvar(
-        dados,
-        mime_type=mime_type,
-        chave=f"{conversa.canal}/{conversa.telefone}/painel-{uuid.uuid4().hex}.{extensao}",
-    )
+    try:
+        chave = storage.salvar(
+            dados,
+            mime_type=mime_type,
+            chave=f"{conversa.canal}/{conversa.telefone}/painel-{uuid.uuid4().hex}.{extensao}",
+        )
+    except Exception as exc:
+        # S3 fora do ar ou mal configurado: o painel recebe o motivo, não um 500.
+        logger.exception("anexo_storage_falhou conversa=%s", conversa.id)
+        raise AcaoRecusada(503, "não deu para guardar o arquivo no storage") from exc
     anexo = {"chave": chave, "mime_type": mime_type, "nome": nome}
     mensagem_id = repositorios.registrar_saida(
         sessao,
