@@ -20,8 +20,8 @@ import json
 import re
 import time
 from collections.abc import Callable
-from dataclasses import asdict, dataclass, field
-from datetime import datetime
+from dataclasses import asdict, dataclass, field, replace
+from datetime import date, datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -29,6 +29,7 @@ import httpx
 
 from saturday.bancos.granatech.normalizacao import (
     DetalheConsulta,
+    Endereco,
     Simulacao,
     id_da_proposta,
     montar_corpo_proposta,
@@ -53,6 +54,19 @@ CONTA_TESTE = {
     "tipo_conta": "conta_corrente",
 }
 ID_INEXISTENTE = "00000000-0000-0000-0000-000000000000"
+# Os CPFs gerados pela api-dev vêm sem nascimento, mãe e endereço (rodada 11), e
+# o dados-tomador recusa sem eles: valem os dados de teste do exemplo da
+# collection de contratação da Granatech.
+NASCIMENTO_TESTE = date(1990, 5, 15)
+ENDERECO_TESTE = Endereco(
+    cep="01001-000",
+    logradouro="Praça da Sé",
+    numero="123",
+    complemento="Apto 45",
+    bairro="Sé",
+    cidade="São Paulo",
+    uf="SP",
+)
 TZ = ZoneInfo("America/Sao_Paulo")
 # Consultas que cada fase abre, para a confirmação do painel.
 CONSULTAS_POR_FASE = {1: 1, 2: 2}
@@ -297,7 +311,12 @@ class Homologacao:
                 "POST",
                 f"/propostas/{id_proposta}/dados-tomador",
                 corpo=montar_dados_tomador(
-                    pessoa=detalhe.pessoa,
+                    pessoa=replace(
+                        detalhe.pessoa,
+                        nascimento=detalhe.pessoa.nascimento or NASCIMENTO_TESTE,
+                        nome_mae=detalhe.pessoa.nome_mae or NOME,
+                        endereco=detalhe.pessoa.endereco or ENDERECO_TESTE,
+                    ),
                     cpf=cpf,
                     nome=NOME,
                     estado_civil="SOLTEIRO",

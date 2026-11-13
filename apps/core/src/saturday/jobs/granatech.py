@@ -140,9 +140,7 @@ def _proposta(
     servico: AgentService | None = None,
 ) -> None:
     id_externo = str(payload.get("id_proposta") or "")
-    notificacao = payload.get("tipo_notificacao")
-    notificacao = str(notificacao) if notificacao else None
-    novo = ordem.status_da_proposta(str(payload.get("status_da_proposta") or ""), notificacao)
+    novo, notificacao = ordem.ler_evento_proposta(payload)
 
     with abrir_sessao(fabrica) as sessao:
         linha = sessao.scalars(

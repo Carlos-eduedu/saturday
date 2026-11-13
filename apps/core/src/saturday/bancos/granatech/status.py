@@ -67,6 +67,45 @@ NOTIFICACAO_PAGA = frozenset({"PAGO", "PROPOSTA_PAGA"})
 REGRESSOES_LEGITIMAS = frozenset({"REFAZER_SEGURANCA_IDENTIDADE", "FALHA_PAGAMENTO"})
 
 
+# A api-dev manda o webhook de proposta com o nome da notificação em `status` e
+# sem `tipo_notificacao` (rodada 11 da homologação, 2026-11-13). Cada
+# notificação tem um status só, na tabela de docs/granatech-homologacao/
+# webhook-propostas.md.
+STATUS_DA_NOTIFICACAO = {
+    "AGUARDANDO_CONFIRMACAO": "PENDING_CONFIRMATION",
+    "AGUARDANDO_REVISAO_USUARIO": "PENDING_USER_REVIEW",
+    "FALHA_PAGAMENTO": "PENDING_USER_REVIEW",
+    "AGUARDANDO_FORMALIZACAO": "PENDING_FORMALIZATION",
+    "FORMALIZACAO_EM_ANDAMENTO": "PENDING_FORMALIZATION",
+    "BLOQUEIO_DE_SALDO_EM_ANDAMENTO": "PENDING_FORMALIZATION",
+    "BLOQUEIO_SALDO": "PENDING_FORMALIZATION",
+    "REFAZER_SEGURANCA_IDENTIDADE": "PENDING_REFORMALIZATION",
+    "AGUARDANDO_ANALISE_BANCO": "PENDING_BANK_ANALYSIS",
+    "SUCESSO_SEGURANCA_IDENTIDADE": "PENDING_PAYMENT",
+    "REPROVADO": "REPROVED",
+    "PROPOSTA_CANCELADA": "CANCELED",
+    "BLOQUEIO_DE_SALDO_CANCELADO": "CANCELED",
+    "PAGO": "PAYED",
+    "PROPOSTA_PAGA": "PAYED",
+}
+
+
+def ler_evento_proposta(payload: dict[str, object]) -> tuple[str, str | None]:
+    """Status efetivo e notificação de um webhook de proposta, nos dois formatos.
+
+    Documentado: ``status_da_proposta`` + ``tipo_notificacao``. Da api-dev: só
+    ``status``, com o nome da notificação.
+    """
+
+    bruto = str(payload.get("status_da_proposta") or payload.get("status") or "")
+    valor = payload.get("tipo_notificacao")
+    notificacao = str(valor) if valor else None
+    if bruto in STATUS_DA_NOTIFICACAO:
+        notificacao = notificacao or bruto
+        bruto = STATUS_DA_NOTIFICACAO[bruto]
+    return status_da_proposta(bruto, notificacao) or "", notificacao
+
+
 def status_da_proposta(status: str | None, notificacao: str | None) -> str | None:
     """Status efetivo do evento de proposta (``PAGO`` vira ``PAYED``)."""
 

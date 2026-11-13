@@ -425,7 +425,11 @@ def montar_dados_tomador(
         "nome_completo": nome,
         # TODO(granatech): valores aceitos de `estado_civil` (enviamos em maiúsculas).
         "estado_civil": estado_civil,
-        "data_nascimento": pessoa.nascimento.isoformat() if pessoa.nascimento else None,
+        # A api-dev pede "Date instance" (400 com só a data); o exemplo da collection
+        # de contratação manda meia-noite UTC.
+        "data_nascimento": (
+            f"{pessoa.nascimento.isoformat()}T00:00:00.000Z" if pessoa.nascimento else None
+        ),
         "telefone_endereco": celular,
         "nome_completo_mae": pessoa.nome_mae,
         "cep": endereco.cep if endereco else None,

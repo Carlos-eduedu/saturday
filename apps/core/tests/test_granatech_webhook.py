@@ -443,6 +443,38 @@ def test_cada_status_de_proposta_e_aplicado(
     assert proposta.tipo_notificacao == notificacao
 
 
+@pytest.mark.parametrize(
+    ("status_api_dev", "esperado"),
+    [
+        ("AGUARDANDO_CONFIRMACAO", "PENDING_CONFIRMATION"),
+        ("AGUARDANDO_FORMALIZACAO", "PENDING_FORMALIZATION"),
+        ("PAGO", "PAYED"),
+    ],
+)
+def test_proposta_no_formato_da_api_dev_e_aplicada(
+    status_api_dev: str,
+    esperado: str,
+    api_pg: TestClient,
+    cliente: ClienteGranatech,
+    fabrica: sessionmaker[Session],
+    service: AgentService,
+    settings: Settings,
+) -> None:
+    """Rodada 11: a api-dev manda a notificação em `status`, sem `tipo_notificacao`."""
+
+    id_proposta = _proposta_criada(cliente)
+    corpo = {"cpf": CPF, "tipo": "PROPOSTA", "status": status_api_dev, "id_proposta": id_proposta}
+
+    resposta = api_pg.post("/webhooks/granatech", json=corpo, headers={"x-webhook-token": TOKEN})
+    _rodar_worker(fabrica, service, cliente, settings)
+
+    assert resposta.status_code == 200
+    proposta = _proposta(fabrica, id_proposta)
+    assert proposta.status == esperado
+    assert proposta.tipo_notificacao == status_api_dev
+    assert _alertas(fabrica) == []
+
+
 def test_proposta_paga_nao_volta_atras(
     cliente: ClienteGranatech,
     http_granatech: TestClient,

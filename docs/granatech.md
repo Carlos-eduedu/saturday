@@ -199,6 +199,15 @@ Cada uma está no código como `TODO(granatech)`:
   webhook em português, e só `AGUARDANDO_AUTORIZACAO_DO_CLIENTE` e `CONCLUIDO`
   (já vistos) são traduzidos para os nomes da documentação; outro nome vira
   alerta;
+- formato do webhook de proposta: a api-dev manda
+  `{tipo: "PROPOSTA", status, id_proposta, cpf}`, com o nome da notificação em
+  `status` e sem `tipo_notificacao` (rodada 11); lemos os dois formatos e
+  tiramos o status da tabela de `webhook-propostas.md`;
+- dados do tomador quando a consulta vem sem eles: os CPFs gerados pela
+  api-dev vêm sem nascimento, mãe e endereço, e o `dados-tomador` recusa
+  (`data_nascimento must be a Date instance`, `nome_completo_mae must be a
+  string`). A homologação usa os dados de teste do exemplo da collection; a
+  jornada do agente ainda não pede ao cliente o que faltar;
 - `tipo_empregador` (padrão 1, por configuração);
 - significado de `FIDUCIARY_INSTITUTION_NO_AUTHORIZATION` e
   `WORKER_MUST_CANCEL_RETURN_REQUEST` (por ora, alerta);

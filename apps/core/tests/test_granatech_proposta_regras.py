@@ -65,7 +65,7 @@ def test_dados_tomador() -> None:
         },
     )
     assert corpo["nome_completo_mae"] == "MAE DE TESTE"
-    assert corpo["data_nascimento"] == "1990-05-15"
+    assert corpo["data_nascimento"] == "1990-05-15T00:00:00.000Z"
     assert corpo["estado"] == "SP" and corpo["cep"] == "01001000"
     assert corpo["estado_civil"] == "CASADO"
     assert corpo["tipo_dados_bancarios"] == "dados_bancarios"

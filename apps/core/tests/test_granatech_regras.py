@@ -110,6 +110,18 @@ def test_status_desconhecido_nao_e_aplicado() -> None:
     assert not status.aceita_proposta("PENDING_CONFIRMATION", "STATUS_NOVO", None)
 
 
+def test_evento_de_proposta_nos_dois_formatos() -> None:
+    documentado = {"status_da_proposta": "PENDING_PAYMENT", "tipo_notificacao": "PROPOSTA_PAGA"}
+    assert status.ler_evento_proposta(documentado) == ("PAYED", "PROPOSTA_PAGA")
+    da_api_dev = {"tipo": "PROPOSTA", "status": "AGUARDANDO_CONFIRMACAO"}
+    assert status.ler_evento_proposta(da_api_dev) == (
+        "PENDING_CONFIRMATION",
+        "AGUARDANDO_CONFIRMACAO",
+    )
+    assert status.ler_evento_proposta({"status": "NOVO"}) == ("NOVO", None)
+    assert status.ler_evento_proposta({}) == ("", None)
+
+
 def test_proposta_avanca_e_nao_regride() -> None:
     assert status.aceita_proposta(None, "PENDING_CONFIRMATION", "AGUARDANDO_CONFIRMACAO")
     assert status.aceita_proposta("PENDING_CONFIRMATION", "PENDING_FORMALIZATION", None)
