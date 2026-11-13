@@ -172,7 +172,7 @@ nunca pelo `conversation_id`, que no WhatsApp carrega o telefone.
 | `POST` | `/admin/conversas/{id}/devolver` | Devolve para a IA (só o dono, ou o gestor). |
 | `POST` | `/admin/conversas/{id}/transferir` | `{usuario_id}`; só conversa assumida. |
 | `POST` | `/admin/conversas/{id}/mensagens` | `{texto}` ou `{modelo}`; só o dono, só WhatsApp. Janela fechada aceita só modelo. |
-| `GET` | `/admin/conversas/{id}/ficha` | Dados mascarados. |
+| `GET` | `/admin/conversas/{id}/ficha` | Dados mascarados, mais a oferta vigente (só valores), a última proposta na Granatech com `difere_da_oferta` e as provas de consentimento (sem o CPF). |
 | `POST` | `/admin/conversas/{id}/revelar` | `{campo: cpf\|telefone\|data_nascimento}`; grava `revelar:{campo}` na auditoria. |
 | `GET` | `/admin/alertas` | Alertas abertos (`handoff`, `erro_interno`, `envio_falhou`, `sem_resposta`). |
 | `POST` | `/admin/alertas/{id}/resolver` | Resolve e audita. |

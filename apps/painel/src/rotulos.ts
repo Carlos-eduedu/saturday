@@ -120,6 +120,33 @@ export const CHAMADAS: Record<string, string> = {
   webhook: "Webhook",
 };
 
+// Aceita o número como texto ("300.00"); o que não for número sai como veio.
+export function reais(valor: string | number | null | undefined): string {
+  const numero = Number(valor);
+  if (valor === undefined || valor === null || valor === "" || Number.isNaN(numero))
+    return `R$ ${valor ?? "—"}`;
+  return numero.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+// Status da proposta na Granatech, como a equipe fala deles.
+export const STATUS_PROPOSTA: Record<string, string> = {
+  PENDING_CONFIRMATION: "Aguardando confirmação",
+  PENDING_USER_REVIEW: "Aguardando revisão",
+  PENDING_FORMALIZATION: "Aguardando assinatura",
+  PENDING_BANK_ANALYSIS: "Banco analisando",
+  PENDING_PAYMENT: "Pagamento a caminho",
+  PENDING_REFORMALIZATION: "Refazer assinatura",
+  REPROVED: "Reprovada",
+  CANCELED: "Cancelada",
+  CANCELED_BY_CLIENT: "Cancelada pelo cliente",
+  PAYED: "Paga",
+};
+
+export const TIPOS_DE_PROVA: Record<string, string> = {
+  consulta: "Autorizou a consulta",
+  proposta: "Aceitou a proposta",
+};
+
 // US$ com 4 casas para valores pequenos (um turno custa frações de centavo).
 export function dolar(valor: number): string {
   if (valor > 0 && valor < 0.0001) return "< US$ 0,0001";

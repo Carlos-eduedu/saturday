@@ -3,13 +3,22 @@
 from __future__ import annotations
 
 import uuid
+from decimal import Decimal
 
 import pytest
 from conftest import resultado_jev
 from sqlalchemy import func, select, update
 
 from saturday.canais.base import OrigemCanal
-from saturday.dados.modelos import Auditoria, Conversa, Mensagem, Outbox
+from saturday.dados.modelos import (
+    Auditoria,
+    Consentimento,
+    ConsultaGranatech,
+    Conversa,
+    Mensagem,
+    Outbox,
+    PropostaGranatech,
+)
 from saturday.dados.sessao import sessao as abrir
 from saturday.painel import acoes, sessoes
 from saturday.schemas import ChatRequest
@@ -304,6 +313,72 @@ def test_ficha_mostra_os_dados_do_ramo_clt(client_pg, service_pg, fabrica, ana, 
         f"/admin/conversas/{alvo}/revelar", headers=csrf, json={"campo": "email"}
     )
     assert revelado.json() == {"campo": "email", "valor": "maria@exemplo.test"}
+
+
+def test_ficha_mostra_oferta_proposta_e_provas(client_pg, service_pg, fabrica, ana, conversa):
+    _cliente_escreve(service_pg, conversa, "oi")
+    alvo = _conversa_id(fabrica, conversa)
+    _entrar(client_pg, "ana@exemplo.test")
+
+    vazia = client_pg.get(f"/admin/conversas/{alvo}/ficha").json()
+    assert (vazia["oferta"], vazia["proposta"], vazia["consentimentos"]) == (None, None, [])
+
+    oferta = {
+        "liberado": "4619.53",
+        "valor_parcela": "300.00",
+        "numero_parcelas": 36,
+        "taxa_mensal": "4.00",
+        "cet_mensal": "4.9848",
+        "valor_seguro": "503.32",
+        "seguro_aplicado": True,
+        "limitado_ao_teto": False,
+        "id_produto": "17",
+        "id_margem": "9",
+    }
+    service_pg.graph.update_state(service_pg.config(conversa), {"clt": {"oferta": oferta}})
+    with abrir(fabrica) as s:
+        s.add(
+            Consentimento(
+                conversa_id=uuid.UUID(alvo),
+                tipo="consulta",
+                texto_mostrado="Você autoriza? Responda SIM.",
+                versao="v1",
+                resposta_literal="SIM",
+                cpf="00189004967",
+            )
+        )
+        consulta = ConsultaGranatech(
+            id_externo="c-1", cpf="00189004967", conversa_id=uuid.UUID(alvo), status="SUCCESS"
+        )
+        s.add(consulta)
+        s.flush()
+        s.add(
+            PropostaGranatech(
+                consulta_id=consulta.id,
+                conversa_id=uuid.UUID(alvo),
+                estado_envio="criada",
+                valor_parcela=Decimal("300.00"),
+                numero_parcelas=36,
+                status="PENDING_FORMALIZATION",
+            )
+        )
+
+    ficha = client_pg.get(f"/admin/conversas/{alvo}/ficha").json()
+    # Só valores: os IDs do banco e o CPF da prova não saem na ficha.
+    assert ficha["oferta"] == {k: v for k, v in oferta.items() if not k.startswith("id_")}
+    assert ficha["proposta"]["status"] == "PENDING_FORMALIZATION"
+    assert ficha["proposta"]["difere_da_oferta"] is False
+    assert [(p["tipo"], p["resposta_literal"]) for p in ficha["consentimentos"]] == [
+        ("consulta", "SIM")
+    ]
+    assert "cpf" not in ficha["consentimentos"][0]
+
+    # A IA refez a simulação com outra parcela: a proposta do banco não acompanha.
+    service_pg.graph.update_state(
+        service_pg.config(conversa), {"clt": {"oferta": {**oferta, "valor_parcela": "250.00"}}}
+    )
+    ficha = client_pg.get(f"/admin/conversas/{alvo}/ficha").json()
+    assert ficha["proposta"]["difere_da_oferta"] is True
 
 
 def test_revelar_cpf_grava_auditoria(client_pg, service_pg, fabrica, ana, conversa):

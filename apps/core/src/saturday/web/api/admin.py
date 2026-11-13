@@ -10,6 +10,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, date, datetime
+from decimal import Decimal
 from typing import Annotated, Any, Literal
 from zoneinfo import ZoneInfo
 
@@ -22,7 +23,15 @@ from sqlalchemy.orm import Session, sessionmaker
 from saturday.agent.service import AgentService
 from saturday.canais.whatsapp.janela import janela_aberta
 from saturday.dados import repositorios
-from saturday.dados.modelos import Alerta, Conversa, Cota, Mensagem, UsuarioPainel
+from saturday.dados.modelos import (
+    Alerta,
+    Consentimento,
+    Conversa,
+    Cota,
+    Mensagem,
+    PropostaGranatech,
+    UsuarioPainel,
+)
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.painel import acoes, exportacao, sessoes, supervisao
 from saturday.painel.auditoria import auditar
@@ -372,7 +381,72 @@ def ficha(
         conversa = sessao.get(Conversa, conversa_id)
         if conversa is None:
             raise HTTPException(status_code=404, detail="conversa não encontrada")
-        return _ficha(conversa, _estado(conversa, service))
+        estado = _estado(conversa, service)
+        return {**_ficha(conversa, estado), **_acompanhamento(sessao, conversa, estado)}
+
+
+# O que a oferta guardada no checkpoint mostra na ficha: só valores, nenhum ID.
+CAMPOS_DA_OFERTA = (
+    "liberado",
+    "valor_parcela",
+    "numero_parcelas",
+    "taxa_mensal",
+    "cet_mensal",
+    "valor_seguro",
+    "seguro_aplicado",
+    "limitado_ao_teto",
+)
+
+
+def _acompanhamento(sessao: Session, conversa: Conversa, estado: dict[str, Any]) -> dict[str, Any]:
+    """O que a IA ofereceu, o que o banco registrou e as provas do SIM.
+
+    Fica ao lado da conversa para a equipe conferir a fala da IA sem trocar de
+    tela. A prova sai sem o CPF: ele já está na ficha, mascarado.
+    """
+
+    guardada = (estado.get("clt") or {}).get("oferta") or {}
+    oferta = {campo: guardada.get(campo) for campo in CAMPOS_DA_OFERTA} if guardada else None
+    proposta = sessao.scalars(
+        select(PropostaGranatech)
+        .where(PropostaGranatech.conversa_id == conversa.id)
+        .order_by(PropostaGranatech.id.desc())
+        .limit(1)
+    ).first()
+    provas = sessao.scalars(
+        select(Consentimento)
+        .where(Consentimento.conversa_id == conversa.id)
+        .order_by(Consentimento.id)
+    )
+    return {
+        "oferta": oferta,
+        "proposta": None
+        if proposta is None
+        else {
+            "id": proposta.id,
+            "status": proposta.status,
+            "tipo_notificacao": proposta.tipo_notificacao,
+            "estado_envio": proposta.estado_envio,
+            "valor_parcela": str(proposta.valor_parcela),
+            "numero_parcelas": proposta.numero_parcelas,
+            "atualizada_em": proposta.atualizada_em,
+            "difere_da_oferta": bool(guardada)
+            and (
+                Decimal(str(guardada["valor_parcela"])) != proposta.valor_parcela
+                or int(guardada["numero_parcelas"]) != proposta.numero_parcelas
+            ),
+        },
+        "consentimentos": [
+            {
+                "tipo": prova.tipo,
+                "versao": prova.versao,
+                "texto_mostrado": prova.texto_mostrado,
+                "resposta_literal": prova.resposta_literal,
+                "criada_em": prova.criada_em,
+            }
+            for prova in provas
+        ],
+    }
 
 
 @router.post("/conversas/{conversa_id}/revelar")

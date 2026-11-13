@@ -24,7 +24,10 @@ import {
   MODELOS,
   MOTIVOS_HANDOFF,
   NOS,
+  reais,
   rotulo,
+  STATUS_PROPOSTA,
+  TIPOS_DE_PROVA,
   tokens,
 } from "../rotulos";
 import { useAvisos } from "../tempoReal";
@@ -542,13 +545,18 @@ function FichaCliente({ id }: { id: string }) {
   const [ficha, setFicha] = useState<Ficha | null>(null);
   const [revelados, setRevelados] = useState<Partial<Record<CampoSensivel, string>>>({});
 
-  useEffect(() => {
-    setRevelados({});
+  const carregar = useCallback(() => {
     api
       .ficha(id)
       .then(setFicha)
       .catch(() => setFicha(null));
   }, [id]);
+  useEffect(() => {
+    setRevelados({});
+    carregar();
+  }, [id, carregar]);
+  // A oferta e a proposta mudam durante a conversa: a ficha acompanha.
+  useAvisos(useCallback((aviso) => aviso.conversa === id && carregar(), [id, carregar]));
 
   const [erroRevelar, setErroRevelar] = useState("");
   async function revelar(campo: CampoSensivel) {
@@ -565,62 +573,155 @@ function FichaCliente({ id }: { id: string }) {
 
   if (!ficha) return <div className="ficha" />;
   return (
-    <div className="ficha">
-      <h2>Ficha</h2>
-      <dl>
-        {ficha.nome && (
-          <div>
-            <dt>Nome</dt>
-            <dd>{ficha.nome}</dd>
-          </div>
+    <>
+      <Acompanhamento ficha={ficha} />
+      <div className="ficha">
+        <h2>Ficha</h2>
+        <dl>
+          {ficha.nome && (
+            <div>
+              <dt>Nome</dt>
+              <dd>{ficha.nome}</dd>
+            </div>
+          )}
+          {(Object.keys(CAMPOS) as CampoSensivel[])
+            .filter((campo) => ficha.dados[campo])
+            .map((campo) => (
+              <div key={campo}>
+                <dt>{CAMPOS[campo]}</dt>
+                <dd>
+                  {revelados[campo] ?? ficha.dados[campo]}
+                  {!revelados[campo] && (
+                    <button
+                      type="button"
+                      className="link"
+                      aria-describedby="aviso-auditoria"
+                      onClick={() => revelar(campo)}
+                    >
+                      Revelar
+                    </button>
+                  )}
+                </dd>
+              </div>
+            ))}
+          {ficha.uf && (
+            <div>
+              <dt>UF</dt>
+              <dd>{ficha.uf}</dd>
+            </div>
+          )}
+          {ficha.publico && (
+            <div>
+              <dt>Público</dt>
+              <dd>{rotulo(PUBLICOS, ficha.publico)}</dd>
+            </div>
+          )}
+          {ficha.handoff_reason && (
+            <div>
+              <dt>Motivo do handoff</dt>
+              <dd>{rotulo(MOTIVOS_HANDOFF, ficha.handoff_reason)}</dd>
+            </div>
+          )}
+        </dl>
+        {erroRevelar && (
+          <p className="erro" role="alert">
+            {erroRevelar}
+          </p>
         )}
-        {(Object.keys(CAMPOS) as CampoSensivel[])
-          .filter((campo) => ficha.dados[campo])
-          .map((campo) => (
-            <div key={campo}>
-              <dt>{CAMPOS[campo]}</dt>
+        <p className="nota" id="aviso-auditoria">
+          Revelar um dado fica registrado na auditoria, em seu nome.
+        </p>
+      </div>
+    </>
+  );
+}
+
+const porcento = (valor: string) =>
+  `${Number(valor).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}% a.m.`;
+
+// O que a IA disse em valores, ao lado da fala: oferta vigente, proposta no
+// banco e as provas do SIM. Só aparece quando a jornada chegou a algum deles.
+function Acompanhamento({ ficha }: { ficha: Ficha }) {
+  const { oferta, proposta, consentimentos } = ficha;
+  if (!oferta && !proposta && consentimentos.length === 0) return null;
+  return (
+    <div className="ficha">
+      {oferta && (
+        <>
+          <h2>Oferta vigente</h2>
+          <dl>
+            <div>
+              <dt>Liberado</dt>
               <dd>
-                {revelados[campo] ?? ficha.dados[campo]}
-                {!revelados[campo] && (
-                  <button
-                    type="button"
-                    className="link"
-                    aria-describedby="aviso-auditoria"
-                    onClick={() => revelar(campo)}
-                  >
-                    Revelar
-                  </button>
-                )}
+                {reais(oferta.liberado)}
+                {oferta.limitado_ao_teto && <span className="nota"> (limitado ao teto)</span>}
               </dd>
             </div>
-          ))}
-        {ficha.uf && (
-          <div>
-            <dt>UF</dt>
-            <dd>{ficha.uf}</dd>
-          </div>
-        )}
-        {ficha.publico && (
-          <div>
-            <dt>Público</dt>
-            <dd>{rotulo(PUBLICOS, ficha.publico)}</dd>
-          </div>
-        )}
-        {ficha.handoff_reason && (
-          <div>
-            <dt>Motivo do handoff</dt>
-            <dd>{rotulo(MOTIVOS_HANDOFF, ficha.handoff_reason)}</dd>
-          </div>
-        )}
-      </dl>
-      {erroRevelar && (
-        <p className="erro" role="alert">
-          {erroRevelar}
-        </p>
+            <div>
+              <dt>Parcelas</dt>
+              <dd>
+                {oferta.numero_parcelas} × {reais(oferta.valor_parcela)}
+              </dd>
+            </div>
+            <div>
+              <dt>Taxa e CET</dt>
+              <dd>
+                {porcento(oferta.taxa_mensal)} · CET {porcento(oferta.cet_mensal)}
+              </dd>
+            </div>
+            <div>
+              <dt>Seguro</dt>
+              <dd>{oferta.seguro_aplicado ? reais(oferta.valor_seguro) : "Sem seguro"}</dd>
+            </div>
+          </dl>
+        </>
       )}
-      <p className="nota" id="aviso-auditoria">
-        Revelar um dado fica registrado na auditoria, em seu nome.
-      </p>
+      {proposta && (
+        <>
+          <h2>Proposta no banco</h2>
+          <dl>
+            <div>
+              <dt>Status</dt>
+              <dd className="texto">
+                {proposta.status ? rotulo(STATUS_PROPOSTA, proposta.status) : "Ainda sem status"}
+              </dd>
+            </div>
+            <div>
+              <dt>Parcelas</dt>
+              <dd>
+                {proposta.numero_parcelas} × {reais(proposta.valor_parcela)}
+              </dd>
+            </div>
+          </dl>
+          {proposta.difere_da_oferta && (
+            <p className="faixa-atencao">
+              <strong>Difere da oferta vigente.</strong> Confira qual valor a IA passou ao cliente.
+            </p>
+          )}
+          <p className="nota">
+            <Link to="/granatech">Ver na Granatech</Link>
+          </p>
+        </>
+      )}
+      <h2>Consentimento</h2>
+      {consentimentos.length === 0 ? (
+        <p className="nota">Nenhuma prova de consentimento gravada.</p>
+      ) : (
+        <ul className="provas">
+          {consentimentos.map((prova) => (
+            <li key={`${prova.tipo}-${prova.criada_em}`}>
+              <strong>{rotulo(TIPOS_DE_PROVA, prova.tipo)}</strong>
+              <span>
+                respondeu “{prova.resposta_literal}” · {formatarHora(prova.criada_em)}
+              </span>
+              <details>
+                <summary>Texto mostrado ({prova.versao})</summary>
+                <p>{prova.texto_mostrado}</p>
+              </details>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

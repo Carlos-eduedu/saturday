@@ -14,7 +14,7 @@ import {
   type PropostaGranatech,
   type PropostaGranatechDetalhe,
 } from "../api";
-import { ETAPAS, rotulo } from "../rotulos";
+import { ETAPAS, rotulo, reais } from "../rotulos";
 import { type Aviso, useAvisos } from "../tempoReal";
 
 // Aba Granatech (decisão 0013). Todos veem consultas e propostas; só o gestor
@@ -28,13 +28,6 @@ type Agir = (acao: () => Promise<unknown>, feito: string | ((r: unknown) => stri
 
 function mensagemDe(erro: unknown): string {
   return erro instanceof ErroApi ? erro.message : "falha inesperada";
-}
-
-// A margem vem do detalhe gravado como a Granatech mandou (pode ser "1.500,00").
-function reais(valor: string | number | undefined): string {
-  const numero = Number(valor);
-  if (valor === undefined || valor === "" || Number.isNaN(numero)) return `R$ ${valor ?? "—"}`;
-  return numero.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 const dataHora = (iso: string | null) =>

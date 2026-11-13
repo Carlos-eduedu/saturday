@@ -53,6 +53,33 @@ export interface Ficha {
   publico: string | null;
   handoff_reason: string | null;
   portabilidade: unknown;
+  // O que a IA ofereceu (valores como texto), o que o banco registrou e as provas do SIM.
+  oferta: {
+    liberado: string;
+    valor_parcela: string;
+    numero_parcelas: number;
+    taxa_mensal: string;
+    cet_mensal: string;
+    valor_seguro: string;
+    seguro_aplicado: boolean;
+    limitado_ao_teto: boolean;
+  } | null;
+  proposta: {
+    id: number;
+    status: string | null;
+    estado_envio: string;
+    valor_parcela: string;
+    numero_parcelas: number;
+    atualizada_em: string;
+    difere_da_oferta: boolean;
+  } | null;
+  consentimentos: {
+    tipo: string;
+    versao: string;
+    texto_mostrado: string;
+    resposta_literal: string;
+    criada_em: string;
+  }[];
 }
 
 export type CampoSensivel = "cpf" | "telefone" | "data_nascimento" | "email";

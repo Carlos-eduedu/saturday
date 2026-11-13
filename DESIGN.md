@@ -207,6 +207,9 @@ Cantos suaves em três passos: 6px para foco e detalhes, 10px para botões e cam
 ### Linha de conversa (assinatura)
 Prévia da última fala com o autor colorido como conteúdo principal; telefone mascarado e canal em segundo plano; à direita, rótulo de atenção, etapa, selo de estado e espera relativa ("cliente espera há 12 min"). No desktop tem o botão Assumir/Devolver; arrastar para a esquerda é atalho (no celular, o caminho). Assumir e devolver valem na hora, na lista e no cabeçalho da conversa; por 5s o aviso "Desfazer" devolve a conversa ao estado de antes. O botão Assumir só é principal (cobalto) na linha que pede atenção.
 
+### Acompanhamento na conversa
+Ao lado das mensagens, antes da Ficha: a oferta vigente (liberado, parcelas, taxa e CET, seguro), a proposta no banco e as provas de consentimento, para conferir a fala da IA sem trocar de tela. Valores em mono. Quando a proposta do banco não bate com a oferta, uma faixa âmbar diz "Difere da oferta vigente".
+
 ### Balões da conversa
 Cliente à esquerda em branco; IA à direita em verde tingido; equipe à direita em cobalto suave; sistema centrado, sem balão, em grafite.
 
