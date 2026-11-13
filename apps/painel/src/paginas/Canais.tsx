@@ -1,4 +1,4 @@
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Vazio } from "../componentes/Vazio";
 import {
   api,
@@ -92,6 +92,60 @@ export function Canais() {
       )}
 
       <section>
+        <h2>Evolution (WhatsApp Web)</h2>
+        {!canais.evolution.ativo ? (
+          <p className="vazio">Canal desligado (SATURDAY_EVOLUTION_ATIVO).</p>
+        ) : (
+          <>
+            {canais.evolution.erro && (
+              <p className="erro" role="alert">
+                {canais.evolution.erro}
+              </p>
+            )}
+            <TabelaInstancias
+              instancias={canais.evolution.instancias}
+              agir={agir}
+              mostrarQr={(nome, qr) => {
+                setDetalhesDe(null);
+                setQrDe({ nome, qr });
+              }}
+              aberta={detalhesDe}
+              detalhar={(nome) => {
+                setQrDe(null);
+                setDetalhesDe(nome === detalhesDe ? null : nome);
+              }}
+            />
+            <NovaInstancia
+              agir={agir}
+              mostrarQr={(nome, qr) => {
+                setDetalhesDe(null);
+                setQrDe({ nome, qr });
+              }}
+            />
+            {/* Abrem junto da tabela, perto de quem clicou, e não no fim da página. */}
+            {qrDe && (
+              <PainelQr
+                key={qrDe.nome}
+                nome={qrDe.nome}
+                inicial={qrDe.qr}
+                fechar={() => {
+                  setQrDe(null);
+                  carregar();
+                }}
+              />
+            )}
+            {detalhesDe && (
+              <PainelDetalhes
+                key={detalhesDe}
+                nome={detalhesDe}
+                fechar={() => setDetalhesDe(null)}
+              />
+            )}
+          </>
+        )}
+      </section>
+
+      <section>
         <h2>WhatsApp oficial (Meta)</h2>
         <p className="nota">Só leitura: os números da Meta são configurados no Meta Business.</p>
         {canais.meta.length === 0 ? (
@@ -107,44 +161,7 @@ export function Canais() {
         )}
       </section>
 
-      <section>
-        <h2>Evolution (WhatsApp Web)</h2>
-        {!canais.evolution.ativo ? (
-          <p className="vazio">Canal desligado (SATURDAY_EVOLUTION_ATIVO).</p>
-        ) : (
-          <>
-            {canais.evolution.erro && (
-              <p className="erro" role="alert">
-                {canais.evolution.erro}
-              </p>
-            )}
-            <TabelaInstancias
-              instancias={canais.evolution.instancias}
-              agir={agir}
-              mostrarQr={(nome, qr) => setQrDe({ nome, qr })}
-              detalhar={setDetalhesDe}
-            />
-            <NovaInstancia agir={agir} mostrarQr={(nome, qr) => setQrDe({ nome, qr })} />
-          </>
-        )}
-      </section>
-
       <RespostasRapidas />
-
-      {detalhesDe && (
-        <PainelDetalhes key={detalhesDe} nome={detalhesDe} fechar={() => setDetalhesDe(null)} />
-      )}
-
-      {qrDe && (
-        <PainelQr
-          nome={qrDe.nome}
-          inicial={qrDe.qr}
-          fechar={() => {
-            setQrDe(null);
-            carregar();
-          }}
-        />
-      )}
     </div>
   );
 }
@@ -153,11 +170,13 @@ function TabelaInstancias({
   instancias,
   agir,
   mostrarQr,
+  aberta,
   detalhar,
 }: {
   instancias: InstanciaEvolution[];
   agir: (acao: () => Promise<unknown>) => Promise<void>;
   mostrarQr: (nome: string, qr: Qr) => void;
+  aberta: string | null;
   detalhar: (nome: string) => void;
 }) {
   if (instancias.length === 0)
@@ -185,18 +204,22 @@ function TabelaInstancias({
       </thead>
       <tbody>
         {instancias.map((i) => (
-          <tr key={i.nome}>
+          <tr key={i.nome} className={aberta === i.nome ? "aberta" : undefined}>
             <td>{i.nome}</td>
             <td data-rotulo="Estado">
               <span className={`estado-instancia estado-${i.estado}`}>
                 {ROTULO_ESTADO[i.estado] ?? i.estado}
               </span>
             </td>
-            <td data-rotulo="Telefone">{i.telefone}</td>
+            <td data-rotulo="Telefone">{i.telefone || "—"}</td>
             <td data-rotulo="Conversas (7 dias)">{i.conversas_7_dias}</td>
             <td className="acoes">
-              <button type="button" onClick={() => detalhar(i.nome)}>
-                Detalhes
+              <button
+                type="button"
+                aria-expanded={aberta === i.nome}
+                onClick={() => detalhar(i.nome)}
+              >
+                {aberta === i.nome ? "Fechar detalhes" : "Detalhes"}
               </button>
               {i.estado !== "open" && (
                 <button
@@ -284,9 +307,17 @@ function PainelQr({ nome, inicial, fechar }: { nome: string; inicial: Qr; fechar
     return () => window.clearInterval(id);
   }, [nome, qr.estado]);
 
+  const topo = useAoAbrir();
   return (
-    <section className="qr" aria-live="polite">
-      <h2>Conectar {nome}</h2>
+    <section className="painel-instancia qr" aria-live="polite">
+      <div className="painel-topo">
+        <h3 ref={topo} tabIndex={-1}>
+          Conectar {nome}
+        </h3>
+        <button type="button" onClick={fechar}>
+          Fechar
+        </button>
+      </div>
       {qr.estado === "open" ? (
         <p>Conectada. O telefone fica fixado nesta instância.</p>
       ) : qr.qr ? (
@@ -302,11 +333,21 @@ function PainelQr({ nome, inicial, fechar }: { nome: string; inicial: Qr; fechar
           {erro}
         </p>
       )}
-      <button type="button" onClick={fechar}>
-        Fechar
-      </button>
     </section>
   );
+}
+
+// Leva quem clicou até o painel que abriu e põe o foco no título dele.
+function useAoAbrir() {
+  const ref = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    const titulo = ref.current;
+    if (!titulo) return;
+    const suave = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    titulo.scrollIntoView({ behavior: suave ? "smooth" : "auto", block: "start" });
+    titulo.focus({ preventScroll: true });
+  }, []);
+  return ref;
 }
 
 function PainelDetalhes({ nome, fechar }: { nome: string; fechar: () => void }) {
@@ -334,9 +375,17 @@ function PainelDetalhes({ nome, fechar }: { nome: string; fechar: () => void }) 
     carregar();
   }
 
+  const topo = useAoAbrir();
   return (
-    <section className="detalhes-instancia" aria-live="polite">
-      <h2>Detalhes de {nome}</h2>
+    <section className="painel-instancia detalhes-instancia" aria-live="polite">
+      <div className="painel-topo">
+        <h3 ref={topo} tabIndex={-1}>
+          Detalhes de {nome}
+        </h3>
+        <button type="button" onClick={fechar}>
+          Fechar
+        </button>
+      </div>
       {erro && (
         <p className="erro" role="alert">
           {erro}
@@ -366,9 +415,6 @@ function PainelDetalhes({ nome, fechar }: { nome: string; fechar: () => void }) 
           />
         </>
       )}
-      <button type="button" onClick={fechar}>
-        Fechar
-      </button>
     </section>
   );
 }
@@ -383,8 +429,8 @@ function SecaoWebhook({
   const { webhook, divergencias } = detalhes;
 
   return (
-    <>
-      <h3>Webhook</h3>
+    <div className="grupo-detalhes">
+      <h4>Webhook</h4>
       {divergencias.length === 0 ? (
         <p className="confere">O webhook confere com o do Saturday.</p>
       ) : (
@@ -423,8 +469,7 @@ function SecaoWebhook({
           <dd>{simNao(webhook.base64)}</dd>
         </dl>
       )}
-
-    </>
+    </div>
   );
 }
 
@@ -452,17 +497,19 @@ function FormEventos({
   }
 
   return (
-    <form className="configuracoes" onSubmit={enviar}>
-      <h3>Eventos</h3>
+    <form className="configuracoes grupo-detalhes" onSubmit={enviar}>
+      <h4>Eventos</h4>
       <fieldset>
         <legend>Usados pelo Saturday (sempre ligados)</legend>
-        {doSaturday.map((e) => (
-          <label key={e} className="opcao">
-            <input type="checkbox" checked disabled />
-            <code>{e}</code>
-            {faltando.includes(e) && <small className="evento-falta">falta na instância</small>}
-          </label>
-        ))}
+        <div className="grade-eventos">
+          {doSaturday.map((e) => (
+            <label key={e} className="opcao">
+              <input type="checkbox" checked disabled />
+              <code>{e}</code>
+              {faltando.includes(e) && <small className="evento-falta">falta na instância</small>}
+            </label>
+          ))}
+        </div>
       </fieldset>
       <fieldset>
         <legend>Outros eventos</legend>
@@ -515,10 +562,10 @@ function FormConfiguracoes({
 
   if (detalhes.configuracoes.length === 0)
     return (
-      <>
-        <h3>Configurações da instância</h3>
+      <div className="grupo-detalhes">
+        <h4>Configurações da instância</h4>
         <p className="vazio">A Evolution não devolveu configurações.</p>
-      </>
+      </div>
     );
 
   function enviar(evento: FormEvent) {
@@ -527,8 +574,9 @@ function FormConfiguracoes({
   }
 
   return (
-    <form className="configuracoes" onSubmit={enviar}>
-      <h3>Configurações da instância</h3>
+    <form className="configuracoes grupo-detalhes" onSubmit={enviar}>
+      <h4>Configurações da instância</h4>
+      <div className="grade-eventos">
       {detalhes.configuracoes.map((c) => {
         const nome = c.nome as Booleanas;
         return (
@@ -547,6 +595,7 @@ function FormConfiguracoes({
           </label>
         );
       })}
+      </div>
       {valores.rejectCall && (
         <label>
           Mensagem para quem ligar (opcional)
