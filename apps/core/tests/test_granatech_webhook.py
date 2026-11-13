@@ -60,6 +60,47 @@ def test_token_errado_responde_401(service: AgentService) -> None:
     assert resposta.status_code == 401
 
 
+def test_recusa_registra_o_diagnostico_sem_o_token(
+    service: AgentService, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Token cru em Authorization (sem Bearer): 401, e o log diz o que mudar."""
+
+    with caplog.at_level("WARNING", logger="saturday.web.api.granatech"):
+        resposta = _api(service).post(
+            "/webhooks/granatech?origem=dev",
+            json=EVENTO,
+            headers={"authorization": TOKEN, "user-agent": "granatech-webhook/1.0"},
+        )
+
+    assert resposta.status_code == 401
+    [registro] = [r for r in caplog.records if r.getMessage() == "granatech_token_invalido"]
+    campos = registro.__dict__
+    assert campos["token_fontes"] == ["authorization_sem_bearer:cru"]
+    assert campos["authorization_cru_bate"] is True
+    assert campos["token_tamanho"] == 0
+    assert campos["token_esperado_tamanho"] == len(TOKEN)
+    assert campos["query_parametros"] == ["origem"]
+    assert campos["corpo_tipo"] == "CONSULTA"
+    assert "cpf" in campos["corpo_chaves"]
+    assert campos["user_agent"] == "granatech-webhook/1.0"
+    assert CPF not in repr(campos)
+    assert TOKEN[:6] not in repr({k: v for k, v in campos.items() if k != "args"})
+
+
+def test_token_com_espaco_aparece_no_diagnostico(
+    service: AgentService, caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level("WARNING", logger="saturday.web.api.granatech"):
+        _api(service).post(
+            "/webhooks/granatech", json=EVENTO, headers={"x-webhook-token": TOKEN + " "}
+        )
+
+    [registro] = [r for r in caplog.records if r.getMessage() == "granatech_token_invalido"]
+    assert registro.__dict__["token_com_espacos"] is True
+    assert registro.__dict__["token_bate_sem_espacos"] is True
+    assert registro.__dict__["token_fontes"] == ["x-webhook-token"]
+
+
 def test_sem_token_na_requisicao_responde_401(service: AgentService) -> None:
     assert _api(service).post("/webhooks/granatech", json=EVENTO).status_code == 401
 

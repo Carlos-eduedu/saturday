@@ -90,6 +90,16 @@ que **voltou**, porque na dev `seguro=false` é ignorado.
 string. O evento vai para `eventos_recebidos` com o sha256 do JSON canônico como
 id, então um reenvio idêntico é descartado.
 
+Chamada recusada (401) gera o log `granatech_token_invalido` com o diagnóstico,
+nunca o token: `token_fontes` (por onde veio: `authorization_bearer`,
+`authorization_sem_bearer:cru` para token sem o prefixo `Bearer `,
+`x-webhook-token`, `query_t` ou `nenhuma`), tamanho e `token_impressao` (8 hex
+do SHA-256) do recebido e do esperado, `token_com_espacos`,
+`token_bate_sem_espacos`, `authorization_cru_bate` (o token certo, só que sem
+`Bearer `), nomes dos cabeçalhos e dos parâmetros, `user_agent`, tamanho e
+chaves do corpo e o `tipo`. Impressões iguais = mesmo token; diferentes = a
+Granatech tem outro token cadastrado.
+
 O worker separa os eventos pela origem. Para a Granatech:
 
 - localiza a consulta (`id_solicitacao`) ou a proposta (`id_proposta`) local;

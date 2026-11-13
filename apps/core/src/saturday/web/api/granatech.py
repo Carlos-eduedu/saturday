@@ -39,6 +39,65 @@ def token_recebido(request: Request) -> str:
     return request.headers.get("x-webhook-token") or request.query_params.get("t") or ""
 
 
+def impressao(token: str) -> str:
+    """8 primeiros hex do SHA-256: compara tokens sem expor nenhum dos dois."""
+
+    return hashlib.sha256(token.encode()).hexdigest()[:8] if token else ""
+
+
+def diagnostico(request: Request, corpo: bytes, esperado: str) -> dict[str, Any]:
+    """O que veio numa chamada recusada, para dizer à Granatech o que mudar.
+
+    Nunca o token nem a query string: só por onde o token veio, o tamanho e a
+    impressão (`impressao`), os nomes dos cabeçalhos e as chaves do corpo (o
+    corpo da consulta traz CPF).
+    """
+
+    autorizacao = request.headers.get("authorization", "")
+    fontes = []
+    if autorizacao.lower().startswith("bearer "):
+        fontes.append("authorization_bearer")
+    elif autorizacao:
+        # Token cru ou outro esquema (Basic, Token...): não é aceito.
+        # Só o nome do esquema (Basic, Token...); sem espaço é o token cru, que
+        # não pode ir para o log nem em parte.
+        esquema, _, resto = autorizacao.partition(" ")
+        nome = esquema[:12] if resto and esquema.isalpha() else "cru"
+        fontes.append(f"authorization_sem_bearer:{nome}")
+    if "x-webhook-token" in request.headers:
+        fontes.append("x-webhook-token")
+    if "t" in request.query_params:
+        fontes.append("query_t")
+    recebido = token_recebido(request)
+    try:
+        payload = json.loads(corpo)
+    except ValueError:
+        payload = None
+    chaves = sorted(payload) if isinstance(payload, dict) else []
+    return {
+        "token_fontes": fontes or ["nenhuma"],
+        "token_tamanho": len(recebido),
+        "token_esperado_tamanho": len(esperado),
+        "token_impressao": impressao(recebido),
+        "token_esperado_impressao": impressao(esperado),
+        "token_com_espacos": recebido != recebido.strip(),
+        "token_bate_sem_espacos": bool(recebido)
+        and hmac.compare_digest(recebido.strip().encode(), esperado.encode()),
+        # Token cru em Authorization (sem "Bearer "): diz se trocar o formato resolve.
+        "authorization_cru_bate": bool(autorizacao)
+        and not autorizacao.lower().startswith("bearer ")
+        and hmac.compare_digest(autorizacao.strip().encode(), esperado.encode()),
+        "query_parametros": sorted(request.query_params.keys()),
+        "cabecalhos": sorted(request.headers.keys()),
+        "content_type": request.headers.get("content-type", ""),
+        "user_agent": request.headers.get("user-agent", "")[:120],
+        "corpo_bytes": len(corpo),
+        "corpo_json": payload is not None,
+        "corpo_chaves": chaves[:30],
+        "corpo_tipo": str(payload.get("tipo", ""))[:40] if isinstance(payload, dict) else "",
+    }
+
+
 def evento_id(payload: dict[str, Any]) -> str:
     """Mesmo evento reenviado = mesmo id, independente da ordem das chaves."""
 
@@ -59,7 +118,10 @@ async def receber(
 
     recebido = token_recebido(request)
     if not hmac.compare_digest(recebido.encode(), esperado.encode()):
-        logger.warning("granatech_token_invalido")
+        logger.warning(
+            "granatech_token_invalido",
+            extra=diagnostico(request, await request.body(), esperado),
+        )
         raise HTTPException(status_code=401, detail="token inválido")
 
     try:
