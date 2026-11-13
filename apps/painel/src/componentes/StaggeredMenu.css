@@ -16,6 +16,9 @@
   height: 100dvh;
   z-index: 40;
   overflow: hidden;
+  /* clip, não hidden: hidden ainda pode ser rolado por programa (foco), e o
+     painel fora da tela arrastava o topo para o lado ao abrir. */
+  overflow: clip;
 }
 
 .staggered-menu-header {

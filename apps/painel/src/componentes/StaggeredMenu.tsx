@@ -109,7 +109,9 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
       toggleBtnRef.current?.focus();
     };
     document.addEventListener('keydown', aoTeclar);
-    panelRef.current?.querySelector<HTMLElement>('.sm-panel-item')?.focus();
+    // Sem rolar: o item ainda está fora da tela, deslizando; rolar o invólucro
+    // arrastava o topo junto e quebrava a abertura.
+    panelRef.current?.querySelector<HTMLElement>('.sm-panel-item')?.focus({ preventScroll: true });
     return () => document.removeEventListener('keydown', aoTeclar);
   }, [open, closeMenu]);
 
