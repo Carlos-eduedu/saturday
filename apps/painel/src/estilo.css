@@ -156,6 +156,8 @@ label { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.875rem
 .centro, .vazio { text-align: center; color: var(--suave); padding: 2.5rem 1rem; }
 .vazio p { margin: 0.25rem 0; }
 .vazio .vazio-titulo { font-family: var(--fonte-titulo); font-size: 1.1rem; font-weight: 500; color: var(--texto); }
+.falha .vazio-titulo { color: var(--erro); }
+.falha button { margin-top: 0.75rem; }
 .titulo-tela { font-size: 1.6rem; margin: 0 0 1.25rem; }
 .titulo-tela .contagem { color: var(--suave); font-weight: 400; font-size: 1.1rem; }
 .status.falhou { color: var(--erro); font-weight: 600; }

@@ -14,7 +14,7 @@ export function Caixa({ eu }: { eu: Eu }) {
   const fichaEmColuna = useMidia("(min-width: 1280px)");
 
   if (!lado)
-    return <AvisoDesfazer>{id ? <Conversa eu={eu} /> : <Inbox eu={eu} />}</AvisoDesfazer>;
+    return <AvisoDesfazer>{id ? <Conversa key={id} eu={eu} /> : <Inbox eu={eu} />}</AvisoDesfazer>;
   return (
     <AvisoDesfazer>
       <div className="caixa">

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { type Alerta, api } from "../api";
+import { Falha } from "../componentes/Falha";
 import { Vazio } from "../componentes/Vazio";
 import { useAvisos } from "../tempoReal";
 import { formatarHora } from "./Inbox";
@@ -19,8 +20,10 @@ const ROTULOS: Record<string, string> = {
 };
 
 export function Alertas() {
-  const [alertas, setAlertas] = useState<Alerta[]>([]);
+  // null = ainda não carregou: a tela não diz "nenhum alerta" antes de saber.
+  const [alertas, setAlertas] = useState<Alerta[] | null>(null);
   const [erro, setErro] = useState("");
+  const [resolvendo, setResolvendo] = useState<number | null>(null);
   const carregar = useCallback(() => {
     api
       .alertas()
@@ -29,13 +32,15 @@ export function Alertas() {
         setErro("");
       })
       .catch((e: unknown) =>
-        setErro(e instanceof Error ? `Não deu para carregar os alertas: ${e.message}` : "Falha."),
+        setErro(e instanceof Error ? e.message : "Não deu para carregar os alertas."),
       );
   }, []);
   useEffect(carregar, [carregar]);
   useAvisos(useCallback((aviso) => aviso.tipo !== "mensagem" && carregar(), [carregar]));
 
   async function resolver(id: number) {
+    if (resolvendo !== null) return;
+    setResolvendo(id);
     try {
       await api.resolverAlerta(id);
     } catch (e) {
@@ -43,8 +48,16 @@ export function Alertas() {
         e instanceof Error ? `Não deu para resolver: ${e.message}` : "Não deu para resolver.",
       );
     }
+    setResolvendo(null);
     carregar();
   }
+
+  if (!alertas)
+    return erro ? (
+      <Falha titulo="Não deu para carregar os alertas." texto={erro} aoTentar={carregar} />
+    ) : (
+      <p className="centro">Carregando…</p>
+    );
 
   return (
     <section>
@@ -69,8 +82,12 @@ export function Alertas() {
               {typeof a.detalhe?.instancia === "string" && <span>{a.detalhe.instancia}</span>}
               <time>{formatarHora(a.criado_em)}</time>
               {a.conversa_id && <Link to={`/conversas/${a.conversa_id}`}>Abrir conversa</Link>}
-              <button type="button" onClick={() => resolver(a.id)}>
-                Resolver
+              <button
+                type="button"
+                disabled={resolvendo !== null}
+                onClick={() => resolver(a.id)}
+              >
+                {resolvendo === a.id ? "Resolvendo…" : "Resolver"}
               </button>
             </li>
           ))}

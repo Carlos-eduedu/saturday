@@ -10,6 +10,7 @@ import {
   type Qr,
   type RespostaRapida,
 } from "../api";
+import { Falha } from "../componentes/Falha";
 
 // Tela Canais (decisão 0010), só para gestor: números da Meta para consulta e
 // instâncias da Evolution geridas aqui. O QR se renova sozinho até conectar.
@@ -74,7 +75,12 @@ export function Canais() {
     carregar();
   }
 
-  if (!canais) return <p className="centro">{erro || "Carregando…"}</p>;
+  if (!canais)
+    return erro ? (
+      <Falha titulo="Não deu para carregar os canais." texto={erro} aoTentar={carregar} />
+    ) : (
+      <p className="centro">Carregando…</p>
+    );
 
   return (
     <div className="canais">

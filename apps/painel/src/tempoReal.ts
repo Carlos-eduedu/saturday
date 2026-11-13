@@ -20,7 +20,14 @@ export function iniciarTempoReal(): () => void {
     if (jaAbriu) emitir({ tipo: "reconectado" });
     jaAbriu = true;
   };
-  fonte.onmessage = (evento) => emitir(JSON.parse(evento.data) as Aviso);
+  fonte.onmessage = (evento) => {
+    // Um aviso malformado não derruba os seguintes.
+    try {
+      emitir(JSON.parse(evento.data) as Aviso);
+    } catch {
+      // ignora
+    }
+  };
   return () => fonte.close();
 }
 

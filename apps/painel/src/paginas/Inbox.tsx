@@ -13,6 +13,7 @@ import { AiChat02Icon, UserCheck01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { confirmarTomada, textoDoAviso, useAvisoDesfazer } from "../componentes/Desfazer";
 import SwipeRow, { type SwipeAction } from "../componentes/SwipeRow";
+import { Falha } from "../componentes/Falha";
 import { Vazio } from "../componentes/Vazio";
 import { ATENCAO, AUTORES, ETAPAS, MOTIVOS_HANDOFF, relativo, rotulo } from "../rotulos";
 import { useMidia } from "../midia";
@@ -107,17 +108,26 @@ export function Inbox({
   const Titulo = compacta ? "h2" : "h1";
   const [fila, setFila] = useState("");
   const [busca, setBusca] = useState("");
-  const [conversas, setConversas] = useState<Resumo[]>([]);
+  // null = ainda não carregou: não mostra "nenhuma conversa" antes de saber.
+  const [conversas, setConversas] = useState<Resumo[] | null>(null);
   const [erro, setErro] = useState("");
 
+  // Digitar na busca dispara um pedido por tecla e os avisos chegam em rajada:
+  // só a resposta do último pedido vale, senão uma lista velha cobre a nova.
+  const ultimoPedido = useRef(0);
   const carregar = useCallback(() => {
+    const pedido = ++ultimoPedido.current;
     api
       .conversas(fila, busca)
       .then((lista) => {
+        if (pedido !== ultimoPedido.current) return;
         setConversas(lista);
         setErro("");
       })
-      .catch((e: Error) => setErro(e.message));
+      .catch((e: unknown) => {
+        if (pedido !== ultimoPedido.current) return;
+        setErro(e instanceof Error ? e.message : "Não deu para carregar as conversas.");
+      });
   }, [fila, busca]);
 
   useEffect(carregar, [carregar]);
@@ -129,7 +139,7 @@ export function Inbox({
     const id = window.setInterval(() => setAgora(Date.now()), 30_000);
     return () => window.clearInterval(id);
   }, []);
-  const pedemAtencao = conversas.filter((c) => c.atencao.length > 0).length;
+  const pedemAtencao = (conversas ?? []).filter((c) => c.atencao.length > 0).length;
 
   // Soltar depois de arrastar não abre a conversa; o clique simples abre.
   const inicio = useRef<{ x: number; y: number } | null>(null);
@@ -198,7 +208,8 @@ export function Inbox({
       <Titulo className="titulo-tela">
         Conversas{" "}
         <span className="contagem">
-          · {rotuloFila} · {conversas.length}
+          · {rotuloFila}
+          {conversas && ` · ${conversas.length}`}
           {pedemAtencao > 0 && ` · ${pedemAtencao} pedem atenção`}
         </span>
       </Titulo>
@@ -228,12 +239,18 @@ export function Inbox({
           />
         </label>
       </div>
-      {erro && (
+      {erro && conversas && (
         <p className="erro" role="alert">
           {erro}
         </p>
       )}
-      {conversas.length === 0 ? (
+      {!conversas ? (
+        erro ? (
+          <Falha titulo="Não deu para carregar as conversas." texto={erro} aoTentar={carregar} />
+        ) : (
+          <p className="centro">Carregando…</p>
+        )
+      ) : conversas.length === 0 ? (
         <Vazio titulo={vazio.titulo} texto={vazio.texto} />
       ) : (
         <ul className="inbox">

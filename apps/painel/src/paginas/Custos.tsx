@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { api, type Custos as DadosCustos, ErroApi } from "../api";
+import { Falha } from "../componentes/Falha";
 import { Vazio } from "../componentes/Vazio";
 import { dolar, tokens } from "../rotulos";
 
@@ -9,19 +10,16 @@ export function Custos() {
   const [custos, setCustos] = useState<DadosCustos | null>(null);
   const [erro, setErro] = useState("");
 
-  useEffect(() => {
+  const carregar = useCallback(() => {
+    setErro("");
     api
       .custos()
       .then(setCustos)
       .catch((e: unknown) => setErro(e instanceof ErroApi ? e.message : "falha ao carregar"));
   }, []);
+  useEffect(carregar, [carregar]);
 
-  if (erro)
-    return (
-      <p className="erro" role="alert">
-        {erro}
-      </p>
-    );
+  if (erro) return <Falha titulo="Não deu para carregar os custos." texto={erro} aoTentar={carregar} />;
   if (!custos) return <p className="centro">Carregando…</p>;
 
   const dia = (iso: string) =>

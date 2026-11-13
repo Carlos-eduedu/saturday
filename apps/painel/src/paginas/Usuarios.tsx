@@ -1,6 +1,7 @@
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Vazio } from "../componentes/Vazio";
 import { api, type Eu, ErroApi, type Perfil, type UsuarioGestao } from "../api";
+import { Falha } from "../componentes/Falha";
 
 // Aba Usuários (decisão 0012), só para gestor: cadastrar, editar, redefinir
 // senha, desbloquear, desativar e reativar. Nunca apagar: a auditoria continua
@@ -55,7 +56,12 @@ export function Usuarios({ eu }: { eu: Eu }) {
     }
   }
 
-  if (!usuarios) return <p className="centro">{erro || "Carregando…"}</p>;
+  if (!usuarios)
+    return erro ? (
+      <Falha titulo="Não deu para carregar os usuários." texto={erro} aoTentar={carregar} />
+    ) : (
+      <p className="centro">Carregando…</p>
+    );
   const selecionado = usuarios.find((u) => u.id === editando) ?? null;
 
   return (

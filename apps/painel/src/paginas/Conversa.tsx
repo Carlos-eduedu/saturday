@@ -15,6 +15,7 @@ import {
 } from "../api";
 import { confirmarTomada, textoDoAviso, useAvisoDesfazer } from "../componentes/Desfazer";
 import { Compositor } from "../componentes/Compositor";
+import { Falha } from "../componentes/Falha";
 import { Vazio } from "../componentes/Vazio";
 import {
   ATENCAO,
@@ -115,8 +116,20 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
   const avisar = useAvisoDesfazer();
   // Assumir pelo cabeçalho leva o cursor para a mensagem.
   const [focarEnvio, setFocarEnvio] = useState(false);
+  // Assumir, devolver e transferir em andamento: o duplo clique não repete.
+  const [ocupado, setOcupado] = useState(false);
+  function agirUmaVez(acao: () => Promise<unknown>): Promise<void> {
+    if (ocupado) return Promise.resolve();
+    setOcupado(true);
+    return agir(acao).finally(() => setOcupado(false));
+  }
 
-  if (!conversa) return <p className="centro">{erro || "Carregando…"}</p>;
+  if (!conversa)
+    return erro ? (
+      <Falha titulo="Não deu para abrir a conversa." texto={erro} aoTentar={carregar} />
+    ) : (
+      <p className="centro">Carregando…</p>
+    );
   const minha = conversa.atendimento === "assumida" && conversa.atendente_id === eu.id;
   const dono = usuarios.find((u) => u.id === conversa.atendente_id)?.nome ?? "outra pessoa";
 
@@ -124,7 +137,7 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
   function mudar(acao: "assumir" | "devolver") {
     if (acao === "assumir" && conversa?.atendimento === "assumida" && !confirmarTomada(dono)) return;
     setFocarEnvio(acao === "assumir");
-    void agir(async () => {
+    void agirUmaVez(async () => {
       await (acao === "assumir" ? api.assumir(id) : api.devolver(id));
       avisar({
         id,
@@ -166,7 +179,8 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
             eu={eu}
             minha={minha}
             usuarios={usuarios}
-            agir={agir}
+            agir={agirUmaVez}
+            ocupado={ocupado}
             mudar={mudar}
           />
           {erro && (
@@ -260,6 +274,7 @@ function Acoes({
   usuarios,
   agir,
   mudar,
+  ocupado,
 }: {
   conversa: Detalhe;
   eu: Eu;
@@ -267,6 +282,7 @@ function Acoes({
   usuarios: Usuario[];
   agir: (acao: () => Promise<unknown>) => Promise<void>;
   mudar: (acao: "assumir" | "devolver") => void;
+  ocupado: boolean;
 }) {
   const [destino, setDestino] = useState("");
   const podeMexer = minha || eu.perfil === "gestor";
@@ -274,12 +290,12 @@ function Acoes({
   return (
     <div className="acoes">
       {!minha && (conversa.atendimento !== "assumida" || eu.perfil === "gestor") && (
-        <button type="button" onClick={() => mudar("assumir")}>
+        <button type="button" disabled={ocupado} onClick={() => mudar("assumir")}>
           Assumir
         </button>
       )}
       {conversa.atendimento !== "ia" && (conversa.atendimento === "handoff" || podeMexer) && (
-        <button type="button" onClick={() => mudar("devolver")}>
+        <button type="button" disabled={ocupado} onClick={() => mudar("devolver")}>
           Devolver para a IA
         </button>
       )}
@@ -309,7 +325,7 @@ function Acoes({
               </label>
               <button
                 type="button"
-                disabled={!destino}
+                disabled={!destino || ocupado}
                 onClick={() => agir(() => api.transferir(conversa.id, destino)).then(() => setDestino(""))}
               >
                 Transferir
@@ -393,13 +409,13 @@ function TrilhaIa({ id }: { id: string }) {
     ),
   );
 
-  if (erro)
-    return (
-      <p className="erro" role="alert">
-        {erro}
-      </p>
+  // Falhar ao recarregar mantém a última trilha à vista.
+  if (!trilha)
+    return erro ? (
+      <Falha titulo="Não deu para carregar a trilha da IA." texto={erro} aoTentar={carregar} />
+    ) : (
+      <p className="centro">Carregando…</p>
     );
-  if (!trilha) return <p className="centro">Carregando…</p>;
   if (trilha.turnos.length === 0)
     return (
       <Vazio
@@ -410,6 +426,11 @@ function TrilhaIa({ id }: { id: string }) {
 
   return (
     <div className="trilha">
+      {erro && (
+        <p className="erro" role="alert">
+          {erro}
+        </p>
+      )}
       {trilha.custo_usd !== null && (
         <p className="trilha-total">
           {dolar(trilha.custo_usd)} · {tokens(trilha.tokens ?? 0)} tokens nesta conversa
@@ -466,11 +487,18 @@ function FichaCliente({ id }: { id: string }) {
   const [ficha, setFicha] = useState<Ficha | null>(null);
   const [revelados, setRevelados] = useState<Partial<Record<CampoSensivel, string>>>({});
 
+  // Falhar ao recarregar mantém a última ficha: some só o que nunca chegou.
+  const [erroCarga, setErroCarga] = useState("");
   const carregar = useCallback(() => {
     api
       .ficha(id)
-      .then(setFicha)
-      .catch(() => setFicha(null));
+      .then((f) => {
+        setFicha(f);
+        setErroCarga("");
+      })
+      .catch((e: unknown) =>
+        setErroCarga(e instanceof Error ? e.message : "Não deu para carregar a ficha."),
+      );
   }, [id]);
   useEffect(() => {
     setRevelados({});
@@ -480,7 +508,11 @@ function FichaCliente({ id }: { id: string }) {
   useAvisos(useCallback((aviso) => aviso.conversa === id && carregar(), [id, carregar]));
 
   const [erroRevelar, setErroRevelar] = useState("");
+  // Cada clique em Revelar grava auditoria: um pedido por vez.
+  const [revelando, setRevelando] = useState<CampoSensivel | null>(null);
   async function revelar(campo: CampoSensivel) {
+    if (revelando) return;
+    setRevelando(campo);
     setErroRevelar("");
     try {
       const { valor } = await api.revelar(id, campo);
@@ -490,9 +522,15 @@ function FichaCliente({ id }: { id: string }) {
         e instanceof Error ? `Não deu para revelar: ${e.message}` : "Não deu para revelar.",
       );
     }
+    setRevelando(null);
   }
 
-  if (!ficha) return <div className="ficha" />;
+  if (!ficha)
+    return erroCarga ? (
+      <Falha titulo="Não deu para carregar a ficha." texto={erroCarga} aoTentar={carregar} />
+    ) : (
+      <p className="centro">Carregando…</p>
+    );
   return (
     <>
       <Acompanhamento ficha={ficha} />
@@ -517,6 +555,7 @@ function FichaCliente({ id }: { id: string }) {
                       type="button"
                       className="link"
                       aria-describedby="aviso-auditoria"
+                      disabled={revelando !== null}
                       onClick={() => revelar(campo)}
                     >
                       Revelar

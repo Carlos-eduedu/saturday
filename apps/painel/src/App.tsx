@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, Navigate, Route, Routes, useLocation } from "react-router";
-import { api, type Cota, type Eu, ErroApi, guardarCsrf } from "./api";
+import { api, type Cota, type Eu, ErroApi, guardarCsrf, SESSAO_EXPIRADA } from "./api";
+import { Falha } from "./componentes/Falha";
 import { Alertas } from "./paginas/Alertas";
 import { Canais } from "./paginas/Canais";
 import { Custos } from "./paginas/Custos";
@@ -14,13 +15,32 @@ import { iniciarTempoReal, useAvisos } from "./tempoReal";
 export function App() {
   const [eu, setEu] = useState<Eu | null>(null);
   const [carregando, setCarregando] = useState(true);
+  // API fora do ar ao abrir: não é o mesmo que "não logado".
+  const [falha, setFalha] = useState("");
 
-  useEffect(() => {
+  const conferir = useCallback(() => {
+    setCarregando(true);
+    setFalha("");
     api
       .eu()
       .then(entrar)
-      .catch(() => setEu(null))
+      .catch((e: unknown) => {
+        setEu(null);
+        if (!(e instanceof ErroApi && e.status === 401))
+          setFalha(e instanceof Error ? e.message : "Não deu para abrir o painel.");
+      })
       .finally(() => setCarregando(false));
+  }, []);
+  useEffect(conferir, [conferir]);
+
+  // Sessão vencida no meio do uso: volta para o login sem recarregar a página.
+  useEffect(() => {
+    const expirou = () => {
+      guardarCsrf("");
+      setEu(null);
+    };
+    window.addEventListener(SESSAO_EXPIRADA, expirou);
+    return () => window.removeEventListener(SESSAO_EXPIRADA, expirou);
   }, []);
 
   function entrar(usuario: Eu) {
@@ -30,10 +50,12 @@ export function App() {
 
   async function sair() {
     await api.sair().catch(() => undefined);
+    guardarCsrf("");
     setEu(null);
   }
 
   if (carregando) return <p className="centro">Carregando…</p>;
+  if (falha) return <Falha titulo="Não deu para abrir o painel." texto={falha} aoTentar={conferir} />;
   if (!eu) return <Login aoEntrar={entrar} />;
   return <Logado eu={eu} aoSair={sair} />;
 }
@@ -147,12 +169,11 @@ function Logado({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
 function ContadorCota() {
   const [cota, setCota] = useState<Cota | null>(null);
   const carregar = useCallback(() => {
+    // Sessão vencida já volta ao login pelo `api`; o resto deixa a última cota.
     api
       .cota()
       .then(setCota)
-      .catch((erro: unknown) => {
-        if (erro instanceof ErroApi && erro.status === 401) window.location.reload();
-      });
+      .catch(() => undefined);
   }, []);
   useEffect(carregar, [carregar]);
   // A cota só muda com consulta à Granatech (Fase 4): basta recarregar ao reconectar.

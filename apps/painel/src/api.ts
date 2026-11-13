@@ -362,12 +362,42 @@ export function guardarCsrf(token: string): void {
   csrf = token;
 }
 
+// Avisado quando a API responde 401 com alguém logado: a sessão de 8 h venceu
+// ou foi encerrada. O App escuta e volta para o login.
+export const SESSAO_EXPIRADA = "painel:sessao-expirada";
+
+// Sem resposta do servidor (rede caiu, API fora): status 0 e texto em português,
+// em vez do "Failed to fetch" do navegador.
+async function buscar(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch {
+    throw new ErroApi(0, "Sem conexão com o servidor. Confira a internet e tente de novo.");
+  }
+}
+
+// Quando a API não diz o motivo (proxy, timeout, erro sem JSON).
+const PADRAO: Record<number, string> = {
+  401: "Sua sessão expirou. Entre de novo.",
+  403: "Você não tem permissão para isso.",
+  404: "Não encontrado: pode ter sido apagado ou o link está errado.",
+  409: "Alguém mudou isso antes de você. Recarregue e confira.",
+  413: "Arquivo grande demais.",
+  429: "Muitas tentativas seguidas. Espere um pouco e tente de novo.",
+};
+
+function textoPadrao(status: number): string {
+  if (PADRAO[status]) return PADRAO[status];
+  if (status >= 500) return "O servidor falhou ao responder. Tente de novo em instantes.";
+  return `Não deu certo (erro ${status}).`;
+}
+
 async function chamar<T>(metodo: string, caminho: string, corpo?: unknown): Promise<T> {
   const cabecalhos: Record<string, string> = {};
   if (metodo !== "GET") cabecalhos["X-CSRF-Token"] = csrf;
   if (corpo !== undefined) cabecalhos["Content-Type"] = "application/json";
   return responder<T>(
-    await fetch(`/admin${caminho}`, {
+    await buscar(`/admin${caminho}`, {
       method: metodo,
       headers: cabecalhos,
       body: corpo === undefined ? undefined : JSON.stringify(corpo),
@@ -378,7 +408,10 @@ async function chamar<T>(metodo: string, caminho: string, corpo?: unknown): Prom
 
 async function responder<T>(resposta: Response): Promise<T> {
   if (!resposta.ok) {
-    let detalhe = resposta.statusText;
+    // O login responde 401 a senha errada: ali não é sessão vencida.
+    if (resposta.status === 401 && csrf && !resposta.url.endsWith("/admin/login"))
+      window.dispatchEvent(new Event(SESSAO_EXPIRADA));
+    let detalhe = textoPadrao(resposta.status);
     try {
       const json = (await resposta.json()) as { detail?: unknown };
       if (typeof json.detail === "string") detalhe = json.detail;
@@ -389,7 +422,7 @@ async function responder<T>(resposta: Response): Promise<T> {
           .filter(Boolean)
           .join("; ");
     } catch {
-      // corpo sem JSON: fica o statusText
+      // corpo sem JSON: fica o texto padrão do status
     }
     throw new ErroApi(resposta.status, detalhe);
   }
@@ -401,7 +434,7 @@ async function responder<T>(resposta: Response): Promise<T> {
 // (sem multipart nem base64). A legenda segue o texto do campo.
 export function enviarAnexo(id: string, arquivo: Blob, nome: string, legenda: string) {
   const params = new URLSearchParams({ nome, legenda });
-  return fetch(`/admin/conversas/${id}/anexos?${params}`, {
+  return buscar(`/admin/conversas/${id}/anexos?${params}`, {
     method: "POST",
     headers: { "X-CSRF-Token": csrf, "Content-Type": arquivo.type || "application/octet-stream" },
     body: arquivo,

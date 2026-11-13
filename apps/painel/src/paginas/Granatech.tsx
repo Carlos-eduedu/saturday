@@ -4,6 +4,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "react-router";
 import LatticeLoader, { type StatusLattice } from "../componentes/LatticeLoader";
 import { CamposConta, CONTA_VAZIA } from "../componentes/CamposConta";
+import { Falha } from "../componentes/Falha";
 import { Vazio } from "../componentes/Vazio";
 import {
   type Acoes,
@@ -79,13 +80,21 @@ export function Granatech({ eu }: { eu: Eu }) {
     ),
   );
 
+  // Uma ação por vez: reenviar o link duas vezes manda duas mensagens ao cliente.
+  const emAndamento = useRef(false);
   const agir: Agir = (acao, feito) => {
+    if (emAndamento.current) return;
+    emAndamento.current = true;
     setErro("");
-    setAviso("");
+    setAviso("Aguarde…");
     acao()
       .then((r) => setAviso(typeof feito === "string" ? feito : feito(r)))
-      .catch((e: unknown) => setErro(mensagemDe(e)))
+      .catch((e: unknown) => {
+        setAviso("");
+        setErro(mensagemDe(e));
+      })
       .finally(() => {
+        emAndamento.current = false;
         carregar();
         setVersao((v) => v + 1);
       });
@@ -713,6 +722,8 @@ function Historico({ eventos }: { eventos: EventoGranatech[] }) {
 
 function Cpf({ consultaId, mascarado }: { consultaId: number; mascarado: string }) {
   const [valor, setValor] = useState<string | null>(null);
+  const [revelando, setRevelando] = useState(false);
+  const [erro, setErro] = useState("");
   return (
     <span>
       {valor ?? mascarado}{" "}
@@ -720,15 +731,26 @@ function Cpf({ consultaId, mascarado }: { consultaId: number; mascarado: string 
         <button
           type="button"
           className="link"
-          onClick={() =>
+          disabled={revelando}
+          onClick={() => {
+            // Cada clique grava auditoria: um pedido por vez.
+            setRevelando(true);
+            setErro("");
             api
               .revelarCpfGranatech(consultaId)
               .then((r) => setValor(r.valor))
-              .catch(() => undefined)
-          }
+              .catch((e: unknown) => setErro(`não deu para revelar: ${mensagemDe(e)}`))
+              .finally(() => setRevelando(false));
+          }}
         >
           Revelar
         </button>
+      )}
+      {erro && (
+        <small className="erro" role="alert">
+          {" "}
+          {erro}
+        </small>
       )}
     </span>
   );
@@ -777,10 +799,28 @@ function DetalheConsulta({
 }) {
   const [c, setC] = useState<ConsultaGranatechDetalhe | null>(null);
   const secao = useAoAbrir(c?.id);
+  // Falhar ao recarregar mantém o último detalhe; sem nenhum, diz por quê.
+  const [erroCarga, setErroCarga] = useState("");
+  const [tentativa, setTentativa] = useState(0);
   useEffect(() => {
-    api.consultaGranatech(id).then(setC).catch(() => setC(null));
-  }, [id, versao]);
-  if (!c) return null;
+    api
+      .consultaGranatech(id)
+      .then((d) => {
+        setC(d);
+        setErroCarga("");
+      })
+      .catch((e: unknown) => setErroCarga(mensagemDe(e)));
+  }, [id, versao, tentativa]);
+  if (!c)
+    return erroCarga ? (
+      <Falha
+        titulo="Não deu para abrir o detalhe."
+        texto={erroCarga}
+        aoTentar={() => setTentativa((t) => t + 1)}
+      />
+    ) : (
+      <p className="centro">Carregando…</p>
+    );
 
   return (
     <section ref={secao}>
@@ -872,10 +912,28 @@ function DetalheProposta({
   const [p, setP] = useState<PropostaGranatechDetalhe | null>(null);
   const [painel, setPainel] = useState<"cancelar" | "conta" | null>(null);
   const secao = useAoAbrir(p?.id);
+  // Falhar ao recarregar mantém o último detalhe; sem nenhum, diz por quê.
+  const [erroCarga, setErroCarga] = useState("");
+  const [tentativa, setTentativa] = useState(0);
   useEffect(() => {
-    api.propostaGranatech(id).then(setP).catch(() => setP(null));
-  }, [id, versao]);
-  if (!p) return null;
+    api
+      .propostaGranatech(id)
+      .then((d) => {
+        setP(d);
+        setErroCarga("");
+      })
+      .catch((e: unknown) => setErroCarga(mensagemDe(e)));
+  }, [id, versao, tentativa]);
+  if (!p)
+    return erroCarga ? (
+      <Falha
+        titulo="Não deu para abrir o detalhe."
+        texto={erroCarga}
+        aoTentar={() => setTentativa((t) => t + 1)}
+      />
+    ) : (
+      <p className="centro">Carregando…</p>
+    );
 
   return (
     <section ref={secao}>
