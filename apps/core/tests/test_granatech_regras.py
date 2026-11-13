@@ -90,6 +90,21 @@ def test_consulta_final_nunca_e_sobrescrita(final: str) -> None:
     assert not status.aceita_consulta(final, "SUCCESS")
 
 
+@pytest.mark.parametrize(
+    ("da_api_dev", "documentado"),
+    [
+        ("AGUARDANDO_AUTORIZACAO_DO_CLIENTE", "AWAITING_CLIENT_AUTHORIZATION"),
+        ("CONCLUIDO", "SUCCESS"),
+    ],
+)
+def test_status_de_consulta_em_portugues_vira_o_documentado(
+    da_api_dev: str, documentado: str
+) -> None:
+    assert status.normalizar_consulta(da_api_dev) == documentado
+    assert status.normalizar_consulta(documentado) == documentado
+    assert status.normalizar_consulta("STATUS_NOVO") == "STATUS_NOVO"
+
+
 def test_status_desconhecido_nao_e_aplicado() -> None:
     assert not status.aceita_consulta("PROCESSING", "STATUS_NOVO")
     assert not status.aceita_proposta("PENDING_CONFIRMATION", "STATUS_NOVO", None)
@@ -289,3 +304,15 @@ def test_corpo_da_proposta_leva_seguro_e_valores_da_simulacao() -> None:
     assert financeiro["valor_liberado_habilitado"] is True
     assert corpo["id_margem"] == "m1"
     assert corpo["informacaoDeSeguros"]["id_externo"] == "SM-100000721-6"
+
+    # Sem o bloco (teste da homologação na api-dev): o resto do corpo é o mesmo.
+    sem_bloco = montar_corpo_proposta(
+        id_consulta="c1",
+        vinculo=vinculo,
+        produto=produto,
+        simulacao=simulacao,
+        tipo_empregador=1,
+        bloco_seguro=False,
+    )
+    assert "informacaoDeSeguros" not in sem_bloco
+    assert sem_bloco["informacoesFinanceira"] == corpo["informacoesFinanceira"]

@@ -22,6 +22,22 @@ CONSULTA: dict[str, int] = {
     "WORKER_MUST_CANCEL_RETURN_REQUEST": FINAL,
 }
 
+# A documentação lista os status em inglês, mas a api-dev manda o webhook de
+# consulta em português (worker do dev, 2026-11-13: rodadas 6 a 8 da
+# homologação). Só os nomes já vistos; o resto continua virando alerta.
+# TODO(granatech): lista completa dos status de consulta em português.
+SINONIMOS_CONSULTA = {
+    "AGUARDANDO_AUTORIZACAO_DO_CLIENTE": "AWAITING_CLIENT_AUTHORIZATION",
+    "CONCLUIDO": "SUCCESS",
+}
+
+
+def normalizar_consulta(status: str) -> str:
+    """Status de consulta no nome da documentação (inglês), venha como vier."""
+
+    return SINONIMOS_CONSULTA.get(status, status)
+
+
 # Consultas que não servem para reaproveitar: a próxima precisa ser nova.
 CONSULTA_SEM_REAPROVEITAMENTO = frozenset(
     {

@@ -280,6 +280,9 @@ class Homologacao:
             produto=produto,
             simulacao=simulacao,
             tipo_empregador=1,
+            # Teste na api-dev: sem o bloco de seguro, como o exemplo ativo da
+            # collection; com ele, o `id_externo` da simulação dá 400.
+            bloco_seguro=False,
         )
         status, dados, arquivo = self.chamar(
             f"proposta-contratacao{numero}", "POST", "/propostas", corpo=corpo

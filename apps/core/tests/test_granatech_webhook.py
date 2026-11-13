@@ -308,6 +308,31 @@ def test_consulta_com_id_consulta_da_api_dev_e_aplicada(
     assert evento["payload"]["status"] == "SUCCESS"
 
 
+def test_consulta_concluida_em_portugues_e_aplicada(
+    api_pg: TestClient,
+    cliente: ClienteGranatech,
+    fabrica: sessionmaker[Session],
+    service: AgentService,
+    settings: Settings,
+) -> None:
+    """A api-dev manda `CONCLUIDO` (worker do dev, 2026-11-13): vale `SUCCESS`, sem alerta."""
+
+    aberta = cliente.abrir_consulta(CPF, "FULANO", "11987654321")
+    corpo = {
+        "cpf": CPF,
+        "id_consulta": aberta.id_externo,
+        "status": "CONCLUIDO",
+        "tipo": "CONSULTA",
+    }
+
+    resposta = api_pg.post("/webhooks/granatech", json=corpo, headers={"x-webhook-token": TOKEN})
+    _rodar_worker(fabrica, service, cliente, settings)
+
+    assert resposta.status_code == 200
+    assert _consulta(fabrica, aberta.id_externo).status == "SUCCESS"
+    assert _alertas(fabrica) == []
+
+
 def test_consulta_fora_de_ordem_nao_regride(
     cliente: ClienteGranatech,
     http_granatech: TestClient,

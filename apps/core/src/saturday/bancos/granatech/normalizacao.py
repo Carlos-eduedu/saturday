@@ -340,8 +340,15 @@ def montar_corpo_proposta(
     produto: Produto,
     simulacao: Simulacao,
     tipo_empregador: int,
+    bloco_seguro: bool = True,
 ) -> dict[str, Any]:
-    """Corpo do ``POST /propostas`` a partir da simulação aceita."""
+    """Corpo do ``POST /propostas`` a partir da simulação aceita.
+
+    ``bloco_seguro=False`` não manda ``informacaoDeSeguros``, como o exemplo ativo
+    da collection de contratação da Granatech. Com o bloco, a api-dev recusa
+    (400: ``informacaoDeSeguros.id_externo must be a number``) o ``id_externo``
+    que a própria simulação devolve (``"SM-100000820-4"``).
+    """
 
     financeiro = {
         # TODO(granatech): confirmar `tipo_empregador` (padrão 1 por config).
@@ -366,7 +373,9 @@ def montar_corpo_proposta(
         "id_margem": vinculo.id_margem,
         "informacoesFinanceira": [financeiro],
     }
-    if simulacao.seguro_aplicado:
+    # TODO(granatech): que número vai em `informacaoDeSeguros.id_externo`, ou se o
+    # bloco é dispensável. Pergunta 10 de 2026-11-10, ainda sem resposta.
+    if bloco_seguro and simulacao.seguro_aplicado:
         corpo["informacaoDeSeguros"] = {
             "id_empresa_seguradora": produto.id_empresa_seguro,
             "valor_total_financiado": _numero(simulacao.valor_total_financiado),

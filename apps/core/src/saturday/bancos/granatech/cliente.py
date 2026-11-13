@@ -337,7 +337,9 @@ class ClienteGranatech:
         return self._gravar_consulta(
             id_externo=id_externo,
             cpf=cpf,
-            status=str(dados.get("status") or "AWAITING_CLIENT_AUTHORIZATION"),
+            status=ordem.normalizar_consulta(
+                str(dados.get("status") or "AWAITING_CLIENT_AUTHORIZATION")
+            ),
             link_termo=dados.get("link_termo_consentimento"),
             conversa_id=conversa_id,
             reaproveitada=False,
@@ -377,7 +379,7 @@ class ClienteGranatech:
         candidatas = []
         for item in self.listar_consultas_por_cpf(cpf):
             criada = _criada_em(item)
-            situacao = str(item.get("status") or "")
+            situacao = ordem.normalizar_consulta(str(item.get("status") or ""))
             # Sem data não dá para saber se está na janela: não reaproveita.
             if criada is None or criada < limite or not item.get("id"):
                 continue
@@ -390,7 +392,9 @@ class ClienteGranatech:
         return self._gravar_consulta(
             id_externo=str(item["id"]),
             cpf=cpf,
-            status=str(item.get("status") or "AWAITING_CLIENT_AUTHORIZATION"),
+            status=ordem.normalizar_consulta(
+                str(item.get("status") or "AWAITING_CLIENT_AUTHORIZATION")
+            ),
             link_termo=item.get("link_termo_consentimento"),
             conversa_id=conversa_id,
             reaproveitada=True,
