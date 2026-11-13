@@ -37,6 +37,24 @@ uv run --project simuladores/meta uvicorn app:app --app-dir simuladores/meta --p
 - mypy é `strict` e só cobre `src/saturday`.
 - Há `.env` e `.env.backup` reais na raiz: não leia. Use o `.env.example`.
 
+## Worktrees
+
+Uma worktree por tarefa, em `.claude/worktrees/<nome>` (`claude --worktree <nome>`). O `.worktreeinclude` copia o `.env` para ela; o resto se monta
+dentro da worktree:
+
+```bash
+uv sync --locked                          # .venv próprio na raiz da worktree
+(cd apps/painel && npm ci)                # se for mexer no painel
+docker exec saturday-postgres-1 createdb -U saturday saturday_test_<nome>
+```
+
+- Os testes de Postgres apagam e recriam as tabelas: cada worktree usa o seu
+  banco (`SATURDAY_TEST_DATABASE_URL=.../saturday_test_<nome>`), nunca o
+  `saturday_test` de outra sessão rodando ao mesmo tempo.
+- O compose local publica portas fixas: só uma worktree sobe o compose por vez.
+- Ao terminar, o ramo da worktree entra na `main` com fast-forward
+  (`git rebase main` antes, se a `main` andou) e a `main` vai para o push.
+
 ## Arquitetura (o que exige ler vários arquivos)
 
 **Duas entradas, mesma montagem.** `saturday` (API, `web/application.py`) e

@@ -34,3 +34,6 @@ evidencias/
 
 # Sessões locais da ferramenta de revisão do painel (guardam chaves)
 apps/painel/.impeccable/
+
+# Worktrees do Claude Code
+.claude/worktrees/
