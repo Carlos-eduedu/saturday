@@ -153,7 +153,7 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
         <header>
           <Link className="voltar" to="/">
             <HugeiconsIcon icon={ArrowLeft01Icon} size={18} strokeWidth={2} />
-            Conversas
+            <span className="voltar-texto">Conversas</span>
           </Link>
           <div className="identidade">
             <h1>{conversa.telefone ?? conversa.canal}</h1>
