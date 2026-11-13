@@ -129,7 +129,7 @@ class Turno:
     def nao_elegivel(self, chave: str, **valores: object) -> dict[str, Any]:
         logger.info("clt_nao_elegivel etapa=%s motivo=%s", self.clt.get("etapa"), chave)
         self.clt.update(etapa="nao_elegivel", passo=None, motivo=chave)
-        return self.responder(texto(chave, **valores))
+        return self.responder(texto(chave, **valores), texto("nao_elegivel_rever"))
 
     def erro(self, chave: str, **valores: object) -> dict[str, Any]:
         """Resposta não reconhecida: pergunta vai à FAQ; dois erros, handoff."""

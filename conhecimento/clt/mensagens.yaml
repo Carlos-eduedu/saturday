@@ -232,6 +232,10 @@ mensagens:
     O banco respondeu que você não tem margem disponível para esse crédito
     agora.
   nao_elegivel_sem_oferta: Não encontrei uma condição dentro das regras para você agora.
+  # Vai junto de todo não elegível: só a equipe reabre a jornada.
+  nao_elegivel_rever: >-
+    Se alguma resposta saiu errada, é só pedir para falar com um atendente que
+    a equipe revê com você.
 
   # ---------------------------------------------------------------- outros
   handoff: >-

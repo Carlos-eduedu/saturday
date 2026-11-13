@@ -203,6 +203,12 @@ def nova(
     return criar
 
 
+def nao_elegivel(chave: str) -> str:
+    """Todo não elegível sai com o convite para a equipe rever as respostas."""
+
+    return f"{texto(chave)}\n\n{texto('nao_elegivel_rever')}"
+
+
 def _consultas(fabrica: sessionmaker[Session]) -> int:
     with abrir_sessao(fabrica) as sessao:
         return int(sessao.scalar(select(func.count()).select_from(ConsultaGranatech)) or 0)
@@ -306,7 +312,7 @@ def test_pedidos_depois_da_oferta_e_limite(nova: Any) -> None:
 def test_reprovado_na_triagem(nova: Any, respostas: tuple[str, ...], chave: str) -> None:
     jornada = nova()
     resposta = jornada.roteiro("Quero o crédito CLT", *respostas)
-    assert resposta.answer == texto(chave)
+    assert resposta.answer == nao_elegivel(chave)
     assert jornada.clt()["etapa"] == "nao_elegivel"
     # Depois de encerrado, só a FAQ.
     jornada.falar("posso tentar de novo?")
@@ -397,7 +403,7 @@ def test_empresa_reprovada(nova: Any, brasilapi: FakeBrasilAPI, extras: dict[str
     brasilapi.dados = {**EMPRESA_OK, **extras}
     jornada = nova()
     resposta = jornada.roteiro(*TRIAGEM_OK, CNPJ)
-    assert resposta.answer == texto("nao_elegivel_empresa")
+    assert resposta.answer == nao_elegivel("nao_elegivel_empresa")
 
 
 def test_brasilapi_fora_do_ar_vai_para_handoff(nova: Any, brasilapi: FakeBrasilAPI) -> None:
@@ -470,7 +476,7 @@ def test_sem_margem(nova: Any) -> None:
     jornada = nova()
     jornada.roteiro(*ATE_CONSENTIMENTO, "SIM")
     jornada.evento_consulta("NO_MARGIN")
-    assert jornada.ultima_saida() == texto("nao_elegivel_sem_margem")
+    assert jornada.ultima_saida() == nao_elegivel("nao_elegivel_sem_margem")
     assert jornada.clt()["etapa"] == "nao_elegivel"
 
 
@@ -519,13 +525,13 @@ def test_divergencia_pos_consulta_vale_a_granatech(
     jornada = nova()
     jornada.roteiro(*ATE_CONSENTIMENTO, "SIM")
     jornada.evento_consulta("SUCCESS")
-    assert jornada.ultima_saida() == texto("nao_elegivel_idade")
+    assert jornada.ultima_saida() == nao_elegivel("nao_elegivel_idade")
 
 
 def test_idade_sem_prazo_nao_segue(nova: Any) -> None:
     jornada = nova()
     resposta = jornada.roteiro(*TRIAGEM_OK, CNPJ, CPF, "Ana Souza", "01/01/1966", "feminino")
-    assert resposta.answer == texto("nao_elegivel_idade")
+    assert resposta.answer == nao_elegivel("nao_elegivel_idade")
 
 
 def test_reaproveita_consulta_pronta_do_mesmo_cpf(
