@@ -70,7 +70,9 @@ def _consulta(
     payload: dict[str, Any],
     servico: AgentService | None = None,
 ) -> None:
-    id_externo = str(payload.get("id_solicitacao") or "")
+    # A especificação diz `id_solicitacao`; a api-dev manda `id_consulta`
+    # (webhook recebido no dev em 2026-11-13). Vale o que vier.
+    id_externo = str(payload.get("id_solicitacao") or payload.get("id_consulta") or "")
     novo = str(payload.get("status") or "")
 
     with abrir_sessao(fabrica) as sessao:

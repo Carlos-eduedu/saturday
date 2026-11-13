@@ -38,6 +38,7 @@ def eventos_do_id(sessao: Session, id_externo: str) -> list[dict[str, Any]]:
             EventoRecebido.origem == ORIGEM,
             or_(
                 EventoRecebido.payload["id_solicitacao"].astext == id_externo,
+                EventoRecebido.payload["id_consulta"].astext == id_externo,
                 EventoRecebido.payload["id_proposta"].astext == id_externo,
             ),
         )

@@ -90,6 +90,10 @@ que **voltou**, porque na dev `seguro=false` é ignorado.
 string. O evento vai para `eventos_recebidos` com o sha256 do JSON canônico como
 id, então um reenvio idêntico é descartado.
 
+O evento de consulta da api-dev chega como `{cpf, id_consulta, status, tipo}`,
+não com o `id_solicitacao` da especificação (webhook recebido no dev em
+2026-11-13); o worker e a homologação aceitam os dois nomes.
+
 Chamada recusada (401) gera o log `granatech_token_invalido` com o diagnóstico,
 nunca o token: `token_fontes` (por onde veio: `authorization_bearer`,
 `authorization_sem_bearer:cru` para token sem o prefixo `Bearer `,

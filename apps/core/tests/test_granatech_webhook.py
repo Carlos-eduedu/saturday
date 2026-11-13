@@ -18,6 +18,7 @@ from saturday.agent.service import AgentService
 from saturday.bancos.granatech.cliente import ClienteGranatech
 from saturday.dados.modelos import Alerta, ConsultaGranatech, EventoRecebido, PropostaGranatech
 from saturday.jobs import alertas
+from saturday.jobs import homologacao as jobs_homologacao
 from saturday.jobs.eventos import processar
 from saturday.settings import Settings
 
@@ -282,6 +283,29 @@ def test_cada_status_de_consulta_e_aplicado(
         "WORKER_MUST_CANCEL_RETURN_REQUEST",
     }
     assert bool(_alertas(fabrica)) == (status in atencao)
+
+
+def test_consulta_com_id_consulta_da_api_dev_e_aplicada(
+    api_pg: TestClient,
+    cliente: ClienteGranatech,
+    fabrica: sessionmaker[Session],
+    service: AgentService,
+    settings: Settings,
+) -> None:
+    """Forma que a api-dev mandou no dev: `id_consulta` no lugar de `id_solicitacao`."""
+
+    aberta = cliente.abrir_consulta(CPF, "FULANO", "11987654321")
+    corpo = {"cpf": CPF, "id_consulta": aberta.id_externo, "status": "SUCCESS", "tipo": "CONSULTA"}
+
+    resposta = api_pg.post("/webhooks/granatech", json=corpo, headers={"x-webhook-token": TOKEN})
+    _rodar_worker(fabrica, service, cliente, settings)
+
+    assert resposta.status_code == 200
+    assert _consulta(fabrica, aberta.id_externo).status == "SUCCESS"
+    assert _alertas(fabrica) == []
+    with fabrica() as sessao:
+        [evento] = jobs_homologacao.eventos_do_id(sessao, aberta.id_externo)
+    assert evento["payload"]["status"] == "SUCCESS"
 
 
 def test_consulta_fora_de_ordem_nao_regride(
