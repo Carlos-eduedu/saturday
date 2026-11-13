@@ -22,10 +22,10 @@ jobs:
         run: uv sync --locked
 
       - name: Formatação
-        run: uv run ruff format --check . ../../scripts
+        run: uv run ruff format --check .
 
       - name: Lint
-        run: uv run ruff check . ../../scripts
+        run: uv run ruff check .
 
       - name: Tipos
         run: uv run mypy

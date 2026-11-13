@@ -18,6 +18,7 @@ from saturday.dados.sessao import criar_engine, criar_factory
 from saturday.health import registrar_batimento
 from saturday.jobs import alertas, recontatos
 from saturday.jobs.eventos import processar
+from saturday.jobs.homologacao import Rodadas
 from saturday.jobs.outbox import Entregador, EntregadorPorCanal, EntregadorWebhook, drenar
 from saturday.log import configurar_logging
 from saturday.settings import Settings, get_settings
@@ -69,6 +70,7 @@ def rodar(settings: Settings, parar: threading.Event) -> None:
         if evolution is not None:
             entregadores["evolution"] = evolution.saida
         entregador = EntregadorPorCanal(entregadores)
+        rodadas = Rodadas(fabrica, settings, parar)
 
         logger.info("worker_iniciado")
         proxima_verificacao = 0.0
@@ -87,6 +89,7 @@ def rodar(settings: Settings, parar: threading.Event) -> None:
                     evolution.cliente if evolution else None,
                 )
                 entregues = drenar(fabrica, entregador, settings)
+                rodadas.verificar()
                 if time.monotonic() >= proxima_verificacao:
                     alertas.verificar(fabrica, servico)
                     recontatos.disparar(fabrica, servico)

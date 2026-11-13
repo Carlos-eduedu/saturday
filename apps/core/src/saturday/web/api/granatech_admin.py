@@ -10,7 +10,10 @@ chegar.
 
 from __future__ import annotations
 
+import io
+import json
 import uuid
+import zipfile
 from datetime import UTC, date, datetime, time
 from typing import Annotated, Any, Literal, cast
 from zoneinfo import ZoneInfo
@@ -18,18 +21,26 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.agent.service import AgentService
+from saturday.bancos.granatech import homologacao
 from saturday.bancos.granatech import status as ordem
 from saturday.bancos.granatech.cliente import ClienteGranatech, ErroGranatech, ErroIncerto
 from saturday.dados import repositorios
-from saturday.dados.modelos import ConsultaGranatech, Conversa, PropostaGranatech
+from saturday.dados.modelos import (
+    ConsultaGranatech,
+    Conversa,
+    HomologacaoGranatech,
+    PropostaGranatech,
+    UsuarioPainel,
+)
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.painel import acoes
 from saturday.painel.auditoria import auditar
 from saturday.privacidade import MASCARAS
-from saturday.settings import TZ_OPERACAO
+from saturday.settings import TZ_OPERACAO, Settings
 from saturday.web.dependencies import (
     UsuarioLogado,
     exigir_csrf,
@@ -498,3 +509,124 @@ def atualizar_detalhe(
     # Só avança se a conversa ainda está em `consultando`; com humano vira alerta.
     service.continuar(conversation_id, "consulta_pronta")
     return {"pronto": True}
+
+
+# ------------------------------------------------------------ homologação (decisão 0014)
+
+
+class PedidoRodada(BaseModel):
+    fase: Literal[1, 2]
+
+
+def _homologacao_disponivel(request: Request) -> Settings:
+    settings = get_settings(request)
+    if not homologacao.disponivel(settings):
+        raise HTTPException(status_code=404, detail="homologação indisponível neste ambiente")
+    return settings
+
+
+def _linha_rodada(r: HomologacaoGranatech, nome: str | None) -> dict[str, Any]:
+    return {
+        "id": r.id,
+        "fase": r.fase,
+        "situacao": r.situacao,
+        "pedido_por": nome,
+        "criado_em": _iso(r.criado_em),
+        "iniciado_em": _iso(r.iniciado_em),
+        "terminado_em": _iso(r.terminado_em),
+        "erro": r.erro,
+    }
+
+
+def _rodada(sessao: Session, rodada_id: int) -> tuple[HomologacaoGranatech, str | None]:
+    linha = sessao.execute(
+        select(HomologacaoGranatech, UsuarioPainel.nome)
+        .outerjoin(UsuarioPainel, UsuarioPainel.id == HomologacaoGranatech.pedido_por)
+        .where(HomologacaoGranatech.id == rodada_id)
+    ).first()
+    if linha is None:
+        raise HTTPException(status_code=404, detail="rodada não encontrada")
+    return linha[0], linha[1]
+
+
+@router.get("/homologacao")
+def listar_rodadas(request: Request, _usuario: Gestor, fabrica: Fabrica) -> dict[str, Any]:
+    settings = _homologacao_disponivel(request)
+    dominio = settings.dominio_publico.strip().rstrip("/")
+    with abrir_sessao(fabrica) as sessao:
+        linhas = sessao.execute(
+            select(HomologacaoGranatech, UsuarioPainel.nome)
+            .outerjoin(UsuarioPainel, UsuarioPainel.id == HomologacaoGranatech.pedido_por)
+            .order_by(HomologacaoGranatech.id.desc())
+            .limit(LIMITE)
+        ).all()
+        rodadas = [_linha_rodada(r, nome) for r, nome in linhas]
+    return {
+        "webhook_esperado": f"https://{dominio}/webhooks/granatech" if dominio else None,
+        "base_granatech": settings.granatech_base_url,
+        "consultas_por_fase": homologacao.CONSULTAS_POR_FASE,
+        "rodadas": rodadas,
+    }
+
+
+@router.post("/homologacao", status_code=201)
+def pedir_rodada(
+    pedido: PedidoRodada, request: Request, usuario: GestorCsrf, fabrica: Fabrica
+) -> dict[str, Any]:
+    _homologacao_disponivel(request)
+    try:
+        with abrir_sessao(fabrica) as sessao:
+            rodada = HomologacaoGranatech(fase=pedido.fase, pedido_por=usuario.id)
+            sessao.add(rodada)
+            sessao.flush()
+            auditar(
+                sessao,
+                usuario.id,
+                "granatech:homologacao",
+                f"rodada:{rodada.id}",
+                {"fase": pedido.fase},
+            )
+            repositorios.notificar(sessao, "homologacao", rodada=rodada.id)
+            return _linha_rodada(rodada, usuario.nome)
+    except IntegrityError:
+        # Índice único: já existe uma rodada pendente ou em andamento.
+        raise HTTPException(status_code=409, detail="já há uma rodada em andamento") from None
+
+
+@router.get("/homologacao/{rodada_id}")
+def ver_rodada(
+    rodada_id: int, request: Request, _usuario: Gestor, fabrica: Fabrica
+) -> dict[str, Any]:
+    _homologacao_disponivel(request)
+    with abrir_sessao(fabrica) as sessao:
+        rodada, nome = _rodada(sessao, rodada_id)
+        return {**_linha_rodada(rodada, nome), "itens": rodada.itens, "passos": rodada.passos}
+
+
+@router.get("/homologacao/{rodada_id}/zip")
+def baixar_rodada(rodada_id: int, request: Request, _usuario: Gestor, fabrica: Fabrica) -> Response:
+    settings = _homologacao_disponivel(request)
+    with abrir_sessao(fabrica) as sessao:
+        rodada, _nome = _rodada(sessao, rodada_id)
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as arquivo:
+            for passo in rodada.passos:
+                conteudo = {k: v for k, v in passo.items() if k != "arquivo"}
+                arquivo.writestr(
+                    passo["arquivo"], json.dumps(conteudo, ensure_ascii=False, indent=2) + "\n"
+                )
+            arquivo.writestr(
+                "RELATORIO.md",
+                homologacao.relatorio(
+                    rodada.itens,
+                    settings.granatech_base_url,
+                    rodada.terminado_em or rodada.criado_em,
+                    rodada.erro,
+                ),
+            )
+        nome = f"granatech-fase{rodada.fase}-rodada{rodada.id}.zip"
+    return Response(
+        buffer.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{nome}"'},
+    )

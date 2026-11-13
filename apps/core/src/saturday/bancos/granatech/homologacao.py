@@ -1,4 +1,4 @@
-"""Evidências da homologação da Granatech (fases 1 e 2) contra a api-dev.
+"""Evidências da homologação da Granatech (decisão 0014).
 
 O que a Granatech pede (``docs/granatech-homologacao/roteiro-homologacao.md``):
 
@@ -7,30 +7,21 @@ O que a Granatech pede (``docs/granatech-homologacao/roteiro-homologacao.md``):
 - Fase 2: 2 contratações com sucesso (status recebido pelo webhook) e 1 erro de
   contratação.
 
-Rode da raiz do repositório, com as variáveis no ambiente (nunca no código)::
-
-    SATURDAY_GRANATECH_BASE_URL=https://api-dev.granatech.com.br \\
-    SATURDAY_GRANATECH_CHAVE_API=... \\
-    SATURDAY_URL_HOMOLOG=https://saturday-homolog.dynatech.systems \\
-    SATURDAY_API_KEY=... \\
-    uv run --project apps/core python scripts/homologacao_granatech.py
-
-O webhook é recebido pelo Saturday (homolog); o script lê os eventos pela rota
-``GET /eventos/granatech/{id}``. A saída fica em ``evidencias/granatech-<data>/``:
-um JSON por passo e um ``RELATORIO.md``. A chave e o token nunca são gravados.
+Uma rodada roda uma fase, no worker (``jobs/homologacao.py``), pedida pelo
+gestor na aba Granatech. Fala com a Granatech por um ``httpx.Client`` próprio,
+sem o ``ClienteGranatech``: a evidência é a requisição e a resposta cruas. Cada
+passo vai para ``ao_mudar``, que o grava na rodada; a chave e o token nunca
+são gravados.
 """
 
 from __future__ import annotations
 
 import json
-import os
 import re
-import sys
 import time
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -45,6 +36,7 @@ from saturday.bancos.granatech.normalizacao import (
     normalizar_detalhe,
     normalizar_simulacao,
 )
+from saturday.settings import Settings
 
 CONSIGNADO = "/api-consignado/v1"
 PRODUCAO = "api.granatech.com.br"
@@ -62,10 +54,18 @@ CONTA_TESTE = {
 }
 ID_INEXISTENTE = "00000000-0000-0000-0000-000000000000"
 TZ = ZoneInfo("America/Sao_Paulo")
+# Consultas que cada fase abre, para a confirmação do painel.
+CONSULTAS_POR_FASE = {1: 1, 2: 2}
+
+
+def disponivel(settings: Settings) -> bool:
+    """Regra 11: nunca em produção, nem apontando para a Granatech de produção."""
+
+    return settings.environment != "prod" and PRODUCAO not in settings.granatech_base_url
 
 
 class ErroHomologacao(Exception):
-    """Um passo obrigatório falhou; o relatório registra até onde chegou."""
+    """Um passo obrigatório falhou; a rodada registra até onde chegou."""
 
 
 @dataclass
@@ -80,16 +80,16 @@ class Evidencia:
 @dataclass
 class Homologacao:
     granatech: httpx.Client
-    saturday: httpx.Client
     chave: str
-    api_key: str
-    saida: Path
+    ler_eventos: Callable[[str], list[dict[str, Any]]]
+    ao_mudar: Callable[[Homologacao], None] = lambda _h: None
     espera_webhook_s: float = 600
     intervalo_s: float = 10
     dormir: Callable[[float], None] = time.sleep
+    passos: list[dict[str, Any]] = field(default_factory=list)
     evidencias: list[Evidencia] = field(default_factory=list)
+    ids_externos: list[str] = field(default_factory=list)
     _token: str = ""
-    _passo: int = 0
 
     # ------------------------------------------------------------ HTTP
 
@@ -139,40 +139,38 @@ class Homologacao:
         return resposta.status_code, dados, arquivo
 
     def _gravar(self, nome: str, conteudo: dict[str, Any]) -> str:
-        self._passo += 1
-        arquivo = f"{self._passo:02d}-{nome}.json"
-        conteudo = {"horario": datetime.now(TZ).isoformat(), **conteudo}
-        texto = json.dumps(conteudo, ensure_ascii=False, indent=2, default=str)
+        arquivo = f"{len(self.passos) + 1:02d}-{nome}.json"
+        conteudo = {"arquivo": arquivo, "horario": datetime.now(TZ).isoformat(), **conteudo}
+        texto = json.dumps(conteudo, ensure_ascii=False, default=str)
         # Nunca grava a chave nem o token, nem por acidente numa resposta.
-        for segredo in (self.chave, self._token, self.api_key):
+        for segredo in (self.chave, self._token):
             if segredo:
                 texto = texto.replace(segredo, "[removido]")
-        (self.saida / arquivo).write_text(texto + "\n", encoding="utf-8")
+        self.passos.append(json.loads(texto))
+        self.ao_mudar(self)
         return arquivo
 
     def esperar_webhook(
         self, nome: str, id_externo: str, aceita: Callable[[dict[str, Any]], bool]
     ) -> tuple[bool, str]:
-        """Consulta o Saturday até chegar um evento aceito para o id."""
+        """Lê os eventos recebidos até chegar um aceito para o id."""
 
         limite = time.monotonic() + self.espera_webhook_s
-        eventos: list[dict[str, Any]] = []
         while True:
-            resposta = self.saturday.get(
-                f"/eventos/granatech/{id_externo}", headers={"X-API-Key": self.api_key}
-            )
-            if resposta.status_code == 200:
-                eventos = list(resposta.json())
-                if any(aceita(e.get("payload") or {}) for e in eventos):
-                    break
+            eventos = self.ler_eventos(id_externo)
+            if any(aceita(e.get("payload") or {}) for e in eventos):
+                return True, self._gravar(nome, {"id": id_externo, "eventos": eventos})
             if time.monotonic() >= limite:
-                arquivo = self._gravar(nome, {"id": id_externo, "eventos": eventos})
-                return False, arquivo
+                return False, self._gravar(nome, {"id": id_externo, "eventos": eventos})
             self.dormir(self.intervalo_s)
-        return True, self._gravar(nome, {"id": id_externo, "eventos": eventos})
+
+    def registrar_id(self, id_externo: str) -> None:
+        self.ids_externos.append(id_externo)
+        self.ao_mudar(self)
 
     def anotar(self, fase: str, item: str, arquivo: str, ok: bool, observacao: str = "") -> None:
         self.evidencias.append(Evidencia(fase, item, arquivo, ok, observacao))
+        self.ao_mudar(self)
 
     # ------------------------------------------------------------ etapas comuns
 
@@ -196,6 +194,7 @@ class Homologacao:
         id_consulta = str(dados.get("id") or "") if isinstance(dados, dict) else ""
         if status >= 400 or not id_consulta:
             raise ErroHomologacao(f"consulta {sufixo}: HTTP {status}")
+        self.registrar_id(id_consulta)
         self.chamar(
             f"termo-{sufixo}",
             "POST",
@@ -277,6 +276,7 @@ class Homologacao:
         id_proposta = id_da_proposta(dados) if isinstance(dados, dict) else None
         if status >= 400 or not id_proposta:
             raise ErroHomologacao(f"contratação {numero}: HTTP {status}")
+        self.registrar_id(id_proposta)
         if detalhe.pessoa is not None:
             self.chamar(
                 f"dados-tomador-contratacao{numero}",
@@ -320,70 +320,42 @@ class Homologacao:
             f"HTTP {status}",
         )
 
-    # ------------------------------------------------------------ relatório
+    # ------------------------------------------------------------ rodada
 
-    def relatorio(self, erro: str | None = None) -> Path:
-        linhas = [
-            "# Evidências da homologação Granatech",
-            "",
-            f"Gerado em {datetime.now(TZ):%d/%m/%Y %H:%M} contra `{self.granatech.base_url}`.",
-            "",
-            "| Fase | Item | Arquivos | Situação | Observação |",
-            "| --- | --- | --- | --- | --- |",
-        ]
-        for e in self.evidencias:
-            situacao = "ok" if e.ok else "**falhou**"
-            linhas.append(f"| {e.fase} | {e.item} | `{e.arquivo}` | {situacao} | {e.observacao} |")
-        if erro:
-            linhas += ["", f"**Parou antes do fim:** {erro}"]
-        caminho = self.saida / "RELATORIO.md"
-        caminho.write_text("\n".join(linhas) + "\n", encoding="utf-8")
-        return caminho
+    def itens(self) -> list[dict[str, Any]]:
+        return [asdict(e) for e in self.evidencias]
 
-    def rodar(self) -> Path:
+    def rodar(self, fase: int) -> str | None:
+        """Roda uma fase; devolve o erro que a parou, ou None."""
+
         try:
-            self.fase1()
-            self.fase2()
+            if fase == 1:
+                self.fase1()
+            else:
+                self.fase2()
         except (ErroHomologacao, httpx.HTTPError) as exc:
-            return self.relatorio(str(exc))
-        return self.relatorio()
+            return str(exc) or type(exc).__name__
+        return None
 
 
-def main() -> int:
-    ambiente = {
-        nome: os.environ.get(nome, "").strip()
-        for nome in (
-            "SATURDAY_GRANATECH_BASE_URL",
-            "SATURDAY_GRANATECH_CHAVE_API",
-            "SATURDAY_URL_HOMOLOG",
-            "SATURDAY_API_KEY",
+def relatorio(
+    itens: list[dict[str, Any]], base_url: str, gerado_em: datetime, erro: str | None
+) -> str:
+    """O ``RELATORIO.md`` que acompanha os JSON no ``.zip``."""
+
+    linhas = [
+        "# Evidências da homologação Granatech",
+        "",
+        f"Gerado em {gerado_em.astimezone(TZ):%d/%m/%Y %H:%M} contra `{base_url}`.",
+        "",
+        "| Fase | Item | Arquivos | Situação | Observação |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for e in itens:
+        situacao = "ok" if e["ok"] else "**falhou**"
+        linhas.append(
+            f"| {e['fase']} | {e['item']} | `{e['arquivo']}` | {situacao} | {e['observacao']} |"
         )
-    }
-    faltando = [nome for nome, valor in ambiente.items() if not valor]
-    if faltando:
-        print("Faltam variáveis: " + ", ".join(faltando), file=sys.stderr)
-        return 2
-    base = ambiente["SATURDAY_GRANATECH_BASE_URL"]
-    if PRODUCAO in base:
-        # Regra 11: homologação nunca roda contra a produção da Granatech.
-        print("Recusado: a base aponta para a produção da Granatech.", file=sys.stderr)
-        return 2
-    saida = Path("evidencias") / f"granatech-{datetime.now(TZ):%Y%m%d-%H%M%S}"
-    saida.mkdir(parents=True, exist_ok=True)
-    with (
-        httpx.Client(base_url=base, timeout=30) as granatech,
-        httpx.Client(base_url=ambiente["SATURDAY_URL_HOMOLOG"], timeout=30) as saturday,
-    ):
-        relatorio = Homologacao(
-            granatech=granatech,
-            saturday=saturday,
-            chave=ambiente["SATURDAY_GRANATECH_CHAVE_API"],
-            api_key=ambiente["SATURDAY_API_KEY"],
-            saida=saida,
-        ).rodar()
-    print(f"Relatório: {relatorio}")
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())
+    if erro:
+        linhas += ["", f"**Parou antes do fim:** {erro}"]
+    return "\n".join(linhas) + "\n"

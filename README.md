@@ -61,8 +61,9 @@ tela **Canais** do painel. Simulador em `simuladores/evolution/`. Ver
 
 Desde a Fase 7: guia de deploy completo em [`docs/deploy.md`](docs/deploy.md)
 (ambiente do zero, backup e restauração), `infra/testar_restauracao.sh` e
-`scripts/homologacao_granatech.py`, que gera as evidências da homologação com a
-Granatech (ver [`docs/granatech.md`](docs/granatech.md)).
+as evidências da homologação com a Granatech, geradas pelo gestor na aba
+Granatech do painel (ver [`docs/granatech.md`](docs/granatech.md) e a
+[decisão 0014](docs/decisoes/0014-homologacao-pelo-painel.md)).
 
 ## Rodar local, sem container
 

@@ -294,6 +294,40 @@ export interface ContaNova {
   tipo_conta: "conta_corrente" | "conta_poupanca";
 }
 
+// Homologação Granatech pelo painel (decisão 0014): só gestor, fora de produção.
+export type SituacaoRodada = "pendente" | "em_andamento" | "concluida" | "falhou" | "interrompida";
+
+export type Rodada = {
+  id: number;
+  fase: 1 | 2;
+  situacao: SituacaoRodada;
+  pedido_por: string | null;
+  criado_em: string | null;
+  iniciado_em: string | null;
+  terminado_em: string | null;
+  erro: string | null;
+};
+
+export type ItemHomologacao = {
+  fase: string;
+  item: string;
+  arquivo: string;
+  ok: boolean;
+  observacao: string;
+};
+
+export type RodadaDetalhe = Rodada & {
+  itens: ItemHomologacao[];
+  passos: ({ arquivo: string } & Record<string, unknown>)[];
+};
+
+export type Homologacao = {
+  webhook_esperado: string | null;
+  base_granatech: string;
+  consultas_por_fase: Record<string, number>;
+  rodadas: Rodada[];
+};
+
 export class ErroApi extends Error {
   constructor(
     readonly status: number,
@@ -404,6 +438,9 @@ export const api = {
     chamar<void>("POST", `/granatech/propostas/${id}/conta`, conta),
   atualizarDetalhe: (id: number) =>
     chamar<{ pronto: boolean }>("POST", `/granatech/consultas/${id}/atualizar-detalhe`),
+  homologacao: () => chamar<Homologacao>("GET", "/granatech/homologacao"),
+  rodada: (id: number) => chamar<RodadaDetalhe>("GET", `/granatech/homologacao/${id}`),
+  pedirRodada: (fase: 1 | 2) => chamar<Rodada>("POST", "/granatech/homologacao", { fase }),
 };
 
 function parametros(filtro: FiltroGranatech): URLSearchParams {
@@ -418,3 +455,4 @@ export const midiaUrl = (mensagemId: number, indice: number) =>
 // Download navegando: o cookie da sessão vai junto e o nome do arquivo vem do
 // `Content-Disposition` da resposta.
 export const exportarUrl = (conversaId: string) => `/admin/conversas/${conversaId}/exportar`;
+export const rodadaZipUrl = (rodadaId: number) => `/admin/granatech/homologacao/${rodadaId}/zip`;

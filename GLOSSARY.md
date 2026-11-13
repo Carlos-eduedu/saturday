@@ -127,6 +127,20 @@ Procurar no banco uma proposta cujo envio teve resultado incerto, antes de
 qualquer nova tentativa; nunca cria outra proposta.
 _Evitar_: reenviar, tentar de novo
 
+**Homologação**:
+O processo em que a Granatech valida a integração da MEX, em duas fases
+(consultas e simulações; contratação), antes de liberar a produção.
+_Evitar_: homolog (homolog é o ambiente do Saturday, não o processo)
+
+**Rodada**:
+Uma execução de uma fase da homologação, disparada pelo gestor.
+_Evitar_: teste, execução
+
+**Evidência**:
+O registro de uma chamada à Granatech ou de um webhook recebido que prova um
+item do roteiro da homologação.
+_Evitar_: log, print
+
 ## Equipe
 
 **Atendente**:

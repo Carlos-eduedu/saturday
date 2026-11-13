@@ -195,26 +195,27 @@ homologação tem duas fases (`roteiro-homologacao.md`):
 - **Fase 2, contratação:** 2 contratações com sucesso, com o status recebido
   pelo webhook, e 1 erro de contratação.
 
-`scripts/homologacao_granatech.py` gera as evidências das duas fases contra a
-api-dev e um `RELATORIO.md` em `evidencias/granatech-<data>/` (fora do git).
-Antes de rodar:
+As evidências saem da seção **Homologação** da aba Granatech do painel
+([decisão 0014](decisoes/0014-homologacao-pelo-painel.md)). Só o gestor vê a
+seção, e só fora de produção: com `SATURDAY_ENVIRONMENT=prod` ou com a base em
+`api.granatech.com.br` ela some e a API responde 404.
 
-1. o webhook da dev precisa apontar para o Saturday homolog
-   (`https://saturday-homolog.dynatech.systems/webhooks/granatech`, header
-   `x-webhook-token`); até 2026-11-11 ele ia para `granatech.dynatech.systems`,
-   o serviço antigo;
-2. o homolog precisa estar no ar com a rota `GET /eventos/granatech/{id}`, que o
-   script usa para ler o que chegou pelo webhook (protegida pela
-   `SATURDAY_API_KEY`).
+1. O gestor clica em "Gerar Fase 1" ou "Gerar Fase 2" e confirma; a rodada
+   fica `pendente` (uma por vez, auditada).
+2. O worker pega a rodada e a roda numa thread própria, com a
+   `SATURDAY_GRANATECH_CHAVE_API` do ambiente: abre a consulta (1 na Fase 1, 2
+   na Fase 2), espera as margens e os webhooks (até 10 min cada, lidos direto
+   de `eventos_recebidos`) e grava cada chamada como evidência.
+3. A tela mostra os itens (ok ou falhou) e o JSON de cada passo, ao vivo pelo
+   SSE; no fim, "Baixar .zip" traz um JSON por passo e o `RELATORIO.md`.
 
-```bash
-SATURDAY_GRANATECH_BASE_URL=https://api-dev.granatech.com.br \
-SATURDAY_GRANATECH_CHAVE_API=... \
-SATURDAY_URL_HOMOLOG=https://saturday-homolog.dynatech.systems \
-SATURDAY_API_KEY=... \
-uv run --project apps/core python scripts/homologacao_granatech.py
-```
+Os webhooks só chegam ao deploy cadastrado na Granatech: hoje o homolog
+(`https://saturday-homolog.dynatech.systems/webhooks/granatech`, header
+`x-webhook-token`; até 2026-11-11 ia para `granatech.dynatech.systems`, o
+serviço antigo). Em outro ambiente o item "via webhook" falha; a seção mostra a
+URL que o ambiente espera. As consultas e propostas da homologação não entram
+nas listas da aba nem na cota, e o webhook delas não abre alerta.
 
-O script se recusa a rodar contra `api.granatech.com.br` e nunca grava a chave
-nem o token. Na dev, o pedido "sem seguro" é ignorado e volta o bloco com
-seguro; o relatório registra isso na evidência da simulação sem seguro.
+A chave e o token nunca são gravados. Se o worker reiniciar no meio, a rodada
+fica `interrompida`; gere outra. Na dev, o pedido "sem seguro" é ignorado e
+volta o bloco com seguro; a evidência da simulação sem seguro registra isso.

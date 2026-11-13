@@ -101,7 +101,8 @@ automaticamente e é o que publica a porta no ambiente local.
 - **Fase 7 (código e guia concluídos):** guia de deploy com ambiente do zero,
   backup e restauração (`docs/deploy.md`), teste de restauração
   (`infra/testar_restauracao.sh`), evidências da homologação Granatech
-  (`scripts/homologacao_granatech.py` e a rota `GET /eventos/granatech/{id}`) e
+  (seção Homologação da aba Granatech, rodada pelo worker; o script saiu,
+  docs/decisoes/0014) e
   o material da Granatech sem segredos em `docs/granatech-homologacao/`. O
   homolog foi montado no Dokploy seguindo o guia (rede, Postgres, stack,
   variáveis sem segredo e domínios). **Pendentes:** bucket S3 de anexos e número

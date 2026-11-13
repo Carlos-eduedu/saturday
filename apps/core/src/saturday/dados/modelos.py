@@ -28,6 +28,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy import true as sa_true
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -423,3 +424,37 @@ class Turno(Base):
     chamadas: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
     custo_usd: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class HomologacaoGranatech(Base):
+    """Uma rodada da homologação Granatech, pedida pelo gestor (decisão 0014).
+
+    ``passos`` guarda cada chamada à api-dev e cada leitura de webhook, sem
+    segredos; ``itens`` diz o que cada passo prova no roteiro; ``ids_externos``
+    lista as consultas e propostas criadas, para o worker não alertar quando o
+    webhook delas chegar. O índice parcial deixa uma rodada aberta por vez.
+    """
+
+    __tablename__ = "homologacoes_granatech"
+    __table_args__ = (
+        Index(
+            "ux_homologacoes_granatech_aberta",
+            text("(true)"),
+            unique=True,
+            postgresql_where=text("situacao IN ('pendente', 'em_andamento')"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    fase: Mapped[int] = mapped_column(Integer, nullable=False)
+    situacao: Mapped[str] = mapped_column(String(16), nullable=False, default="pendente")
+    pedido_por: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("usuarios_painel.id", ondelete="SET NULL")
+    )
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
+    iniciado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    terminado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    erro: Mapped[str | None] = mapped_column(Text)
+    passos: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
+    itens: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
+    ids_externos: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)

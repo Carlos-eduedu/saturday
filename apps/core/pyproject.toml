@@ -55,7 +55,7 @@ select = ["E", "F", "W", "I", "B", "UP", "S", "SIM"]
 [tool.mypy]
 strict = true
 ignore_missing_imports = true
-files = ["src/saturday", "../../scripts"]
+files = ["src/saturday"]
 mypy_path = "src"
 
 [tool.pytest.ini_options]

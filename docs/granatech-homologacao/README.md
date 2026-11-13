@@ -13,5 +13,5 @@ CPFs dos exemplos foram removidos ou trocados pelos dados de teste. Um teste
 | `webhook-propostas.md` | Status e notificações de propostas |
 | `postman-consultas.json`, `postman-contratacao.json` | Collections do Postman (preencha `api_key` localmente) |
 
-As evidências das fases saem de `scripts/homologacao_granatech.py` (ver
-[`../granatech.md`](../granatech.md)).
+As evidências das fases saem da seção Homologação da aba Granatech do painel
+(ver [`../granatech.md`](../granatech.md)).

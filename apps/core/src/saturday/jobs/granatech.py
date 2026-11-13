@@ -27,6 +27,7 @@ from saturday.bancos.granatech.cliente import ClienteGranatech
 from saturday.dados import repositorios
 from saturday.dados.modelos import ConsultaGranatech, Conversa, PropostaGranatech
 from saturday.dados.sessao import sessao as abrir_sessao
+from saturday.jobs.homologacao import eh_da_homologacao
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +80,9 @@ def _consulta(
             .with_for_update()
         ).first()
         if linha is None:
+            if eh_da_homologacao(sessao, id_externo):
+                logger.info("granatech_evento_homologacao status=%s", novo)
+                return
             _alertar(sessao, None, motivo="consulta_desconhecida", id=id_externo, status=novo)
             return
 
@@ -145,6 +149,9 @@ def _proposta(
             .with_for_update()
         ).first()
         if linha is None:
+            if eh_da_homologacao(sessao, id_externo):
+                logger.info("granatech_evento_homologacao status=%s", novo)
+                return
             _alertar(sessao, None, motivo="proposta_desconhecida", id=id_externo, status=novo)
             return
 

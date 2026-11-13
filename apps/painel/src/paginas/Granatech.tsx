@@ -11,8 +11,12 @@ import {
   type Eu,
   type EventoGranatech,
   type FiltroGranatech,
+  type Homologacao as DadosHomologacao,
   type PropostaGranatech,
   type PropostaGranatechDetalhe,
+  type RodadaDetalhe,
+  rodadaZipUrl,
+  type SituacaoRodada,
 } from "../api";
 import { ETAPAS, rotulo, reais } from "../rotulos";
 import { type Aviso, useAvisos } from "../tempoReal";
@@ -145,6 +149,191 @@ export function Granatech({ eu }: { eu: Eu }) {
             setSelecao({ aba: "consultas", id });
           }}
         />
+      )}
+
+      {gestor && <Homologacao />}
+    </div>
+  );
+}
+
+// Homologação Granatech (decisão 0014): só o gestor, e só fora de produção (a
+// API responde 404 e a seção some). O worker roda a rodada; a tela acompanha
+// pelo aviso `homologacao` do SSE.
+
+const SITUACAO: Record<SituacaoRodada, string> = {
+  pendente: "na fila",
+  em_andamento: "em andamento",
+  concluida: "concluída",
+  falhou: "falhou",
+  interrompida: "interrompida",
+};
+
+function Homologacao() {
+  const [dados, setDados] = useState<DadosHomologacao | null>(null);
+  const [indisponivel, setIndisponivel] = useState(false);
+  const [aberta, setAberta] = useState<number | null>(null);
+  const [versao, setVersao] = useState(0);
+  const [erro, setErro] = useState("");
+
+  const carregar = useCallback(() => {
+    api
+      .homologacao()
+      .then((d) => {
+        setDados(d);
+        setAberta((atual) => atual ?? d.rodadas[0]?.id ?? null);
+      })
+      .catch((e: unknown) => {
+        if (e instanceof ErroApi && e.status === 404) setIndisponivel(true);
+        else setErro(mensagemDe(e));
+      });
+  }, []);
+  useEffect(carregar, [carregar]);
+
+  useAvisos(
+    useCallback(
+      (a: Aviso) => {
+        if (a.tipo !== "homologacao" && a.tipo !== "reconectado") return;
+        carregar();
+        setVersao((v) => v + 1);
+      },
+      [carregar],
+    ),
+  );
+
+  if (indisponivel) return null;
+  if (!dados) return erro ? <p className="erro">{erro}</p> : null;
+
+  const ocupada = dados.rodadas.some((r) => r.situacao === "pendente" || r.situacao === "em_andamento");
+
+  function gerar(fase: 1 | 2) {
+    const n = dados?.consultas_por_fase[String(fase)] ?? fase;
+    const plural = n === 1 ? "1 consulta" : `${n} consultas`;
+    if (!window.confirm(`Isso abre ${plural} na api-dev e leva até 30 min. Continuar?`)) return;
+    setErro("");
+    api
+      .pedirRodada(fase)
+      .then((r) => setAberta(r.id))
+      .catch((e: unknown) => setErro(mensagemDe(e)))
+      .finally(carregar);
+  }
+
+  return (
+    <section>
+      <h2>Homologação</h2>
+      <p className="nota">
+        Gera as evidências que a Granatech pede em cada fase, contra <code>{dados.base_granatech}</code>.
+        Os webhooks só chegam se a Granatech estiver apontada para{" "}
+        {dados.webhook_esperado ? <code>{dados.webhook_esperado}</code> : "este ambiente (SATURDAY_DOMINIO_PUBLICO vazio)"}.
+      </p>
+      {erro && (
+        <p className="erro" role="alert">
+          {erro}
+        </p>
+      )}
+      <div className="acoes">
+        <button type="button" disabled={ocupada} onClick={() => gerar(1)}>
+          Gerar Fase 1
+        </button>
+        <button type="button" disabled={ocupada} onClick={() => gerar(2)}>
+          Gerar Fase 2
+        </button>
+      </div>
+
+      {dados.rodadas.length === 0 ? (
+        <Vazio titulo="Nenhuma rodada." texto="Gere a evidência de uma fase." />
+      ) : (
+        <table>
+          <thead>
+            <tr>
+              <th>Pedida</th>
+              <th>Fase</th>
+              <th>Situação</th>
+              <th>Por</th>
+              <th>Terminou</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {dados.rodadas.map((r) => (
+              <tr key={r.id}>
+                <td>{dataHora(r.criado_em)}</td>
+                <td data-rotulo="Fase">{r.fase}</td>
+                <td data-rotulo="Situação">{SITUACAO[r.situacao]}</td>
+                <td data-rotulo="Por">{r.pedido_por ?? "—"}</td>
+                <td data-rotulo="Terminou">{dataHora(r.terminado_em)}</td>
+                <td className="acoes">
+                  <button type="button" onClick={() => setAberta(r.id)}>
+                    Ver
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      {aberta !== null && <DetalheRodada key={aberta} id={aberta} versao={versao} />}
+    </section>
+  );
+}
+
+function DetalheRodada({ id, versao }: { id: number; versao: number }) {
+  const [rodada, setRodada] = useState<RodadaDetalhe | null>(null);
+  const [erro, setErro] = useState("");
+
+  useEffect(() => {
+    api
+      .rodada(id)
+      .then(setRodada)
+      .catch((e: unknown) => setErro(mensagemDe(e)));
+  }, [id, versao]);
+
+  if (erro) return <p className="erro">{erro}</p>;
+  if (!rodada) return <p className="centro">Carregando…</p>;
+  const terminada = rodada.situacao !== "pendente" && rodada.situacao !== "em_andamento";
+
+  return (
+    <div>
+      <h3>
+        Rodada {rodada.id}, Fase {rodada.fase}: {SITUACAO[rodada.situacao]}
+      </h3>
+      {rodada.erro && <p className="erro">Parou antes do fim: {rodada.erro}</p>}
+      {rodada.itens.length > 0 && (
+        <table>
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Situação</th>
+              <th>Arquivos</th>
+              <th>Observação</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rodada.itens.map((i) => (
+              <tr key={i.item}>
+                <td>{i.item}</td>
+                <td data-rotulo="Situação">{i.ok ? "ok" : "falhou"}</td>
+                <td data-rotulo="Arquivos">
+                  <code>{i.arquivo}</code>
+                </td>
+                <td data-rotulo="Observação">{i.observacao || "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {rodada.passos.map((p) => (
+        <details key={p.arquivo}>
+          <summary>
+            <code>{p.arquivo}</code>
+          </summary>
+          <pre className="nota">{JSON.stringify(p, null, 2)}</pre>
+        </details>
+      ))}
+      {terminada && rodada.passos.length > 0 && (
+        <a className="botao" href={rodadaZipUrl(rodada.id)}>
+          Baixar .zip
+        </a>
       )}
     </div>
   );

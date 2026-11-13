@@ -5,9 +5,10 @@
 import { useEffect } from "react";
 
 export interface Aviso {
-  tipo: "mensagem" | "conversa" | "alerta" | "granatech" | "reconectado";
+  tipo: "mensagem" | "conversa" | "alerta" | "granatech" | "homologacao" | "reconectado";
   conversa?: string;
   alerta?: string;
+  rodada?: string;
 }
 
 const EVENTO = "painel";
