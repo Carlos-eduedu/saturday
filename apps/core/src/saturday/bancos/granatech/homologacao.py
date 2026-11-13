@@ -164,8 +164,20 @@ class Homologacao:
         return resposta.status_code, dados, arquivo
 
     def _gravar(self, nome: str, conteudo: dict[str, Any]) -> str:
+        # A mesma chamada repetida em seguida (esperar o detalhe ficar pronto)
+        # fica num arquivo só, com a última resposta e quantas vezes foi feita.
+        tentativas = 1
+        anterior = self.passos[-1] if self.passos else None
+        if anterior is not None and str(anterior.get("arquivo", "")).endswith(f"-{nome}.json"):
+            self.passos.pop()
+            tentativas = int(anterior.get("tentativas") or 1) + 1
         arquivo = f"{len(self.passos) + 1:02d}-{nome}.json"
-        conteudo = {"arquivo": arquivo, "horario": datetime.now(TZ).isoformat(), **conteudo}
+        conteudo = {
+            "arquivo": arquivo,
+            "horario": datetime.now(TZ).isoformat(),
+            **({"tentativas": tentativas} if tentativas > 1 else {}),
+            **conteudo,
+        }
         texto = json.dumps(conteudo, ensure_ascii=False, default=str)
         # Nunca grava a chave nem o token, nem por acidente numa resposta.
         for segredo in (self.chave, self._token):

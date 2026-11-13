@@ -69,6 +69,24 @@ def test_fase1_gera_as_quatro_evidencias(http_granatech: TestClient) -> None:
     assert len(homologacao.ids_externos) == 1
 
 
+def test_mesma_chamada_repetida_fica_num_arquivo_so(http_granatech: TestClient) -> None:
+    """Esperar o detalhe gerava um arquivo por consulta (rodada 12: dezenas deles)."""
+
+    homologacao = _homologacao(http_granatech, _TodoId())
+    homologacao._gravar("termo-x", {"status_http": 201})
+    for status in (200, 200, 200):
+        homologacao._gravar("detalhe-x", {"status_http": status})
+    homologacao._gravar("simulacao-x", {"status_http": 200})
+
+    assert [p["arquivo"] for p in homologacao.passos] == [
+        "01-termo-x.json",
+        "02-detalhe-x.json",
+        "03-simulacao-x.json",
+    ]
+    assert homologacao.passos[1]["tentativas"] == 3
+    assert "tentativas" not in homologacao.passos[0]
+
+
 def test_fase2_contrata_duas_vezes_e_registra_o_erro(
     http_granatech: TestClient, simulador_granatech: ModuleType
 ) -> None:
