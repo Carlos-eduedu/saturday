@@ -48,6 +48,9 @@ const STATUS_ENTREGA: Record<string, string> = {
   failed: "falhou",
 };
 
+// Conteúdo que `painel/acoes.enviar_anexo` grava quando o anexo vai sem legenda.
+const ANEXO_SEM_LEGENDA = /^\[(imagem|documento|áudio) .+\]$/;
+
 type Aba = "mensagens" | "ficha" | "ia";
 
 // `fichaEmAba`: sem espaço para a coluna lateral (conversa ao lado da lista),
@@ -198,12 +201,24 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
               {conversa.mensagens.map((m) => (
                 <li key={m.id} className={`msg msg-${m.direcao} msg-${m.autor}`}>
                   <span className="autor">{AUTOR[m.autor]}</span>
-                  <p>{m.conteudo}</p>
-                  {m.anexos.map((anexo, indice) => (
-                    <a key={indice} href={midiaUrl(m.id, indice)} target="_blank" rel="noreferrer">
-                      Anexo ({anexo.mime_type})
-                    </a>
-                  ))}
+                  {/* Anexo sem legenda grava "[documento nome]": o anexo já se mostra. */}
+                  {!(m.anexos.length > 0 && ANEXO_SEM_LEGENDA.test(m.conteudo)) && <p>{m.conteudo}</p>}
+                  {m.anexos.map((anexo, indice) => {
+                    const url = midiaUrl(m.id, indice);
+                    if (anexo.mime_type.startsWith("audio/"))
+                      return <audio key={indice} className="anexo-audio" controls preload="none" src={url} />;
+                    if (anexo.mime_type.startsWith("image/"))
+                      return (
+                        <a key={indice} className="anexo-imagem" href={url} target="_blank" rel="noreferrer">
+                          <img src={url} alt={anexo.nome ?? "Imagem enviada"} loading="lazy" />
+                        </a>
+                      );
+                    return (
+                      <a key={indice} className="anexo-arquivo" href={url} target="_blank" rel="noreferrer">
+                        {anexo.nome ?? `Anexo (${anexo.mime_type})`}
+                      </a>
+                    );
+                  })}
                   <small>
                     {formatarHora(m.criada_em)}
                     {m.status_entrega && (

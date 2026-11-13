@@ -98,7 +98,7 @@ def criar_canal_whatsapp(
     cliente = WhatsAppClient(http, settings)
     return (
         EntradaWhatsApp(cliente, storage, Transcritor(http, settings)),
-        SaidaWhatsApp(cliente, fabrica, settings),
+        SaidaWhatsApp(cliente, fabrica, settings, storage=storage),
     )
 
 
@@ -124,7 +124,7 @@ def criar_canal_evolution(
     cliente = EvolutionClient(http, settings)
     return CanalEvolution(
         entrada=EntradaWhatsApp(cliente, storage, Transcritor(http, settings), canal="evolution"),
-        saida=SaidaEvolution(cliente, fabrica),
+        saida=SaidaEvolution(cliente, fabrica, storage=storage),
         cliente=cliente,
     )
 

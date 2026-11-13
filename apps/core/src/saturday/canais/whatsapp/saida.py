@@ -13,11 +13,14 @@ quebra de linha) e fica na linha do outbox até o cliente escrever de novo.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.canais.base import Resultado
+from saturday.canais.whatsapp.audio import ErroConversao, para_ogg_opus
 from saturday.canais.whatsapp.cliente import (
     ErroIncerto,
     ErroJanelaFechada,
@@ -33,10 +36,13 @@ from saturday.dados import repositorios
 from saturday.dados.modelos import Outbox
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.settings import Settings
+from saturday.storage.base import Storage
 
 logger = logging.getLogger(__name__)
 
 MODELO_PADRAO = "atualizacao_pedido"
+# Tipo do anexo no outbox (`painel/midia.py`) → tipo da mensagem na Meta.
+TIPO_META = {"imagem": "image", "documento": "document", "audio": "audio"}
 
 
 class SaidaWhatsApp:
@@ -45,10 +51,15 @@ class SaidaWhatsApp:
         cliente: WhatsAppClient,
         fabrica: sessionmaker[Session],
         settings: Settings,
+        *,
+        storage: Storage | None = None,
+        converter_audio: Callable[[bytes], bytes] = para_ogg_opus,
     ) -> None:
         self._cliente = cliente
         self._fabrica = fabrica
         self._settings = settings
+        self._storage = storage
+        self._converter_audio = converter_audio
 
     def entregar(self, linha: Outbox, *, permitir_modelo: bool = False) -> Resultado:
         """Uma tentativa. ``permitir_modelo`` vem do outbox na conversão."""
@@ -61,7 +72,8 @@ class SaidaWhatsApp:
             logger.error("whatsapp_saida_sem_destino outbox=%s", linha.id)
             return Resultado.PERMANENTE
         modelo = MODELOS.get(str(payload.get("modelo") or ""))
-        if modelo is None and not texto:
+        midia = payload.get("midia")
+        if modelo is None and not texto and not midia:
             logger.info("whatsapp_saida_vazia outbox=%s", linha.id)
             return Resultado.OK
 
@@ -75,7 +87,13 @@ class SaidaWhatsApp:
             elif permitir_modelo or not aberta:
                 self._avisar_por_modelo(linha, numero, phone_number_id)
                 return Resultado.AGUARDANDO_CLIENTE
-            self._enviar_texto(linha, numero, phone_number_id, texto)
+            elif isinstance(midia, dict):
+                self._enviar_midia(linha, numero, phone_number_id, midia, texto)
+            else:
+                self._enviar_texto(linha, numero, phone_number_id, texto)
+        except ErroConversao as exc:
+            logger.error("whatsapp_audio_nao_converteu outbox=%s erro=%s", linha.id, exc)
+            return Resultado.PERMANENTE
         except ErroJanelaFechada:
             # Nossa janela dizia aberta, a Meta discordou: o outbox converte.
             return Resultado.JANELA_FECHADA
@@ -113,6 +131,40 @@ class SaidaWhatsApp:
             lambda parte: self._cliente.enviar_texto(phone_number_id, numero, parte),
         )
 
+    def _enviar_midia(
+        self,
+        linha: Outbox,
+        numero: str,
+        phone_number_id: str,
+        midia: dict[str, Any],
+        legenda: str,
+    ) -> None:
+        """Anexo do painel: lê do storage, sobe na Meta e envia pelo id."""
+
+        tipo = TIPO_META.get(str(midia.get("tipo") or ""))
+        if tipo is None or self._storage is None:
+            raise ErroPermanente(f"anexo sem tipo ou sem storage: {midia.get('tipo')}")
+        try:
+            dados = self._storage.ler(str(midia["chave"]))
+        except KeyError as exc:
+            raise ErroPermanente("anexo sumiu do storage") from exc
+        mime_type = str(midia.get("mime_type") or "")
+        nome = str(midia.get("nome") or "arquivo")
+        if tipo == "audio":
+            dados, mime_type = self._converter_audio(dados), "audio/ogg"
+            nome = nome.rsplit(".", 1)[0] + ".ogg"
+        media_id = self._cliente.subir_midia(phone_number_id, dados, mime_type, nome)
+        wamid = self._cliente.enviar_midia(
+            phone_number_id, numero, tipo, media_id, legenda=legenda, nome=nome
+        )
+        self._marcar(linha, wamid)
+
+    def _marcar(self, linha: Outbox, wamid: str | None) -> None:
+        mensagem_id = (linha.payload or {}).get("mensagem_id")
+        if isinstance(mensagem_id, int):
+            with abrir_sessao(self._fabrica) as sessao:
+                repositorios.marcar_envio(sessao, mensagem_id, wamid=wamid, status="sent")
+
     def _enviar_modelo_do_painel(
         self,
         linha: Outbox,
@@ -120,11 +172,7 @@ class SaidaWhatsApp:
         phone_number_id: str,
         modelo: Modelo,
     ) -> None:
-        wamid = self._cliente.enviar_modelo(phone_number_id, numero, modelo)
-        mensagem_id = (linha.payload or {}).get("mensagem_id")
-        if isinstance(mensagem_id, int):
-            with abrir_sessao(self._fabrica) as sessao:
-                repositorios.marcar_envio(sessao, mensagem_id, wamid=wamid, status="sent")
+        self._marcar(linha, self._cliente.enviar_modelo(phone_number_id, numero, modelo))
 
     def _avisar_por_modelo(self, linha: Outbox, numero: str, phone_number_id: str) -> None:
         """Um aviso por conversa: o segundo envio pendente espera o mesmo."""

@@ -19,6 +19,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session, sessionmaker
+from starlette.concurrency import run_in_threadpool
 
 from saturday.agent.clt import leitura
 from saturday.agent.service import AgentService
@@ -36,6 +37,7 @@ from saturday.dados.modelos import (
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.painel import acoes, exportacao, sessoes, supervisao
 from saturday.painel.auditoria import auditar
+from saturday.painel.midia import mime_base
 from saturday.privacidade import MASCARAS
 from saturday.settings import TZ_OPERACAO
 from saturday.web.api.granatech_admin import Conta
@@ -278,7 +280,9 @@ def ver_conversa(conversa_id: uuid.UUID, _usuario: Logado, fabrica: Fabrica) -> 
                 "conteudo": m.conteudo,
                 "status_entrega": m.status_entrega,
                 "criada_em": m.criada_em,
-                "anexos": [{"mime_type": a.get("mime_type")} for a in m.anexos or []],
+                "anexos": [
+                    {"mime_type": a.get("mime_type"), "nome": a.get("nome")} for a in m.anexos or []
+                ],
             }
             for m in mensagens
         ]
@@ -377,6 +381,38 @@ def enviar(
 ) -> dict[str, int]:
     mensagem_id = _executar(
         fabrica, conversa_id, acoes.enviar, usuario.id, texto=dados.texto, modelo=dados.modelo
+    )
+    return {"mensagem_id": mensagem_id}
+
+
+@router.post("/conversas/{conversa_id}/anexos", status_code=201)
+async def enviar_anexo(
+    conversa_id: uuid.UUID,
+    request: Request,
+    usuario: ComCsrf,
+    fabrica: Fabrica,
+    service: Servico,
+    nome: Annotated[str, Query(min_length=1, max_length=200)],
+    legenda: Annotated[str, Query(max_length=1024)] = "",
+) -> dict[str, int]:
+    """O arquivo vem cru no corpo (`Content-Type` é o MIME): sem multipart nem
+    base64. O limite de 20 MB do corpo vale aqui também (`web/limites.py`)."""
+
+    if service.storage is None:
+        raise HTTPException(status_code=503, detail="storage de anexos indisponível")
+    dados = await request.body()
+    mensagem_id = await run_in_threadpool(
+        _executar,
+        fabrica,
+        conversa_id,
+        acoes.enviar_anexo,
+        usuario.id,
+        service.storage,
+        dados=dados,
+        mime_type=mime_base(request.headers.get("content-type", "")),
+        # Só o nome: um caminho vindo do navegador não entra na mensagem.
+        nome=nome.replace("\\", "/").rsplit("/", 1)[-1].strip() or "arquivo",
+        legenda=legenda.strip(),
     )
     return {"mensagem_id": mensagem_id}
 

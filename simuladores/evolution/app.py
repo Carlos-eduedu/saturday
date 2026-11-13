@@ -97,6 +97,51 @@ def _autorizado(request: Request) -> bool:
     return request.headers.get("apikey") == API_KEY
 
 
+async def _enviar_midia(instancia: str, request: Request, rota: str) -> Any:
+    """`sendMedia` e `sendWhatsAppAudio`: guarda o corpo sem o base64 (só o
+    tamanho decodificado), consome falha programada e responde com `key.id`."""
+
+    if not _autorizado(request):
+        return _erro(401, "Unauthorized")
+    corpo = await request.json()
+    if FALHAS:
+        falha = FALHAS.pop(0)
+        return _erro(int(falha.get("status", 500)), ["Error: falha simulada"])
+    campo = "media" if rota == "sendMedia" else "audio"
+    bruto = str(corpo.pop(campo, ""))
+    identificador = _id()
+    ENVIADAS.append(
+        {
+            "instancia": instancia,
+            "id": identificador,
+            "rota": rota,
+            f"{campo}_bytes": len(base64.b64decode(bruto)) if bruto else 0,
+            **corpo,
+        }
+    )
+    return JSONResponse(
+        status_code=201,
+        content={
+            "key": {
+                "remoteJid": f"{corpo.get('number')}@s.whatsapp.net",
+                "fromMe": True,
+                "id": identificador,
+            },
+            "status": "PENDING",
+        },
+    )
+
+
+@app.post("/message/sendMedia/{instancia}")
+async def enviar_midia(instancia: str, request: Request) -> Any:
+    return await _enviar_midia(instancia, request, "sendMedia")
+
+
+@app.post("/message/sendWhatsAppAudio/{instancia}")
+async def enviar_audio(instancia: str, request: Request) -> Any:
+    return await _enviar_midia(instancia, request, "sendWhatsAppAudio")
+
+
 @app.post("/message/sendText/{instancia}")
 async def enviar_texto(instancia: str, request: Request) -> Any:
     """Consome uma falha programada, se houver; senão responde 201 com `key.id`."""

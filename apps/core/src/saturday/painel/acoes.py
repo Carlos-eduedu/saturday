@@ -29,7 +29,9 @@ from saturday.dados.modelos import (
 from saturday.dados.outbox import enfileirar
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.dados.trava import travar_conversa
+from saturday.painel import midia
 from saturday.painel.auditoria import auditar
+from saturday.storage.base import Storage
 
 # Modelos que o atendente pode mandar: utilidade e sem botão de link.
 # TODO: variáveis de modelo quando os textos forem cadastrados na Meta; os
@@ -200,6 +202,29 @@ def editar_ficha(
     repositorios.notificar(sessao, "conversa", conversa=conversa.id)
 
 
+def _conferir_envio(conversa: Conversa, usuario_id: uuid.UUID) -> None:
+    """Só quem assumiu responde, e o painel só envia pelo WhatsApp."""
+
+    if conversa.atendimento != "assumida" or conversa.atendente_id != usuario_id:
+        raise AcaoRecusada(409, "assuma a conversa antes de responder")
+    if (
+        conversa.canal not in CANAIS_WHATSAPP
+        or not conversa.telefone
+        or not conversa.phone_number_id
+    ):
+        raise AcaoRecusada(409, "o painel só envia pelo WhatsApp")
+
+
+def _payload(conversa: Conversa, mensagem_id: int, texto: str) -> dict[str, Any]:
+    return {
+        "conversation_id": conversa.conversation_id,
+        "numero": conversa.telefone,
+        "phone_number_id": conversa.phone_number_id,
+        "answer": texto,
+        "mensagem_id": mensagem_id,
+    }
+
+
 def enviar(
     sessao: Session,
     conversa: Conversa,
@@ -210,14 +235,7 @@ def enviar(
 ) -> int:
     """Grava a mensagem do atendente e o envio no outbox, na mesma transação."""
 
-    if conversa.atendimento != "assumida" or conversa.atendente_id != usuario_id:
-        raise AcaoRecusada(409, "assuma a conversa antes de responder")
-    if (
-        conversa.canal not in CANAIS_WHATSAPP
-        or not conversa.telefone
-        or not conversa.phone_number_id
-    ):
-        raise AcaoRecusada(409, "o painel só envia pelo WhatsApp")
+    _conferir_envio(conversa, usuario_id)
     if (texto is None) == (modelo is None):
         raise AcaoRecusada(422, "envie texto ou modelo")
     # Janela e modelos são da Meta; a Evolution só manda texto (decisão 0009).
@@ -238,13 +256,7 @@ def enviar(
         autor="atendente",
         usuario_id=usuario_id,
     )
-    payload: dict[str, Any] = {
-        "conversation_id": conversa.conversation_id,
-        "numero": conversa.telefone,
-        "phone_number_id": conversa.phone_number_id,
-        "answer": texto or "",
-        "mensagem_id": mensagem_id,
-    }
+    payload = _payload(conversa, mensagem_id, texto or "")
     if modelo is not None:
         payload["modelo"] = modelo
     enfileirar(sessao, conversa_id=conversa.id, canal=conversa.canal, payload=payload)
@@ -254,5 +266,60 @@ def enviar(
         "enviar_mensagem",
         str(conversa.id),
         {"mensagem_id": mensagem_id, "modelo": modelo},
+    )
+    return mensagem_id
+
+
+def enviar_anexo(
+    sessao: Session,
+    conversa: Conversa,
+    usuario_id: uuid.UUID,
+    storage: Storage,
+    *,
+    dados: bytes,
+    mime_type: str,
+    nome: str,
+    legenda: str,
+) -> int:
+    """Guarda o arquivo no storage e enfileira o envio; o outbox leva só a chave.
+
+    Mesmas regras do texto: só quem assumiu, só WhatsApp e, na Meta, só com a
+    janela aberta (fora dela a Meta recusa qualquer coisa que não seja modelo).
+    """
+
+    _conferir_envio(conversa, usuario_id)
+    try:
+        tipo = midia.conferir(dados, mime_type)
+    except midia.MidiaRecusada as exc:
+        raise AcaoRecusada(exc.status, exc.detalhe) from exc
+    if conversa.canal == "whatsapp" and not janela_aberta(
+        conversa.ultima_entrada_em, datetime.now(UTC)
+    ):
+        raise AcaoRecusada(409, "janela de 24 h fechada: envie um modelo")
+
+    extensao = midia.EXTENSAO[mime_type]
+    chave = storage.salvar(
+        dados,
+        mime_type=mime_type,
+        chave=f"{conversa.canal}/{conversa.telefone}/painel-{uuid.uuid4().hex}.{extensao}",
+    )
+    anexo = {"chave": chave, "mime_type": mime_type, "nome": nome}
+    mensagem_id = repositorios.registrar_saida(
+        sessao,
+        conversa,
+        conteudo=legenda or f"[{midia.ROTULO[tipo]} {nome}]",
+        autor="atendente",
+        usuario_id=usuario_id,
+        anexos=[anexo],
+    )
+    payload = _payload(conversa, mensagem_id, legenda)
+    payload["midia"] = {**anexo, "tipo": tipo}
+    enfileirar(sessao, conversa_id=conversa.id, canal=conversa.canal, payload=payload)
+    auditar(
+        sessao,
+        usuario_id,
+        "enviar_anexo",
+        str(conversa.id),
+        {"mensagem_id": mensagem_id, "tipo": tipo, "bytes": len(dados)},
     )
     return mensagem_id

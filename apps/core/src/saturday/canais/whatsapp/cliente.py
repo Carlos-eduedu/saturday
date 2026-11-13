@@ -121,6 +121,67 @@ class WhatsAppClient:
                     return wamid
         return None
 
+    def subir_midia(self, phone_number_id: str, dados: bytes, mime_type: str, nome: str) -> str:
+        """`POST /{phone_number_id}/media` (multipart); devolve o id da mídia.
+
+        Repetir não faz mal: cada tentativa gera outro id, e a Meta apaga os
+        que sobram em 30 dias.
+        """
+
+        url = f"{self._base}/{phone_number_id}/media"
+        try:
+            resposta = self._http.post(
+                url,
+                data={"messaging_product": "whatsapp", "type": mime_type},
+                files={"file": (nome, dados, mime_type)},
+                headers=self._cabecalhos(),
+            )
+        except httpx.HTTPError as exc:
+            raise ErroTemporario(f"rede: {type(exc).__name__}") from exc
+        try:
+            corpo = resposta.json()
+        except ValueError:
+            corpo = {}
+        if resposta.status_code >= 400:
+            raise classificar(resposta.status_code, corpo)
+        media_id = corpo.get("id")
+        if not isinstance(media_id, str):
+            raise ErroTemporario("upload sem id")
+        return media_id
+
+    def enviar_midia(
+        self,
+        phone_number_id: str,
+        numero: str,
+        tipo: str,
+        media_id: str,
+        *,
+        legenda: str = "",
+        nome: str = "",
+    ) -> str | None:
+        """Mensagem `image`, `document` ou `audio` com a mídia já subida.
+
+        TODO(meta): `caption` e `filename` seguem a referência da Cloud API; a
+        leitura das docs não trouxe o esquema completo. O primeiro envio real
+        no dev confirma.
+        """
+
+        conteudo: dict[str, Any] = {"id": media_id}
+        if legenda and tipo in ("image", "document"):
+            conteudo["caption"] = legenda
+        if nome and tipo == "document":
+            conteudo["filename"] = nome
+        return self._enviar(
+            phone_number_id,
+            {
+                "messaging_product": "whatsapp",
+                "recipient_type": "individual",
+                "to": numero,
+                "type": tipo,
+                tipo: conteudo,
+            },
+        )
+
     def enviar_texto(self, phone_number_id: str, numero: str, texto: str) -> str | None:
         return self._enviar(
             phone_number_id,

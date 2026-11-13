@@ -1,6 +1,10 @@
 import {
   Attachment01Icon,
+  Cancel01Icon,
+  Delete02Icon,
   Download04Icon,
+  Pdf01Icon,
+  StopIcon,
   FlashIcon,
   Mail01Icon,
   Mic01Icon,
@@ -18,6 +22,7 @@ import {
   useState,
 } from "react";
 import {
+  ANEXOS_ACEITOS,
   api,
   type ContaNova,
   type Detalhe,
@@ -25,19 +30,30 @@ import {
   type Eu,
   exportarUrl,
   type Ficha,
+  enviarAnexo,
   type RespostaRapida,
 } from "../api";
 import { MODELOS, rotulo } from "../rotulos";
 import { type Banco, CamposConta, CONTA_VAZIA } from "./CamposConta";
 import { Dialogo } from "./Dialogo";
+import { LIMITE_GRAVACAO_S, useGravador } from "./useGravador";
 
 type Agir = (acao: () => Promise<unknown>) => Promise<void>;
 type Aberto = "ficha" | "modelo" | null;
 
 const ALTURA_MAXIMA = 220; // ~8 linhas; depois disso o campo rola.
+const MB = 1024 * 1024;
+
+const tamanho = (bytes: number) =>
+  bytes >= MB
+    ? `${(bytes / MB).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} MB`
+    : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+
+const relogio = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
 // Área de escrever da conversa: campo que cresce, respostas rápidas com "/",
-// atalhos do painel (ficha, modelo, exportar) e, na Parte 2, anexo e áudio.
+// atalhos do painel (ficha, modelo, exportar), anexo (botão ou arrastar) e
+// áudio gravado. O texto do campo vira a legenda do anexo.
 // Só quem assumiu escreve; o gestor também corrige a ficha sem assumir.
 export function Compositor({
   conversa,
@@ -58,7 +74,20 @@ export function Compositor({
   const [respostas, setRespostas] = useState<RespostaRapida[]>([]);
   const [indice, setIndice] = useState(0);
   const [semSugestoes, setSemSugestoes] = useState(false);
+  const [anexo, setAnexo] = useState<{ arquivo: File; url: string } | null>(null);
+  const [erroAnexo, setErroAnexo] = useState("");
+  const [arrastando, setArrastando] = useState(false);
   const campo = useRef<HTMLTextAreaElement>(null);
+  const seletor = useRef<HTMLInputElement>(null);
+  const gravador = useGravador(escolherArquivo);
+
+  // A prévia (imagem, player) usa um object URL: solto quando o anexo sai.
+  useEffect(
+    () => () => {
+      if (anexo) URL.revokeObjectURL(anexo.url);
+    },
+    [anexo],
+  );
 
   useEffect(() => {
     api
@@ -81,6 +110,22 @@ export function Compositor({
   const janelaAberta = conversa.janela_aberta || !meta;
   const temModelo = meta && conversa.modelos.length > 0;
   const podeFicha = minha || eu.perfil === "gestor";
+  const podeAnexar = minha && janelaAberta && !enviando && !gravador.gravando;
+  const audio = anexo?.arquivo.type.startsWith("audio/") ?? false;
+
+  function escolherArquivo(arquivo: File) {
+    const limite = ANEXOS_ACEITOS[arquivo.type.split(";")[0]];
+    if (!limite) {
+      setErroAnexo("Tipo não aceito: envie JPG, PNG, PDF ou áudio.");
+      return;
+    }
+    if (arquivo.size > limite) {
+      setErroAnexo(`${arquivo.name} tem ${tamanho(arquivo.size)}; o limite é ${limite / MB} MB.`);
+      return;
+    }
+    setErroAnexo("");
+    setAnexo({ arquivo, url: URL.createObjectURL(arquivo) });
+  }
 
   const busca = /^\/(\S*)$/.exec(texto)?.[1]?.toLowerCase();
   const sugestoes =
@@ -99,11 +144,17 @@ export function Compositor({
 
   async function enviar(evento?: FormEvent) {
     evento?.preventDefault();
-    if (!texto.trim() || enviando || !minha) return;
+    if ((!texto.trim() && !anexo) || enviando || !minha) return;
     setEnviando(true);
     await agir(async () => {
-      await api.enviar(conversa.id, { texto });
-      setTexto("");
+      if (anexo) {
+        await enviarAnexo(conversa.id, anexo.arquivo, anexo.arquivo.name, audio ? "" : texto.trim());
+        setAnexo(null);
+        if (!audio) setTexto("");
+      } else {
+        await api.enviar(conversa.id, { texto });
+        setTexto("");
+      }
     });
     setEnviando(false);
   }
@@ -134,7 +185,9 @@ export function Compositor({
   }
 
   const placeholder = minha
-    ? respostas.length > 0
+    ? anexo
+      ? "Legenda (opcional)"
+      : respostas.length > 0
       ? "Escreva a mensagem ou / para uma resposta rápida"
       : "Escreva a mensagem"
     : "Assuma a conversa no topo para responder";
@@ -144,7 +197,35 @@ export function Compositor({
       {!janelaAberta && minha && (
         <p className="aviso">Janela de 24 h fechada: só é possível enviar um modelo.</p>
       )}
-      <form className={minha ? "compositor" : "compositor inativo"} onSubmit={enviar}>
+      <form
+        className={["compositor", !minha && "inativo", arrastando && "arrastando"].filter(Boolean).join(" ")}
+        onSubmit={enviar}
+        onDragOver={(e) => {
+          if (!podeAnexar || !e.dataTransfer.types.includes("Files")) return;
+          e.preventDefault();
+          setArrastando(true);
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setArrastando(false);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setArrastando(false);
+          const arquivo = e.dataTransfer.files[0];
+          if (arquivo && podeAnexar) escolherArquivo(arquivo);
+        }}
+      >
+        <input
+          ref={seletor}
+          type="file"
+          hidden
+          accept={Object.keys(ANEXOS_ACEITOS).join(",")}
+          onChange={(e) => {
+            const arquivo = e.target.files?.[0];
+            if (arquivo) escolherArquivo(arquivo);
+            e.target.value = "";
+          }}
+        />
         {sugestoes.length > 0 && (
           <ul className="sugestoes" role="listbox" id="respostas-rapidas" aria-label="Respostas rápidas">
             {sugestoes.map((r, i) => (
@@ -163,7 +244,49 @@ export function Compositor({
             ))}
           </ul>
         )}
-        {janelaAberta && (
+        {(anexo || erroAnexo || gravador.erro) && (
+          <div className="anexo-pendente">
+            {anexo && (
+              <div className="chip-anexo">
+                {audio ? (
+                  <audio controls src={anexo.url} aria-label="Ouvir o áudio gravado" />
+                ) : anexo.arquivo.type.startsWith("image/") ? (
+                  <img src={anexo.url} alt="" />
+                ) : (
+                  <HugeiconsIcon icon={Pdf01Icon} size={22} strokeWidth={1.8} />
+                )}
+                {!audio && (
+                  <span className="dados-anexo">
+                    <span className="nome">{anexo.arquivo.name}</span>
+                    <small>{tamanho(anexo.arquivo.size)}</small>
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className="icone"
+                  onClick={() => setAnexo(null)}
+                  aria-label={audio ? "Descartar o áudio" : "Remover o anexo"}
+                  title={audio ? "Descartar" : "Remover"}
+                >
+                  <HugeiconsIcon icon={audio ? Delete02Icon : Cancel01Icon} size={18} strokeWidth={2} />
+                </button>
+              </div>
+            )}
+            {(erroAnexo || gravador.erro) && (
+              <p className="erro" role="alert">
+                {erroAnexo || gravador.erro}
+              </p>
+            )}
+          </div>
+        )}
+        {gravador.gravando && (
+          <div className="gravando" role="status">
+            <span className="ponto" aria-hidden="true" />
+            Gravando <time>{relogio(gravador.segundos)}</time>
+            <small>até {relogio(LIMITE_GRAVACAO_S)}</small>
+          </div>
+        )}
+        {janelaAberta && !gravador.gravando && !audio && (
           <textarea
             ref={campo}
             value={texto}
@@ -216,22 +339,34 @@ export function Compositor({
           <button
             type="button"
             className="icone"
-            disabled
-            aria-label="Anexar arquivo (em breve)"
-            title="Anexar arquivo (em breve)"
+            disabled={!podeAnexar}
+            onClick={() => seletor.current?.click()}
+            aria-label="Anexar arquivo"
+            title="Anexar JPG, PNG ou PDF (ou arraste aqui)"
           >
             <HugeiconsIcon icon={Attachment01Icon} size={20} strokeWidth={2} />
           </button>
           <button
             type="button"
             className="icone"
-            disabled
-            aria-label="Gravar áudio (em breve)"
-            title="Gravar áudio (em breve)"
+            disabled={!podeAnexar || !!anexo || !gravador.suportado}
+            onClick={() => void gravador.iniciar()}
+            aria-label="Gravar áudio"
+            title={gravador.suportado ? "Gravar áudio" : "Este navegador não grava áudio"}
           >
             <HugeiconsIcon icon={Mic01Icon} size={20} strokeWidth={2} />
           </button>
-          {janelaAberta ? (
+          {gravador.gravando ? (
+            <>
+              <button type="button" className="cancelar-gravacao" onClick={gravador.cancelar}>
+                Cancelar
+              </button>
+              <button type="button" className="principal enviar" onClick={gravador.parar}>
+                <HugeiconsIcon icon={StopIcon} size={18} strokeWidth={2} />
+                Parar
+              </button>
+            </>
+          ) : janelaAberta ? (
             <>
               {minha && (
                 <span className="dica" aria-hidden="true">
@@ -241,7 +376,7 @@ export function Compositor({
               <button
                 type="submit"
                 className="enviar"
-                disabled={!minha || enviando || !texto.trim()}
+                disabled={!minha || enviando || (!texto.trim() && !anexo)}
               >
                 <HugeiconsIcon icon={SentIcon} size={18} strokeWidth={2} />
                 {enviando ? "Enviando…" : "Enviar"}

@@ -188,6 +188,43 @@ class EvolutionClient:
             return str(chave["id"])
         return None
 
+    @staticmethod
+    def _id(dados: dict[str, Any]) -> str | None:
+        chave = dados.get("key")
+        if isinstance(chave, dict) and isinstance(chave.get("id"), str):
+            return str(chave["id"])
+        return None
+
+    def enviar_midia(
+        self,
+        instancia: str,
+        numero: str,
+        *,
+        mediatype: str,
+        mime_type: str,
+        dados: bytes,
+        nome: str,
+        legenda: str = "",
+    ) -> str | None:
+        """`sendMedia` (imagem ou documento) com o arquivo em base64."""
+
+        corpo: dict[str, Any] = {
+            "number": f"{DDI_BRASIL}{numero}",
+            "mediatype": mediatype,
+            "mimetype": mime_type,
+            "media": base64.b64encode(dados).decode(),
+            "fileName": nome,
+        }
+        if legenda:
+            corpo["caption"] = legenda
+        return self._id(self._objeto("POST", f"/message/sendMedia/{instancia}", corpo))
+
+    def enviar_audio(self, instancia: str, numero: str, dados: bytes) -> str | None:
+        """`sendWhatsAppAudio`: a Evolution converte para ogg/opus e manda como voz."""
+
+        corpo = {"number": f"{DDI_BRASIL}{numero}", "audio": base64.b64encode(dados).decode()}
+        return self._id(self._objeto("POST", f"/message/sendWhatsAppAudio/{instancia}", corpo))
+
     def marcar_lida(self, instancia: str, wamid: str) -> None:
         """Nada a fazer: a instância lê sozinho (`readMessages=true`).
 

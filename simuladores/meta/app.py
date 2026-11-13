@@ -27,6 +27,8 @@ ENVIADAS: list[dict[str, Any]] = []
 LIDAS: list[dict[str, Any]] = []
 MIDIAS: dict[str, tuple[bytes, str]] = {}
 FALHAS: list[dict[str, Any]] = []
+# Uploads de mídia de saída (`POST /{pnid}/media`): só metadados, para conferir.
+SUBIDAS: list[dict[str, Any]] = []
 CONTADOR = {"wamid": 0}
 
 SATURDAY_URL = os.environ.get("SIMULADOR_SATURDAY_URL", "http://api:8000")
@@ -63,7 +65,30 @@ async def enviar(phone_number_id: str, request: Request) -> Any:
 
 @app.get("/admin/enviadas")
 def listar_enviadas() -> dict[str, Any]:
-    return {"enviadas": ENVIADAS}
+    return {"enviadas": ENVIADAS, "subidas": SUBIDAS}
+
+
+@app.post("/{phone_number_id}/media")
+async def subir_midia(phone_number_id: str, request: Request) -> Any:
+    """Upload multipart da mídia de saída; devolve o id para a mensagem.
+
+    O corpo não é desmontado (sem python-multipart): guarda o tipo, o tamanho
+    e se os campos da Meta vieram, o que basta para conferir o envio.
+    """
+
+    corpo = await request.body()
+    media_id = f"media-saida-{uuid.uuid4().hex[:12]}"
+    SUBIDAS.append(
+        {
+            "phone_number_id": phone_number_id,
+            "id": media_id,
+            "content_type": request.headers.get("content-type", ""),
+            "bytes": len(corpo),
+            "messaging_product": b'name="messaging_product"' in corpo,
+            "arquivo": b'name="file"' in corpo,
+        }
+    )
+    return {"id": media_id}
 
 
 @app.get("/admin/lidas")
@@ -74,6 +99,7 @@ def listar_lidas() -> dict[str, Any]:
 @app.post("/admin/limpar")
 def limpar() -> dict[str, int]:
     ENVIADAS.clear()
+    SUBIDAS.clear()
     LIDAS.clear()
     MIDIAS.clear()
     FALHAS.clear()

@@ -32,6 +32,12 @@ e [decisoes/0011](decisoes/0011-configuracoes-da-instancia-pelo-painel.md).
   400 (instância desconectada) → temporário; número sem WhatsApp, 401 e 404 →
   permanente.
 - Painel: atendente envia texto a qualquer hora; o envio de modelo não aparece.
+- Anexo do painel (imagem ou PDF): `POST /message/sendMedia/{instância}` com
+  `mediatype`, `mimetype`, `fileName`, `caption` e o arquivo em base64 em
+  `media`. Áudio gravado: `POST /message/sendWhatsAppAudio/{instância}` com o
+  base64 em `audio`; a própria Evolution converte para ogg/opus e manda como
+  mensagem de voz (o ffmpeg do Saturday só entra no canal da Meta). Contrato
+  lido no código-fonte da tag 2.3.7 (`sendMessage.dto.ts`).
 
 ## Variáveis
 

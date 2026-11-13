@@ -38,7 +38,7 @@ export interface Mensagem {
   conteudo: string;
   status_entrega: string | null;
   criada_em: string;
-  anexos: { mime_type: string }[];
+  anexos: { mime_type: string; nome?: string | null }[];
 }
 
 export interface Detalhe extends Resumo {
@@ -366,12 +366,17 @@ async function chamar<T>(metodo: string, caminho: string, corpo?: unknown): Prom
   const cabecalhos: Record<string, string> = {};
   if (metodo !== "GET") cabecalhos["X-CSRF-Token"] = csrf;
   if (corpo !== undefined) cabecalhos["Content-Type"] = "application/json";
-  const resposta = await fetch(`/admin${caminho}`, {
-    method: metodo,
-    headers: cabecalhos,
-    body: corpo === undefined ? undefined : JSON.stringify(corpo),
-    credentials: "same-origin",
-  });
+  return responder<T>(
+    await fetch(`/admin${caminho}`, {
+      method: metodo,
+      headers: cabecalhos,
+      body: corpo === undefined ? undefined : JSON.stringify(corpo),
+      credentials: "same-origin",
+    }),
+  );
+}
+
+async function responder<T>(resposta: Response): Promise<T> {
   if (!resposta.ok) {
     let detalhe = resposta.statusText;
     try {
@@ -391,6 +396,30 @@ async function chamar<T>(metodo: string, caminho: string, corpo?: unknown): Prom
   if (resposta.status === 204) return undefined as T;
   return (await resposta.json()) as T;
 }
+
+// Anexo do painel: o arquivo vai cru no corpo, com o MIME no Content-Type
+// (sem multipart nem base64). A legenda segue o texto do campo.
+export function enviarAnexo(id: string, arquivo: Blob, nome: string, legenda: string) {
+  const params = new URLSearchParams({ nome, legenda });
+  return fetch(`/admin/conversas/${id}/anexos?${params}`, {
+    method: "POST",
+    headers: { "X-CSRF-Token": csrf, "Content-Type": arquivo.type || "application/octet-stream" },
+    body: arquivo,
+    credentials: "same-origin",
+  }).then((r) => responder<{ mensagem_id: number }>(r));
+}
+
+// Espelha `painel/midia.py`: tipos aceitos e limite de cada um, em bytes.
+const MB = 1024 * 1024;
+export const ANEXOS_ACEITOS: Record<string, number> = {
+  "image/jpeg": 5 * MB,
+  "image/png": 5 * MB,
+  "application/pdf": 16 * MB,
+  "audio/webm": 16 * MB,
+  "audio/ogg": 16 * MB,
+  "audio/mp4": 16 * MB,
+  "audio/mpeg": 16 * MB,
+};
 
 export const api = {
   entrar: (email: string, senha: string) => chamar<Eu>("POST", "/login", { email, senha }),

@@ -744,6 +744,7 @@ main {
   .msg { max-width: 90%; }
   .transferir { flex-direction: column; align-items: stretch; }
   .compositor .dica { display: none; }
+  .compositor .dica + .enviar { margin-left: auto; }
   .dialogo { width: 100%; max-width: 100%; margin: auto 0 0; max-height: 92dvh; border-radius: var(--raio-l) var(--raio-l) 0 0; border-bottom: none; }
   .acoes { margin-left: 0; width: 100%; }
   .mais-painel { right: auto; left: 0; }
@@ -1007,3 +1008,51 @@ main {
 .form-resposta h3 { margin: 0; font-size: 0.95rem; }
 .form-resposta .erro { margin: 0; }
 .form-resposta .acoes-form { display: flex; gap: 0.5rem; justify-content: flex-end; }
+
+/* Anexo e gravação no compositor. */
+.compositor.arrastando { border-color: var(--destaque); border-style: dashed; background: color-mix(in srgb, var(--destaque) 6%, var(--superficie)); }
+.anexo-pendente { display: flex; flex-direction: column; gap: 0.4rem; padding: 0.75rem 0.75rem 0; }
+.anexo-pendente .erro { margin: 0; font-size: 0.875rem; }
+.chip-anexo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: 100%;
+  width: fit-content;
+  padding: 0.35rem 0.35rem 0.35rem 0.6rem;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-m);
+  background: var(--superficie-2);
+}
+.chip-anexo img { width: 2.75rem; height: 2.75rem; object-fit: cover; border-radius: var(--raio-s); }
+.chip-anexo > svg { color: var(--erro); flex: none; }
+.chip-anexo audio { height: 2.25rem; max-width: 18rem; }
+.chip-anexo .dados-anexo { display: flex; flex-direction: column; min-width: 0; }
+.chip-anexo .nome { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 22rem; }
+.chip-anexo small { color: var(--suave); font-size: 0.8rem; }
+.chip-anexo .icone { width: 2.25rem; min-height: 2.25rem; padding: 0; display: grid; place-items: center; border-color: transparent; background: none; color: var(--suave); }
+.chip-anexo .icone:hover:not(:disabled) { color: var(--texto); background: var(--superficie); transform: none; box-shadow: none; }
+.gravando {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 3.25rem;
+  padding: 0.85rem 1rem 0.35rem;
+  font-weight: 500;
+}
+.gravando time { font-family: var(--fonte-mono); font-variant-numeric: tabular-nums; }
+.gravando small { color: var(--suave); font-weight: 400; }
+.gravando .ponto { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--erro); animation: gravando-pulso 1.2s ease-in-out infinite; }
+@keyframes gravando-pulso { 50% { opacity: 0.3; } }
+.compositor .cancelar-gravacao { margin-left: auto; }
+.compositor .cancelar-gravacao + .enviar { margin-left: 0.5rem; }
+
+/* Anexos no histórico. */
+.msg .anexo-imagem { display: block; margin-top: 0.35rem; }
+.msg .anexo-imagem img { display: block; max-width: min(100%, 16rem); max-height: 16rem; border-radius: var(--raio-m); border: 1px solid var(--borda); }
+.msg .anexo-audio { display: block; margin-top: 0.35rem; max-width: 100%; height: 2.5rem; }
+.msg .anexo-arquivo { display: block; margin: 0.35rem 0 0.15rem; overflow-wrap: anywhere; }
+@media (max-width: 599px) {
+  .chip-anexo .nome { max-width: 12rem; }
+  .chip-anexo audio { max-width: 12rem; }
+}

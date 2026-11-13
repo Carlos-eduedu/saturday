@@ -43,8 +43,12 @@ No compositor da conversa, o botão de atalhos edita a ficha (nome, nascimento,
 sexo, e-mail, celular, CPF e conta, com auditoria só dos nomes dos campos; o CPF
 trava depois da consulta e a conta depois da proposta), envia modelo e exporta
 a conversa; `/` insere uma **resposta rápida**, cadastrada pelo gestor na tela
-Canais. Anexar e gravar áudio aparecem desabilitados até a mídia de saída
-existir.
+Canais. O compositor também envia anexo (JPG e PNG até 5 MB, PDF até 16 MB, por
+botão ou arrastando) e áudio gravado no navegador (até 5 min): o arquivo vai cru
+para `POST /admin/conversas/{id}/anexos`, fica no S3 e o outbox leva só a chave.
+Na Meta o worker sobe a mídia (`/{phone_number_id}/media`) e envia pelo id; o
+áudio vira voz (ogg/opus) com o ffmpeg que a imagem do core instala. Na
+Evolution, `sendMedia` e `sendWhatsAppAudio` (ver `docs/evolution.md`).
 
 Desde a Fase 4 existe a **camada da Granatech** (`apps/core/src/saturday/bancos/`):
 cliente com token em cache e retry só em GET, normalização em `Decimal`, ajuste ao

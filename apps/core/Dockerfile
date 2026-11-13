@@ -32,6 +32,12 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # ---------- Etapa 2: runtime ----------
 FROM python:3.14-slim AS runtime
 
+# ffmpeg: o worker converte o áudio gravado no painel em voz (ogg/opus) para a
+# Meta (`canais/whatsapp/audio.py`). Roda por pipe, sem gravar em disco.
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN groupadd --system --gid 1000 saturday \
     && useradd --system --uid 1000 --gid saturday --create-home saturday
 
