@@ -340,14 +340,15 @@ def montar_corpo_proposta(
     produto: Produto,
     simulacao: Simulacao,
     tipo_empregador: int,
-    bloco_seguro: bool = True,
+    id_externo_da_cobertura: bool = False,
 ) -> dict[str, Any]:
     """Corpo do ``POST /propostas`` a partir da simulação aceita.
 
-    ``bloco_seguro=False`` não manda ``informacaoDeSeguros``, como o exemplo ativo
-    da collection de contratação da Granatech. Com o bloco, a api-dev recusa
-    (400: ``informacaoDeSeguros.id_externo must be a number``) o ``id_externo``
-    que a própria simulação devolve (``"SM-100000820-4"``).
+    Na api-dev, ``informacaoDeSeguros`` é obrigatório em produto com seguro
+    (rodada 9 da homologação) e ``id_externo`` precisa ser número: o
+    ``"SM-100000820-4"`` da simulação dá 400 (rodada 7).
+    ``id_externo_da_cobertura=True`` manda no lugar o ``id_cobertura_seguro`` do
+    produto (o mesmo ``id_produto_seguro`` da simulação), como número.
     """
 
     financeiro = {
@@ -373,14 +374,21 @@ def montar_corpo_proposta(
         "id_margem": vinculo.id_margem,
         "informacoesFinanceira": [financeiro],
     }
-    # TODO(granatech): que número vai em `informacaoDeSeguros.id_externo`, ou se o
-    # bloco é dispensável. Pergunta 10 de 2026-11-10, ainda sem resposta.
-    if bloco_seguro and simulacao.seguro_aplicado:
+    # TODO(granatech): que número vai em `informacaoDeSeguros.id_externo`.
+    # Pergunta 10 de 2026-11-10, ainda sem resposta; a homologação testa o
+    # `id_cobertura_seguro`.
+    if simulacao.seguro_aplicado:
+        cobertura = produto.id_produto_seguro
+        id_externo: int | str = (
+            int(cobertura)
+            if id_externo_da_cobertura and cobertura and cobertura.isdigit()
+            else str(simulacao.info_seguradora.get("id_externo") or "")
+        )
         corpo["informacaoDeSeguros"] = {
             "id_empresa_seguradora": produto.id_empresa_seguro,
             "valor_total_financiado": _numero(simulacao.valor_total_financiado),
             "numero_parcelas": simulacao.numero_parcelas,
-            "id_externo": str(simulacao.info_seguradora.get("id_externo") or ""),
+            "id_externo": id_externo,
             "valor_seguro": _numero(simulacao.valor_seguro),
             "iof": _numero(simulacao.valor_iof),
         }

@@ -189,10 +189,11 @@ Cada uma está no código como `TODO(granatech)`:
 - `informacaoDeSeguros` de proposta sem seguro;
 - que número vai em `informacaoDeSeguros.id_externo`: a api-dev recusa com 400
   (`must be a number`) o `"SM-…"` que a simulação devolve (rodada 7 da
-  homologação, 2026-11-13). A fase 2 da homologação manda a proposta sem o
-  bloco, como o exemplo ativo da collection de contratação
-  (`montar_corpo_proposta(bloco_seguro=False)`); a jornada do agente ainda
-  manda o bloco;
+  homologação, 2026-11-13), e sem o bloco ela recusa produto com seguro
+  (rodada 9: "é obrigatório informar as informações de seguro"). A fase 2 da
+  homologação testa o `id_cobertura_seguro` do produto como número
+  (`montar_corpo_proposta(id_externo_da_cobertura=True)`); a jornada do agente
+  ainda manda o `"SM-…"`;
 - lista completa dos status de consulta em português: a api-dev manda o
   webhook em português, e só `AGUARDANDO_AUTORIZACAO_DO_CLIENTE` e `CONCLUIDO`
   (já vistos) são traduzidos para os nomes da documentação; outro nome vira

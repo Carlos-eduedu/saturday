@@ -305,14 +305,14 @@ def test_corpo_da_proposta_leva_seguro_e_valores_da_simulacao() -> None:
     assert corpo["id_margem"] == "m1"
     assert corpo["informacaoDeSeguros"]["id_externo"] == "SM-100000721-6"
 
-    # Sem o bloco (teste da homologação na api-dev): o resto do corpo é o mesmo.
-    sem_bloco = montar_corpo_proposta(
+    # Teste da homologação na api-dev: `id_externo` vira a cobertura, como número.
+    pela_cobertura = montar_corpo_proposta(
         id_consulta="c1",
         vinculo=vinculo,
         produto=produto,
         simulacao=simulacao,
         tipo_empregador=1,
-        bloco_seguro=False,
+        id_externo_da_cobertura=True,
     )
-    assert "informacaoDeSeguros" not in sem_bloco
-    assert sem_bloco["informacoesFinanceira"] == corpo["informacoesFinanceira"]
+    assert pela_cobertura["informacaoDeSeguros"]["id_externo"] == 21
+    assert pela_cobertura["informacoesFinanceira"] == corpo["informacoesFinanceira"]
