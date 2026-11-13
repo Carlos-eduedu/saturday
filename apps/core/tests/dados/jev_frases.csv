@@ -1,42 +1,61 @@
-frase,intent,oferta_pendente,resposta_oferta
-"Vocês atendem aposentados do INSS?",duvida,false,
-"Como funciona a portabilidade do consignado?",duvida,false,
-"Quanto custa para fazer a portabilidade?",duvida,false,
-"Qual é o prazo do processo?",duvida,false,
-"Vocês pedem senha do Meu INSS?",duvida,false,
-"O atendimento é feito por uma pessoa?",duvida,false,
-"Vocês são um robô?",duvida,false,
-"Estou insatisfeito com o atendimento.",duvida,false,
-"O atendente disse que ia me retornar.",duvida,false,
-"Quero falar com uma pessoa.",humano,false,
-"Me passa para um atendente, por favor.",humano,false,
-"Consigo falar com um humano?",humano,false,
-"Me liga, por favor.",humano,false,
-"Quero atendimento humano agora.",humano,false,
-"Chama alguém para me atender.",humano,false,
-"Não estou conseguindo enviar o extrato.",suporte,false,
-"O aplicativo do Meu INSS não abre.",suporte,false,
-"Não consigo anexar o PDF aqui.",suporte,false,
-"Deu erro quando tentei enviar a foto.",suporte,false,
-"O arquivo não carrega de jeito nenhum.",suporte,false,
-"Sim.",duvida,true,aceita
-"Pode fazer.",duvida,true,aceita
-"Quero seguir.",duvida,true,aceita
-"Vamos nessa.",duvida,true,aceita
-"Pode dar andamento.",duvida,true,aceita
-"Quero sim.",duvida,true,aceita
-"Ok.",duvida,true,duvida
-"Entendi.",duvida,true,duvida
-"Quanto vou receber?",duvida,true,duvida
-"O prazo continua o mesmo?",duvida,true,duvida
-"É seguro fazer isso?",duvida,true,duvida
-"Não.",duvida,true,recusa
-"Não quero.",duvida,true,recusa
-"Agora não.",duvida,true,recusa
-"Não tenho interesse.",duvida,true,recusa
-"Prefiro não fazer.",duvida,true,recusa
-"Não quero, obrigado.",duvida,true,recusa
-"Me explica melhor a oferta.",duvida,true,duvida
-"Quero falar com um atendente.",humano,true,duvida
-"Não consigo ver o botão de enviar.",suporte,true,duvida
-"Pode me ligar?",humano,true,duvida
+frase,intent,oferta_pendente,resposta_oferta,publico
+Vocês atendem aposentados do INSS?,duvida,false,,
+Como funciona a portabilidade do consignado?,duvida,false,,
+Quanto custa para fazer a portabilidade?,duvida,false,,
+Qual é o prazo do processo?,duvida,false,,
+Vocês pedem senha do Meu INSS?,duvida,false,,
+O atendimento é feito por uma pessoa?,duvida,false,,
+Vocês são um robô?,duvida,false,,
+Estou insatisfeito com o atendimento.,duvida,false,,
+O atendente disse que ia me retornar.,duvida,false,,
+Quero falar com uma pessoa.,humano,false,,
+"Me passa para um atendente, por favor.",humano,false,,
+Consigo falar com um humano?,humano,false,,
+"Me liga, por favor.",humano,false,,
+Quero atendimento humano agora.,humano,false,,
+Chama alguém para me atender.,humano,false,,
+Não estou conseguindo enviar o extrato.,suporte,false,,
+O aplicativo do Meu INSS não abre.,suporte,false,,
+Não consigo anexar o PDF aqui.,suporte,false,,
+Deu erro quando tentei enviar a foto.,suporte,false,,
+O arquivo não carrega de jeito nenhum.,suporte,false,,
+Sim.,duvida,true,aceita,
+Pode fazer.,duvida,true,aceita,
+Quero seguir.,duvida,true,aceita,
+Vamos nessa.,duvida,true,aceita,
+Pode dar andamento.,duvida,true,aceita,
+Quero sim.,duvida,true,aceita,
+Ok.,duvida,true,duvida,
+Entendi.,duvida,true,duvida,
+Quanto vou receber?,duvida,true,duvida,
+O prazo continua o mesmo?,duvida,true,duvida,
+É seguro fazer isso?,duvida,true,duvida,
+Não.,duvida,true,recusa,
+Não quero.,duvida,true,recusa,
+Agora não.,duvida,true,recusa,
+Não tenho interesse.,duvida,true,recusa,
+Prefiro não fazer.,duvida,true,recusa,
+"Não quero, obrigado.",duvida,true,recusa,
+Me explica melhor a oferta.,duvida,true,duvida,
+Quero falar com um atendente.,humano,true,duvida,
+Não consigo ver o botão de enviar.,suporte,true,duvida,
+Pode me ligar?,humano,true,duvida,
+Oii,saudacao,false,,
+Oi,saudacao,false,,
+aoba,saudacao,false,,
+Olá,saudacao,false,,
+Tudo bem?,saudacao,false,,
+Bom dia!,saudacao,false,,
+whatsuppp!! bro how you are today dude?,saudacao,false,,
+"Oi, quero fazer um empréstimo",duvida,false,,
+"Olá, você sabe meu nome?",duvida,false,,
+CLT,duvida,false,,clt
+Sou CLT,duvida,false,,clt
+Trabalho de carteira assinada,duvida,false,,clt
+Quero o crédito do trabalhador,duvida,false,,clt
+Quero um empréstimo consignado privado,duvida,false,,clt
+Quero testar sua integração com a granatech,duvida,false,,
+Sou aposentado do INSS,duvida,false,,inss
+Eu não sou servidor público,duvida,false,,indefinido
+Não sou aposentado,duvida,false,,indefinido
+Eu sou efetivado,duvida,false,,

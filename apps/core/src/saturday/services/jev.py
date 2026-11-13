@@ -11,7 +11,12 @@ import httpx
 
 from saturday.metrics import registrar_chamada, uso_do_payload
 from saturday.services.openrouter import OpenRouterClient, OpenRouterError
-from saturday.settings import JEV_INTENT_THRESHOLD, JEV_TIMEOUT_S, Settings
+from saturday.settings import (
+    JEV_INTENT_THRESHOLD,
+    JEV_SAUDACAO_THRESHOLD,
+    JEV_TIMEOUT_S,
+    Settings,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +50,7 @@ class JevResult:
 
     @property
     def saudou(self) -> bool:
-        return self.probabilidade("intent", "saudacao") >= JEV_INTENT_THRESHOLD
+        return self.probabilidade("intent", "saudacao") >= JEV_SAUDACAO_THRESHOLD
 
     @property
     def aceitou_oferta(self) -> bool:
@@ -78,7 +83,9 @@ def _perguntas(oferta_pendente: bool) -> dict[str, Any]:
                 ),
                 "saudacao": (
                     "Só cumprimenta ou puxa conversa, sem pedido nem pergunta "
-                    "(ex.: 'oi', 'bom dia', 'tudo bem?')."
+                    "(ex.: 'oi', 'bom dia', 'tudo bem?'). NÃO conta: concordar ou "
+                    "responder ('ok', 'entendi', 'sim', 'vamos'), nem cumprimento "
+                    "junto com um pedido ('oi, quero um empréstimo')."
                 ),
             },
         },

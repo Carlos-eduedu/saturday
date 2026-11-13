@@ -13,10 +13,12 @@ INSS está em curso. Com a flag desligada, quem é CLT continua sendo atendido
 pela FAQ, como antes.
 
 Para o cliente chegar lá, uma saudação sem jornada em curso (intenção
-`saudacao` do Jev, com probabilidade ≥ 0,8) recebe boas-vindas fixas que
+`saudacao` do Jev, com probabilidade ≥ 0,95, medida em
+`tests/test_jev_avaliacao.py`) recebe boas-vindas fixas que
 perguntam o público, sem chamar o LLM (`agent/nodes.py:boas_vindas`). O
 critério `clt` do Jev também aceita quem pede o Crédito do Trabalhador,
-empréstimo CLT ou consignado privado. Fora de jornada, a primeira resposta sem
+empréstimo CLT ou consignado privado, e o público só troca com probabilidade
+≥ 0,8 (negar um público cai em `indefinido`). Fora de jornada, a primeira resposta sem
 FAQ vira "não entendi" com o que o agente faz; só a segunda seguida vai para a
 equipe (`tentativas_resposta`). Dentro de uma jornada, sem FAQ é handoff na
 hora, como antes.

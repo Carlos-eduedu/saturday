@@ -9,7 +9,6 @@ from zoneinfo import ZoneInfo
 from langchain_core.messages import AIMessage
 from langgraph.runtime import Runtime
 
-from saturday.agent.clt.leitura import NEGACAO
 from saturday.agent.coleta import hoje_operacao, normalizar_uf, parse_data_nascimento
 from saturday.agent.context import AgentContext
 from saturday.agent.state import AgentState
@@ -33,7 +32,7 @@ from saturday.portabilidade import hiscon as hiscon_mod
 from saturday.portabilidade.regras import IDADE_WEBPLUS, PRAZO_C6
 from saturday.portabilidade.util import parse_data
 from saturday.services.anexos import AnexoInvalido
-from saturday.settings import HISTORY_MAX_MESSAGES, TZ_OPERACAO
+from saturday.settings import HISTORY_MAX_MESSAGES, JEV_INTENT_THRESHOLD, TZ_OPERACAO
 
 
 def _historico(state: AgentState) -> list[dict[str, str]]:
@@ -157,12 +156,13 @@ def classify_intent(state: AgentState, runtime: Runtime[AgentContext]) -> dict[s
         intent = "duvida"
 
     publico = resultado.publico
-    anterior = state.get("publico")
-    if publico == "indefinido" or (
-        anterior and anterior != "indefinido" and NEGACAO.search(state.get("user_message", ""))
+    if (
+        publico == "indefinido"
+        or resultado.probabilidade("publico", publico) < JEV_INTENT_THRESHOLD
     ):
-        # Frase com negação ("não sou servidor") não troca um público já conhecido.
-        publico = anterior or "indefinido"
+        # Só um público dito com clareza troca o anterior; negar ("não sou
+        # servidor") cai em `indefinido` pelo critério do Jev.
+        publico = state.get("publico") or "indefinido"
 
     resposta_oferta = None
     if state.get("oferta_pendente"):

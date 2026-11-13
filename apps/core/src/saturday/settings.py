@@ -227,6 +227,9 @@ def get_settings() -> Settings:
 
 # Limites e timeouts.
 JEV_INTENT_THRESHOLD = 0.8
+# Medido com o Jev real (tests/test_jev_avaliacao.py, 2026-11-12): saudações de
+# verdade ficam em 0,99+, e "Ok."/"Vamos nessa."/"Entendi." chegam a 0,88.
+JEV_SAUDACAO_THRESHOLD = 0.95
 JEV_TIMEOUT_S = 5
 LLM_TIMEOUT_S = 30
 LLM_TEMPERATURE = 0

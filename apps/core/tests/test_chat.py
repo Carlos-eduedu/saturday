@@ -237,12 +237,16 @@ def test_3d_saudacao_no_meio_da_jornada_segue_o_caminho_de_hoje(client, service,
     assert r["intent"] != "saudacao"
 
 
-def test_3e_negar_um_publico_nao_troca_o_publico_conhecido(client, fakes: Fakes):
+def test_3e_publico_sem_clareza_nao_troca_o_publico_conhecido(client, fakes: Fakes):
     conversa = cid()
     fakes.jev.resultado = resultado_jev(publico="clt")
     client.post("/chat", json={"conversation_id": conversa, "message": "sou CLT"})
 
-    fakes.jev.resultado = resultado_jev(publico="servidor_publico")
+    # Público citado sem clareza (o Jev real põe a negação em `indefinido`).
+    fakes.jev.resultado = resultado_jev(
+        publico="servidor_publico",
+        probabilities={"intent": {"duvida": 0.9}, "publico": {"servidor_publico": 0.4}},
+    )
     r = client.post(
         "/chat", json={"conversation_id": conversa, "message": "Eu não sou servidor público"}
     ).json()

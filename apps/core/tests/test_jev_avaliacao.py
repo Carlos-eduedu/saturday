@@ -11,7 +11,7 @@ import httpx
 import pytest
 
 from saturday.services.jev import JevClient
-from saturday.settings import JEV_INTENT_THRESHOLD, Settings
+from saturday.settings import JEV_INTENT_THRESHOLD, JEV_SAUDACAO_THRESHOLD, Settings
 
 FRASES = Path(__file__).parent / "dados" / "jev_frases.csv"
 
@@ -34,7 +34,11 @@ def test_avaliacao_jev_imprime_acertos_por_rotulo():
     total_intent: Counter[str] = Counter()
     acertos_oferta: Counter[str] = Counter()
     total_oferta: Counter[str] = Counter()
+    acertos_publico: Counter[str] = Counter()
+    total_publico: Counter[str] = Counter()
     erros: list[str] = []
+    # Probabilidades por frase, para calibrar os limiares (saudação e público).
+    detalhes: list[str] = []
 
     with httpx.Client(timeout=30) as http:
         client = JevClient(http, settings)
@@ -52,6 +56,29 @@ def test_avaliacao_jev_imprime_acertos_por_rotulo():
                     f"obtido={resultado.intent} "
                     f"p(esperado)={resultado.probabilidade('intent', esperado):.2f} "
                     f"p(obtido)={resultado.probabilidade('intent', resultado.intent):.2f}"
+                )
+
+            esperado_publico = (linha.get("publico") or "").strip()
+            if esperado_publico:
+                total_publico[esperado_publico] += 1
+                if resultado.publico == esperado_publico:
+                    acertos_publico[esperado_publico] += 1
+                else:
+                    erros.append(
+                        f"publico: {linha['frase']!r} esperado={esperado_publico} "
+                        f"obtido={resultado.publico} "
+                        f"p(esperado)={resultado.probabilidade('publico', esperado_publico):.2f} "
+                        f"p(obtido)={resultado.probabilidade('publico', resultado.publico):.2f}"
+                    )
+            if esperado == "saudacao" or esperado_publico:
+                publicos = resultado.probabilities.get("publico", {})
+                distribuicao = " ".join(
+                    f"{rotulo}={valor:.2f}" for rotulo, valor in sorted(publicos.items())
+                )
+                detalhes.append(
+                    f"{linha['frase']!r}: p(saudacao)="
+                    f"{resultado.probabilidade('intent', 'saudacao'):.2f} "
+                    f"publico[{distribuicao}]"
                 )
 
             esperado_oferta = linha["resposta_oferta"].strip()
@@ -79,6 +106,15 @@ def test_avaliacao_jev_imprime_acertos_por_rotulo():
             f"  {rotulo}: {acertos_oferta[rotulo]}/{total_oferta[rotulo]} "
             f"({acertos_oferta[rotulo] / total_oferta[rotulo]:.0%})"
         )
+    print("Acerto por rótulo de publico (escolha mais provável, sem limiar):")
+    for rotulo in sorted(total_publico):
+        print(
+            f"  {rotulo}: {acertos_publico[rotulo]}/{total_publico[rotulo]} "
+            f"({acertos_publico[rotulo] / total_publico[rotulo]:.0%})"
+        )
+    print(f"Probabilidades por frase (limite da saudação {JEV_SAUDACAO_THRESHOLD:.2f}):")
+    for detalhe in detalhes:
+        print("  " + detalhe)
     print("Erros (frase, esperado, obtido, probabilidades):")
     for erro in erros:
         print("  " + erro)
