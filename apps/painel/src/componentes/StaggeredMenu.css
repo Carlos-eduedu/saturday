@@ -12,6 +12,8 @@
   left: 0;
   width: 100vw;
   height: 100vh;
+  /* iOS: 100vh inclui a área sob a barra do Safari e escondia o fim do menu. */
+  height: 100dvh;
   z-index: 40;
   overflow: hidden;
 }

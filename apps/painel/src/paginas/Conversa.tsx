@@ -251,6 +251,17 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
                 eu={eu}
                 minha={minha}
                 focar={focarEnvio}
+                assumir={
+                  !minha && (conversa.atendimento !== "assumida" || eu.perfil === "gestor")
+                    ? {
+                        acao: () => {
+                          setFocarEnvio(true);
+                          mudar("assumir");
+                        },
+                        ocupado,
+                      }
+                    : undefined
+                }
                 agir={(acao) => {
                   // Quem envia quer ver a própria mensagem, mesmo lendo mais acima.
                   noFim.current = true;

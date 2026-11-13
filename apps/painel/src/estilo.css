@@ -270,7 +270,7 @@ time, small { font-size: 0.8rem; color: var(--suave); }
 .sm-panel-itemWrap { line-height: 1.15; }
 .sm-panel-item { display: block; padding: 0.3rem 3rem 0.3rem 0; min-height: var(--alvo); font-size: clamp(2rem, 9vw, 3rem); }
 .sm-socials { margin-top: 0; padding-top: 1.5rem; border-top: 1px solid var(--borda); }
-.staggered-menu-panel { padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); }
+.staggered-menu-panel { padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain; }
 .sm-panel-item[aria-current="page"] { color: var(--destaque); }
 .sm-panel-list[data-numbering] .sm-panel-item::after { font-family: var(--fonte-mono); right: 0; top: 50%; transform: translateY(-50%); font-size: 0.8rem; }
 .sm-socials-title { color: var(--suave); font-family: var(--fonte-texto); font-size: 0.85rem; }

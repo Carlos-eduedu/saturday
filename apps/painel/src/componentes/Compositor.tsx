@@ -61,12 +61,16 @@ export function Compositor({
   minha,
   focar,
   agir,
+  assumir,
 }: {
   conversa: Detalhe;
   eu: Eu;
   minha: boolean;
   focar: boolean;
   agir: Agir;
+  // Presente quando quem vê pode assumir: o botão fica onde o polegar já está,
+  // e no celular o cabeçalho com o Assumir rola para longe.
+  assumir?: { acao: () => void; ocupado: boolean };
 }) {
   const [texto, setTexto] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -190,7 +194,9 @@ export function Compositor({
       : respostas.length > 0
       ? "Escreva a mensagem ou / para uma resposta rápida"
       : "Escreva a mensagem"
-    : "Assuma a conversa no topo para responder";
+    : assumir
+    ? "Assuma a conversa para responder"
+    : "Só quem está com a conversa responde";
 
   return (
     <div className="envio">
@@ -366,6 +372,15 @@ export function Compositor({
                 Parar
               </button>
             </>
+          ) : !minha && assumir ? (
+            <button
+              type="button"
+              className="principal enviar"
+              disabled={assumir.ocupado}
+              onClick={assumir.acao}
+            >
+              Assumir para responder
+            </button>
           ) : janelaAberta ? (
             <>
               {minha && (
