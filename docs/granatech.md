@@ -184,8 +184,9 @@ Cada uma está no código como `TODO(granatech)`:
   dois);
 - formato das listagens de consulta e de proposta (aceitamos lista ou `data`,
   `dados`, `items`, `content`);
-- formato da resposta do `POST /propostas` (aceitamos `id`, `id_proposta` ou
-  `data.id`);
+- formato da resposta do `POST /propostas`: a api-dev devolve só o id, como
+  texto JSON (rodada 10, 2026-11-13); aceitamos também `id`, `id_proposta` ou
+  `data.id`;
 - `informacaoDeSeguros` de proposta sem seguro;
 - que número vai em `informacaoDeSeguros.id_externo`: a api-dev recusa com 400
   (`must be a number`) o `"SM-…"` que a simulação devolve (rodada 7 da

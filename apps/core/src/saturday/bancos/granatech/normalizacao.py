@@ -315,8 +315,15 @@ def itens_da_listagem(dados: object) -> list[dict[str, Any]]:
 
 
 def id_da_proposta(dados: object) -> str | None:
-    """TODO(granatech): formato da resposta do POST; aceita `id`, `id_proposta` ou `data.id`."""
+    """Id da proposta na resposta do ``POST /propostas``.
 
+    A api-dev devolve só o id, como texto JSON (``"29ee4653-..."``, rodada 10 da
+    homologação, 2026-11-13). TODO(granatech): confirmar; aceita também `id`,
+    `id_proposta` ou `data.id` num objeto.
+    """
+
+    if isinstance(dados, str):
+        return dados.strip() or None
     if not isinstance(dados, dict):
         return None
     for valor in (dados.get("id"), dados.get("id_proposta")):

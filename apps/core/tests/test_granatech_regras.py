@@ -262,6 +262,15 @@ def test_id_da_proposta_aceita_os_tres_formatos() -> None:
     assert id_da_proposta({"ok": True}) is None
 
 
+def test_id_da_proposta_aceita_o_texto_puro_da_api_dev() -> None:
+    """Rodada 10 da homologação: o 201 do POST /propostas é só o id, como texto JSON."""
+
+    assert id_da_proposta("29ee4653-0c04-42b2-87da-1b24f66c111b") == (
+        "29ee4653-0c04-42b2-87da-1b24f66c111b"
+    )
+    assert id_da_proposta("  ") is None
+
+
 def test_itens_da_listagem() -> None:
     assert itens_da_listagem([{"id": 1}]) == [{"id": 1}]
     assert itens_da_listagem({"data": [{"id": 2}]}) == [{"id": 2}]

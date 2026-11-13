@@ -287,7 +287,7 @@ class Homologacao:
         status, dados, arquivo = self.chamar(
             f"proposta-contratacao{numero}", "POST", "/propostas", corpo=corpo
         )
-        id_proposta = id_da_proposta(dados) if isinstance(dados, dict) else None
+        id_proposta = id_da_proposta(dados)
         if status >= 400 or not id_proposta:
             raise ErroHomologacao(f"contratação {numero}: HTTP {status}")
         self.registrar_id(id_proposta)
