@@ -9,6 +9,10 @@ import { Link } from 'react-router';
 import { gsap } from 'gsap';
 import './StaggeredMenu.css';
 
+// Tempos do menu, em segundos: a abertura inteira e os movimentos avulsos.
+const ABERTURA_S = 0.22;
+const CURTO_S = 0.15;
+
 export interface StaggeredMenuItem {
   label: string;
   ariaLabel: string;
@@ -226,6 +230,8 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
       }
     }
 
+    // DESIGN.md: movimento curto. A coreografia fica, comprimida no tempo.
+    tl.timeScale(tl.duration() / ABERTURA_S);
     openTlRef.current = tl;
     return tl;
   }, [position]);
@@ -259,7 +265,7 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
     const offscreen = position === 'left' ? -100 : 100;
     closeTweenRef.current = gsap.to(all, {
       xPercent: offscreen,
-      duration: reduz() ? 0 : 0.32,
+      duration: reduz() ? 0 : CURTO_S,
       ease: 'power3.in',
       overwrite: 'auto',
       onComplete: () => {
@@ -287,9 +293,9 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
     if (!icon) return;
     spinTweenRef.current?.kill();
     if (opening) {
-      spinTweenRef.current = gsap.to(icon, { rotate: 225, duration: 0.8, ease: 'power4.out', overwrite: 'auto' });
+      spinTweenRef.current = gsap.to(icon, { rotate: 225, duration: CURTO_S, ease: 'power4.out', overwrite: 'auto' });
     } else {
-      spinTweenRef.current = gsap.to(icon, { rotate: 0, duration: 0.35, ease: 'power3.inOut', overwrite: 'auto' });
+      spinTweenRef.current = gsap.to(icon, { rotate: 0, duration: CURTO_S, ease: 'power3.inOut', overwrite: 'auto' });
     }
   }, []);
 
@@ -302,8 +308,7 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
         const targetColor = opening ? openMenuButtonColor : menuButtonColor;
         colorTweenRef.current = gsap.to(btn, {
           color: targetColor,
-          delay: 0.18,
-          duration: 0.3,
+          duration: CURTO_S,
           ease: 'power2.out'
         });
       } else {
@@ -347,7 +352,7 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
     const finalShift = ((lineCount - 1) / lineCount) * 100;
     textCycleAnimRef.current = gsap.to(inner, {
       yPercent: -finalShift,
-      duration: 0.5 + lineCount * 0.07,
+      duration: CURTO_S,
       ease: 'power4.out'
     });
   }, []);

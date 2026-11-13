@@ -62,6 +62,14 @@ export const ATENCAO: Record<string, string> = {
   envio_falhou: "Envio falhou",
 };
 
+// Modelos aprovados na Meta que o painel envia. O texto fica cadastrado lá.
+export const MODELOS: Record<string, string> = {
+  atualizacao_pedido: "Atualização do pedido",
+  autorizacao_pendente: "Autorização pendente",
+  dados_bancarios_pendentes: "Dados bancários pendentes",
+  pagamento_confirmado: "Pagamento confirmado",
+};
+
 export const PUBLICOS: Record<string, string> = {
   clt: "Crédito do Trabalhador (CLT)",
   inss: "Portabilidade INSS",

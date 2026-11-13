@@ -1,5 +1,7 @@
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { useParams } from "react-router";
+import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Link, useParams } from "react-router";
 import {
   api,
   type CampoSensivel,
@@ -11,6 +13,7 @@ import {
   type Trilha,
   type Usuario,
 } from "../api";
+import { confirmarTomada, textoDoAviso, useAvisoDesfazer } from "../componentes/Desfazer";
 import { Vazio } from "../componentes/Vazio";
 import {
   ATENCAO,
@@ -18,13 +21,14 @@ import {
   PUBLICOS,
   dolar,
   ETAPAS,
+  MODELOS,
   MOTIVOS_HANDOFF,
   NOS,
   rotulo,
   tokens,
 } from "../rotulos";
 import { useAvisos } from "../tempoReal";
-import { formatarHora, ROTULO_ATENDIMENTO } from "./Inbox";
+import { formatarHora, ROTULO_ATENDIMENTO, textoDaEspera } from "./Inbox";
 
 const AUTOR = { cliente: "Cliente", ia: "IA", atendente: "Equipe", sistema: "Sistema" };
 const CAMPOS: Record<CampoSensivel, string> = {
@@ -75,44 +79,99 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
     }
   }
 
-  // Ao abrir uma conversa, a leitura começa pela última mensagem.
-  const fim = useRef<HTMLLIElement | null>(null);
-  const rolouPara = useRef("");
+  // A leitura começa pela última mensagem e a acompanha enquanto a pessoa está
+  // no fim. `fim` vem depois do envio: rolar até a última mensagem a deixaria
+  // atrás do envio fixo.
+  const fim = useRef<HTMLDivElement | null>(null);
+  const noFim = useRef(true);
   useEffect(() => {
-    if (!conversa || rolouPara.current === conversa.id) return;
-    rolouPara.current = conversa.id;
-    fim.current?.scrollIntoView({ block: "end" });
-  }, [conversa]);
+    const medir = () => {
+      const caixa = fim.current?.getBoundingClientRect();
+      if (caixa) noFim.current = caixa.bottom <= window.innerHeight + 80;
+    };
+    window.addEventListener("scroll", medir, { passive: true });
+    return () => window.removeEventListener("scroll", medir);
+  }, []);
+  const ultima = conversa?.mensagens[conversa.mensagens.length - 1]?.id;
+  useEffect(() => {
+    if (ultima !== undefined && noFim.current) fim.current?.scrollIntoView({ block: "end" });
+    // Assumir troca o botão pelo envio, mais alto: o fim muda de lugar.
+  }, [ultima, conversa?.atendimento]);
+
+  // Quem está com a conversa: para o selo, a transferência e a confirmação de tomada.
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  useEffect(() => {
+    api
+      .usuarios()
+      .then(setUsuarios)
+      .catch(() => undefined);
+  }, []);
+  const avisar = useAvisoDesfazer();
+  // "Assumir e responder" leva o cursor para a mensagem.
+  const [focarEnvio, setFocarEnvio] = useState(false);
 
   if (!conversa) return <p className="centro">{erro || "Carregando…"}</p>;
   const minha = conversa.atendimento === "assumida" && conversa.atendente_id === eu.id;
+  const dono = usuarios.find((u) => u.id === conversa.atendente_id)?.nome ?? "outra pessoa";
+
+  // Assumir e devolver valem na hora; o aviso deixa desfazer por 5 s.
+  function mudar(acao: "assumir" | "devolver") {
+    if (acao === "assumir" && conversa?.atendimento === "assumida" && !confirmarTomada(dono)) return;
+    void agir(async () => {
+      await (acao === "assumir" ? api.assumir(id) : api.devolver(id));
+      avisar({
+        id,
+        texto: textoDoAviso(acao, conversa?.telefone ?? conversa?.canal ?? ""),
+        depois: carregar,
+      });
+    });
+  }
 
   return (
     <div className={fichaEmAba ? "conversa em-abas" : "conversa"}>
       <section className="historico">
         <header>
+          <Link className="voltar" to="/">
+            <HugeiconsIcon icon={ArrowLeft01Icon} size={18} strokeWidth={2} />
+            Conversas
+          </Link>
           <div className="identidade">
             <h1>{conversa.telefone ?? conversa.canal}</h1>
             <p>
               <span className={`selo selo-${conversa.atendimento}`}>
                 {ROTULO_ATENDIMENTO[conversa.atendimento]}
-                {minha ? " (você)" : ""}
+                {conversa.atendente_id && (minha ? " (você)" : ` · ${dono}`)}
               </span>
               <span>{conversa.canal === "evolution" ? "Evolution" : "WhatsApp oficial"}</span>
               {conversa.etapa && <span>{rotulo(ETAPAS, conversa.etapa)}</span>}
+              {conversa.canal === "whatsapp" && (
+                <span className={conversa.janela_aberta ? "janela aberta" : "janela fechada"}>
+                  {conversa.janela_aberta ? "janela aberta" : "janela fechada"}
+                </span>
+              )}
+              {conversa.aguardando_desde && (
+                <span className="espera">{textoDaEspera(conversa, Date.now())}</span>
+              )}
             </p>
           </div>
-          <Acoes conversa={conversa} eu={eu} minha={minha} agir={agir} />
+          <Acoes
+            conversa={conversa}
+            eu={eu}
+            minha={minha}
+            usuarios={usuarios}
+            agir={agir}
+            mudar={mudar}
+          />
+          {erro && (
+            <p className="erro" role="alert">
+              {erro}
+            </p>
+          )}
         </header>
         {(conversa.atencao ?? []).length > 0 && (
           <p className="faixa-atencao">
             <strong>{(conversa.atencao ?? []).map((a) => rotulo(ATENCAO, a)).join(" · ")}</strong>
             {conversa.motivo_handoff && ` — ${rotulo(MOTIVOS_HANDOFF, conversa.motivo_handoff)}`}
-          </p>
-        )}
-        {erro && (
-          <p className="erro" role="alert">
-            {erro}
           </p>
         )}
         {fichaEmAba && (
@@ -132,12 +191,8 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
         {(!fichaEmAba || aba === "mensagens") && (
           <>
             <ol className="mensagens">
-              {conversa.mensagens.map((m, i) => (
-                <li
-                  key={m.id}
-                  ref={i === conversa.mensagens.length - 1 ? fim : undefined}
-                  className={`msg msg-${m.direcao} msg-${m.autor}`}
-                >
+              {conversa.mensagens.map((m) => (
+                <li key={m.id} className={`msg msg-${m.direcao} msg-${m.autor}`}>
                   <span className="autor">{AUTOR[m.autor]}</span>
                   <p>{m.conteudo}</p>
                   {m.anexos.map((anexo, indice) => (
@@ -159,16 +214,28 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
             </ol>
             {(conversa.canal === "whatsapp" || conversa.canal === "evolution") &&
               (minha ? (
-                <Envio conversa={conversa} agir={agir} />
+                <Envio
+                  conversa={conversa}
+                  focar={focarEnvio}
+                  agir={(acao) => {
+                    // Quem envia quer ver a própria mensagem, mesmo lendo mais acima.
+                    noFim.current = true;
+                    return agir(acao);
+                  }}
+                />
               ) : (
                 <button
                   type="button"
                   className="principal"
-                  onClick={() => agir(() => api.assumir(id))}
+                  onClick={() => {
+                    setFocarEnvio(true);
+                    mudar("assumir");
+                  }}
                 >
                   Assumir e responder
                 </button>
               ))}
+            <div ref={fim} />
           </>
         )}
       </section>
@@ -181,121 +248,154 @@ function Acoes({
   conversa,
   eu,
   minha,
+  usuarios,
   agir,
+  mudar,
 }: {
   conversa: Detalhe;
   eu: Eu;
   minha: boolean;
-  agir: (acao: () => Promise<unknown>) => void;
+  usuarios: Usuario[];
+  agir: (acao: () => Promise<unknown>) => Promise<void>;
+  mudar: (acao: "assumir" | "devolver") => void;
 }) {
-  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [destino, setDestino] = useState("");
   const podeMexer = minha || eu.perfil === "gestor";
 
-  useEffect(() => {
-    if (podeMexer)
-      api
-        .usuarios()
-        .then(setUsuarios)
-        .catch(() => undefined);
-  }, [podeMexer]);
-
   return (
     <div className="acoes">
-      <a className="botao" href={exportarUrl(conversa.id)}>
-        Exportar .md
-      </a>
       {!minha && (conversa.atendimento !== "assumida" || eu.perfil === "gestor") && (
-        <button type="button" onClick={() => agir(() => api.assumir(conversa.id))}>
+        <button type="button" onClick={() => mudar("assumir")}>
           Assumir
         </button>
       )}
       {conversa.atendimento !== "ia" && (conversa.atendimento === "handoff" || podeMexer) && (
-        <button type="button" onClick={() => agir(() => api.devolver(conversa.id))}>
+        <button type="button" onClick={() => mudar("devolver")}>
           Devolver para a IA
         </button>
       )}
-      {conversa.atendimento === "assumida" && podeMexer && (
-        <span className="transferir">
-          <label>
-            Transferir para
-            <select value={destino} onChange={(e) => setDestino(e.target.value)}>
-              <option value="">Escolha a pessoa</option>
-              {usuarios
-                .filter((u) => u.id !== conversa.atendente_id)
-                .map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.nome}
-                  </option>
-                ))}
-            </select>
-          </label>
-          <button
-            type="button"
-            disabled={!destino}
-            onClick={() => agir(() => api.transferir(conversa.id, destino))}
-          >
-            Transferir
-          </button>
-        </span>
-      )}
+      {/* O que não é do momento fica recolhido: o cabeçalho mostra só quem responde. */}
+      <details
+        className="mais"
+        onKeyDown={(e) => {
+          if (e.key === "Escape") e.currentTarget.open = false;
+        }}
+      >
+        <summary>Mais</summary>
+        <div className="mais-painel">
+          {conversa.atendimento === "assumida" && podeMexer && (
+            <span className="transferir">
+              <label>
+                Transferir para
+                <select value={destino} onChange={(e) => setDestino(e.target.value)}>
+                  <option value="">Escolha a pessoa</option>
+                  {usuarios
+                    .filter((u) => u.id !== conversa.atendente_id)
+                    .map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.nome}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                disabled={!destino}
+                onClick={() => agir(() => api.transferir(conversa.id, destino)).then(() => setDestino(""))}
+              >
+                Transferir
+              </button>
+            </span>
+          )}
+          <a className="botao" href={exportarUrl(conversa.id)}>
+            Exportar conversa (.md)
+          </a>
+        </div>
+      </details>
     </div>
   );
 }
 
 function Envio({
   conversa,
+  focar,
   agir,
 }: {
   conversa: Detalhe;
-  agir: (acao: () => Promise<unknown>) => void;
+  focar: boolean;
+  agir: (acao: () => Promise<unknown>) => Promise<void>;
 }) {
   const [texto, setTexto] = useState("");
+  const [enviando, setEnviando] = useState(false);
   const [modelo, setModelo] = useState(conversa.modelos[0] ?? "");
 
-  function enviarTexto(evento: FormEvent) {
+  async function enviarTexto(evento: FormEvent) {
     evento.preventDefault();
-    if (!texto.trim()) return;
-    agir(async () => {
+    if (!texto.trim() || enviando) return;
+    setEnviando(true);
+    await agir(async () => {
       await api.enviar(conversa.id, { texto });
       setTexto("");
     });
+    setEnviando(false);
   }
+
+  function enviarModelo() {
+    // O texto do modelo fica cadastrado na Meta: o painel não tem como mostrá-lo.
+    const pergunta =
+      `Enviar o modelo "${rotulo(MODELOS, modelo)}" para ${conversa.telefone}? ` +
+      "O cliente recebe o texto aprovado na Meta, que o painel não mostra.";
+    if (window.confirm(pergunta)) void agir(() => api.enviar(conversa.id, { modelo }));
+  }
+
+  const janelaAberta = conversa.janela_aberta || conversa.canal === "evolution";
+  const blocoModelo = conversa.modelos.length > 0 && (
+    <div className="modelo">
+      <label>
+        Modelo
+        <select value={modelo} onChange={(e) => setModelo(e.target.value)}>
+          {conversa.modelos.map((m) => (
+            <option key={m} value={m}>
+              {rotulo(MODELOS, m)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <button type="button" disabled={!modelo} onClick={enviarModelo}>
+        Enviar modelo
+      </button>
+    </div>
+  );
 
   return (
     <div className="envio">
       {/* Evolution não tem janela nem modelo: sempre texto (decisão 0009). */}
-      {conversa.janela_aberta || conversa.canal === "evolution" ? (
+      {janelaAberta ? (
         <form onSubmit={enviarTexto}>
           <label>
             Mensagem
-            <textarea value={texto} onChange={(e) => setTexto(e.target.value)} rows={3} />
+            <textarea
+              value={texto}
+              onChange={(e) => setTexto(e.target.value)}
+              rows={3}
+              autoFocus={focar}
+            />
           </label>
-          <button type="submit">Enviar</button>
+          <button type="submit" disabled={enviando}>
+            {enviando ? "Enviando…" : "Enviar"}
+          </button>
         </form>
       ) : (
         <p className="aviso">Janela de 24 h fechada: só é possível enviar um modelo.</p>
       )}
-      {conversa.modelos.length > 0 && (
-        <div className="modelo">
-          <label>
-            Modelo
-            <select value={modelo} onChange={(e) => setModelo(e.target.value)}>
-              {conversa.modelos.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            type="button"
-            disabled={!modelo}
-            onClick={() => agir(() => api.enviar(conversa.id, { modelo }))}
-          >
-            Enviar modelo
-          </button>
-        </div>
+      {/* Com a janela aberta o texto livre resolve; o modelo fica a um clique. */}
+      {blocoModelo && janelaAberta ? (
+        <details>
+          <summary>Enviar um modelo</summary>
+          {blocoModelo}
+        </details>
+      ) : (
+        blocoModelo
       )}
     </div>
   );

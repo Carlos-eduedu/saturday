@@ -320,6 +320,7 @@ export const api = {
   conversa: (id: string) => chamar<Detalhe>("GET", `/conversas/${id}`),
   assumir: (id: string) => chamar<void>("POST", `/conversas/${id}/assumir`),
   devolver: (id: string) => chamar<void>("POST", `/conversas/${id}/devolver`),
+  desfazer: (id: string) => chamar<void>("POST", `/conversas/${id}/desfazer`),
   transferir: (id: string, usuario_id: string) =>
     chamar<void>("POST", `/conversas/${id}/transferir`, { usuario_id }),
   enviar: (id: string, envio: { texto: string } | { modelo: string }) =>

@@ -11,6 +11,7 @@ import { Link, useNavigate } from "react-router";
 import { api, type Eu, type Resumo, type Usuario } from "../api";
 import { AiChat02Icon, UserCheck01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { confirmarTomada, textoDoAviso, useAvisoDesfazer } from "../componentes/Desfazer";
 import SwipeRow, { type SwipeAction } from "../componentes/SwipeRow";
 import { Vazio } from "../componentes/Vazio";
 import { ATENCAO, AUTORES, ETAPAS, MOTIVOS_HANDOFF, relativo, rotulo } from "../rotulos";
@@ -27,20 +28,6 @@ const CORES_SWIPE = {
 } as CSSProperties;
 
 type Acao = "assumir" | "devolver";
-
-// Tempo para desfazer: a ação só vai para a API depois disso.
-const DESFAZER_MS = 5000;
-
-interface Pendente {
-  id: string;
-  acao: Acao;
-  rotulo: string;
-  timer: number;
-}
-
-function chamarApi(p: Pendente) {
-  return p.acao === "assumir" ? api.assumir(p.id) : api.devolver(p.id);
-}
 
 // Uma forma de agir por tela: a partir de 600 px, o botão da linha; abaixo,
 // arrastar (o mesmo corte do CSS que esconde o botão).
@@ -97,7 +84,7 @@ const VAZIOS: Record<string, { titulo: string; texto: string }> = {
   },
 };
 
-function textoDaEspera(c: Resumo, agora: number): string {
+export function textoDaEspera(c: Resumo, agora: number): string {
   if (!c.aguardando_desde) return relativo(c.ultima_atividade, agora);
   const quanto = relativo(c.aguardando_desde, agora);
   return quanto === "agora" ? "cliente acabou de escrever" : `cliente espera ${quanto}`;
@@ -173,73 +160,29 @@ export function Inbox({
   }, []);
   const nomeDe = (id: string | null) => usuarios.find((u) => u.id === id)?.nome ?? "outra pessoa";
 
-  // Assumir e devolver esperam 5 s antes de ir para a API: dá para desfazer
-  // sem endpoint novo e sem adivinhar o estado anterior (IA, handoff ou dono).
-  const [pendente, setPendente] = useState<Pendente | null>(null);
-  const pendenteRef = useRef<Pendente | null>(null);
+  // Assumir e devolver valem na hora; o aviso deixa desfazer por 5 s.
+  const avisar = useAvisoDesfazer();
+  const [agindo, setAgindo] = useState("");
   // O SwipeRow que dobrou só volta remontado: a versão entra na chave.
   const [versao, setVersao] = useState(0);
 
-  const executar = useCallback(
-    async (p: Pendente) => {
-      try {
-        await chamarApi(p);
-      } catch (e) {
-        setErro(e instanceof Error ? e.message : "Não deu para concluir a ação. Tente de novo.");
-        setVersao((v) => v + 1);
-      }
-      carregar();
-    },
-    [carregar],
-  );
-
-  // Saiu da tela com uma ação esperando: ela vale na hora, não se perde.
-  useEffect(
-    () => () => {
-      const p = pendenteRef.current;
-      if (p) {
-        window.clearTimeout(p.timer);
-        void chamarApi(p).catch(() => undefined);
-      }
-    },
-    [],
-  );
-
-  function agir(c: Resumo, acao: Acao) {
-    if (pendenteRef.current?.id === c.id) return;
+  async function agir(c: Resumo, acao: Acao) {
+    if (agindo) return;
     const deOutro = acao === "assumir" && c.atendimento === "assumida" && c.atendente_id !== eu.id;
-    if (
-      deOutro &&
-      !window.confirm(
-        `Assumir a conversa que está com ${nomeDe(c.atendente_id)}? Essa pessoa deixa de ser a dona dela.`,
-      )
-    ) {
+    if (deOutro && !confirmarTomada(nomeDe(c.atendente_id))) {
       setVersao((v) => v + 1);
       return;
     }
-    // Uma ação esperando por vez: a anterior vale na hora.
-    const anterior = pendenteRef.current;
-    if (anterior) {
-      window.clearTimeout(anterior.timer);
-      void executar(anterior);
+    setAgindo(c.id);
+    try {
+      await (acao === "assumir" ? api.assumir(c.id) : api.devolver(c.id));
+      avisar({ id: c.id, texto: textoDoAviso(acao, c.telefone ?? c.canal), depois: carregar });
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Não deu para concluir a ação. Tente de novo.");
     }
-    const p: Pendente = { id: c.id, acao, rotulo: c.telefone ?? c.canal, timer: 0 };
-    p.timer = window.setTimeout(() => {
-      pendenteRef.current = null;
-      setPendente(null);
-      void executar(p);
-    }, DESFAZER_MS);
-    pendenteRef.current = p;
-    setPendente(p);
-  }
-
-  function desfazer() {
-    const p = pendenteRef.current;
-    if (!p) return;
-    window.clearTimeout(p.timer);
-    pendenteRef.current = null;
-    setPendente(null);
+    setAgindo("");
     setVersao((v) => v + 1);
+    carregar();
   }
 
   const rotuloFila = FILAS.find((f) => f.valor === fila)?.rotulo ?? "Todas";
@@ -354,7 +297,8 @@ export function Inbox({
                         {c.etapa && <span className="etapa">{rotulo(ETAPAS, c.etapa)}</span>}
                         <span className={`selo selo-${c.atendimento}`}>
                           {ROTULO_ATENDIMENTO[c.atendimento]}
-                          {c.atendente_id === eu.id ? " (você)" : ""}
+                          {c.atendente_id &&
+                            (c.atendente_id === eu.id ? " (você)" : ` · ${nomeDe(c.atendente_id)}`)}
                         </span>
                         <time
                           dateTime={c.aguardando_desde ?? c.ultima_atividade}
@@ -370,7 +314,7 @@ export function Inbox({
                 );
                 const acao = compacta ? null : acaoDa(c, eu);
                 if (!acao) return linha;
-                const esperando = pendente?.id === c.id;
+                const esperando = agindo === c.id;
                 return (
                   <SwipeRow
                     actions={comBotao ? [] : [ACOES[acao]]}
@@ -386,7 +330,12 @@ export function Inbox({
                       {linha}
                       <button
                         type="button"
-                        className={acao === "assumir" ? "acao-linha principal" : "acao-linha"}
+                        // Cobalto só onde a equipe é chamada: o resto fica secundário.
+                        className={
+                          acao === "assumir" && c.atencao.length > 0
+                            ? "acao-linha principal"
+                            : "acao-linha"
+                        }
                         disabled={esperando}
                         onClick={() => agir(c, acao)}
                       >
@@ -399,16 +348,6 @@ export function Inbox({
             </li>
           ))}
         </ul>
-      )}
-      {pendente && (
-        <div className="aviso-flutuante" role="status">
-          <span>
-            {pendente.acao === "assumir" ? "Assumindo" : "Devolvendo para a IA"} {pendente.rotulo}
-          </span>
-          <button type="button" onClick={desfazer}>
-            Desfazer
-          </button>
-        </div>
       )}
     </section>
   );

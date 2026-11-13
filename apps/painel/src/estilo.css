@@ -75,7 +75,8 @@ html { scroll-padding-top: calc(var(--topo) + 1rem); }
 /* Três papéis: principal (submit ou .principal), secundário (padrão) e link.
    `a.botao` é o link de download (exportar a conversa) com o peso de botão. */
 button,
-a.botao {
+a.botao,
+.mais > summary {
   font: inherit;
   font-weight: 500;
   min-height: var(--alvo);
@@ -89,10 +90,11 @@ a.botao {
     box-shadow 120ms ease;
 }
 button:hover:not(:disabled),
+.mais > summary:hover,
 a.botao:hover { transform: translateY(-1px); border-color: var(--suave); box-shadow: var(--sombra); }
 button:active:not(:disabled),
 a.botao:active { transform: translateY(0) scale(0.98); box-shadow: none; }
-a.botao { display: inline-flex; align-items: center; text-decoration: none; }
+a.botao, .mais > summary { display: inline-flex; align-items: center; text-decoration: none; }
 button:disabled { opacity: 0.5; cursor: default; }
 button[type="submit"], button.principal {
   background: var(--destaque);
@@ -135,6 +137,8 @@ input, select, textarea {
   color: var(--texto);
   transition: border-color 120ms ease, box-shadow 120ms ease;
 }
+/* O cinza padrão do navegador não fecha contraste no tema escuro. */
+::placeholder { color: var(--suave); opacity: 1; }
 input:hover, select:hover, textarea:hover { border-color: var(--suave); }
 input:focus, select:focus, textarea:focus { border-color: var(--destaque); box-shadow: 0 0 0 3px var(--destaque-suave); outline: none; }
 textarea { resize: vertical; }
@@ -365,12 +369,16 @@ main {
 .inbox li.pede-atencao a,
 .inbox li.pede-atencao .swipe-row__surface { background: color-mix(in srgb, var(--handoff) 5%, var(--superficie)); }
 .inbox li a[aria-current="page"] { border-color: var(--destaque); background: var(--destaque-suave); }
+/* Na linha aberta, o tom dos selos parte da superfície: sobre o cobalto suave o
+   texto âmbar e o verde caíam abaixo de 4,5:1. */
+.inbox li a[aria-current="page"] :is(.selo, .atencao) { background: color-mix(in srgb, currentColor 13%, var(--superficie)); }
 .selo {
   font-size: 0.78rem;
   font-weight: 500;
   padding: 0.15rem 0.6rem;
   border-radius: 999px;
   background: color-mix(in srgb, currentColor 12%, transparent);
+  white-space: nowrap;
 }
 .selo-ia { color: var(--ia); }
 .selo-handoff { color: var(--handoff); }
@@ -482,6 +490,8 @@ main {
   background: var(--fundo);
   border-bottom: 1px solid var(--borda);
 }
+/* O erro de uma ação fica no cabeçalho fixo: à vista em qualquer ponto do histórico. */
+.historico header .erro { flex-basis: 100%; margin: 0; }
 .identidade { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
 .historico h1 { font-size: 1.45rem; margin: 0; font-family: var(--fonte-mono); font-weight: 500; letter-spacing: 0; }
 .identidade p { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; font-size: 0.85rem; color: var(--suave); }
@@ -494,6 +504,42 @@ main {
   background: color-mix(in srgb, var(--handoff) 11%, var(--superficie));
 }
 .acoes { display: flex; gap: 0.5rem; align-items: end; flex-wrap: wrap; margin-left: auto; }
+/* "Mais": transferir e exportar, fora do caminho de quem só quer responder. */
+.mais { position: relative; }
+.mais > summary { list-style: none; user-select: none; }
+.mais > summary::-webkit-details-marker { display: none; }
+.mais[open] > summary { background: var(--superficie-2); }
+.mais-painel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.4rem);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 17rem;
+  padding: 1rem;
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-l);
+  box-shadow: var(--sombra-alta);
+}
+.mais-painel .transferir label { flex: 1; }
+.mais-painel a.botao { justify-content: center; }
+/* Volta para a lista quando ela não está ao lado. */
+.voltar { display: none; }
+@media (max-width: 1023px) {
+  .historico .voltar {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex-basis: 100%;
+    min-height: var(--alvo);
+    font-weight: 500;
+    text-decoration: none;
+  }
+}
+.identidade .espera { color: var(--texto); font-weight: 500; }
 .transferir { display: flex; gap: 0.5rem; align-items: end; }
 .mensagens { display: flex; flex-direction: column; gap: 0.6rem; margin: 1.25rem 0; }
 .msg {
@@ -538,6 +584,15 @@ main {
   border-top: 1px solid var(--borda);
 }
 .envio form, .modelo { display: flex; gap: 0.5rem; align-items: end; }
+.envio details > summary {
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  min-height: var(--alvo);
+  color: var(--destaque);
+  font-weight: 500;
+  cursor: pointer;
+}
 .envio form label, .modelo label { flex: 1; }
 @media (max-width: 767px) {
   /* No celular, cabeçalho e envio fixos tomariam a tela inteira. */
@@ -547,6 +602,7 @@ main {
   .msg { max-width: 90%; }
   .envio form, .modelo, .transferir { flex-direction: column; align-items: stretch; }
   .acoes { margin-left: 0; width: 100%; }
+  .mais-painel { right: auto; left: 0; }
 }
 .lateral { position: sticky; top: calc(var(--topo) + 1rem); display: flex; flex-direction: column; gap: 0.75rem; max-height: calc(100vh - var(--topo) - 2rem); overflow-y: auto; }
 .abas-laterais { display: flex; gap: 0.25rem; padding: 0.25rem; background: var(--superficie-2); border-radius: var(--raio-l); }

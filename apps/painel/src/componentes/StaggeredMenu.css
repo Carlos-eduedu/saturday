@@ -242,8 +242,8 @@
   padding: 2px 0;
   display: inline-block;
   transition:
-    color 0.3s ease,
-    opacity 0.3s ease;
+    color 0.15s ease,
+    opacity 0.15s ease;
 }
 
 .sm-socials-link:hover {
@@ -277,8 +277,8 @@
   letter-spacing: -2px;
   text-transform: uppercase;
   transition:
-    background 0.25s,
-    color 0.25s;
+    background 0.15s,
+    color 0.15s;
   display: inline-block;
   text-decoration: none;
   padding-right: 1.4em;
@@ -286,7 +286,7 @@
 
 .staggered-menu-panel .sm-socials-list .sm-socials-link {
   opacity: 1;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.15s ease;
 }
 
 .staggered-menu-panel .sm-socials-list:hover .sm-socials-link:not(:hover) {
