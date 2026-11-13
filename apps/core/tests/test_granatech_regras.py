@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -324,16 +325,15 @@ def test_corpo_da_proposta_leva_seguro_e_valores_da_simulacao() -> None:
     assert financeiro["valor_solicitado"] == 4619.53
     assert financeiro["valor_liberado_habilitado"] is True
     assert corpo["id_margem"] == "m1"
-    assert corpo["informacaoDeSeguros"]["id_externo"] == "SM-100000721-6"
+    # A api-dev recusa o "SM-..." da simulação: vai a cobertura, como número.
+    assert corpo["informacaoDeSeguros"]["id_externo"] == 21
 
-    # Teste da homologação na api-dev: `id_externo` vira a cobertura, como número.
-    pela_cobertura = montar_corpo_proposta(
+    # Sem cobertura numérica no produto, sobra o id_externo da simulação.
+    sem_cobertura = montar_corpo_proposta(
         id_consulta="c1",
         vinculo=vinculo,
-        produto=produto,
+        produto=replace(produto, id_produto_seguro=None),
         simulacao=simulacao,
         tipo_empregador=1,
-        id_externo_da_cobertura=True,
     )
-    assert pela_cobertura["informacaoDeSeguros"]["id_externo"] == 21
-    assert pela_cobertura["informacoesFinanceira"] == corpo["informacoesFinanceira"]
+    assert sem_cobertura["informacaoDeSeguros"]["id_externo"] == "SM-100000721-6"

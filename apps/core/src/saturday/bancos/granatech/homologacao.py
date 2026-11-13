@@ -306,9 +306,6 @@ class Homologacao:
             produto=produto,
             simulacao=simulacao,
             tipo_empregador=1,
-            # Teste na api-dev: o bloco de seguro é obrigatório (rodada 9) e o
-            # `id_externo` "SM-..." da simulação dá 400 (rodada 7).
-            id_externo_da_cobertura=True,
         )
         status, dados, arquivo = self.chamar(
             f"proposta-contratacao{numero}", "POST", "/propostas", corpo=corpo

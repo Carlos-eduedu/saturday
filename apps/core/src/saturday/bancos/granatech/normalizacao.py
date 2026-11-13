@@ -347,15 +347,14 @@ def montar_corpo_proposta(
     produto: Produto,
     simulacao: Simulacao,
     tipo_empregador: int,
-    id_externo_da_cobertura: bool = False,
 ) -> dict[str, Any]:
     """Corpo do ``POST /propostas`` a partir da simulação aceita.
 
     Na api-dev, ``informacaoDeSeguros`` é obrigatório em produto com seguro
     (rodada 9 da homologação) e ``id_externo`` precisa ser número: o
-    ``"SM-100000820-4"`` da simulação dá 400 (rodada 7).
-    ``id_externo_da_cobertura=True`` manda no lugar o ``id_cobertura_seguro`` do
-    produto (o mesmo ``id_produto_seguro`` da simulação), como número.
+    ``"SM-100000820-4"`` da simulação dá 400 (rodada 7). Vai o
+    ``id_cobertura_seguro`` do produto (o ``id_produto_seguro`` da simulação),
+    como número, aceito nas rodadas 10, 11 e 13.
     """
 
     financeiro = {
@@ -381,14 +380,14 @@ def montar_corpo_proposta(
         "id_margem": vinculo.id_margem,
         "informacoesFinanceira": [financeiro],
     }
-    # TODO(granatech): que número vai em `informacaoDeSeguros.id_externo`.
-    # Pergunta 10 de 2026-11-10, ainda sem resposta; a homologação testa o
-    # `id_cobertura_seguro`.
+    # TODO(granatech): confirmar que `informacaoDeSeguros.id_externo` é o
+    # `id_cobertura_seguro` (pergunta enviada em 2026-11-13). Sem cobertura
+    # numérica, sobra o `id_externo` da simulação, que a api-dev recusa.
     if simulacao.seguro_aplicado:
         cobertura = produto.id_produto_seguro
         id_externo: int | str = (
             int(cobertura)
-            if id_externo_da_cobertura and cobertura and cobertura.isdigit()
+            if cobertura and cobertura.isdigit()
             else str(simulacao.info_seguradora.get("id_externo") or "")
         )
         corpo["informacaoDeSeguros"] = {
