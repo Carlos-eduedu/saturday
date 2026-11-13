@@ -161,7 +161,8 @@ def _esperar(rodadas: jobs_homologacao.Rodadas) -> None:
 def test_gestor_pede_rodada_uma_por_vez_com_auditoria(
     service: AgentService, fabrica: sessionmaker[Session]
 ) -> None:
-    client = _painel(service, fabrica, dominio_publico="saturday.exemplo.test")
+    # Com a URL inteira na variável, o https:// não sai dobrado.
+    client = _painel(service, fabrica, dominio_publico="https://saturday.exemplo.test/")
     cabecalhos = _entrar(client, fabrica, "gestor")
 
     resposta = client.post(ROTA, json={"fase": 2}, headers=cabecalhos)

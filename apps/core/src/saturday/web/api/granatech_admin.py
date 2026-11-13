@@ -552,7 +552,7 @@ def _rodada(sessao: Session, rodada_id: int) -> tuple[HomologacaoGranatech, str 
 @router.get("/homologacao")
 def listar_rodadas(request: Request, _usuario: Gestor, fabrica: Fabrica) -> dict[str, Any]:
     settings = _homologacao_disponivel(request)
-    dominio = settings.dominio_publico.strip().rstrip("/")
+    dominio = settings.dominio_publico
     with abrir_sessao(fabrica) as sessao:
         linhas = sessao.execute(
             select(HomologacaoGranatech, UsuarioPainel.nome)

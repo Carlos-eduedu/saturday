@@ -103,6 +103,13 @@ class Settings(BaseSettings):
     # proposta ligada.
     dominio_publico: str = ""
 
+    @field_validator("dominio_publico")
+    @classmethod
+    def _so_o_dominio(cls, valor: str) -> str:
+        # Aceita a URL inteira na variável: os links já põem o https://.
+        valor = valor.strip().removeprefix("https://").removeprefix("http://")
+        return valor.rstrip("/")
+
     @field_validator("anexo_dominios", "whatsapp_numeros", mode="before")
     @classmethod
     def _lista_por_virgula(cls, valor: object) -> object:
