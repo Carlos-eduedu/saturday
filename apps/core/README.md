@@ -168,6 +168,7 @@ nunca pelo `conversation_id`, que no WhatsApp carrega o telefone.
 | `GET` | `/admin/conversas?fila=ia\|handoff\|assumida\|minhas&busca=` | Inbox, com `nao_lida` e `janela_aberta`. |
 | `GET` | `/admin/conversas/{id}` | Histórico com autor e status de entrega; marca como vista. |
 | `POST` | `/admin/conversas/{id}/assumir` | Atendente assume da IA ou do handoff; o gestor toma de outro atendente. |
+| `POST` | `/admin/conversas/{id}/desfazer` | Desfaz o último assumir ou devolver de quem pede, por até 15 s e enquanto nada mais mexeu no atendimento; a conversa volta ao estado de antes (IA, handoff ou o dono anterior). |
 | `POST` | `/admin/conversas/{id}/devolver` | Devolve para a IA (só o dono, ou o gestor). |
 | `POST` | `/admin/conversas/{id}/transferir` | `{usuario_id}`; só conversa assumida. |
 | `POST` | `/admin/conversas/{id}/mensagens` | `{texto}` ou `{modelo}`; só o dono, só WhatsApp. Janela fechada aceita só modelo. |

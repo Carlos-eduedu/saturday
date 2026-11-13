@@ -6,12 +6,12 @@ import uuid
 
 import pytest
 from conftest import resultado_jev
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 
 from saturday.canais.base import OrigemCanal
 from saturday.dados.modelos import Auditoria, Conversa, Mensagem, Outbox
 from saturday.dados.sessao import sessao as abrir
-from saturday.painel import sessoes
+from saturday.painel import acoes, sessoes
 from saturday.schemas import ChatRequest
 
 SENHA = "senha-bem-comprida-1"
@@ -199,6 +199,64 @@ def test_transferir_e_tomar_de_outro(client_pg, service_pg, fabrica, ana, conver
     detalhe = client_pg.get(f"/admin/conversas/{alvo}").json()
     assert detalhe["atendimento"] == "assumida"
     assert detalhe["atendente_id"] != bia
+
+
+def _atendimento(client, alvo):
+    detalhe = client.get(f"/admin/conversas/{alvo}").json()
+    return detalhe["atendimento"], detalhe["atendente_id"]
+
+
+def test_desfazer_devolve_o_estado_de_antes(client_pg, service_pg, fabrica, ana, conversa):
+    bia = _criar(fabrica, "bia@exemplo.test")
+    _criar(fabrica, "gestor@exemplo.test", "gestor")
+    _cliente_escreve(service_pg, conversa, "oi")
+    alvo = _conversa_id(fabrica, conversa)
+    with abrir(fabrica) as s:
+        s.get(Conversa, uuid.UUID(alvo)).atendimento = "handoff"
+
+    # Assumir um handoff e desfazer volta ao handoff, não à IA.
+    csrf = _entrar(client_pg, "ana@exemplo.test")
+    client_pg.post(f"/admin/conversas/{alvo}/assumir", headers=csrf)
+    assert client_pg.post(f"/admin/conversas/{alvo}/desfazer", headers=csrf).status_code == 204
+    assert _atendimento(client_pg, alvo) == ("handoff", None)
+    # Desfazer não se desfaz.
+    assert client_pg.post(f"/admin/conversas/{alvo}/desfazer", headers=csrf).status_code == 409
+
+    # Devolver e desfazer devolve a conversa a quem estava com ela.
+    client_pg.post(f"/admin/conversas/{alvo}/assumir", headers=csrf)
+    client_pg.post(f"/admin/conversas/{alvo}/devolver", headers=csrf)
+    assert client_pg.post(f"/admin/conversas/{alvo}/desfazer", headers=csrf).status_code == 204
+    assert _atendimento(client_pg, alvo) == ("assumida", ana)
+
+    # O gestor toma a conversa da Ana e desfaz: ela volta para a Ana.
+    csrf = _entrar(client_pg, "gestor@exemplo.test")
+    client_pg.post(f"/admin/conversas/{alvo}/assumir", headers=csrf)
+    assert client_pg.post(f"/admin/conversas/{alvo}/desfazer", headers=csrf).status_code == 204
+    assert _atendimento(client_pg, alvo) == ("assumida", ana)
+
+    # Só desfaz quem agiu, e só enquanto nada mais mexeu no atendimento.
+    client_pg.post(f"/admin/conversas/{alvo}/assumir", headers=csrf)
+    csrf_ana = _entrar(client_pg, "ana@exemplo.test")
+    assert client_pg.post(f"/admin/conversas/{alvo}/desfazer", headers=csrf_ana).status_code == 409
+    csrf = _entrar(client_pg, "gestor@exemplo.test")
+    client_pg.post(f"/admin/conversas/{alvo}/transferir", headers=csrf, json={"usuario_id": bia})
+    assert client_pg.post(f"/admin/conversas/{alvo}/desfazer", headers=csrf).status_code == 409
+
+
+def test_desfazer_vence_com_o_prazo(client_pg, service_pg, fabrica, ana, conversa):
+    _cliente_escreve(service_pg, conversa, "oi")
+    alvo = _conversa_id(fabrica, conversa)
+    csrf = _entrar(client_pg, "ana@exemplo.test")
+    client_pg.post(f"/admin/conversas/{alvo}/assumir", headers=csrf)
+    with abrir(fabrica) as s:
+        s.execute(
+            update(Auditoria)
+            .where(Auditoria.acao == "assumir")
+            .values(criada_em=func.now() - acoes.PRAZO_DESFAZER * 2)
+        )
+
+    assert client_pg.post(f"/admin/conversas/{alvo}/desfazer", headers=csrf).status_code == 409
+    assert _atendimento(client_pg, alvo) == ("assumida", ana)
 
 
 def test_inbox_filtra_por_fila_e_marca_lida(client_pg, service_pg, fabrica, ana, conversa):

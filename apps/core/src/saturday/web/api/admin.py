@@ -300,6 +300,12 @@ def _devolver(sessao: Session, conversa: Conversa, usuario: UsuarioLogado) -> st
     return conversa.conversation_id
 
 
+@router.post("/conversas/{conversa_id}/desfazer", status_code=204)
+def desfazer(conversa_id: uuid.UUID, usuario: ComCsrf, fabrica: Fabrica) -> Response:
+    _executar(fabrica, conversa_id, acoes.desfazer, usuario.id)
+    return Response(status_code=204)
+
+
 @router.post("/conversas/{conversa_id}/transferir", status_code=204)
 def transferir(
     conversa_id: uuid.UUID, dados: Transferencia, usuario: ComCsrf, fabrica: Fabrica

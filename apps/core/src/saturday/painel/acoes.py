@@ -9,17 +9,17 @@ from __future__ import annotations
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.canais.base import CANAIS_WHATSAPP
 from saturday.canais.whatsapp.janela import janela_aberta
 from saturday.canais.whatsapp.modelos import MODELOS
 from saturday.dados import repositorios
-from saturday.dados.modelos import Conversa, UsuarioPainel
+from saturday.dados.modelos import Auditoria, Conversa, UsuarioPainel
 from saturday.dados.outbox import enfileirar
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.dados.trava import travar_conversa
@@ -65,6 +65,19 @@ def conversa_travada(
         yield sessao, conversa
 
 
+# Ações que mudam o atendimento; a última delas é a única que se desfaz.
+ACOES_DE_ATENDIMENTO = ("assumir", "devolver", "transferir", "desfazer")
+# Folga sobre os 5 s em que o painel mostra "Desfazer".
+PRAZO_DESFAZER = timedelta(seconds=15)
+
+
+def _estado(conversa: Conversa) -> dict[str, Any]:
+    """O atendimento de agora, para a auditoria e para o desfazer."""
+
+    dono = conversa.atendente_id
+    return {"antes": conversa.atendimento, "de": str(dono) if dono else None}
+
+
 def _exigir_dono(conversa: Conversa, usuario_id: uuid.UUID, gestor: bool) -> None:
     if gestor or conversa.atendente_id == usuario_id:
         return
@@ -78,15 +91,9 @@ def assumir(sessao: Session, conversa: Conversa, usuario_id: uuid.UUID, gestor: 
         if conversa.atendente_id == usuario_id:
             return
         _exigir_dono(conversa, usuario_id, gestor)
-    anterior = conversa.atendente_id
+    antes = _estado(conversa)
     repositorios.mudar_atendimento(sessao, conversa, "assumida", atendente_id=usuario_id)
-    auditar(
-        sessao,
-        usuario_id,
-        "assumir",
-        str(conversa.id),
-        {"de": str(anterior) if anterior else None},
-    )
+    auditar(sessao, usuario_id, "assumir", str(conversa.id), antes)
 
 
 def devolver(sessao: Session, conversa: Conversa, usuario_id: uuid.UUID, gestor: bool) -> None:
@@ -94,8 +101,44 @@ def devolver(sessao: Session, conversa: Conversa, usuario_id: uuid.UUID, gestor:
         return
     if conversa.atendimento == "assumida":
         _exigir_dono(conversa, usuario_id, gestor)
+    antes = _estado(conversa)
     repositorios.mudar_atendimento(sessao, conversa, "ia")
-    auditar(sessao, usuario_id, "devolver", str(conversa.id))
+    auditar(sessao, usuario_id, "devolver", str(conversa.id), antes)
+
+
+def desfazer(sessao: Session, conversa: Conversa, usuario_id: uuid.UUID) -> None:
+    """Volta a conversa ao estado de antes do último assumir ou devolver de quem pede.
+
+    Só vale por `PRAZO_DESFAZER` e enquanto nada mais mexeu no atendimento: a
+    ação desfeita precisa ser a última da conversa e o estado, o que ela deixou.
+    """
+
+    ultima = sessao.scalars(
+        select(Auditoria)
+        .where(Auditoria.alvo == str(conversa.id), Auditoria.acao.in_(ACOES_DE_ATENDIMENTO))
+        .order_by(Auditoria.id.desc())
+        .limit(1)
+    ).first()
+    recente = (
+        ultima is not None
+        and ultima.usuario_id == usuario_id
+        and ultima.acao in ("assumir", "devolver")
+        and sessao.scalar(select(func.now() - ultima.criada_em <= PRAZO_DESFAZER))
+    )
+    if ultima is None or not recente:
+        raise AcaoRecusada(409, "não dá mais para desfazer")
+    deixou = ("assumida", usuario_id) if ultima.acao == "assumir" else ("ia", None)
+    if (conversa.atendimento, conversa.atendente_id) != deixou:
+        raise AcaoRecusada(409, "não dá mais para desfazer: a conversa já mudou")
+
+    antes = ultima.detalhe or {}
+    dono = uuid.UUID(antes["de"]) if antes.get("de") else None
+    if antes.get("antes") == "assumida":
+        destino = sessao.get(UsuarioPainel, dono) if dono else None
+        if destino is None or not destino.ativo:
+            raise AcaoRecusada(409, "não dá mais para desfazer: quem estava com ela saiu")
+    repositorios.mudar_atendimento(sessao, conversa, str(antes.get("antes")), atendente_id=dono)
+    auditar(sessao, usuario_id, "desfazer", str(conversa.id), {"acao": ultima.acao})
 
 
 def transferir(
