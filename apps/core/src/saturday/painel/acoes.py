@@ -19,7 +19,13 @@ from saturday.canais.base import CANAIS_WHATSAPP
 from saturday.canais.whatsapp.janela import janela_aberta
 from saturday.canais.whatsapp.modelos import MODELOS
 from saturday.dados import repositorios
-from saturday.dados.modelos import Auditoria, Conversa, UsuarioPainel
+from saturday.dados.modelos import (
+    Auditoria,
+    ConsultaGranatech,
+    Conversa,
+    PropostaGranatech,
+    UsuarioPainel,
+)
 from saturday.dados.outbox import enfileirar
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.dados.trava import travar_conversa
@@ -163,6 +169,35 @@ def transferir(
         str(conversa.id),
         {"de": str(anterior), "para": str(destino_id)},
     )
+
+
+def editar_ficha(
+    sessao: Session,
+    conversa: Conversa,
+    usuario_id: uuid.UUID,
+    gestor: bool,
+    campos: list[str],
+) -> None:
+    """Confere se a correção da ficha cabe e deixa o rastro, sem os valores.
+
+    CPF e conta param de mudar quando o banco já os recebeu: o CPF depois da
+    consulta (muda a cota e a consulta feita), a conta depois da proposta (aí
+    só pela Granatech, em "corrigir conta").
+    """
+
+    _exigir_dono(conversa, usuario_id, gestor)
+    if not campos:
+        raise AcaoRecusada(422, "nada para mudar")
+    if "cpf" in campos and sessao.scalar(
+        select(ConsultaGranatech.id).where(ConsultaGranatech.conversa_id == conversa.id).limit(1)
+    ):
+        raise AcaoRecusada(409, "o CPF não muda depois da consulta na Granatech")
+    if "conta" in campos and sessao.scalar(
+        select(PropostaGranatech.id).where(PropostaGranatech.conversa_id == conversa.id).limit(1)
+    ):
+        raise AcaoRecusada(409, "a proposta já foi criada: corrija a conta pela aba Granatech")
+    auditar(sessao, usuario_id, "conversa:editar_ficha", str(conversa.id), {"campos": campos})
+    repositorios.notificar(sessao, "conversa", conversa=conversa.id)
 
 
 def enviar(

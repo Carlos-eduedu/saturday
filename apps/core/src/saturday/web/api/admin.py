@@ -16,10 +16,11 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
+from saturday.agent.clt import leitura
 from saturday.agent.service import AgentService
 from saturday.canais.whatsapp.janela import janela_aberta
 from saturday.dados import repositorios
@@ -37,6 +38,7 @@ from saturday.painel import acoes, exportacao, sessoes, supervisao
 from saturday.painel.auditoria import auditar
 from saturday.privacidade import MASCARAS
 from saturday.settings import TZ_OPERACAO
+from saturday.web.api.granatech_admin import Conta
 from saturday.web.dependencies import (
     COOKIE_SESSAO,
     UsuarioLogado,
@@ -75,6 +77,52 @@ class Transferencia(BaseModel):
 
 class Revelar(BaseModel):
     campo: CampoSensivel
+
+
+class ContaFicha(Conta):
+    banco_nome: str = Field(default="", max_length=120)
+
+
+class EdicaoFicha(BaseModel):
+    """Só os campos que mudaram; ausente é "não mexer"."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    nome: str | None = Field(default=None, min_length=3, max_length=120)
+    nascimento: date | None = None
+    sexo: Literal["F", "M"] | None = None
+    email: str | None = Field(default=None, max_length=254)
+    celular: str | None = Field(default=None, pattern=r"^\d{11}$")
+    cpf: str | None = None
+    conta: ContaFicha | None = None
+
+    @field_validator("nome")
+    @classmethod
+    def _nome_completo(cls, valor: str | None) -> str | None:
+        if valor is not None and len(valor.split()) < 2:
+            raise ValueError("nome completo, com sobrenome")
+        return valor.strip() if valor else valor
+
+    @field_validator("nascimento")
+    @classmethod
+    def _nascimento(cls, valor: date | None) -> date | None:
+        if valor is not None and not date(1900, 1, 1) <= valor < date.today():
+            raise ValueError("data de nascimento fora do possível")
+        return valor
+
+    @field_validator("cpf")
+    @classmethod
+    def _cpf(cls, valor: str | None) -> str | None:
+        if valor is not None and leitura.cpf(valor) is None:
+            raise ValueError("CPF inválido")
+        return leitura.cpf(valor) if valor else valor
+
+    @field_validator("email")
+    @classmethod
+    def _email(cls, valor: str | None) -> str | None:
+        if valor is not None and leitura.email(valor) is None:
+            raise ValueError("e-mail inválido")
+        return leitura.email(valor) if valor else valor
 
 
 def _eu(request: Request, usuario: UsuarioLogado) -> dict[str, Any]:
@@ -447,6 +495,29 @@ def _acompanhamento(sessao: Session, conversa: Conversa, estado: dict[str, Any])
             for prova in provas
         ],
     }
+
+
+@router.patch("/conversas/{conversa_id}/ficha", status_code=204)
+def editar_ficha(
+    conversa_id: uuid.UUID,
+    dados: EdicaoFicha,
+    usuario: ComCsrf,
+    fabrica: Fabrica,
+    service: Servico,
+) -> Response:
+    campos = dados.model_dump(exclude_none=True, mode="json")
+    try:
+        # A trava da conversa fica de pé até gravar o checkpoint: nenhum turno
+        # lê a ficha no meio. Falhou o checkpoint, a auditoria volta junto.
+        with acoes.conversa_travada(fabrica, conversa_id) as (sessao, conversa):
+            acoes.editar_ficha(sessao, conversa, usuario.id, usuario.gestor, sorted(campos))
+            try:
+                service.editar_ficha(conversa.conversation_id, campos)
+            except ValueError as exc:
+                raise acoes.AcaoRecusada(409, str(exc)) from exc
+    except acoes.AcaoRecusada as exc:
+        raise _recusa(exc) from exc
+    return Response(status_code=204)
 
 
 @router.post("/conversas/{conversa_id}/revelar")

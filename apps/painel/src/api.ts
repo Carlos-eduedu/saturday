@@ -285,6 +285,23 @@ export interface FiltroGranatech {
   cpf?: string;
 }
 
+// Correção da ficha pelo painel: só os campos que mudaram.
+export interface EdicaoFicha {
+  nome?: string;
+  nascimento?: string;
+  sexo?: "F" | "M";
+  email?: string;
+  celular?: string;
+  cpf?: string;
+  conta?: ContaNova & { banco_nome?: string };
+}
+
+export interface RespostaRapida {
+  id: number;
+  atalho: string;
+  texto: string;
+}
+
 export interface ContaNova {
   banco_codigo: string;
   agencia: string;
@@ -360,6 +377,12 @@ async function chamar<T>(metodo: string, caminho: string, corpo?: unknown): Prom
     try {
       const json = (await resposta.json()) as { detail?: unknown };
       if (typeof json.detail === "string") detalhe = json.detail;
+      // Validação do pydantic: lista de erros por campo.
+      else if (Array.isArray(json.detail))
+        detalhe = json.detail
+          .map((e: { msg?: string }) => (e.msg ?? "").replace(/^Value error, /, ""))
+          .filter(Boolean)
+          .join("; ");
     } catch {
       // corpo sem JSON: fica o statusText
     }
@@ -389,6 +412,14 @@ export const api = {
   enviar: (id: string, envio: { texto: string } | { modelo: string }) =>
     chamar<{ mensagem_id: number }>("POST", `/conversas/${id}/mensagens`, envio),
   ficha: (id: string) => chamar<Ficha>("GET", `/conversas/${id}/ficha`),
+  editarFicha: (id: string, edicao: EdicaoFicha) =>
+    chamar<void>("PATCH", `/conversas/${id}/ficha`, edicao),
+  respostas: () => chamar<RespostaRapida[]>("GET", "/respostas-rapidas"),
+  criarResposta: (r: Omit<RespostaRapida, "id">) =>
+    chamar<RespostaRapida>("POST", "/respostas-rapidas", r),
+  editarResposta: (id: number, r: Omit<RespostaRapida, "id">) =>
+    chamar<RespostaRapida>("PATCH", `/respostas-rapidas/${id}`, r),
+  apagarResposta: (id: number) => chamar<void>("DELETE", `/respostas-rapidas/${id}`),
   revelar: (id: string, campo: CampoSensivel) =>
     chamar<{ campo: CampoSensivel; valor: string }>("POST", `/conversas/${id}/revelar`, { campo }),
   alertas: () => chamar<Alerta[]>("GET", "/alertas"),

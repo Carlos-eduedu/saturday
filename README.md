@@ -39,6 +39,12 @@ os termos estão no [`GLOSSARY.md`](GLOSSARY.md). A aba **Granatech** lista
 consultas e propostas e deixa o gestor reconciliar, reenviar o link de
 biometria, cancelar, corrigir a conta e atualizar o detalhe
 ([decisão 0013](docs/decisoes/0013-acoes-do-painel-na-granatech-por-turno-de-sistema.md)).
+No compositor da conversa, o botão de atalhos edita a ficha (nome, nascimento,
+sexo, e-mail, celular, CPF e conta, com auditoria só dos nomes dos campos; o CPF
+trava depois da consulta e a conta depois da proposta), envia modelo e exporta
+a conversa; `/` insere uma **resposta rápida**, cadastrada pelo gestor na tela
+Canais. Anexar e gravar áudio aparecem desabilitados até a mídia de saída
+existir.
 
 Desde a Fase 4 existe a **camada da Granatech** (`apps/core/src/saturday/bancos/`):
 cliente com token em cache e retry só em GET, normalização em `Decimal`, ajuste ao

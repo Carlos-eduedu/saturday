@@ -3,6 +3,7 @@ import { Cancel01Icon, CancelCircleIcon, CheckmarkCircle02Icon, Download04Icon }
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "react-router";
 import LatticeLoader, { type StatusLattice } from "../componentes/LatticeLoader";
+import { CamposConta, CONTA_VAZIA } from "../componentes/CamposConta";
 import { Vazio } from "../componentes/Vazio";
 import {
   type Acoes,
@@ -1026,26 +1027,7 @@ function CorrigirConta({
   aoEnviar: (conta: ContaNova) => void;
   aoFechar: () => void;
 }) {
-  const [bancos, setBancos] = useState<{ codigo: string; nome: string }[] | null>(null);
-  const [erro, setErro] = useState("");
-  const [conta, setConta] = useState<ContaNova>({
-    banco_codigo: "",
-    agencia: "",
-    digito_agencia: "",
-    numero_conta: "",
-    digito_conta: "",
-    tipo_conta: "conta_corrente",
-  });
-  useEffect(() => {
-    api
-      .bancosGranatech()
-      .then(setBancos)
-      .catch((e: unknown) => setErro(mensagemDe(e)));
-  }, []);
-  const campo = (nome: keyof ContaNova) => ({
-    value: conta[nome],
-    onChange: (e: { target: { value: string } }) => setConta({ ...conta, [nome]: e.target.value }),
-  });
+  const [conta, setConta] = useState<ContaNova>(CONTA_VAZIA);
 
   function enviar(evento: FormEvent) {
     evento.preventDefault();
@@ -1056,41 +1038,7 @@ function CorrigirConta({
     <form className="form-usuario" onSubmit={enviar}>
       <h3>Corrigir conta</h3>
       <p className="nota">A conta precisa ser do próprio cliente.</p>
-      {erro && <p className="erro">{erro}</p>}
-      <label>
-        Banco
-        <select {...campo("banco_codigo")} required>
-          <option value="">{bancos ? "Escolha" : "Carregando…"}</option>
-          {bancos?.map((b) => (
-            <option key={b.codigo} value={b.codigo}>
-              {b.codigo} · {b.nome}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Agência
-        <input {...campo("agencia")} inputMode="numeric" pattern="\d{1,6}" required />
-      </label>
-      <label>
-        Dígito da agência
-        <input {...campo("digito_agencia")} pattern="[0-9Xx]?" maxLength={1} />
-      </label>
-      <label>
-        Conta
-        <input {...campo("numero_conta")} inputMode="numeric" pattern="\d{1,20}" required />
-      </label>
-      <label>
-        Dígito da conta
-        <input {...campo("digito_conta")} pattern="[0-9Xx]" maxLength={1} required />
-      </label>
-      <label>
-        Tipo
-        <select {...campo("tipo_conta")}>
-          <option value="conta_corrente">Conta corrente</option>
-          <option value="conta_poupanca">Conta poupança</option>
-        </select>
-      </label>
+      <CamposConta conta={conta} mudar={setConta} />
       <button type="submit">Enviar à Granatech</button>
       <button type="button" onClick={aoFechar}>
         Voltar

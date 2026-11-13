@@ -55,6 +55,10 @@ def agora() -> datetime:
     return datetime.now(ZoneInfo(TZ_OPERACAO))
 
 
+# Campo da ficha editada no painel → chave em `cliente` no ramo INSS.
+CAMPOS_FICHA_INSS = {"nome": "nome", "cpf": "cpf", "nascimento": "data_nascimento"}
+
+
 class AgentService:
     """Orquestra o grafo, o checkpointer, o outbox e a trava por conversa."""
 
@@ -229,6 +233,31 @@ class AgentService:
         config = self.config(conversation_id)
         if self.estado_atual(config):
             self.graph.update_state(config, self._atualizacao_liberacao())
+
+    def editar_ficha(self, conversation_id: str, campos: dict[str, Any]) -> None:
+        """Grava na ficha os dados corrigidos pela equipe no painel.
+
+        Quem chama já segura a trava da conversa (nenhum turno roda junto). O
+        ramo CLT guarda em ``clt.dados``; o INSS, em ``cliente``, que só tem
+        nome, CPF e nascimento. Sem jornada começada não há ficha a corrigir.
+        """
+
+        config = self.config(conversation_id)
+        estado = self.estado_atual(config)
+        if estado.get("clt"):
+            clt = dict(estado["clt"])
+            clt["dados"] = {**(clt.get("dados") or {}), **campos}
+            self.graph.update_state(config, {"clt": clt})
+            return
+        if estado.get("cliente"):
+            sobra = set(campos) - CAMPOS_FICHA_INSS.keys()
+            if sobra:
+                raise ValueError(f"o ramo INSS não guarda: {', '.join(sorted(sobra))}")
+            cliente = dict(estado["cliente"])
+            cliente.update({CAMPOS_FICHA_INSS[c]: v for c, v in campos.items()})
+            self.graph.update_state(config, {"cliente": cliente})
+            return
+        raise ValueError("a conversa ainda não tem ficha")
 
     def _expirou(self, desde: datetime | None) -> bool:
         if self.settings.handoff_auto_release_horas <= 0 or desde is None:

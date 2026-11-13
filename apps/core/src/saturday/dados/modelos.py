@@ -458,3 +458,22 @@ class HomologacaoGranatech(Base):
     passos: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
     itens: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
     ids_externos: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+
+
+class RespostaRapida(Base):
+    """Texto salvo que a equipe insere na conversa digitando "/atalho".
+
+    Texto fixo, sem variáveis: quem envia é o atendente, depois de revisar.
+    """
+
+    __tablename__ = "respostas_rapidas"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    atalho: Mapped[str] = mapped_column(String(40), unique=True, nullable=False)
+    texto: Mapped[str] = mapped_column(Text, nullable=False)
+    criado_por: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("usuarios_painel.id", ondelete="SET NULL")
+    )
+    atualizado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=AGORA, onupdate=AGORA
+    )

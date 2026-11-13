@@ -8,6 +8,7 @@ import {
   ErroApi,
   type InstanciaEvolution,
   type Qr,
+  type RespostaRapida,
 } from "../api";
 
 // Tela Canais (decisão 0010), só para gestor: números da Meta para consulta e
@@ -121,6 +122,8 @@ export function Canais() {
           </>
         )}
       </section>
+
+      <RespostasRapidas />
 
       {detalhesDe && (
         <PainelDetalhes key={detalhesDe} nome={detalhesDe} fechar={() => setDetalhesDe(null)} />
@@ -558,5 +561,130 @@ function FormConfiguracoes({
         </button>
       </div>
     </form>
+  );
+}
+
+// Textos salvos que a equipe insere na conversa com "/atalho". Só o gestor
+// mantém; o texto é fixo e quem envia revisa antes.
+function RespostasRapidas() {
+  const [lista, setLista] = useState<RespostaRapida[] | null>(null);
+  const [editando, setEditando] = useState<RespostaRapida | null>(null);
+  const [atalho, setAtalho] = useState("");
+  const [texto, setTexto] = useState("");
+  const [erro, setErro] = useState("");
+
+  const carregar = useCallback(() => {
+    api
+      .respostas()
+      .then(setLista)
+      .catch((e: unknown) => setErro(mensagemDe(e)));
+  }, []);
+  useEffect(carregar, [carregar]);
+
+  function editar(r: RespostaRapida | null) {
+    setEditando(r);
+    setAtalho(r?.atalho ?? "");
+    setTexto(r?.texto ?? "");
+    setErro("");
+  }
+
+  async function salvar(evento: FormEvent) {
+    evento.preventDefault();
+    const dados = { atalho: atalho.trim().toLowerCase(), texto: texto.trim() };
+    try {
+      await (editando ? api.editarResposta(editando.id, dados) : api.criarResposta(dados));
+      editar(null);
+      carregar();
+    } catch (e) {
+      setErro(mensagemDe(e));
+    }
+  }
+
+  async function apagar(r: RespostaRapida) {
+    if (!window.confirm(`Apagar a resposta /${r.atalho}?`)) return;
+    try {
+      await api.apagarResposta(r.id);
+      if (editando?.id === r.id) editar(null);
+      carregar();
+    } catch (e) {
+      setErro(mensagemDe(e));
+    }
+  }
+
+  return (
+    <section className="respostas-rapidas">
+      <h2>Respostas rápidas</h2>
+      <p className="nota">
+        Na conversa, digite <code>/</code> e o atalho para inserir o texto. Quem envia revisa antes;
+        nada passa pela IA.
+      </p>
+      {lista === null ? (
+        <p className="nota">Carregando…</p>
+      ) : lista.length === 0 ? (
+        <Vazio titulo="Nenhuma resposta rápida." texto="Crie a primeira abaixo." />
+      ) : (
+        <table>
+          <thead>
+            <tr>
+              <th>Atalho</th>
+              <th>Texto</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {lista.map((r) => (
+              <tr key={r.id}>
+                <td>
+                  <code>/{r.atalho}</code>
+                </td>
+                <td data-rotulo="Texto" className="texto-resposta">
+                  {r.texto}
+                </td>
+                <td className="acoes">
+                  <button type="button" onClick={() => editar(r)}>
+                    Editar
+                  </button>
+                  <button type="button" className="perigo" onClick={() => apagar(r)}>
+                    Apagar
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <form className="form-resposta" onSubmit={salvar}>
+        <h3>{editando ? `Editar /${editando.atalho}` : "Nova resposta"}</h3>
+        <label>
+          Atalho
+          <input
+            value={atalho}
+            onChange={(e) => setAtalho(e.target.value)}
+            pattern="[a-z0-9][a-z0-9_\-]{0,39}"
+            title="Letras minúsculas, números, - ou _; sem espaço"
+            placeholder="ex.: documentos"
+            required
+            autoComplete="off"
+          />
+        </label>
+        <label>
+          Texto
+          <textarea value={texto} onChange={(e) => setTexto(e.target.value)} rows={3} required />
+        </label>
+        {erro && (
+          <p className="erro" role="alert">
+            {erro}
+          </p>
+        )}
+        <div className="acoes-form">
+          {editando && (
+            <button type="button" onClick={() => editar(null)}>
+              Cancelar
+            </button>
+          )}
+          <button type="submit">{editando ? "Salvar" : "Criar"}</button>
+        </div>
+      </form>
+    </section>
   );
 }

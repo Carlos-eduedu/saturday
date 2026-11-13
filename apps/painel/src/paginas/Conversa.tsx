@@ -1,4 +1,4 @@
-import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link, useParams } from "react-router";
@@ -14,6 +14,7 @@ import {
   type Usuario,
 } from "../api";
 import { confirmarTomada, textoDoAviso, useAvisoDesfazer } from "../componentes/Desfazer";
+import { Compositor } from "../componentes/Compositor";
 import { Vazio } from "../componentes/Vazio";
 import {
   ATENCAO,
@@ -21,7 +22,6 @@ import {
   PUBLICOS,
   dolar,
   ETAPAS,
-  MODELOS,
   MOTIVOS_HANDOFF,
   NOS,
   reais,
@@ -98,7 +98,7 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
   const ultima = conversa?.mensagens[conversa.mensagens.length - 1]?.id;
   useEffect(() => {
     if (ultima !== undefined && noFim.current) fim.current?.scrollIntoView({ block: "end" });
-    // Assumir troca o botão pelo envio, mais alto: o fim muda de lugar.
+    // Assumir libera o campo de escrever: o fim pode mudar de lugar.
   }, [ultima, conversa?.atendimento]);
 
   // Quem está com a conversa: para o selo, a transferência e a confirmação de tomada.
@@ -110,7 +110,7 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
       .catch(() => undefined);
   }, []);
   const avisar = useAvisoDesfazer();
-  // "Assumir e responder" leva o cursor para a mensagem.
+  // Assumir pelo cabeçalho leva o cursor para a mensagem.
   const [focarEnvio, setFocarEnvio] = useState(false);
 
   if (!conversa) return <p className="centro">{erro || "Carregando…"}</p>;
@@ -120,6 +120,7 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
   // Assumir e devolver valem na hora; o aviso deixa desfazer por 5 s.
   function mudar(acao: "assumir" | "devolver") {
     if (acao === "assumir" && conversa?.atendimento === "assumida" && !confirmarTomada(dono)) return;
+    setFocarEnvio(acao === "assumir");
     void agir(async () => {
       await (acao === "assumir" ? api.assumir(id) : api.devolver(id));
       avisar({
@@ -215,29 +216,19 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
                 </li>
               ))}
             </ol>
-            {(conversa.canal === "whatsapp" || conversa.canal === "evolution") &&
-              (minha ? (
-                <Envio
-                  conversa={conversa}
-                  focar={focarEnvio}
-                  agir={(acao) => {
-                    // Quem envia quer ver a própria mensagem, mesmo lendo mais acima.
-                    noFim.current = true;
-                    return agir(acao);
-                  }}
-                />
-              ) : (
-                <button
-                  type="button"
-                  className="principal"
-                  onClick={() => {
-                    setFocarEnvio(true);
-                    mudar("assumir");
-                  }}
-                >
-                  Assumir e responder
-                </button>
-              ))}
+            {(conversa.canal === "whatsapp" || conversa.canal === "evolution") && (
+              <Compositor
+                conversa={conversa}
+                eu={eu}
+                minha={minha}
+                focar={focarEnvio}
+                agir={(acao) => {
+                  // Quem envia quer ver a própria mensagem, mesmo lendo mais acima.
+                  noFim.current = true;
+                  return agir(acao);
+                }}
+              />
+            )}
             <div ref={fim} />
           </>
         )}
@@ -315,91 +306,6 @@ function Acoes({
           </a>
         </div>
       </details>
-    </div>
-  );
-}
-
-function Envio({
-  conversa,
-  focar,
-  agir,
-}: {
-  conversa: Detalhe;
-  focar: boolean;
-  agir: (acao: () => Promise<unknown>) => Promise<void>;
-}) {
-  const [texto, setTexto] = useState("");
-  const [enviando, setEnviando] = useState(false);
-  const [modelo, setModelo] = useState(conversa.modelos[0] ?? "");
-
-  async function enviarTexto(evento: FormEvent) {
-    evento.preventDefault();
-    if (!texto.trim() || enviando) return;
-    setEnviando(true);
-    await agir(async () => {
-      await api.enviar(conversa.id, { texto });
-      setTexto("");
-    });
-    setEnviando(false);
-  }
-
-  function enviarModelo() {
-    // O texto do modelo fica cadastrado na Meta: o painel não tem como mostrá-lo.
-    const pergunta =
-      `Enviar o modelo "${rotulo(MODELOS, modelo)}" para ${conversa.telefone}? ` +
-      "O cliente recebe o texto aprovado na Meta, que o painel não mostra.";
-    if (window.confirm(pergunta)) void agir(() => api.enviar(conversa.id, { modelo }));
-  }
-
-  const janelaAberta = conversa.janela_aberta || conversa.canal === "evolution";
-  const blocoModelo = conversa.modelos.length > 0 && (
-    <div className="modelo">
-      <label>
-        Modelo
-        <select value={modelo} onChange={(e) => setModelo(e.target.value)}>
-          {conversa.modelos.map((m) => (
-            <option key={m} value={m}>
-              {rotulo(MODELOS, m)}
-            </option>
-          ))}
-        </select>
-      </label>
-      <button type="button" disabled={!modelo} onClick={enviarModelo}>
-        Enviar modelo
-      </button>
-    </div>
-  );
-
-  return (
-    <div className="envio">
-      {/* Evolution não tem janela nem modelo: sempre texto (decisão 0009). */}
-      {janelaAberta ? (
-        <form onSubmit={enviarTexto}>
-          <label>
-            Mensagem
-            <textarea
-              value={texto}
-              onChange={(e) => setTexto(e.target.value)}
-              rows={3}
-              autoFocus={focar}
-            />
-          </label>
-          <button type="submit" disabled={enviando}>
-            {enviando ? "Enviando…" : "Enviar"}
-          </button>
-        </form>
-      ) : (
-        <p className="aviso">Janela de 24 h fechada: só é possível enviar um modelo.</p>
-      )}
-      {/* Com a janela aberta o texto livre resolve; o modelo fica a um clique. */}
-      {blocoModelo && janelaAberta ? (
-        <details>
-          <summary>Enviar um modelo</summary>
-          {blocoModelo}
-        </details>
-      ) : (
-        blocoModelo
-      )}
     </div>
   );
 }

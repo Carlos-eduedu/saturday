@@ -55,6 +55,11 @@ ou cliente sem resposta numa conversa assumida.
 **Ficha**:
 Os dados pessoais e de jornada de um cliente, mostrados mascarados no painel.
 
+**Resposta rápida**:
+Texto salvo que o atendente insere na conversa digitando "/" e o atalho; quem
+envia revisa antes. Não passa pela IA.
+_Evitar_: template, modelo (modelo é a mensagem aprovada na Meta)
+
 **Revelar**:
 Mostrar ao usuário do painel um dado pessoal sem máscara; sempre deixa rastro
 na auditoria.

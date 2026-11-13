@@ -338,7 +338,7 @@ def revelar_cpf(consulta_id: int, usuario: ComCsrf, fabrica: Fabrica) -> dict[st
 
 
 @router.get("/bancos")
-def bancos(request: Request, _usuario: Gestor) -> list[dict[str, str]]:
+def bancos(request: Request, _usuario: Logado) -> list[dict[str, str]]:
     try:
         lista = _cliente(request).bancos_em_cache()
     except ErroGranatech as exc:
