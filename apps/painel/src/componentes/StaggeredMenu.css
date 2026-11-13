@@ -143,7 +143,6 @@
   overflow-y: auto;
   z-index: 10;
   pointer-events: auto;
-  opacity: 0;
 }
 
 [data-position='left'] .staggered-menu-panel {
@@ -159,7 +158,6 @@
   width: clamp(260px, 38vw, 420px);
   pointer-events: none;
   z-index: 5;
-  opacity: 0;
 }
 
 [data-position='left'] .sm-prelayers {
@@ -173,8 +171,6 @@
   right: 0;
   height: 100%;
   width: 100%;
-  transform: translateX(0);
-  opacity: 0;
 }
 
 .sm-panel-inner {
@@ -359,4 +355,63 @@
   .staggered-menu-wrapper[data-open] .sm-logo-img {
     filter: invert(100%);
   }
+}
+
+/* ------------------------------------------------------------------------
+   Animação sem biblioteca (era GSAP). Tudo preso ao `data-open` do
+   invólucro: abrir leva ~220 ms com saída rápida (ease-out forte), fechar
+   ~150 ms acelerando; os itens sobem em cascata pelo `--i` de cada um. */
+.staggered-menu-wrapper {
+  --sm-abrir: cubic-bezier(0.16, 1, 0.3, 1);
+  --sm-fechar: cubic-bezier(0.5, 0, 0.75, 0);
+  --sm-fora: 100%;
+}
+.staggered-menu-wrapper[data-position='left'] { --sm-fora: -100%; }
+
+.staggered-menu-panel,
+.sm-prelayer {
+  transform: translateX(var(--sm-fora));
+  visibility: hidden;
+  transition: transform 150ms var(--sm-fechar), visibility 0s linear 150ms;
+}
+.staggered-menu-wrapper[data-open] .staggered-menu-panel,
+.staggered-menu-wrapper[data-open] .sm-prelayer {
+  transform: translateX(0);
+  visibility: visible;
+  transition: transform 220ms var(--sm-abrir), visibility 0s;
+}
+/* O atraso vale só para o deslize: o painel fica visível na hora, senão o foco
+   não entra no primeiro item ao abrir. */
+.staggered-menu-wrapper[data-open] .sm-prelayer { transition-delay: calc(var(--i, 0) * 10ms), 0s; }
+.staggered-menu-wrapper[data-open] .staggered-menu-panel { transition-delay: 20ms, 0s; }
+
+/* Itens: sobem girando de leve, um depois do outro. Ao fechar voltam sem animar. */
+/* Fechado: os itens só voltam para baixo depois que o painel saiu (150 ms). */
+.sm-panel-itemLabel { transform: translateY(140%) rotate(10deg); transition: transform 0s linear 150ms; }
+.staggered-menu-wrapper[data-open] .sm-panel-itemLabel {
+  transform: none;
+  transition: transform 260ms var(--sm-abrir);
+  transition-delay: calc(40ms + var(--i, 0) * 18ms);
+}
+.sm-panel-list[data-numbering] .sm-panel-item::after { --sm-num-opacity: 0; transition: opacity 0s linear 150ms; }
+.staggered-menu-wrapper[data-open] .sm-panel-list[data-numbering] .sm-panel-item::after {
+  --sm-num-opacity: 1;
+  transition: opacity 200ms ease-out calc(80ms + var(--i, 0) * 15ms);
+}
+.sm-socials-title { opacity: 0; transition: opacity 0s linear 150ms; }
+.staggered-menu-wrapper[data-open] .sm-socials-title { opacity: 1; transition: opacity 200ms ease-out 100ms; }
+
+/* Botão: o "+" vira "×" e o rótulo troca de Menu para Fechar deslizando. */
+.sm-icon { transition: transform 150ms var(--sm-fechar); }
+.sm-icon-line-v { transform: translate(-50%, -50%) rotate(90deg); }
+.staggered-menu-wrapper[data-open] .sm-icon { transform: rotate(225deg); transition: transform 150ms var(--sm-abrir); }
+.sm-toggle-textInner { transition: transform 150ms var(--sm-abrir); }
+.staggered-menu-wrapper[data-open] .sm-toggle-textInner { transform: translateY(-50%); }
+
+@media (prefers-reduced-motion: reduce) {
+  .staggered-menu-panel, .sm-prelayer, .sm-panel-itemLabel, .sm-icon, .sm-toggle-textInner,
+  .sm-socials-title, .sm-panel-list[data-numbering] .sm-panel-item::after {
+    transition: none !important;
+  }
+  .staggered-menu-wrapper[data-open] .sm-panel-itemLabel { transform: none; }
 }

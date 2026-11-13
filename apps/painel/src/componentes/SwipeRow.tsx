@@ -1,8 +1,10 @@
-// Do React Bits (registro @react-bits, SwipeRow-TS-CSS); só os textos traduzidos.
+// Do React Bits (registro @react-bits, SwipeRow-TS-CSS); textos traduzidos e o
+// `motion` trocado por `movimento.ts`: os transforms vão direto no estilo.
 'use client';
 
 import React, { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { animate, motion, useMotionValue, useReducedMotion, useTransform } from 'motion/react';
+import { useMidia } from '../midia';
+import { type Curva, Valor } from './movimento';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Delete02Icon } from '@hugeicons/core-free-icons';
 
@@ -12,7 +14,7 @@ const HYST = 10;
 const FLICK = 110;
 const DECEL = 0.998;
 const VMAX = 1500;
-const EASE_OUT: [number, number, number, number] = [0.23, 1, 0.32, 1];
+const EASE_OUT: Curva = [0.23, 1, 0.32, 1];
 const SPRING_UI = { type: 'spring' as const, duration: 0.3, bounce: 0 };
 const DEFAULT_ACTIONS: SwipeAction[] = [{ id: 'delete', label: 'Delete' }];
 
@@ -135,7 +137,7 @@ const SwipeRow: React.FC<SwipeRowProps> = ({
   style
 }) => {
   const uid = useId();
-  const reduce = useReducedMotion();
+  const reduce = useMidia('(prefers-reduced-motion: reduce)');
   const s = direction === 'left' ? -1 : 1;
   const A = actionWidth;
   const n = actions.length;
@@ -156,20 +158,29 @@ const SwipeRow: React.FC<SwipeRowProps> = ({
   const foldTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const heading = useRef<number | null>(null);
 
-  const x = useMotionValue(0);
-  const spread = useMotionValue(0);
-  const landed = useMotionValue(0);
+  const [x] = useState(() => new Valor(0));
+  const [spread] = useState(() => new Valor(0));
+  const [landed] = useState(() => new Valor(0));
   const commitPoint = () => Math.max(commitAt * w.current, D + A / 2);
   const canCommit = () => fullSwipe && n > 0 && commitPoint() <= w.current;
-  const exposed = useTransform(x, v => s * v);
-  const surfaceXf = useTransform(x, v => `translateX(${v}px)`);
-  const railXf = useTransform(exposed, (e: number) => `translateX(${-s * Math.max(0, D - e)}px)`);
-  const shift = useTransform([exposed, spread], ([e, p]: number[]) => p * Math.max(0, e - A));
-  const blockXf = useTransform(shift, v => `translateX(${s * v}px)`);
-  const glyphXf = useTransform(
-    [shift, landed],
-    ([v, l]: number[]) => `translateX(${-s * l * (v - (w.current - A) / 2)}px)`
-  );
+  const exposed = { get: () => s * x.get() };
+
+  // Os mesmos transforms derivados de antes, escritos direto no estilo a cada mudança.
+  const railRef = useRef<HTMLDivElement>(null);
+  const blockRef = useRef<HTMLDivElement>(null);
+  const glyphRef = useRef<HTMLButtonElement>(null);
+  const pintar = () => {
+    const e = exposed.get();
+    const shift = spread.get() * Math.max(0, e - A);
+    if (surface.current) surface.current.style.transform = `translateX(${x.get()}px)`;
+    if (railRef.current) railRef.current.style.transform = `translateX(${-s * Math.max(0, D - e)}px)`;
+    if (blockRef.current) blockRef.current.style.transform = `translateX(${s * shift}px)`;
+    if (glyphRef.current)
+      glyphRef.current.style.transform = `translateX(${-s * landed.get() * (shift - (w.current - A) / 2)}px)`;
+  };
+  x.aoMudar = spread.aoMudar = landed.aoMudar = pintar;
+  useLayoutEffect(pintar);
+  useEffect(() => () => [x, spread, landed].forEach(v => v.stop()), [x, spread, landed]);
 
   const map = (raw: number) => {
     const W = w.current;
@@ -217,12 +228,11 @@ const SwipeRow: React.FC<SwipeRowProps> = ({
   const settle = (target: number, v = 0) => {
     heading.current = target;
     if (reduce) {
-      animate(x, s * target, { duration: 0.2, ease: EASE_OUT });
+      void x.animar(s * target, { duration: 0.2, ease: EASE_OUT });
       return;
     }
     const flick = Math.abs(v) >= FLICK;
-    animate(
-      x,
+    void x.animar(
       s * target,
       flick
         ? { type: 'spring', duration: 0.4, bounce: snapBounce, velocity: s * clamp(v, -VMAX, VMAX) }
@@ -232,7 +242,7 @@ const SwipeRow: React.FC<SwipeRowProps> = ({
   const setSpread = (on: boolean) => {
     if ((spread.get() === 1) === on) return;
     if (reduce) spread.set(on ? 1 : 0);
-    else animate(spread, on ? 1 : 0, SPRING_UI);
+    else void spread.animar(on ? 1 : 0, SPRING_UI);
     if (on && primary) {
       setSay(`Solte para ${primary.label.toLowerCase()}`);
       if (haptic && grip.current?.touch) navigator.vibrate?.(8);
@@ -258,14 +268,14 @@ const SwipeRow: React.FC<SwipeRowProps> = ({
       if (viaKey) {
         x.set(s * w.current);
         fold();
-      } else animate(x, s * w.current, { duration: 0.2, ease: EASE_OUT }).then(fold);
+      } else void x.animar(s * w.current, { duration: 0.2, ease: EASE_OUT }).then(fold);
       return;
     }
     if (leap) {
-      if (spread.get() < 1) animate(spread, 1, SPRING_UI);
-      animate(landed, 1, SPRING_UI);
+      if (spread.get() < 1) void spread.animar(1, SPRING_UI);
+      void landed.animar(1, SPRING_UI);
     }
-    animate(x, s * w.current, { ...SPRING_UI, velocity: s * v }).then(fold);
+    void x.animar(s * w.current, { ...SPRING_UI, velocity: s * v }).then(fold);
   };
   useEffect(() => {
     if (openProp === undefined || grip.current || phase !== 'idle') return;
@@ -417,10 +427,10 @@ const SwipeRow: React.FC<SwipeRowProps> = ({
       }
     >
       <div className="swipe-row__clip">
-        <motion.div
+        <div
+          ref={railRef}
           id={railId}
           className="swipe-row__rail"
-          style={{ transform: railXf }}
           inert={!open || undefined}
           aria-hidden={!open}
         >
@@ -443,11 +453,11 @@ const SwipeRow: React.FC<SwipeRowProps> = ({
             </button>
           ))}
           {primary ? (
-            <motion.div className="swipe-row__block" style={{ transform: blockXf }}>
-              <motion.button
+            <div ref={blockRef} className="swipe-row__block">
+              <button
+                ref={glyphRef}
                 type="button"
                 className="swipe-row__action swipe-row__action--commit"
-                style={{ transform: glyphXf }}
                 onClick={e => act(primary, e)}
               >
                 <span className="swipe-row__glyph">
@@ -456,11 +466,11 @@ const SwipeRow: React.FC<SwipeRowProps> = ({
                   </span>
                   <span>{primary.label}</span>
                 </span>
-              </motion.button>
-            </motion.div>
+              </button>
+            </div>
           ) : null}
-        </motion.div>
-        <motion.div ref={surface} className="swipe-row__surface" style={{ transform: surfaceXf }} onPointerDown={down}>
+        </div>
+        <div ref={surface} className="swipe-row__surface" onPointerDown={down}>
           {children}
           <button
             type="button"
@@ -474,7 +484,7 @@ const SwipeRow: React.FC<SwipeRowProps> = ({
           >
             {n} {n === 1 ? 'ação' : 'ações'}
           </button>
-        </motion.div>
+        </div>
       </div>
       <span className="swipe-row__sr" aria-live="polite">
         {say}
