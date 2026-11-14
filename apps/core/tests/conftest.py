@@ -113,6 +113,7 @@ class FakeLLM:
         self,
         historico: list[dict[str, str]],
         resumo: str | None = None,
+        trechos: list[Any] | None = None,
     ) -> LLMAnswer:
         self.chamadas_responder.append((historico, resumo))
         if self.erro is not None:
@@ -260,6 +261,9 @@ def pg_url() -> str:
 @pytest.fixture(scope="session")
 def pg_engine(pg_url: str) -> Iterator[Engine]:
     engine = create_engine(_url_sqlalchemy(pg_url), poolclass=NullPool, future=True)
+    # A base de conhecimento usa `vector`: o Postgres de teste precisa do pgvector.
+    with engine.begin() as conexao:
+        conexao.exec_driver_sql("CREATE EXTENSION IF NOT EXISTS vector")
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     yield engine

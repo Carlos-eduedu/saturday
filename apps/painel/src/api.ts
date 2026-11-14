@@ -224,7 +224,31 @@ export interface Grafo {
   arestas: { de: string; para: string; condicional: boolean }[];
 }
 
-export type PapelModelo = "jev" | "llm" | "visao" | "transcricao";
+export type PapelModelo = "jev" | "llm" | "visao" | "transcricao" | "embeddings";
+
+export interface FonteConhecimento {
+  id: string;
+  titulo: string;
+  tipo: "texto" | "pdf" | "markdown" | "txt";
+  arquivo_nome: string | null;
+  tamanho: number;
+  status: "pendente" | "indexando" | "pronta" | "erro";
+  erro: string | null;
+  trechos: number;
+  modelo: string | null;
+  desatualizada: boolean;
+  autor: string | null;
+  criada_em: string;
+  atualizada_em: string;
+  indexada_em: string | null;
+  editavel: boolean;
+}
+
+export interface BaseConhecimento {
+  fontes: FonteConhecimento[];
+  modelo_embeddings: string;
+  pode_editar: boolean;
+}
 
 export interface ModeloDoCatalogo {
   id: string;
@@ -529,6 +553,17 @@ export function enviarAnexo(id: string, arquivo: Blob, nome: string, legenda: st
   }).then((r) => responder<{ mensagem_id: number }>(r));
 }
 
+// Fonte da base de conhecimento: arquivo cru no corpo, como o anexo.
+export function enviarFonte(arquivo: File, titulo: string) {
+  const params = new URLSearchParams({ titulo, nome: arquivo.name });
+  return buscar(`/admin/agente/conhecimento/arquivo?${params}`, {
+    method: "POST",
+    headers: { "X-CSRF-Token": csrf, "Content-Type": arquivo.type || "application/octet-stream" },
+    body: arquivo,
+    credentials: "same-origin",
+  }).then((r) => responder<{ id: string }>(r));
+}
+
 // Espelha `painel/midia.py`: tipos aceitos e limite de cada um, em bytes.
 const MB = 1024 * 1024;
 export const ANEXOS_ACEITOS: Record<string, number> = {
@@ -596,6 +631,14 @@ export const api = {
   testarModelo: (papel: PapelModelo, modelo: string, texto: string) =>
     chamar<ResultadoTeste>("POST", "/agente/modelos/testar", { papel, modelo, texto }),
   versoesAgente: () => chamar<VersaoAgente[]>("GET", "/agente/versoes"),
+  conhecimento: () => chamar<BaseConhecimento>("GET", "/agente/conhecimento"),
+  adicionarTexto: (titulo: string, texto: string) =>
+    chamar<{ id: string }>("POST", "/agente/conhecimento/texto", { titulo, texto }),
+  editarFonte: (id: string, dados: { titulo?: string; texto?: string }) =>
+    chamar<void>("PATCH", `/agente/conhecimento/${id}`, dados),
+  reindexarFonte: (id: string) => chamar<void>("POST", `/agente/conhecimento/${id}/reindexar`),
+  reindexarTodas: () => chamar<{ fontes: number }>("POST", "/agente/conhecimento/reindexar"),
+  removerFonte: (id: string) => chamar<void>("DELETE", `/agente/conhecimento/${id}`),
   salvarVersao: (
     versao_base: number | null,
     modelos: Partial<Record<PapelModelo, string>>,

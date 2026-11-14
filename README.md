@@ -46,6 +46,10 @@ situação, duração, erro (só o nome da exceção) e o caminho no grafo, e tr
 modelo de cada etapa em versões com histórico, catálogo da OpenRouter (fonte e
 data à vista), comparação e teste
 ([decisão 0016](docs/decisoes/0016-modelos-do-agente-versionados-no-banco.md)).
+A base de conhecimento (texto, PDF, Markdown, TXT) é indexada pelo worker com
+embeddings da OpenRouter em pgvector e entra no prompt ao lado da FAQ fixa
+([decisão 0017](docs/decisoes/0017-base-de-conhecimento-com-pgvector.md)); o
+Postgres precisa da imagem `pgvector/pgvector:pg17`.
 No compositor da conversa, o botão de atalhos edita a ficha (nome, nascimento,
 sexo, e-mail, celular, CPF e conta, com auditoria só dos nomes dos campos; o CPF
 trava depois da consulta e a conta depois da proposta), envia modelo e exporta

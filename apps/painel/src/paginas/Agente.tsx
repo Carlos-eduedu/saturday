@@ -14,9 +14,10 @@ import { ItemTurno } from "../componentes/ItemTurno";
 import { Vazio } from "../componentes/Vazio";
 import { NOS, rotulo } from "../rotulos";
 import { useAvisos } from "../tempoReal";
+import { AbaConhecimento } from "./AgenteConhecimento";
 import { AbaModelos, AbaVersoes } from "./AgenteModelos";
 
-type Aba = "grafo" | "execucoes" | "modelos" | "versoes";
+type Aba = "grafo" | "execucoes" | "modelos" | "conhecimento" | "versoes";
 const INICIO = "__start__";
 const FIM = "__end__";
 
@@ -48,6 +49,7 @@ export function Agente() {
           ["grafo", "Grafo"],
           ["execucoes", "Execuções"],
           ["modelos", "Modelos"],
+          ["conhecimento", "Conhecimento"],
           ["versoes", "Versões"],
         ]}
         valor={aba}
@@ -70,6 +72,7 @@ export function Agente() {
           />
         ))}
       {aba === "modelos" && <AbaModelos />}
+      {aba === "conhecimento" && <AbaConhecimento />}
       {aba === "versoes" && <AbaVersoes />}
       {aba === "execucoes" && (
         <ListaExecucoes

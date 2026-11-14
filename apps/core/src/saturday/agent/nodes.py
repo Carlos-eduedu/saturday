@@ -196,10 +196,13 @@ def classify_intent(state: AgentState, runtime: Runtime[AgentContext]) -> dict[s
 def generate_answer(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
     """Responde a dúvida pelo LLM, ancorado na FAQ; sem resposta segura, vai para handoff."""
 
+    conhecimento = runtime.context.conhecimento
+    trechos = conhecimento.buscar(state.get("user_message", "")) if conhecimento else []
     try:
         resposta = runtime.context.llm.responder(
             _historico(state),
             _resumo_portabilidade(state),
+            trechos,
         )
     except Exception:
         return {

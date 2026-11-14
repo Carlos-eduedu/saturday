@@ -90,7 +90,8 @@ Na ordem. Cada passo de escrita no Dokploy (criar, editar, deploy) segue a
    domínios: sem o DNS, o certificado não sai.
 2. **Rede de dados.** No Dokploy, crie a rede `saturday-<amb>-dados` (overlay,
    attachable) e sincronize com o Docker.
-3. **Postgres.** Crie `saturday-postgres-<amb>` (imagem `postgres:17-alpine`,
+3. **Postgres.** Crie `saturday-postgres-<amb>` (imagem `pgvector/pgvector:pg17`, que a
+   base de conhecimento exige — decisão 0017;
    banco e usuário `saturday`, senha só com letras e números) no ambiente do
    projeto `Saturday`. Em Networks, ligue-o à rede do passo 2 e faça o deploy do
    banco. Anote o host interno: é o `appName` que o Dokploy devolve, com um

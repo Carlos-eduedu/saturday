@@ -17,13 +17,18 @@ from typing import Annotated, Any
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import select, text
+from sqlalchemy import select, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.agente_config import PAPEIS, Modelos, do_ambiente, versao_vigente
 from saturday.dados import repositorios
-from saturday.dados.modelos import CatalogoModelos, ConfigAgente, UsuarioPainel
+from saturday.dados.modelos import (
+    CatalogoModelos,
+    ConfigAgente,
+    FonteConhecimento,
+    UsuarioPainel,
+)
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.metrics import iniciar_metricas
 from saturday.painel.auditoria import auditar
@@ -240,6 +245,9 @@ def testar(dados: Teste, request: Request, usuario: GestorCsrf, fabrica: Fabrica
         raise HTTPException(status_code=422, detail="id de modelo inválido")
     if dados.papel == "transcricao":
         raise HTTPException(status_code=422, detail="o teste de transcrição precisa de áudio")
+    if dados.papel == "embeddings":
+        # Testa-se pela busca: reindexe uma fonte e pergunte na conversa.
+        raise HTTPException(status_code=422, detail="embeddings não respondem a mensagem")
 
     settings = get_settings(request)
     http: httpx.Client = request.app.state.http
@@ -387,6 +395,13 @@ def _gravar(
         for papel, valor in modelos.items()
         if anteriores.get(papel) != valor
     }
+    if "embeddings" in mudou:
+        # Vetores de modelos diferentes não se comparam: tudo volta para a fila.
+        sessao.execute(
+            update(FonteConhecimento)
+            .where(FonteConhecimento.status != "pendente")
+            .values(status="pendente", erro=None)
+        )
     auditar(
         sessao,
         usuario.id,

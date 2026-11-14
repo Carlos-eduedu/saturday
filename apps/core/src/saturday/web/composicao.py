@@ -27,6 +27,7 @@ from saturday.canais.evolution.saida import SaidaEvolution
 from saturday.canais.whatsapp.cliente import WhatsAppClient
 from saturday.canais.whatsapp.entrada import EntradaWhatsApp
 from saturday.canais.whatsapp.saida import SaidaWhatsApp
+from saturday.conhecimento import Conhecimento
 from saturday.fontes.brasilapi import BrasilAPI
 from saturday.services.anexos import AnexosClient
 from saturday.services.jev import JevClient
@@ -59,6 +60,7 @@ def criar_contexto(
         brasilapi=BrasilAPI(http, fabrica) if granatech is not None else None,
         fabrica=fabrica,
         dominio_publico=settings.dominio_publico,
+        conhecimento=Conhecimento(http, settings, fabrica, modelos) if fabrica else None,
     )
 
 

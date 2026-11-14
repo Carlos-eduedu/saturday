@@ -44,7 +44,7 @@ echo "Formato do backup: $FORMATO"
 
 docker run -d --rm --name "$NOME" \
   -e POSTGRES_USER=saturday -e POSTGRES_PASSWORD=restauracao -e POSTGRES_DB=saturday \
-  postgres:17-alpine >/dev/null
+  pgvector/pgvector:pg17 >/dev/null
 for _ in $(seq 1 60); do
   docker exec "$NOME" pg_isready -U saturday -d saturday >/dev/null 2>&1 && break
   sleep 1

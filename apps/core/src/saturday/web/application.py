@@ -14,6 +14,7 @@ from saturday.web.api import (
     agente_modelos,
     canais,
     chat,
+    conhecimento,
     conversas,
     evolution,
     granatech,
@@ -62,6 +63,7 @@ def get_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(ia.router)
     app.include_router(agente.router)
     app.include_router(agente_modelos.router)
+    app.include_router(conhecimento.router)
     app.include_router(respostas.router)
     webhooks.documentar_webhook(app)
 

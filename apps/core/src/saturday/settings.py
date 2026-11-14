@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     llm_model: str = ""
     vision_model: str = ""
     jev_model: str = "typesafe/jev-1.13"
+    # Embeddings da base de conhecimento (OpenRouter `/api/v1/embeddings`).
+    embeddings_model: str = "openai/text-embedding-3-small"
     webhook_url: str = ""
     webhook_secret: SecretStr = SecretStr("")
     anexo_dominios: Annotated[list[str], NoDecode] = Field(default_factory=list)

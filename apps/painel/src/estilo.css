@@ -904,6 +904,22 @@ main {
 .resultado-teste dl { display: grid; grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr)); gap: 0.4rem; margin: 0; }
 .resultado-teste dt { font-size: 0.75rem; color: var(--suave); }
 .resultado-teste dd { margin: 0; }
+.conhecimento { display: flex; flex-direction: column; gap: 1rem; }
+.nova-fonte h2 { margin: 0; font-size: 1.1rem; }
+.nova-fonte label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; color: var(--suave); }
+.nova-fonte .escolha { display: flex; flex-wrap: wrap; gap: 0.25rem 1.25rem; }
+.nova-fonte .opcao { flex-direction: row; align-items: center; gap: 0.5rem; min-height: var(--alvo); color: var(--texto); }
+.nova-fonte > button { align-self: flex-start; }
+.fontes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.fonte { display: flex; flex-direction: column; gap: 0.4rem; padding: 0.85rem 1rem; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio-m); }
+.fonte p { margin: 0; }
+.fonte.fonte-erro { border-color: var(--erro); }
+.fonte-topo { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.75rem; }
+.status-fonte { margin-left: auto; font-size: 0.8rem; font-weight: 600; color: var(--suave); }
+.status-fonte.pronta { color: var(--ia); }
+.status-fonte.erro { color: var(--erro); }
+.status-fonte.indexando, .status-fonte.pendente { color: var(--handoff); }
+.fonte-acoes { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .execucoes-filtros { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem; }
 .execucoes-filtros label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.8rem; color: var(--suave); }
 .ao-vivo { margin-left: auto; display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: var(--ia); font-weight: 600; }

@@ -14,6 +14,7 @@ import time
 
 import httpx
 
+from saturday.conhecimento import Conhecimento
 from saturday.dados.sessao import criar_engine, criar_factory
 from saturday.health import registrar_batimento
 from saturday.jobs import alertas, recontatos
@@ -71,6 +72,7 @@ def rodar(settings: Settings, parar: threading.Event) -> None:
             entregadores["evolution"] = evolution.saida
         entregador = EntregadorPorCanal(entregadores)
         rodadas = Rodadas(fabrica, settings, parar)
+        conhecimento = Conhecimento(http, settings, fabrica)
 
         logger.info("worker_iniciado")
         proxima_verificacao = 0.0
@@ -90,6 +92,8 @@ def rodar(settings: Settings, parar: threading.Event) -> None:
                 )
                 entregues = drenar(fabrica, entregador, settings)
                 rodadas.verificar()
+                # Uma fonte por volta: indexar não atrasa a entrega das mensagens.
+                indexou = conhecimento.indexar_pendente(storage)
                 if time.monotonic() >= proxima_verificacao:
                     alertas.verificar(fabrica, servico)
                     recontatos.disparar(fabrica, servico)
@@ -98,7 +102,7 @@ def rodar(settings: Settings, parar: threading.Event) -> None:
                 logger.exception("worker_erro_no_lote")
                 parar.wait(INTERVALO_OCIOSO_S)
                 continue
-            if not eventos and not entregues:
+            if not eventos and not entregues and not indexou:
                 parar.wait(INTERVALO_OCIOSO_S)
 
     if pool is not None:

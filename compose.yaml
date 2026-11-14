@@ -90,7 +90,8 @@ services:
     cpus: 0.25
 
   postgres:
-    image: postgres:17-alpine
+    # pgvector: a base de conhecimento guarda embeddings (decisão 0017).
+    image: pgvector/pgvector:pg17
     profiles: ["postgres"]
     environment:
       POSTGRES_DB: saturday

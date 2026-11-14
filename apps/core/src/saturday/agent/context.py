@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import Session, sessionmaker
 
     from saturday.bancos.granatech.cliente import ClienteGranatech
+    from saturday.conhecimento import Conhecimento
     from saturday.fontes.brasilapi import BrasilAPI
 
 
@@ -32,3 +33,5 @@ class AgentContext:
     fabrica: sessionmaker[Session] | None = None
     # Domínio dos links curtos da biometria (`SATURDAY_DOMINIO_PUBLICO`).
     dominio_publico: str = ""
+    # Base de conhecimento (RAG) do nó de respostas; sem banco, só a FAQ fixa.
+    conhecimento: Conhecimento | None = None

@@ -235,7 +235,13 @@ function CartaoPapel({
   const latencia = dados.latencia[valor];
   const usaCatalogo = papel.do_catalogo && opcoes.length > 0;
   const provedor =
-    papel.papel === "jev" ? "OpenRouter Decisions" : papel.papel === "transcricao" ? dados.transcricao_provedor : null;
+    papel.papel === "jev"
+      ? "OpenRouter Decisions"
+      : papel.papel === "transcricao"
+        ? dados.transcricao_provedor
+        : papel.papel === "embeddings"
+          ? "OpenRouter Embeddings; trocar manda reindexar todas as fontes"
+          : null;
 
   return (
     <section className={valor !== papel.modelo ? "papel-modelo alterado" : "papel-modelo"}>
@@ -317,7 +323,7 @@ function CartaoPapel({
           </dd>
         </div>
       </dl>
-      {dados.pode_testar && papel.papel !== "transcricao" && valor && (
+      {dados.pode_testar && !["transcricao", "embeddings"].includes(papel.papel) && valor && (
         <button type="button" onClick={testar}>
           Testar {valor === papel.modelo ? "este modelo" : "antes de salvar"}
         </button>

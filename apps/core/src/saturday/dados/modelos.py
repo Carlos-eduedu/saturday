@@ -34,6 +34,7 @@ from sqlalchemy import false as sa_false
 from sqlalchemy import true as sa_true
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.types import UserDefinedType
 
 from saturday.dados.base import Base
 
@@ -522,3 +523,74 @@ class CatalogoModelos(Base):
     fonte: Mapped[str] = mapped_column(Text, nullable=False)
     modelos: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
     buscado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
+
+
+class Vetor(UserDefinedType[list[float]]):
+    """Coluna `vector` do pgvector, sem dimensão fixa: cada trecho guarda o modelo
+    que o gerou, e a busca só compara trechos do modelo vigente."""
+
+    cache_ok = True
+
+    def get_col_spec(self, **_kw: Any) -> str:
+        return "vector"
+
+    def bind_processor(self, _dialect: Any) -> Any:
+        def processar(valor: list[float] | None) -> str | None:
+            return None if valor is None else "[" + ",".join(repr(float(x)) for x in valor) + "]"
+
+        return processar
+
+    def bind_expression(self, bindvalue: Any) -> Any:
+        return func.cast(bindvalue, self)
+
+    def result_processor(self, _dialect: Any, _coltype: Any) -> Any:
+        def processar(valor: str | None) -> list[float] | None:
+            return None if valor is None else [float(x) for x in valor.strip("[]").split(",")]
+
+        return processar
+
+
+class FonteConhecimento(Base):
+    """Fonte da base de conhecimento: texto digitado no painel ou arquivo (PDF, MD, TXT).
+
+    O arquivo fica no storage privado (``arquivo_chave``); o texto extraído vira
+    trechos com embedding. ``status``: pendente → indexando → pronta | erro.
+    """
+
+    __tablename__ = "fontes_conhecimento"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    titulo: Mapped[str] = mapped_column(String(120), nullable=False)
+    tipo: Mapped[str] = mapped_column(String(16), nullable=False)
+    texto: Mapped[str | None] = mapped_column(Text)
+    arquivo_chave: Mapped[str | None] = mapped_column(Text)
+    arquivo_nome: Mapped[str | None] = mapped_column(String(200))
+    tamanho: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pendente", index=True)
+    # Só o tipo do erro e uma frase nossa, nunca o conteúdo.
+    erro: Mapped[str | None] = mapped_column(String(200))
+    trechos: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    modelo: Mapped[str | None] = mapped_column(String(128))
+    autor_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("usuarios_painel.id", ondelete="SET NULL")
+    )
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
+    atualizada_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=AGORA, onupdate=AGORA
+    )
+    indexada_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class TrechoConhecimento(Base):
+    """Pedaço de uma fonte com o embedding e o modelo que o gerou."""
+
+    __tablename__ = "trechos_conhecimento"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    fonte_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("fontes_conhecimento.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    ordem: Mapped[int] = mapped_column(Integer, nullable=False)
+    texto: Mapped[str] = mapped_column(Text, nullable=False)
+    embedding: Mapped[list[float]] = mapped_column(Vetor(), nullable=False)
+    modelo: Mapped[str] = mapped_column(String(128), nullable=False)

@@ -35,6 +35,9 @@ uv run --project simuladores/meta uvicorn app:app --app-dir simuladores/meta --p
   (trava, outbox, poda de checkpoints, retenção) são pulados — rode-os antes de
   dar uma fase por pronta.
 - mypy é `strict` e só cobre `src/saturday`.
+- O Postgres de teste precisa do pgvector (decisão 0017): o `postgres` do
+  compose usa `pgvector/pgvector:pg17`; um container antigo em
+  `postgres:17-alpine` faz os testes de banco falharem em `CREATE EXTENSION`.
 - Há `.env` e `.env.backup` reais na raiz: não leia. Use o `.env.example`.
 
 ## Worktrees

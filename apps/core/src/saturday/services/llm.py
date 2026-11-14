@@ -11,6 +11,7 @@ from typing import Any
 import httpx
 
 from saturday.agente_config import Modelos
+from saturday.conhecimento import Trecho
 from saturday.faq import FAQ
 from saturday.metrics import registrar_chamada, uso_do_payload
 from saturday.services.anexos import Anexo
@@ -32,7 +33,7 @@ class LLMAnswer:
     resolvido: bool
 
 
-def _system_prompt(resumo: str | None) -> str:
+def _system_prompt(resumo: str | None, trechos: list[Trecho] | None = None) -> str:
     partes = [
         "Você é o assistente virtual da MEX, especializado em portabilidade de "
         "empréstimos consignados. Responda em português do Brasil, de forma curta "
@@ -46,6 +47,12 @@ def _system_prompt(resumo: str | None) -> str:
         '{"resposta": "texto", "resolvido": true}.',
         "FAQ:\n" + FAQ,
     ]
+    if trechos:
+        # Recuperados da base de conhecimento pela pergunta: valem como a FAQ.
+        partes.append(
+            "Trechos da base de conhecimento (valem como a FAQ; use só o que está escrito):\n"
+            + "\n\n".join(f"[{t.titulo}]\n{t.texto}" for t in trechos)
+        )
     if resumo:
         partes.append("Resumo da análise de portabilidade:\n" + resumo)
     return "\n\n".join(partes)
@@ -220,6 +227,7 @@ class LLMClient:
         self,
         historico: list[dict[str, str]],
         resumo: str | None = None,
+        trechos: list[Trecho] | None = None,
     ) -> LLMAnswer:
         """Responde a dúvida do cliente. Levanta ``LLMError`` em qualquer falha."""
 
@@ -229,7 +237,9 @@ class LLMClient:
         if not modelo:
             raise LLMError("LLM não configurado")
 
-        mensagens: list[dict[str, Any]] = [{"role": "system", "content": _system_prompt(resumo)}]
+        mensagens: list[dict[str, Any]] = [
+            {"role": "system", "content": _system_prompt(resumo, trechos)}
+        ]
         mensagens.extend(historico)
 
         payload = {

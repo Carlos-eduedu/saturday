@@ -44,6 +44,10 @@ PAPEIS: dict[str, Papel] = {
     "llm": Papel("Respostas pela FAQ", "generate_answer", "llm_model", True),
     "visao": Papel("Leitura do extrato (visão)", "read_statement", "vision_model", True, "image"),
     "transcricao": Papel("Transcrição de áudio", None, "transcricao_modelo", False),
+    # Trocar o modelo de embeddings manda reindexar todas as fontes.
+    "embeddings": Papel(
+        "Busca na base de conhecimento (embeddings)", "generate_answer", "embeddings_model", False
+    ),
 }
 
 
