@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
-import { type Alerta, api } from "../api";
+import { type Alerta, api, mensagemDeFalha } from "../api";
 import { Falha } from "../componentes/Falha";
 import { Vazio } from "../componentes/Vazio";
 import { useAvisos } from "../tempoReal";
@@ -32,7 +32,7 @@ export function Alertas() {
         setErro("");
       })
       .catch((e: unknown) =>
-        setErro(e instanceof Error ? e.message : "Não deu para carregar os alertas."),
+        setErro(mensagemDeFalha(e, "carregar os alertas")),
       );
   }, []);
   useEffect(carregar, [carregar]);
@@ -45,7 +45,7 @@ export function Alertas() {
       await api.resolverAlerta(id);
     } catch (e) {
       setErro(
-        e instanceof Error ? `Não deu para resolver: ${e.message}` : "Não deu para resolver.",
+        mensagemDeFalha(e, "resolver o alerta"),
       );
     }
     setResolvendo(null);

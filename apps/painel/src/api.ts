@@ -467,6 +467,16 @@ export class ErroApi extends Error {
   }
 }
 
+/** O que mostrar na tela quando uma chamada falha. A recusa do servidor já vem
+ *  em português; falha de rede chega como `TypeError: Failed to fetch` — que não
+ *  vai para a tela do atendente. */
+export function mensagemDeFalha(erro: unknown, acao?: string): string {
+  if (erro instanceof ErroApi) return erro.message;
+  return acao
+    ? `Não consegui ${acao}: o servidor não respondeu. Confira a conexão e tente de novo.`
+    : "Não consegui falar com o servidor. Confira a conexão e tente de novo.";
+}
+
 let csrf = "";
 
 export function guardarCsrf(token: string): void {

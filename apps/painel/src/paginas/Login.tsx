@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from "react";
-import { api, type Eu } from "../api";
+import { api, ErroApi, type Eu } from "../api";
 
 export function Login({ aoEntrar }: { aoEntrar: (eu: Eu) => void }) {
   const [email, setEmail] = useState("");
@@ -13,8 +13,15 @@ export function Login({ aoEntrar }: { aoEntrar: (eu: Eu) => void }) {
     setErro("");
     try {
       aoEntrar(await api.entrar(email, senha));
-    } catch {
-      setErro("E-mail ou senha inválidos.");
+    } catch (e) {
+      // A API responde 401 para qualquer recusa, de propósito: não entrega se o
+      // e-mail existe. Falha de rede ou 5xx é outra coisa — dizer "senha
+      // inválida" ali manda a pessoa tentar de novo com a senha certa.
+      setErro(
+        e instanceof ErroApi
+          ? "E-mail ou senha inválidos."
+          : "Não consegui falar com o servidor. Confira a conexão e tente de novo.",
+      );
     } finally {
       setEnviando(false);
     }

@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { App } from "./App";
+import { FalhaDeTela } from "./componentes/FalhaDeTela";
 // Fontes servidas pelo próprio painel: nada de Google Fonts (dados de clientes na tela).
 import "@fontsource-variable/red-hat-display";
 import "@fontsource-variable/red-hat-text";
@@ -12,7 +13,9 @@ import "./estilo.css";
 createRoot(document.getElementById("raiz")!).render(
   <StrictMode>
     <BrowserRouter>
-      <App />
+      <FalhaDeTela>
+        <App />
+      </FalhaDeTela>
     </BrowserRouter>
   </StrictMode>,
 );

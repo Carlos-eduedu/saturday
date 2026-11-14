@@ -1,5 +1,5 @@
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
-import { api } from "../api";
+import { api, mensagemDeFalha } from "../api";
 
 // Assumir e devolver valem na hora, na lista e na conversa; por 5 s o aviso
 // deixa desfazer, e a API devolve a conversa ao estado de antes.
@@ -43,7 +43,7 @@ export function AvisoDesfazer({ children }: { children: ReactNode }) {
       await api.desfazer(atual.id);
       setAviso(null);
     } catch (e) {
-      const motivo = e instanceof Error ? e.message : "tente de novo";
+      const motivo = mensagemDeFalha(e, "desfazer");
       setAviso({ ...atual, texto: `Não deu para desfazer: ${motivo}`, falhou: true });
     }
     atual.depois();

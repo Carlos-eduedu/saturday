@@ -1,6 +1,6 @@
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Vazio } from "../componentes/Vazio";
-import { api, type Eu, ErroApi, type Perfil, type UsuarioGestao } from "../api";
+import { api, type Eu, ErroApi, type Perfil, mensagemDeFalha, type UsuarioGestao } from "../api";
 import { Falha } from "../componentes/Falha";
 
 // Aba Usuários (decisão 0012), só para gestor: cadastrar, editar, redefinir
@@ -11,10 +11,6 @@ import { Falha } from "../componentes/Falha";
 const SENHA_MINIMA = 12;
 
 const ROTULO_PERFIL: Record<Perfil, string> = { atendente: "Atendente", gestor: "Gestor" };
-
-function mensagemDe(erro: unknown): string {
-  return erro instanceof ErroApi ? erro.message : "falha inesperada";
-}
 
 function situacao(u: UsuarioGestao): string {
   if (u.situacao === "bloqueado" && u.bloqueado_ate) {
@@ -37,7 +33,7 @@ export function Usuarios({ eu }: { eu: Eu }) {
     api
       .gestaoUsuarios()
       .then(setUsuarios)
-      .catch((e: unknown) => setErro(mensagemDe(e)));
+      .catch((e: unknown) => setErro(mensagemDeFalha(e)));
   }, []);
   useEffect(carregar, [carregar]);
 
@@ -49,7 +45,7 @@ export function Usuarios({ eu }: { eu: Eu }) {
       setAviso(feito);
       return true;
     } catch (e) {
-      setErro(mensagemDe(e));
+      setErro(mensagemDeFalha(e));
       return false;
     } finally {
       carregar();
