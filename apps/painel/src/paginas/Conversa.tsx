@@ -14,7 +14,8 @@ import {
   type Trilha,
   type Usuario,
 } from "../api";
-import { confirmarTomada, textoDoAviso, useAvisoDesfazer } from "../componentes/Desfazer";
+import { useConfirmar } from "../componentes/Confirmar";
+import { pedidoDeTomada, textoDoAviso, useAvisoDesfazer } from "../componentes/Desfazer";
 import { Abas } from "../componentes/Abas";
 import { Compositor } from "../componentes/Compositor";
 import { Falha } from "../componentes/Falha";
@@ -125,6 +126,7 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
       .catch(() => undefined);
   }, []);
   const avisar = useAvisoDesfazer();
+  const confirmar = useConfirmar();
   // Assumir pelo cabeçalho leva o cursor para a mensagem.
   const [focarEnvio, setFocarEnvio] = useState(false);
   // Assumir, devolver e transferir em andamento: o duplo clique não repete.
@@ -145,8 +147,13 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
   const dono = usuarios.find((u) => u.id === conversa.atendente_id)?.nome ?? "outra pessoa";
 
   // Assumir e devolver valem na hora; o aviso deixa desfazer por 5 s.
-  function mudar(acao: "assumir" | "devolver") {
-    if (acao === "assumir" && conversa?.atendimento === "assumida" && !confirmarTomada(dono)) return;
+  async function mudar(acao: "assumir" | "devolver") {
+    if (
+      acao === "assumir" &&
+      conversa?.atendimento === "assumida" &&
+      !(await confirmar(pedidoDeTomada(dono)))
+    )
+      return;
     setFocarEnvio(acao === "assumir");
     void agirUmaVez(async () => {
       await (acao === "assumir" ? api.assumir(id) : api.devolver(id));

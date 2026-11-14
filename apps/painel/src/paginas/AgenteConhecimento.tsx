@@ -151,7 +151,7 @@ export function AbaConhecimento() {
                     Reindexar
                   </button>
                   <button type="button" className="perigo" onClick={() => setRemovendo(f)}>
-                    Remover
+                    Apagar
                   </button>
                 </div>
               )}
@@ -172,7 +172,7 @@ export function AbaConhecimento() {
       )}
       {removendo && (
         <Dialogo
-          titulo={`Remover “${removendo.titulo}”`}
+          titulo={`Apagar “${removendo.titulo}”?`}
           aoFechar={() => setRemovendo(null)}
           rodape={
             <>
@@ -185,10 +185,10 @@ export function AbaConhecimento() {
                 onClick={() => {
                   const alvo = removendo;
                   setRemovendo(null);
-                  agir(() => api.removerFonte(alvo.id), `“${alvo.titulo}” foi removida.`);
+                  agir(() => api.removerFonte(alvo.id), `“${alvo.titulo}” foi apagada.`);
                 }}
               >
-                Remover
+                Apagar
               </button>
             </>
           }
@@ -280,7 +280,7 @@ function NovaFonte({ criada }: { criada: () => void }) {
         </p>
       )}
       <button type="submit" disabled={enviando}>
-        {enviando ? "Enviando…" : "Adicionar e indexar"}
+        {enviando ? "Adicionando…" : "Adicionar e indexar"}
       </button>
     </form>
   );

@@ -11,7 +11,8 @@ import { Link, useNavigate } from "react-router";
 import { api, type Eu, mensagemDeFalha, type Resumo, type Usuario } from "../api";
 import { AiChat02Icon, UserCheck01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { confirmarTomada, textoDoAviso, useAvisoDesfazer } from "../componentes/Desfazer";
+import { useConfirmar } from "../componentes/Confirmar";
+import { pedidoDeTomada, textoDoAviso, useAvisoDesfazer } from "../componentes/Desfazer";
 import SwipeRow, { type SwipeAction } from "../componentes/SwipeRow";
 import { Falha } from "../componentes/Falha";
 import { Vazio } from "../componentes/Vazio";
@@ -180,6 +181,7 @@ export function Inbox({
 
   // Assumir e devolver valem na hora; o aviso deixa desfazer por 5 s.
   const avisar = useAvisoDesfazer();
+  const confirmar = useConfirmar();
   const [agindo, setAgindo] = useState("");
   // O SwipeRow que dobrou só volta remontado: a versão entra na chave.
   const [versao, setVersao] = useState(0);
@@ -187,7 +189,7 @@ export function Inbox({
   async function agir(c: Resumo, acao: Acao) {
     if (agindo) return;
     const deOutro = acao === "assumir" && c.atendimento === "assumida" && c.atendente_id !== eu.id;
-    if (deOutro && !confirmarTomada(nomeDe(c.atendente_id))) {
+    if (deOutro && !(await confirmar(pedidoDeTomada(nomeDe(c.atendente_id))))) {
       setVersao((v) => v + 1);
       return;
     }
@@ -373,7 +375,7 @@ export function Inbox({
                         disabled={esperando}
                         onClick={() => agir(c, acao)}
                       >
-                        {esperando ? "Aguarde…" : ACOES[acao].label}
+                        {esperando ? (acao === "assumir" ? "Assumindo…" : "Devolvendo…") : ACOES[acao].label}
                       </button>
                     </span>
                   </SwipeRow>

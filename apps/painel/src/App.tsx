@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, Navigate, Route, Routes, useLocation } from "react-router";
 import { api, type Cota, type Eu, ErroApi, guardarCsrf, SESSAO_EXPIRADA } from "./api";
+import { ConfirmarProvider } from "./componentes/Confirmar";
 import { Falha } from "./componentes/Falha";
 import { Alertas } from "./paginas/Alertas";
 import { Canais } from "./paginas/Canais";
@@ -158,6 +159,7 @@ function Logado({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
         }
       />
       <main>
+        <ConfirmarProvider>
         <Routes>
           <Route path="/" element={<Caixa eu={eu} />} />
           <Route path="/conversas/:id" element={<Caixa eu={eu} />} />
@@ -169,6 +171,7 @@ function Logado({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
           {eu.perfil === "gestor" && <Route path="/custos" element={<Custos />} />}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
+        </ConfirmarProvider>
       </main>
     </div>
   );

@@ -1,5 +1,7 @@
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { Cancel01Icon, CancelCircleIcon, CheckmarkCircle02Icon, Download04Icon } from "@hugeicons/core-free-icons";
+import { useConfirmar } from "../componentes/Confirmar";
+import { Dialogo } from "../componentes/Dialogo";
+import { CancelCircleIcon, CheckmarkCircle02Icon, Download04Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "react-router";
 import LatticeLoader, { type StatusLattice } from "../componentes/LatticeLoader";
@@ -95,7 +97,7 @@ export function Granatech({ eu }: { eu: Eu }) {
     if (emAndamento.current) return;
     emAndamento.current = true;
     setErro("");
-    setAviso("Aguarde…");
+    setAviso("Falando com a Granatech…");
     acao()
       .then((r) => setAviso(typeof feito === "string" ? feito : feito(r)))
       .catch((e: unknown) => {
@@ -193,6 +195,7 @@ const SITUACAO: Record<SituacaoRodada, string> = {
 };
 
 function Homologacao() {
+  const confirmar = useConfirmar();
   const [dados, setDados] = useState<DadosHomologacao | null>(null);
   const [indisponivel, setIndisponivel] = useState(false);
   const [aberta, setAberta] = useState<number | null>(null);
@@ -224,14 +227,29 @@ function Homologacao() {
   );
 
   if (indisponivel) return null;
-  if (!dados) return erro ? <p className="erro">{erro}</p> : null;
+  if (!dados)
+    return (
+      <section>
+        <h2>Homologação</h2>
+        {erro ? (
+          <Falha titulo="Não deu para carregar a homologação." texto={erro} aoTentar={carregar} />
+        ) : (
+          <p className="centro">Carregando…</p>
+        )}
+      </section>
+    );
 
   const ocupada = dados.rodadas.some((r) => r.situacao === "pendente" || r.situacao === "em_andamento");
 
-  function gerar(fase: 1 | 2) {
+  async function gerar(fase: 1 | 2) {
     const n = dados?.consultas_por_fase[String(fase)] ?? fase;
     const plural = n === 1 ? "1 consulta" : `${n} consultas`;
-    if (!window.confirm(`Isso abre ${plural} na api-dev e leva até 30 min. Continuar?`)) return;
+    const ok = await confirmar({
+      titulo: `Gerar a Fase ${fase}?`,
+      texto: `Isso abre ${plural} na api-dev e leva até 30 min.`,
+      acao: "Gerar",
+    });
+    if (!ok) return;
     setErro("");
     api
       .pedirRodada(fase)
@@ -411,64 +429,54 @@ function SituacaoAoVivo({ rodada }: { rodada: RodadaDetalhe }) {
 }
 
 function DetalheRodada({ id, versao, aoFechar }: { id: number; versao: number; aoFechar: () => void }) {
-  const dialogo = useRef<HTMLDialogElement>(null);
   const [rodada, setRodada] = useState<RodadaDetalhe | null>(null);
   const [erro, setErro] = useState("");
-
-  useEffect(() => {
-    dialogo.current?.showModal();
-  }, []);
+  // Muda a cada "Tentar de novo": refaz a busca mesmo sem aviso novo.
+  const [tentativa, setTentativa] = useState(0);
 
   useEffect(() => {
     api
       .rodada(id)
-      .then(setRodada)
+      .then((r) => {
+        setErro("");
+        setRodada(r);
+      })
       .catch((e: unknown) => setErro(mensagemDe(e)));
-  }, [id, versao]);
-
-  const fechar = () => dialogo.current?.close();
+  }, [id, versao, tentativa]);
 
   return (
-    // O <dialog> não tem padding: clique direto nele é clique no fundo.
-    <dialog
-      ref={dialogo}
-      className="modal-rodada"
-      aria-labelledby="titulo-rodada"
-      onClose={aoFechar}
-      onClick={(e) => e.target === dialogo.current && fechar()}
+    <Dialogo
+      titulo={
+        <>
+          Rodada {id}
+          {rodada && <span className="fase"> · Fase {rodada.fase}</span>}
+        </>
+      }
+      aoFechar={aoFechar}
+      largo
+      rodape={
+        rodada &&
+        !ativa(rodada.situacao) &&
+        rodada.passos.length > 0 && (
+          <a className="botao principal" href={rodadaZipUrl(rodada.id)}>
+            <HugeiconsIcon icon={Download04Icon} size={18} strokeWidth={2} />
+            Baixar .zip
+          </a>
+        )
+      }
     >
-      <div className="modal-rodada__corpo">
-        <header>
-          <h2 id="titulo-rodada">
-            Rodada {id}
-            {rodada && <span className="fase"> · Fase {rodada.fase}</span>}
-          </h2>
-          <button type="button" className="fechar" onClick={fechar} aria-label="Fechar">
-            <HugeiconsIcon icon={Cancel01Icon} size={20} strokeWidth={2} />
-          </button>
-        </header>
-        <div className="modal-rodada__conteudo">
-          {erro ? (
-            <p className="erro">{erro}</p>
-          ) : !rodada ? (
-            <p className="nota">Carregando…</p>
-          ) : (
-            <ConteudoRodada rodada={rodada} />
-          )}
-        </div>
-        <footer>
-          {rodada && !ativa(rodada.situacao) && rodada.passos.length > 0 && (
-            <a className="botao principal" href={rodadaZipUrl(rodada.id)}>
-              <HugeiconsIcon icon={Download04Icon} size={18} strokeWidth={2} />
-              Baixar .zip
-            </a>
-          )}
-          <button type="button" onClick={fechar}>
-            Fechar
-          </button>
-        </footer>
-      </div>
-    </dialog>
+      {erro ? (
+        <Falha
+          titulo="Não deu para abrir a rodada."
+          texto={erro}
+          aoTentar={() => setTentativa((t) => t + 1)}
+        />
+      ) : !rodada ? (
+        <p className="centro">Carregando…</p>
+      ) : (
+        <ConteudoRodada rodada={rodada} />
+      )}
+    </Dialogo>
   );
 }
 
@@ -1074,9 +1082,16 @@ function Cancelar({
   aoFechar: () => void;
 }) {
   const [motivo, setMotivo] = useState("");
-  function enviar(evento: FormEvent) {
+  const confirmar = useConfirmar();
+  async function enviar(evento: FormEvent) {
     evento.preventDefault();
-    if (!window.confirm("Cancelar a proposta na Granatech? Não dá para desfazer.")) return;
+    const ok = await confirmar({
+      titulo: "Cancelar a proposta na Granatech?",
+      texto: "Não dá para desfazer.",
+      acao: "Cancelar proposta",
+      perigo: true,
+    });
+    if (!ok) return;
     aoConfirmar(motivo.trim());
   }
   return (

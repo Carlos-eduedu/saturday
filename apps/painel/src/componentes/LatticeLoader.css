@@ -233,6 +233,15 @@
     animation-duration: 1400ms !important;
   }
 
+  /* A regra global do painel (estilo.css) zera toda animação com !important;
+     aqui fica só o pulso de opacidade sincronizado, sem a onda que percorre a
+     grade, para o "carregando" não sumir. */
+  .lattice-loader__run .lattice-loader__cell:not([data-hole]) {
+    animation-name: lattice-on !important;
+    animation-iteration-count: infinite !important;
+    animation-timing-function: ease-in-out !important;
+  }
+
   .lattice-loader .lattice-loader__mark {
     transform: none;
   }

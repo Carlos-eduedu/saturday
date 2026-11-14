@@ -1,4 +1,5 @@
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { useConfirmar } from "../componentes/Confirmar";
 import { Vazio } from "../componentes/Vazio";
 import { api, type Eu, type Perfil, mensagemDeFalha, type UsuarioGestao } from "../api";
 import { Falha } from "../componentes/Falha";
@@ -24,6 +25,7 @@ function situacao(u: UsuarioGestao): string {
 }
 
 export function Usuarios({ eu }: { eu: Eu }) {
+  const confirmar = useConfirmar();
   const [usuarios, setUsuarios] = useState<UsuarioGestao[] | null>(null);
   const [erro, setErro] = useState("");
   const [aviso, setAviso] = useState("");
@@ -119,17 +121,18 @@ export function Usuarios({ eu }: { eu: Eu }) {
                         <button
                           type="button"
                           className="perigo"
-                          onClick={() => {
+                          onClick={async () => {
                             const conversas =
                               u.conversas_assumidas > 0
                                 ? ` ${u.conversas_assumidas} conversa(s) assumida(s) por ${u.nome} voltam para "aguardando humano".`
                                 : "";
-                            if (
-                              !window.confirm(
-                                `Desativar ${u.nome}? A pessoa sai do painel na hora e não entra mais.${conversas}`,
-                              )
-                            )
-                              return;
+                            const ok = await confirmar({
+                              titulo: `Desativar ${u.nome}?`,
+                              texto: `A pessoa sai do painel na hora e não entra mais.${conversas}`,
+                              acao: "Desativar",
+                              perigo: true,
+                            });
+                            if (!ok) return;
                             agir(
                               () => api.desativarUsuario(u.id),
                               `${u.nome} desativado.`,
@@ -249,7 +252,10 @@ function EdicaoUsuario({
     editaAgente !== usuario.pode_editar_agente;
 
   // Abre abaixo da lista: leva o gestor até o painel.
-  useEffect(() => secao.current?.scrollIntoView({ behavior: "smooth", block: "start" }), []);
+  useEffect(() => {
+    const suave = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    secao.current?.scrollIntoView({ behavior: suave ? "smooth" : "auto", block: "start" });
+  }, []);
 
   function salvar(evento: FormEvent) {
     evento.preventDefault();

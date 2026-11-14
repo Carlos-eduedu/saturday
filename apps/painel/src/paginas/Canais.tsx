@@ -1,4 +1,5 @@
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { useConfirmar } from "../componentes/Confirmar";
 import { Vazio } from "../componentes/Vazio";
 import {
   api,
@@ -178,16 +179,22 @@ function TabelaInstancias({
   aberta: string | null;
   detalhar: (nome: string) => void;
 }) {
+  const confirmarAcao = useConfirmar();
   if (instancias.length === 0)
     return (
       <Vazio titulo="Nenhuma instância." texto="Crie a primeira abaixo e leia o QR no celular." />
     );
 
-  function confirmar(verbo: string, i: InstanciaEvolution): boolean {
-    return window.confirm(
-      `${verbo} a instância ${i.nome}? ${i.conversas_7_dias} conversa(s) falaram por ela nos ` +
-        "últimos 7 dias; as respostas pendentes para elas não serão entregues.",
-    );
+  // Desconectar e apagar cortam a entrega das respostas pendentes.
+  async function confirmar(verbo: string, i: InstanciaEvolution): Promise<boolean> {
+    return confirmarAcao({
+      titulo: `${verbo} a instância ${i.nome}?`,
+      texto:
+        `${i.conversas_7_dias} conversa(s) falaram por ela nos últimos 7 dias; ` +
+        "as respostas pendentes para elas não serão entregues.",
+      acao: verbo,
+      perigo: true,
+    });
   }
 
   return (
@@ -233,8 +240,9 @@ function TabelaInstancias({
               {i.estado === "open" && (
                 <button
                   type="button"
-                  onClick={() =>
-                    confirmar("Desconectar", i) && agir(() => api.desconectarInstancia(i.nome))
+                  onClick={async () =>
+                    (await confirmar("Desconectar", i)) &&
+                    agir(() => api.desconectarInstancia(i.nome))
                   }
                 >
                   Desconectar
@@ -243,7 +251,9 @@ function TabelaInstancias({
               <button
                 type="button"
                 className="perigo"
-                onClick={() => confirmar("Apagar", i) && agir(() => api.apagarInstancia(i.nome))}
+                onClick={async () =>
+                  (await confirmar("Apagar", i)) && agir(() => api.apagarInstancia(i.nome))
+                }
               >
                 Apagar
               </button>
@@ -621,6 +631,7 @@ function FormConfiguracoes({
 // Textos salvos que a equipe insere na conversa com "/atalho". Só o gestor
 // mantém; o texto é fixo e quem envia revisa antes.
 function RespostasRapidas() {
+  const confirmar = useConfirmar();
   const [lista, setLista] = useState<RespostaRapida[] | null>(null);
   const [editando, setEditando] = useState<RespostaRapida | null>(null);
   const [atalho, setAtalho] = useState("");
@@ -655,7 +666,13 @@ function RespostasRapidas() {
   }
 
   async function apagar(r: RespostaRapida) {
-    if (!window.confirm(`Apagar a resposta /${r.atalho}?`)) return;
+    const ok = await confirmar({
+      titulo: `Apagar a resposta /${r.atalho}?`,
+      texto: "Ela some do atalho / na conversa para toda a equipe.",
+      acao: "Apagar",
+      perigo: true,
+    });
+    if (!ok) return;
     try {
       await api.apagarResposta(r.id);
       if (editando?.id === r.id) editar(null);
@@ -673,7 +690,7 @@ function RespostasRapidas() {
         nada passa pela IA.
       </p>
       {lista === null ? (
-        <p className="nota">Carregando…</p>
+        <p className="centro">Carregando…</p>
       ) : lista.length === 0 ? (
         <Vazio titulo="Nenhuma resposta rápida." texto="Crie a primeira abaixo." />
       ) : (

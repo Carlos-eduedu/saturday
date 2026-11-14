@@ -271,8 +271,8 @@ export function Compositor({
                   type="button"
                   className="icone"
                   onClick={() => setAnexo(null)}
-                  aria-label={audio ? "Descartar o áudio" : "Remover o anexo"}
-                  title={audio ? "Descartar" : "Remover"}
+                  aria-label={audio ? "Remover o áudio" : "Remover o anexo"}
+                  title="Remover"
                 >
                   <HugeiconsIcon icon={audio ? Delete02Icon : Cancel01Icon} size={18} strokeWidth={2} />
                 </button>

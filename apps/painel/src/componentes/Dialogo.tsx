@@ -8,11 +8,14 @@ export function Dialogo({
   titulo,
   aoFechar,
   rodape,
+  largo = false,
   children,
 }: {
-  titulo: string;
+  titulo: ReactNode;
   aoFechar: () => void;
   rodape?: ReactNode;
+  // Conteúdo extenso (rodada da homologação): 46rem em vez de 36rem.
+  largo?: boolean;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -25,7 +28,7 @@ export function Dialogo({
   return (
     <dialog
       ref={ref}
-      className="dialogo"
+      className={largo ? "dialogo dialogo--largo" : "dialogo"}
       aria-labelledby={idTitulo}
       onClose={aoFechar}
       onClick={(e) => e.target === ref.current && fechar()}
