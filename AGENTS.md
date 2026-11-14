@@ -423,6 +423,7 @@ Todas as variáveis do Saturday mantêm o prefixo `SATURDAY_` de hoje; nesta esp
 | `TRANSCRICAO_API_KEY`, `TRANSCRICAO_MODELO` | vazio | Transcrição de áudio |
 | `WHATSAPP_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN` | vazio | Obrigatórias fora de `pytest` |
 | `WHATSAPP_NUMEROS` | vazio | `phone_number_id` ativos, separados por vírgula |
+| `WHATSAPP_ROTULOS` | vazio | Nome de cada número na tela Canais: `id=Rótulo`, separados por vírgula |
 | `WHATSAPP_GRAPH_URL` | `https://graph.facebook.com/v23.0` | Aponta para o simulador em dev |
 | `GRANATECH_BASE_URL` | api-dev | Aponta para o simulador em dev |
 | `GRANATECH_CHAVE_API`, `GRANATECH_WEBHOOK_TOKEN` | vazio | Obrigatórias com a Granatech ligada |

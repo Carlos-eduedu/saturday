@@ -107,7 +107,11 @@ def _conversas_recentes(sessao: Session) -> dict[str, int]:
 @router.get("")
 def listar(request: Request, _usuario: Gestor, fabrica: Fabrica) -> dict[str, Any]:
     settings = get_settings(request)
-    meta = [{"phone_number_id": numero} for numero in settings.whatsapp_numeros]
+    # TODO(meta): qualidade e número exibido; a rota da Graph não está no contrato (regra 12).
+    meta = [
+        {"phone_number_id": numero, "rotulo": settings.whatsapp_rotulos.get(numero)}
+        for numero in settings.whatsapp_numeros
+    ]
     resposta: dict[str, Any] = {
         "meta": meta,
         "evolution": {"ativo": settings.evolution_ativo, "instancias": [], "erro": None},

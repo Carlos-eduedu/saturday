@@ -18,7 +18,7 @@ import httpx
 import pytest
 import uvicorn
 from fastapi.testclient import TestClient
-from pydantic import SecretStr
+from pydantic import SecretStr, ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -143,7 +143,7 @@ def test_criar_lista_e_audita(
     assert "CONNECTION_UPDATE" in webhook["events"]
 
     canais = api.get("/admin/canais").json()
-    assert canais["meta"] == [{"phone_number_id": "100000000000001"}]
+    assert canais["meta"] == [{"phone_number_id": "100000000000001", "rotulo": None}]
     [instancia] = canais["evolution"]["instancias"]
     assert instancia["nome"] == "mex-vendas"
     assert instancia["estado"] == "connecting"
@@ -463,3 +463,25 @@ def test_webhook_de_conexao_vai_para_a_fila(
             "telefone": "",
             "motivo": 401,
         }
+
+
+def test_numero_da_meta_sai_com_o_rotulo_configurado(
+    api: TestClient, fabrica: sessionmaker[Session], settings: Settings
+) -> None:
+    settings.whatsapp_rotulos = {"100000000000001": "Vendas"}
+    _entrar(api, fabrica, "gestor")
+
+    meta = api.get("/admin/canais").json()["meta"]
+
+    assert meta == [{"phone_number_id": "100000000000001", "rotulo": "Vendas"}]
+
+
+def test_rotulos_da_meta_lidos_da_variavel() -> None:
+    lido = Settings(
+        environment="pytest",
+        whatsapp_rotulos=" 100000000000001=Vendas , ,100000000000002=Pós-venda",
+    )
+    assert lido.whatsapp_rotulos == {"100000000000001": "Vendas", "100000000000002": "Pós-venda"}
+    for invalido in ("100000000000001", "=Vendas", "100000000000001="):
+        with pytest.raises(ValidationError, match="id=Rótulo"):
+            Settings(environment="pytest", whatsapp_rotulos=invalido)

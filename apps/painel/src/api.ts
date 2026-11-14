@@ -149,7 +149,8 @@ export interface InstanciaEvolution {
 }
 
 export interface Canais {
-  meta: { phone_number_id: string }[];
+  // `rotulo` vem de SATURDAY_WHATSAPP_ROTULOS; nulo quando o número não tem nome.
+  meta: { phone_number_id: string; rotulo: string | null }[];
   evolution: { ativo: boolean; instancias: InstanciaEvolution[]; erro: string | null };
 }
 

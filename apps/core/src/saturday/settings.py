@@ -61,6 +61,8 @@ class Settings(BaseSettings):
     whatsapp_app_secret: SecretStr = SecretStr("")
     whatsapp_verify_token: SecretStr = SecretStr("")
     whatsapp_numeros: Annotated[list[str], NoDecode] = Field(default_factory=list)
+    # Nome de cada número na tela Canais: `phone_number_id=Rótulo`, separados por vírgula.
+    whatsapp_rotulos: Annotated[dict[str, str], NoDecode] = Field(default_factory=dict)
     whatsapp_graph_url: str = "https://graph.facebook.com/v23.0"
     whatsapp_limite_midia_mb: int = 50
 
@@ -118,6 +120,23 @@ class Settings(BaseSettings):
         if isinstance(valor, str):
             return [item.strip() for item in valor.split(",") if item.strip()]
         return valor
+
+    @field_validator("whatsapp_rotulos", mode="before")
+    @classmethod
+    def _rotulos(cls, valor: object) -> object:
+        if not isinstance(valor, str):
+            return valor
+        rotulos: dict[str, str] = {}
+        for item in valor.split(","):
+            if not item.strip():
+                continue
+            numero, separador, rotulo = item.partition("=")
+            if not separador or not numero.strip() or not rotulo.strip():
+                raise ValueError(
+                    f"SATURDAY_WHATSAPP_ROTULOS: {item.strip()!r} não está no formato id=Rótulo"
+                )
+            rotulos[numero.strip()] = rotulo.strip()
+        return rotulos
 
     def validar_para_subir(self) -> None:
         """Interrompe a subida quando falta configuração obrigatória."""

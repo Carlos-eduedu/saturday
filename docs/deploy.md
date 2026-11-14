@@ -115,6 +115,8 @@ Na ordem. Cada passo de escrita no Dokploy (criar, editar, deploy) segue a
      `SATURDAY_GRANATECH_PROPOSTA_ATIVA=false` fora de produção;
    - `SATURDAY_WHATSAPP_NUMEROS` (o `phone_number_id` do número do ambiente;
      fora de produção, só número de teste da Meta);
+   - `SATURDAY_WHATSAPP_ROTULOS` (opcional: `phone_number_id=Rótulo`, o nome que
+     a tela Canais mostra para cada número);
    - `SATURDAY_DOMINIO_PUBLICO` = domínio da API (obrigatória com a proposta
      ligada).
 

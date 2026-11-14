@@ -151,12 +151,13 @@ export function Canais() {
         {canais.meta.length === 0 ? (
           <p className="vazio">Nenhum número configurado.</p>
         ) : (
-          // A API só devolve o phone_number_id (sem o número exibido nem a
-          // qualidade): rotula o que é, em vez de parecer um telefone.
+          // A API devolve o phone_number_id e o nome dado na configuração (sem o
+          // número exibido nem a qualidade): o ID fica à mostra, em vez de parecer
+          // um telefone.
           <ul className="lista-numeros">
             {canais.meta.map((m) => (
               <li key={m.phone_number_id}>
-                <span className="rotulo-dado">ID do número na Meta</span>
+                <span className="rotulo-dado">{m.rotulo ?? "ID do número na Meta"}</span>
                 <span className="dado">{m.phone_number_id}</span>
               </li>
             ))}
