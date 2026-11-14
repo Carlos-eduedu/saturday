@@ -65,7 +65,7 @@ def grafo(_usuario: Logado, fabrica: Fabrica) -> dict[str, Any]:
         .subquery()
     )
     with abrir_sessao(fabrica) as sessao:
-        passagens = dict(
+        passagens: dict[str, int] = dict(
             sessao.execute(
                 select(nos_do_caminho.c.no, func.count()).group_by(nos_do_caminho.c.no)
             ).all()
