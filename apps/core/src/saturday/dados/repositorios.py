@@ -194,7 +194,20 @@ def abrir_alerta(
     *,
     conversa_id: uuid.UUID | None = None,
     detalhe: dict[str, Any] | None = None,
+    unico: bool = False,
 ) -> Alerta:
+    """Abre um alerta; com `unico`, reaproveita o aberto do mesmo tipo na conversa."""
+
+    if unico:
+        aberto = sessao.scalars(
+            select(Alerta).where(
+                Alerta.tipo == tipo,
+                Alerta.conversa_id == conversa_id,
+                Alerta.resolvido_em.is_(None),
+            )
+        ).first()
+        if aberto is not None:
+            return aberto
     alerta = Alerta(tipo=tipo, conversa_id=conversa_id, detalhe=detalhe)
     sessao.add(alerta)
     sessao.flush()

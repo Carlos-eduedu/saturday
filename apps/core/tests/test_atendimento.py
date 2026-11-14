@@ -127,6 +127,34 @@ def test_handoff_antigo_so_no_checkpoint_continua_valendo(service_pg, fakes, fab
     assert _conversa(fabrica, conversa).atendimento == "handoff"
 
 
+def test_handoff_antigo_abre_um_alerta_so(service_pg, fakes, fabrica, conversa):
+    service_pg.process_message(ChatRequest(conversation_id=conversa, message="oi"))
+    service_pg.graph.update_state(
+        service_pg.config(conversa),
+        {"status": "handoff", "handoff_em": datetime.now(TZ).isoformat()},
+    )
+
+    service_pg.process_message(ChatRequest(conversation_id=conversa, message="oi"))
+    service_pg.process_message(ChatRequest(conversation_id=conversa, message="alguém aí?"))
+
+    with abrir_sessao(fabrica) as sessao:
+        abertos = sessao.scalars(select(Alerta).where(Alerta.resolvido_em.is_(None))).all()
+        assert [a.tipo for a in abertos] == ["handoff"]
+
+
+def test_alerta_unico_reaproveita_o_aberto(service_pg, fabrica, conversa):
+    service_pg.process_message(ChatRequest(conversation_id=conversa, message="oi"))
+    with abrir_sessao(fabrica) as sessao:
+        conversa_id = repositorios.buscar_conversa(sessao, conversa).id
+        primeiro = repositorios.abrir_alerta(sessao, "handoff", conversa_id=conversa_id)
+        segundo = repositorios.abrir_alerta(sessao, "handoff", conversa_id=conversa_id, unico=True)
+        outro_tipo = repositorios.abrir_alerta(
+            sessao, "erro_interno", conversa_id=conversa_id, unico=True
+        )
+        assert segundo.id == primeiro.id
+        assert outro_tipo.id != primeiro.id
+
+
 def test_erro_interno_vai_para_handoff_com_alerta(service_pg, fabrica, conversa, monkeypatch):
     def quebra(*_args, **_kwargs):
         raise RuntimeError("grafo caiu")

@@ -502,7 +502,7 @@ class AgentService:
 
         if conversa.atendimento == "ia" and estado.get("status") == "handoff":
             # Handoff anterior à Fase 3, gravado só no checkpoint.
-            repositorios.mudar_atendimento(sessao, conversa, "handoff")
+            self._abrir_handoff(sessao, conversa, "handoff", estado.get("handoff_reason"))
         if conversa.atendimento == "assumida":
             return True, estado
         if conversa.atendimento == "handoff":
@@ -539,6 +539,7 @@ class AgentService:
             tipo_alerta,
             conversa_id=conversa.id,
             detalhe={"motivo": motivo, **(detalhe or {})},
+            unico=True,
         )
 
     def _liberar_handoff(self, config: dict[str, Any]) -> dict[str, Any]:
