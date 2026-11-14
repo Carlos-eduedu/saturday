@@ -5,8 +5,8 @@ import {
   type Canais as DadosCanais,
   type ConfiguracoesInstancia,
   type DetalhesInstancia,
-  ErroApi,
   type InstanciaEvolution,
+  mensagemDeFalha,
   type Qr,
   type RespostaRapida,
 } from "../api";
@@ -47,10 +47,6 @@ function simNao(valor: boolean | null): string {
   return valor === null ? "—" : valor ? "sim" : "não";
 }
 
-function mensagemDe(erro: unknown): string {
-  return erro instanceof ErroApi ? erro.message : "falha inesperada";
-}
-
 export function Canais() {
   const [canais, setCanais] = useState<DadosCanais | null>(null);
   const [erro, setErro] = useState("");
@@ -61,7 +57,7 @@ export function Canais() {
     api
       .canais()
       .then(setCanais)
-      .catch((e: unknown) => setErro(mensagemDe(e)));
+      .catch((e: unknown) => setErro(mensagemDeFalha(e)));
   }, []);
   useEffect(carregar, [carregar]);
 
@@ -70,7 +66,7 @@ export function Canais() {
     try {
       await acao();
     } catch (e) {
-      setErro(mensagemDe(e));
+      setErro(mensagemDeFalha(e));
     }
     carregar();
   }
@@ -94,7 +90,10 @@ export function Canais() {
       <section>
         <h2>Evolution (WhatsApp Web)</h2>
         {!canais.evolution.ativo ? (
-          <p className="vazio">Canal desligado (SATURDAY_EVOLUTION_ATIVO).</p>
+          <p className="vazio">
+            Canal desligado neste ambiente. Para ligar, defina{" "}
+            <code>SATURDAY_EVOLUTION_ATIVO</code> e reinicie a API.
+          </p>
         ) : (
           <>
             {canais.evolution.erro && (
@@ -302,7 +301,7 @@ function PainelQr({ nome, inicial, fechar }: { nome: string; inicial: Qr; fechar
       api
         .qrInstancia(nome)
         .then(setQr)
-        .catch((e: unknown) => setErro(mensagemDe(e)));
+        .catch((e: unknown) => setErro(mensagemDeFalha(e)));
     }, RENOVAR_QR_MS);
     return () => window.clearInterval(id);
   }, [nome, qr.estado]);
@@ -359,7 +358,7 @@ function PainelDetalhes({ nome, fechar }: { nome: string; fechar: () => void }) 
     api
       .detalhesInstancia(nome)
       .then(setDetalhes)
-      .catch((e: unknown) => setErro(mensagemDe(e)));
+      .catch((e: unknown) => setErro(mensagemDeFalha(e)));
   }, [nome]);
   useEffect(carregar, [carregar]);
 
@@ -370,7 +369,7 @@ function PainelDetalhes({ nome, fechar }: { nome: string; fechar: () => void }) 
       await acao();
       setAviso(feito);
     } catch (e) {
-      setErro(mensagemDe(e));
+      setErro(mensagemDeFalha(e));
     }
     carregar();
   }
@@ -632,7 +631,7 @@ function RespostasRapidas() {
     api
       .respostas()
       .then(setLista)
-      .catch((e: unknown) => setErro(mensagemDe(e)));
+      .catch((e: unknown) => setErro(mensagemDeFalha(e)));
   }, []);
   useEffect(carregar, [carregar]);
 
@@ -651,7 +650,7 @@ function RespostasRapidas() {
       editar(null);
       carregar();
     } catch (e) {
-      setErro(mensagemDe(e));
+      setErro(mensagemDeFalha(e));
     }
   }
 
@@ -662,7 +661,7 @@ function RespostasRapidas() {
       if (editando?.id === r.id) editar(null);
       carregar();
     } catch (e) {
-      setErro(mensagemDe(e));
+      setErro(mensagemDeFalha(e));
     }
   }
 

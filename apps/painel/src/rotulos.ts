@@ -162,3 +162,87 @@ export function dolar(valor: number): string {
 }
 
 export const tokens = (n: number) => n.toLocaleString("pt-BR");
+
+// O que o atendente lê no lugar do código da Granatech. O que não estiver aqui
+// aparece como veio: melhor o código cru do que um rótulo errado.
+export const SITUACAO_DA_CONSULTA: Record<string, string> = {
+  AWAITING_CLIENT_AUTHORIZATION: "Aguardando o cliente autorizar",
+  PROCESSING: "Em processamento",
+  SUCCESS: "Concluída",
+  PENDING: "Pendente",
+  NO_MARGIN: "Sem margem",
+  USED: "Já usada",
+  UNEXPECTED_ERROR: "Erro inesperado",
+  FIDUCIARY_INSTITUTION_NO_AUTHORIZATION: "Instituição sem autorização",
+  WORKER_MUST_CANCEL_RETURN_REQUEST: "Cancelamento pendente",
+};
+
+export const SITUACAO_DA_PROPOSTA: Record<string, string> = {
+  PENDING_CONFIRMATION: "Aguardando confirmação",
+  AGUARDANDO_CONFIRMACAO: "Aguardando confirmação",
+  PENDING_USER_REVIEW: "Aguardando revisão",
+  AGUARDANDO_REVISAO_USUARIO: "Aguardando revisão",
+  PENDING_FORMALIZATION: "Aguardando formalização",
+  AGUARDANDO_FORMALIZACAO: "Aguardando formalização",
+  PENDING_BANK_ANALYSIS: "Em análise no banco",
+  AGUARDANDO_ANALISE_BANCO: "Em análise no banco",
+  PENDING_PAYMENT: "Aguardando pagamento",
+  PENDING_REFORMALIZATION: "Refazer a identidade",
+  REFAZER_SEGURANCA_IDENTIDADE: "Refazer a identidade",
+  SUCESSO_SEGURANCA_IDENTIDADE: "Identidade aprovada",
+  BLOQUEIO_DE_SALDO_EM_ANDAMENTO: "Bloqueando o saldo",
+  BLOQUEIO_SALDO: "Saldo bloqueado",
+  FORMALIZACAO_EM_ANDAMENTO: "Formalização em andamento",
+  FALHA_PAGAMENTO: "Falha no pagamento",
+  REPROVED: "Reprovada",
+  REPROVADO: "Reprovada",
+  CANCELED: "Cancelada",
+  CANCELED_BY_CLIENT: "Cancelada pelo cliente",
+  PAYED: "Paga",
+  PAGO: "Paga",
+  PROPOSTA_PAGA: "Paga",
+};
+
+/** Status e `tipo_notificacao` dizem a mesma coisa em dialetos diferentes:
+ *  mostra o rótulo uma vez só, e os dois apenas quando divergem. */
+export function situacaoDaProposta(
+  status: string | null | undefined,
+  notificacao: string | null | undefined,
+): string {
+  const doStatus = status ? SITUACAO_DA_PROPOSTA[status] : undefined;
+  const daNotificacao = notificacao ? SITUACAO_DA_PROPOSTA[notificacao] : undefined;
+  if (doStatus && daNotificacao && doStatus !== daNotificacao) {
+    return `${doStatus} · ${daNotificacao}`;
+  }
+  return doStatus ?? daNotificacao ?? status ?? notificacao ?? "—";
+}
+
+/** As situações na ordem em que a proposta anda; o filtro do painel segue essa
+ *  ordem. Só entram códigos que podem aparecer na coluna `status`. */
+export const SITUACOES_DA_PROPOSTA = [
+  "PENDING_CONFIRMATION",
+  "PENDING_USER_REVIEW",
+  "PENDING_FORMALIZATION",
+  "BLOQUEIO_DE_SALDO_EM_ANDAMENTO",
+  "BLOQUEIO_SALDO",
+  "FORMALIZACAO_EM_ANDAMENTO",
+  "PENDING_BANK_ANALYSIS",
+  "PENDING_PAYMENT",
+  "PENDING_REFORMALIZATION",
+  "PAYED",
+  "REPROVED",
+  "CANCELED",
+  "CANCELED_BY_CLIENT",
+] as const;
+
+export const SITUACOES_DA_CONSULTA = [
+  "AWAITING_CLIENT_AUTHORIZATION",
+  "PROCESSING",
+  "PENDING",
+  "SUCCESS",
+  "NO_MARGIN",
+  "USED",
+  "UNEXPECTED_ERROR",
+  "FIDUCIARY_INSTITUTION_NO_AUTHORIZATION",
+  "WORKER_MUST_CANCEL_RETURN_REQUEST",
+] as const;

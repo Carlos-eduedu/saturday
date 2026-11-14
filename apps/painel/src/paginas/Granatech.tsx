@@ -24,7 +24,16 @@ import {
   rodadaZipUrl,
   type SituacaoRodada,
 } from "../api";
-import { ETAPAS, rotulo, reais } from "../rotulos";
+import {
+  ETAPAS,
+  rotulo,
+  reais,
+  SITUACAO_DA_CONSULTA,
+  SITUACAO_DA_PROPOSTA,
+  SITUACOES_DA_CONSULTA,
+  SITUACOES_DA_PROPOSTA,
+  situacaoDaProposta,
+} from "../rotulos";
 import { type Aviso, useAvisos } from "../tempoReal";
 
 // Aba Granatech (decisão 0013). Todos veem consultas e propostas; só o gestor
@@ -123,13 +132,14 @@ export function Granatech({ eu }: { eu: Eu }) {
                 onClick={() => {
                   setAba(a);
                   setSelecao(null);
+                  setFiltro((f) => ({ ...f, status: undefined }));
                 }}
               >
                 {a === "propostas" ? "Propostas" : "Consultas"}
               </button>
             ))}
           </div>
-          <Filtros aoFiltrar={setFiltro} />
+          <Filtros aba={aba} aoFiltrar={setFiltro} />
         </div>
         {aba === "consultas" ? (
           <ListaConsultas linhas={consultas} selecionar={(id) => setSelecao({ aba, id })} />
@@ -236,7 +246,7 @@ function Homologacao() {
       <p className="nota">
         Gera as evidências que a Granatech pede em cada fase, contra <code>{dados.base_granatech}</code>.
         Os webhooks só chegam se a Granatech estiver apontada para{" "}
-        {dados.webhook_esperado ? <code>{dados.webhook_esperado}</code> : "este ambiente (SATURDAY_DOMINIO_PUBLICO vazio)"}.
+        {dados.webhook_esperado ? <code>{dados.webhook_esperado}</code> : "este ambiente, que ainda não tem endereço público configurado"}.
       </p>
       {erro && (
         <p className="erro" role="alert">
@@ -552,22 +562,36 @@ function ConteudoRodada({ rodada }: { rodada: RodadaDetalhe }) {
   );
 }
 
-function Filtros({ aoFiltrar }: { aoFiltrar: (f: FiltroGranatech) => void }) {
+function Filtros({ aba, aoFiltrar }: { aba: Aba; aoFiltrar: (f: FiltroGranatech) => void }) {
   const [status, setStatus] = useState("");
   const [desde, setDesde] = useState("");
   const [ate, setAte] = useState("");
   const [cpf, setCpf] = useState("");
 
+  // Proposta e consulta usam vocabulários diferentes: trocar de aba não pode
+  // levar junto um filtro que não existe do outro lado.
+  useEffect(() => setStatus(""), [aba]);
+
+  const situacoes = aba === "propostas" ? SITUACOES_DA_PROPOSTA : SITUACOES_DA_CONSULTA;
+  const nomes = aba === "propostas" ? SITUACAO_DA_PROPOSTA : SITUACAO_DA_CONSULTA;
+
   function filtrar(evento: FormEvent) {
     evento.preventDefault();
-    aoFiltrar({ status: status.trim().toUpperCase(), desde, ate, cpf: cpf.replace(/\D/g, "") });
+    aoFiltrar({ status, desde, ate, cpf: cpf.replace(/\D/g, "") });
   }
 
   return (
     <form className="form-usuario" onSubmit={filtrar}>
       <label>
         Status
-        <input value={status} onChange={(e) => setStatus(e.target.value)} placeholder="ex.: PAYED" />
+        <select value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="">Todas</option>
+          {situacoes.map((codigo) => (
+            <option key={codigo} value={codigo}>
+              {rotulo(nomes, codigo)}
+            </option>
+          ))}
+        </select>
       </label>
       <label>
         De
@@ -625,7 +649,7 @@ function ListaConsultas({
           <tr key={c.id}>
             <td>{dataHora(c.criada_em)}</td>
             <td data-rotulo="CPF">{c.cpf}</td>
-            <td data-rotulo="Status">{c.status}</td>
+            <td data-rotulo="Status">{rotulo(SITUACAO_DA_CONSULTA, c.status)}</td>
             <td data-rotulo="Detalhe">{c.tem_detalhe ? "gravado" : "—"}</td>
             <td data-rotulo="Conversa">
               <SemConversa conversa={c.conversa_id} />
@@ -671,8 +695,7 @@ function ListaPropostas({
             <td data-rotulo="CPF">{p.cpf}</td>
             <td data-rotulo="Envio">{p.estado_envio}</td>
             <td data-rotulo="Status">
-              {p.status ?? "—"}
-              {p.tipo_notificacao && <small> ({p.tipo_notificacao})</small>}
+              {situacaoDaProposta(p.status, p.tipo_notificacao)}
             </td>
             <td data-rotulo="Parcelas">
               {p.numero_parcelas} × {reais(p.valor_parcela)}
@@ -708,8 +731,10 @@ function Historico({ eventos }: { eventos: EventoGranatech[] }) {
       {eventos.map((e, i) => (
         // O histórico só cresce: a posição identifica o evento.
         <li key={i}>
-          <time>{dataHora(e.recebido_em)}</time> {e.status ?? "—"}
-          {e.tipo_notificacao && <small> ({e.tipo_notificacao})</small>}
+          <time>{dataHora(e.recebido_em)}</time> {rotulo(SITUACAO_DA_CONSULTA, e.status ?? "—")}{(e.tipo_notificacao &&
+              rotulo(SITUACAO_DA_PROPOSTA, e.tipo_notificacao) !== rotulo(SITUACAO_DA_CONSULTA, e.status ?? "")) && (
+              <small> ({rotulo(SITUACAO_DA_PROPOSTA, e.tipo_notificacao)})</small>
+            )}
           {e.origem === "painel" && <small> pelo painel</small>}
           {e.informacoes != null && (
             <pre className="nota">{JSON.stringify(e.informacoes, null, 2)}</pre>
@@ -831,7 +856,7 @@ function DetalheConsulta({
           <Cpf consultaId={c.id} mascarado={c.cpf} />
         </dd>
         <dt>Status</dt>
-        <dd>{c.status}</dd>
+        <dd>{rotulo(SITUACAO_DA_CONSULTA, c.status)}</dd>
         <dt>Etapa da conversa</dt>
         <dd>{c.etapa ? rotulo(ETAPAS, c.etapa) : "—"}</dd>
         <dt>Idade e sexo</dt>
@@ -947,8 +972,7 @@ function DetalheProposta({
         <dd>{p.estado_envio}</dd>
         <dt>Status</dt>
         <dd>
-          {p.status ?? "—"}
-          {p.tipo_notificacao && <small> ({p.tipo_notificacao})</small>}
+          {situacaoDaProposta(p.status, p.tipo_notificacao)}
         </dd>
         <dt>Parcelas</dt>
         <dd>
