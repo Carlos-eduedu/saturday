@@ -14,15 +14,17 @@ import { ItemTurno } from "../componentes/ItemTurno";
 import { Vazio } from "../componentes/Vazio";
 import { NOS, rotulo } from "../rotulos";
 import { useAvisos } from "../tempoReal";
+import { AbaModelos, AbaVersoes } from "./AgenteModelos";
 
-type Aba = "grafo" | "execucoes";
+type Aba = "grafo" | "execucoes" | "modelos" | "versoes";
 const INICIO = "__start__";
 const FIM = "__end__";
 
 const mensagem = (e: unknown) => (e instanceof ErroApi ? e.message : "falha ao carregar");
 
 // Aba Agente: o grafo que roda (lido da estrutura compilada na API) e as
-// execuções de todas as conversas, ao vivo. Só leitura nesta versão.
+// execuções de todas as conversas, ao vivo; os modelos de cada etapa e as
+// versões da configuração (editar exige a permissão "editar o agente").
 export function Agente() {
   const [aba, setAba] = useState<Aba>("grafo");
   const [grafo, setGrafo] = useState<Grafo | null>(null);
@@ -45,6 +47,8 @@ export function Agente() {
         opcoes={[
           ["grafo", "Grafo"],
           ["execucoes", "Execuções"],
+          ["modelos", "Modelos"],
+          ["versoes", "Versões"],
         ]}
         valor={aba}
         mudar={setAba}
@@ -65,6 +69,8 @@ export function Agente() {
             }}
           />
         ))}
+      {aba === "modelos" && <AbaModelos />}
+      {aba === "versoes" && <AbaVersoes />}
       {aba === "execucoes" && (
         <ListaExecucoes
           nos={grafo?.nos.filter((n) => n.id !== INICIO && n.id !== FIM) ?? []}

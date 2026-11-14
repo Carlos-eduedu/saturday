@@ -30,6 +30,7 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy import false as sa_false
 from sqlalchemy import true as sa_true
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -232,6 +233,10 @@ class UsuarioPainel(Base):
     tentativas_falhas: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     bloqueado_ate: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
+    # Troca modelos e a base de conhecimento na aba Agente; independe do perfil.
+    pode_editar_agente: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=sa_false()
+    )
 
 
 class Auditoria(Base):
@@ -481,3 +486,39 @@ class RespostaRapida(Base):
     atualizado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=AGORA, onupdate=AGORA
     )
+
+
+class ConfigAgente(Base):
+    """Uma versão da configuração do agente (aba Agente). A de maior número vale.
+
+    Só se acrescenta: salvar e restaurar criam versão nova, então o histórico
+    diz quem trocou o quê e quando. ``modelos`` é papel → id do modelo
+    (`agente_config.PAPEIS`); papel ausente usa o ambiente.
+    """
+
+    __tablename__ = "config_agente"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    versao: Mapped[int] = mapped_column(Integer, nullable=False, unique=True)
+    modelos: Mapped[dict[str, str]] = mapped_column(JSONB, nullable=False, default=dict)
+    nota: Mapped[str | None] = mapped_column(String(280))
+    restaurada_de: Mapped[int | None] = mapped_column(Integer)
+    autor_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("usuarios_painel.id", ondelete="SET NULL")
+    )
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
+
+
+class CatalogoModelos(Base):
+    """Última leitura do catálogo de modelos da OpenRouter (uma linha só).
+
+    Preço e limite mudam na fonte: o painel mostra sempre ``fonte`` e
+    ``buscado_em`` ao lado deles.
+    """
+
+    __tablename__ = "catalogo_modelos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    fonte: Mapped[str] = mapped_column(Text, nullable=False)
+    modelos: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
+    buscado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)

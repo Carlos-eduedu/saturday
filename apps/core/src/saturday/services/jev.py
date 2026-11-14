@@ -9,6 +9,7 @@ from typing import Any
 
 import httpx
 
+from saturday.agente_config import Modelos
 from saturday.metrics import registrar_chamada, uso_do_payload
 from saturday.services.openrouter import OpenRouterClient, OpenRouterError
 from saturday.settings import (
@@ -219,8 +220,11 @@ def _parse(data: Any, oferta_pendente: bool) -> JevResult:
 class JevClient:
     """Cliente do Jev para uma instância da aplicação."""
 
-    def __init__(self, http: httpx.Client, settings: Settings) -> None:
+    def __init__(
+        self, http: httpx.Client, settings: Settings, modelos: Modelos | None = None
+    ) -> None:
         self._settings = settings
+        self._modelos = modelos or Modelos(settings)
         self._openrouter = OpenRouterClient(
             http,
             settings.openrouter_api_key.get_secret_value(),
@@ -236,7 +240,8 @@ class JevClient:
 
         if not self._settings.openrouter_api_key.get_secret_value():
             raise JevError("Jev não configurado")
-        if not self._settings.jev_model:
+        modelo = self._modelos.modelo("jev")
+        if not modelo:
             raise JevError("Jev não configurado")
 
         state: dict[str, Any] = {"ultima_mensagem": message}
@@ -244,7 +249,7 @@ class JevClient:
             state["ultima_mensagem_agente"] = oferta or ""
 
         payload = {
-            "model": self._settings.jev_model,
+            "model": modelo,
             "state": state,
             "questions": _perguntas(oferta_pendente),
         }
@@ -256,11 +261,17 @@ class JevClient:
                 JEV_TIMEOUT_S,
             )
         except OpenRouterError as exc:
-            registrar_chamada("jev", (time.monotonic() - inicio) * 1000, status="erro")
+            registrar_chamada(
+                "jev", (time.monotonic() - inicio) * 1000, status="erro", modelo=modelo
+            )
             logger.warning("jev_falhou: %s", type(exc).__name__)
             raise JevError("Falha ao consultar o Jev") from exc
 
         registrar_chamada(
-            "jev", (time.monotonic() - inicio) * 1000, status="ok", **uso_do_payload(dados)
+            "jev",
+            (time.monotonic() - inicio) * 1000,
+            status="ok",
+            modelo=modelo,
+            **uso_do_payload(dados),
         )
         return _parse(dados, oferta_pendente)

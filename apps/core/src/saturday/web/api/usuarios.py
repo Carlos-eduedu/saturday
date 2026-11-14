@@ -46,6 +46,7 @@ class Edicao(BaseModel):
     nome: str | None = None
     email: str | None = None
     perfil: str | None = None
+    pode_editar_agente: bool | None = None
 
 
 class NovaSenha(BaseModel):
@@ -70,6 +71,7 @@ def _linha(usuario: UsuarioPainel, assumidas: int) -> dict[str, Any]:
         "nome": usuario.nome,
         "email": usuario.email,
         "perfil": usuario.perfil,
+        "pode_editar_agente": usuario.pode_editar_agente,
         "situacao": situacao,
         "bloqueado_ate": ate.isoformat() if ate else None,
         "criado_em": usuario.criado_em.isoformat(),
@@ -109,7 +111,13 @@ def editar(usuario_id: uuid.UUID, dados: Edicao, usuario: GestorCsrf, fabrica: F
     _executar(
         fabrica,
         lambda s: regras.editar(
-            s, usuario.id, usuario_id, nome=dados.nome, email=dados.email, perfil=dados.perfil
+            s,
+            usuario.id,
+            usuario_id,
+            nome=dados.nome,
+            email=dados.email,
+            perfil=dados.perfil,
+            pode_editar_agente=dados.pode_editar_agente,
         ),
     )
     return Response(status_code=204)

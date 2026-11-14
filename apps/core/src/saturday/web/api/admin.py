@@ -134,6 +134,7 @@ def _eu(request: Request, usuario: UsuarioLogado) -> dict[str, Any]:
         "email": usuario.email,
         "nome": usuario.nome,
         "perfil": usuario.perfil,
+        "pode_editar_agente": usuario.pode_editar_agente,
         "csrf": sessoes.token_csrf(segredo, usuario.token),
     }
 
@@ -151,7 +152,14 @@ def login(dados: Login, request: Request, response: Response, fabrica: Fabrica) 
         usuario = sessoes.autenticar(sessao, dados.email, dados.senha)
         token = sessoes.abrir_sessao(sessao, usuario) if usuario else None
         logado = (
-            UsuarioLogado(usuario.id, usuario.email, usuario.nome, usuario.perfil, token)
+            UsuarioLogado(
+                usuario.id,
+                usuario.email,
+                usuario.nome,
+                usuario.perfil,
+                token,
+                usuario.pode_editar_agente,
+            )
             if usuario and token
             else None
         )

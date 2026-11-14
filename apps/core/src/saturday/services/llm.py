@@ -10,6 +10,7 @@ from typing import Any
 
 import httpx
 
+from saturday.agente_config import Modelos
 from saturday.faq import FAQ
 from saturday.metrics import registrar_chamada, uso_do_payload
 from saturday.services.anexos import Anexo
@@ -134,8 +135,11 @@ def _parte_anexo(anexo: Anexo) -> dict[str, Any]:
 class LLMClient:
     """Cliente de texto e visão do OpenRouter."""
 
-    def __init__(self, http: httpx.Client, settings: Settings) -> None:
+    def __init__(
+        self, http: httpx.Client, settings: Settings, modelos: Modelos | None = None
+    ) -> None:
         self._settings = settings
+        self._modelos = modelos or Modelos(settings)
         self._openrouter = OpenRouterClient(
             http,
             settings.openrouter_api_key.get_secret_value(),
@@ -177,6 +181,7 @@ class LLMClient:
                 nome,
                 (time.monotonic() - inicio) * 1000,
                 status="ok" if uso is not None else "erro",
+                modelo=payload.get("model"),
                 **(uso or {}),
             )
 
@@ -187,13 +192,14 @@ class LLMClient:
             raise LLMError("nenhum anexo")
         if not self._settings.openrouter_api_key.get_secret_value():
             raise LLMError("modelo de visão não configurado")
-        if not self._settings.vision_model:
+        modelo = self._modelos.modelo("visao")
+        if not modelo:
             raise LLMError("modelo de visão não configurado")
 
         conteudo: list[dict[str, Any]] = [{"type": "text", "text": PROMPT_EXTRATO}]
         conteudo.extend(_parte_anexo(anexo) for anexo in anexos)
         payload = {
-            "model": self._settings.vision_model,
+            "model": modelo,
             "temperature": 0,
             "messages": [{"role": "user", "content": conteudo}],
             "response_format": {"type": "json_object"},
@@ -219,14 +225,15 @@ class LLMClient:
 
         if not self._settings.openrouter_api_key.get_secret_value():
             raise LLMError("LLM não configurado")
-        if not self._settings.llm_model:
+        modelo = self._modelos.modelo("llm")
+        if not modelo:
             raise LLMError("LLM não configurado")
 
         mensagens: list[dict[str, Any]] = [{"role": "system", "content": _system_prompt(resumo)}]
         mensagens.extend(historico)
 
         payload = {
-            "model": self._settings.llm_model,
+            "model": modelo,
             "temperature": LLM_TEMPERATURE,
             "messages": mensagens,
             "response_format": {"type": "json_object"},

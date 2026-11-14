@@ -243,16 +243,25 @@ function EdicaoUsuario({
   const [nome, setNome] = useState(usuario.nome);
   const [email, setEmail] = useState(usuario.email);
   const [perfil, setPerfil] = useState<Perfil>(usuario.perfil);
+  const [editaAgente, setEditaAgente] = useState(usuario.pode_editar_agente);
   const [senha, setSenha] = useState("");
   const secao = useRef<HTMLElement>(null);
-  const mudou = nome !== usuario.nome || email !== usuario.email || perfil !== usuario.perfil;
+  const mudou =
+    nome !== usuario.nome ||
+    email !== usuario.email ||
+    perfil !== usuario.perfil ||
+    editaAgente !== usuario.pode_editar_agente;
 
   // Abre abaixo da lista: leva o gestor até o painel.
   useEffect(() => secao.current?.scrollIntoView({ behavior: "smooth", block: "start" }), []);
 
   function salvar(evento: FormEvent) {
     evento.preventDefault();
-    agir(() => api.editarUsuario(usuario.id, { nome, email, perfil }), "Alterações salvas.");
+    agir(
+      () =>
+        api.editarUsuario(usuario.id, { nome, email, perfil, pode_editar_agente: editaAgente }),
+      "Alterações salvas.",
+    );
   }
 
   async function trocarSenha(evento: FormEvent) {
@@ -288,6 +297,14 @@ function EdicaoUsuario({
             <option value="gestor">Gestor (tudo, inclusive usuários)</option>
           </select>
           {ehVoce && <small>Você não pode tirar o seu próprio perfil de gestor.</small>}
+        </label>
+        <label className="opcao">
+          <input
+            type="checkbox"
+            checked={editaAgente}
+            onChange={(e) => setEditaAgente(e.target.checked)}
+          />
+          Pode editar o agente (modelos, base de conhecimento, voltar versão)
         </label>
         <button type="submit" disabled={!mudou}>
           Salvar

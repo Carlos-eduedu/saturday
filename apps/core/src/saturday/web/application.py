@@ -11,6 +11,7 @@ from saturday.settings import Settings, get_settings
 from saturday.web.api import (
     admin,
     agente,
+    agente_modelos,
     canais,
     chat,
     conversas,
@@ -60,6 +61,7 @@ def get_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(granatech_admin.router)
     app.include_router(ia.router)
     app.include_router(agente.router)
+    app.include_router(agente_modelos.router)
     app.include_router(respostas.router)
     webhooks.documentar_webhook(app)
 

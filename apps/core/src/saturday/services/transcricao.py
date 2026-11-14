@@ -11,6 +11,7 @@ import logging
 
 import httpx
 
+from saturday.agente_config import Modelos
 from saturday.settings import Settings
 
 logger = logging.getLogger(__name__)
@@ -27,11 +28,17 @@ EXTENSAO_POR_MIME = {
 
 
 class Transcritor:
-    def __init__(self, http: httpx.Client, settings: Settings) -> None:
+    def __init__(
+        self, http: httpx.Client, settings: Settings, modelos: Modelos | None = None
+    ) -> None:
         self._http = http
         self._base = settings.transcricao_base_url.rstrip("/")
         self._chave = settings.transcricao_api_key.get_secret_value()
-        self._modelo = settings.transcricao_modelo
+        self._modelos = modelos or Modelos(settings)
+
+    @property
+    def _modelo(self) -> str:
+        return self._modelos.modelo("transcricao")
 
     @property
     def habilitado(self) -> bool:

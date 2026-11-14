@@ -9,6 +9,7 @@ export interface Eu {
   email: string;
   nome: string;
   perfil: Perfil;
+  pode_editar_agente: boolean;
   csrf: string;
 }
 
@@ -110,6 +111,7 @@ export interface UsuarioGestao {
   nome: string;
   email: string;
   perfil: Perfil;
+  pode_editar_agente: boolean;
   situacao: "ativo" | "bloqueado" | "desativado";
   bloqueado_ate: string | null;
   criado_em: string;
@@ -220,6 +222,63 @@ export interface NoDoGrafo {
 export interface Grafo {
   nos: NoDoGrafo[];
   arestas: { de: string; para: string; condicional: boolean }[];
+}
+
+export type PapelModelo = "jev" | "llm" | "visao" | "transcricao";
+
+export interface ModeloDoCatalogo {
+  id: string;
+  nome: string;
+  contexto: number | null;
+  max_saida: number | null;
+  entrada: string[];
+  saida: string[];
+  // US$ por milhão de tokens (imagem: por milhão de unidades, como a fonte cobra).
+  preco_entrada: number | null;
+  preco_saida: number | null;
+  preco_imagem: number | null;
+  parametros: string[];
+}
+
+export interface VersaoAgente {
+  versao: number;
+  modelos: Partial<Record<PapelModelo, string>>;
+  nota: string | null;
+  restaurada_de: number | null;
+  autor: string | null;
+  criada_em: string;
+}
+
+export interface ModelosAgente {
+  vigente: VersaoAgente | null;
+  papeis: {
+    papel: PapelModelo;
+    rotulo: string;
+    no: string | null;
+    do_catalogo: boolean;
+    exige_entrada: string | null;
+    modelo: string;
+    origem: "versao" | "ambiente";
+    variavel: string;
+  }[];
+  catalogo: { fonte: string; buscado_em: string | null; modelos: ModeloDoCatalogo[] };
+  transcricao_provedor: string;
+  latencia: Record<string, { media_ms: number; p95_ms: number; chamadas: number }>;
+  latencia_dias: number;
+  em_andamento: number;
+  pode_editar: boolean;
+  pode_testar: boolean;
+}
+
+export interface ResultadoTeste {
+  ok: boolean;
+  erro: string | null;
+  resposta: string | null;
+  detalhe: Record<string, unknown> | null;
+  latencia_ms: number;
+  custo_usd: number | null;
+  tokens_entrada: number | null;
+  tokens_saida: number | null;
 }
 
 export interface Trilha {
@@ -518,7 +577,10 @@ export const api = {
   canais: () => chamar<Canais>("GET", "/canais"),
   gestaoUsuarios: () => chamar<UsuarioGestao[]>("GET", "/gestao/usuarios"),
   criarUsuario: (dados: NovoUsuario) => chamar<{ id: string }>("POST", "/gestao/usuarios", dados),
-  editarUsuario: (id: string, dados: { nome: string; email: string; perfil: Perfil }) =>
+  editarUsuario: (
+    id: string,
+    dados: { nome: string; email: string; perfil: Perfil; pode_editar_agente: boolean },
+  ) =>
     chamar<void>("PATCH", `/gestao/usuarios/${id}`, dados),
   redefinirSenha: (id: string, senha: string) =>
     chamar<void>("POST", `/gestao/usuarios/${id}/senha`, { senha }),
@@ -529,6 +591,18 @@ export const api = {
   turnos: (id: string) => chamar<Trilha>("GET", `/conversas/${id}/turnos`),
   custos: () => chamar<Custos>("GET", "/custos"),
   grafo: () => chamar<Grafo>("GET", "/agente/grafo"),
+  modelosAgente: () => chamar<ModelosAgente>("GET", "/agente/modelos"),
+  atualizarCatalogo: () => chamar<{ modelos: number }>("POST", "/agente/catalogo/atualizar"),
+  testarModelo: (papel: PapelModelo, modelo: string, texto: string) =>
+    chamar<ResultadoTeste>("POST", "/agente/modelos/testar", { papel, modelo, texto }),
+  versoesAgente: () => chamar<VersaoAgente[]>("GET", "/agente/versoes"),
+  salvarVersao: (
+    versao_base: number | null,
+    modelos: Partial<Record<PapelModelo, string>>,
+    nota: string,
+  ) => chamar<{ versao: number }>("POST", "/agente/versoes", { versao_base, modelos, nota }),
+  restaurarVersao: (versao: number, versao_base: number | null) =>
+    chamar<{ versao: number }>("POST", `/agente/versoes/${versao}/restaurar`, { versao_base }),
   execucoes: (filtro: { no?: string; situacao: SituacaoExecucao; antes_de?: number }) => {
     const q = new URLSearchParams({ situacao: filtro.situacao });
     if (filtro.no) q.set("no", filtro.no);

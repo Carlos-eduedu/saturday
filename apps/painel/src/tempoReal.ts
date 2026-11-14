@@ -12,6 +12,7 @@ export interface Aviso {
     | "granatech"
     | "homologacao"
     | "turno"
+    | "agente"
     | "reconectado";
   conversa?: string;
   alerta?: string;

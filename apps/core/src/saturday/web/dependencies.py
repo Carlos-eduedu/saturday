@@ -70,6 +70,8 @@ class UsuarioLogado:
     nome: str
     perfil: str
     token: str
+    # Troca modelos e a base de conhecimento na aba Agente; independe do perfil.
+    pode_editar_agente: bool = False
 
     @property
     def gestor(self) -> bool:
@@ -86,7 +88,14 @@ def usuario_logado(
         usuario = sessoes.usuario_da_sessao(sessao, token)
         if usuario is None:
             raise HTTPException(status_code=401, detail="não autenticado")
-        return UsuarioLogado(usuario.id, usuario.email, usuario.nome, usuario.perfil, token)
+        return UsuarioLogado(
+            usuario.id,
+            usuario.email,
+            usuario.nome,
+            usuario.perfil,
+            token,
+            usuario.pode_editar_agente,
+        )
 
 
 def exigir_csrf(
@@ -112,6 +121,14 @@ def gestor_logado(usuario: Annotated[UsuarioLogado, Depends(usuario_logado)]) ->
     """Telas de gestão (Canais, Usuários): só leitura."""
 
     return _gestor(usuario)
+
+
+def editor_do_agente(usuario: Annotated[UsuarioLogado, Depends(exigir_csrf)]) -> UsuarioLogado:
+    """Aba Agente: salvar e restaurar a configuração, atualizar o catálogo."""
+
+    if not usuario.pode_editar_agente:
+        raise HTTPException(status_code=403, detail="sem permissão para editar o agente")
+    return usuario
 
 
 def gestor_com_csrf(usuario: Annotated[UsuarioLogado, Depends(exigir_csrf)]) -> UsuarioLogado:

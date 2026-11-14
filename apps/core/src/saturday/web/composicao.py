@@ -20,6 +20,7 @@ from psycopg_pool import ConnectionPool
 from saturday.agent.context import AgentContext
 from saturday.agent.graph import build_graph
 from saturday.agent.service import AgentService
+from saturday.agente_config import Modelos
 from saturday.bancos.granatech.cliente import ClienteGranatech
 from saturday.canais.evolution.cliente import EvolutionClient
 from saturday.canais.evolution.saida import SaidaEvolution
@@ -49,9 +50,10 @@ def criar_contexto(
     """
 
     granatech = criar_cliente_granatech(http, settings, fabrica)
+    modelos = Modelos(settings, fabrica)
     return AgentContext(
-        jev=JevClient(http, settings),
-        llm=LLMClient(http, settings),
+        jev=JevClient(http, settings, modelos),
+        llm=LLMClient(http, settings, modelos),
         anexos=AnexosClient(http, settings, storage),
         granatech=granatech,
         brasilapi=BrasilAPI(http, fabrica) if granatech is not None else None,
@@ -97,7 +99,7 @@ def criar_canal_whatsapp(
 
     cliente = WhatsAppClient(http, settings)
     return (
-        EntradaWhatsApp(cliente, storage, Transcritor(http, settings)),
+        EntradaWhatsApp(cliente, storage, Transcritor(http, settings, Modelos(settings, fabrica))),
         SaidaWhatsApp(cliente, fabrica, settings, storage=storage),
     )
 
@@ -123,7 +125,12 @@ def criar_canal_evolution(
         return None
     cliente = EvolutionClient(http, settings)
     return CanalEvolution(
-        entrada=EntradaWhatsApp(cliente, storage, Transcritor(http, settings), canal="evolution"),
+        entrada=EntradaWhatsApp(
+            cliente,
+            storage,
+            Transcritor(http, settings, Modelos(settings, fabrica)),
+            canal="evolution",
+        ),
         saida=SaidaEvolution(cliente, fabrica, storage=storage),
         cliente=cliente,
     )

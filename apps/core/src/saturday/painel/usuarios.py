@@ -132,9 +132,12 @@ def editar(
     nome: str | None = None,
     email: str | None = None,
     perfil: str | None = None,
+    pode_editar_agente: bool | None = None,
 ) -> None:
     usuario = _buscar(sessao, usuario_id)
     mudancas: dict[str, Any] = {}
+    if pode_editar_agente is not None and pode_editar_agente != usuario.pode_editar_agente:
+        mudancas["pode_editar_agente"] = pode_editar_agente
     if nome is not None and _validar_nome(nome) != usuario.nome:
         mudancas["nome"] = _validar_nome(nome)
     if email is not None and _validar_email(email) != usuario.email:

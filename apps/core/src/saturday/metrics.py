@@ -16,6 +16,8 @@ class Chamada:
     status: str | None = None
     tokens_entrada: int | None = None
     tokens_saida: int | None = None
+    # Id do modelo de IA chamado; mede a latência por modelo na aba Agente.
+    modelo: str | None = None
 
 
 @dataclass
@@ -31,6 +33,7 @@ class TurnMetrics:
         status: str | None = None,
         tokens_entrada: int | None = None,
         tokens_saida: int | None = None,
+        modelo: str | None = None,
     ) -> None:
         self.chamadas.append(
             Chamada(
@@ -40,6 +43,7 @@ class TurnMetrics:
                 status=status,
                 tokens_entrada=tokens_entrada,
                 tokens_saida=tokens_saida,
+                modelo=modelo,
             )
         )
 
@@ -61,6 +65,7 @@ class TurnMetrics:
                     "status": chamada.status,
                     "tokens_entrada": chamada.tokens_entrada,
                     "tokens_saida": chamada.tokens_saida,
+                    **({"modelo": chamada.modelo} if chamada.modelo else {}),
                 }
                 for chamada in self.chamadas
             ],
@@ -90,6 +95,7 @@ def registrar_chamada(
     status: str | int | None = None,
     tokens_entrada: int | None = None,
     tokens_saida: int | None = None,
+    modelo: str | None = None,
 ) -> None:
     metricas = _ATUAL.get()
     if metricas is not None:
@@ -100,6 +106,7 @@ def registrar_chamada(
             status=None if status is None else str(status),
             tokens_entrada=tokens_entrada,
             tokens_saida=tokens_saida,
+            modelo=modelo,
         )
 
 
