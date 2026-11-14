@@ -90,14 +90,25 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
   // no fim. `fim` vem depois do envio: rolar até a última mensagem a deixaria
   // atrás do envio fixo.
   const fim = useRef<HTMLDivElement | null>(null);
+  // A lista rola por conta própria; sem ela (abas Ficha/IA) quem rola é a página.
+  const lista = useRef<HTMLOListElement | null>(null);
   const noFim = useRef(true);
   useEffect(() => {
     const medir = () => {
       const caixa = fim.current?.getBoundingClientRect();
-      if (caixa) noFim.current = caixa.bottom <= window.innerHeight + 80;
+      const janela = lista.current?.getBoundingClientRect();
+      if (!caixa) return;
+      noFim.current = janela
+        ? caixa.bottom <= janela.bottom + 80
+        : caixa.bottom <= window.innerHeight + 80;
     };
+    const alvo = lista.current;
     window.addEventListener("scroll", medir, { passive: true });
-    return () => window.removeEventListener("scroll", medir);
+    alvo?.addEventListener("scroll", medir, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", medir);
+      alvo?.removeEventListener("scroll", medir);
+    };
   }, []);
   const ultima = conversa?.mensagens[conversa.mensagens.length - 1]?.id;
   useEffect(() => {
@@ -207,7 +218,7 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
         {fichaEmAba && aba === "ia" && <TrilhaIa id={id} />}
         {(!fichaEmAba || aba === "mensagens") && (
           <>
-            <ol className="mensagens">
+            <ol className="mensagens" ref={lista}>
               {conversa.mensagens.map((m) => (
                 <li key={m.id} className={`msg msg-${m.direcao} msg-${m.autor}`}>
                   <span className="autor">{AUTOR[m.autor]}</span>

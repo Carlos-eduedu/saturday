@@ -27,6 +27,12 @@
      ficar alinhado com o que está embaixo. */
   --largura: 96rem;
   --margem: clamp(1rem, 2vw, 1.5rem);
+  /* Respiro vertical do conteúdo; a coluna fixa desconta os dois lados para
+     não sobrar rolagem de página. */
+  --respiro: clamp(1rem, 3vw, 2rem);
+  /* Pé do compositor: a lista termina na mesma linha em que o cartão do
+     campo de texto termina. */
+  --pe-compositor: 1rem;
 
   --fonte-titulo: "Red Hat Display Variable", system-ui, sans-serif;
   --fonte-texto: "Red Hat Text Variable", system-ui, sans-serif;
@@ -286,7 +292,7 @@ time, small { font-size: 0.8rem; color: var(--suave); }
 .quem { font-size: 0.85rem; color: var(--suave); }
 
 main {
-  padding: calc(var(--topo) + clamp(1rem, 3vw, 2rem)) var(--margem) clamp(1rem, 3vw, 2rem);
+  padding: calc(var(--topo) + var(--respiro)) var(--margem) var(--respiro);
   max-width: var(--largura);
   margin: 0 auto;
 }
@@ -401,8 +407,6 @@ main {
   color: var(--handoff);
   background: color-mix(in srgb, var(--handoff) 13%, transparent);
 }
-.inbox li.pede-atencao a,
-.inbox li.pede-atencao .swipe-row__surface { background: color-mix(in srgb, var(--handoff) 5%, var(--superficie)); }
 .inbox li a[aria-current="page"] { border-color: var(--destaque); background: var(--destaque-suave); }
 /* Na linha aberta, o tom dos selos parte da superfície: sobre o cobalto suave o
    texto âmbar e o verde caíam abaixo de 4,5:1. */
@@ -444,7 +448,6 @@ main {
 .inbox .swipe-row a:hover { transform: none; box-shadow: none; }
 /* O hover pinta a linha inteira, botão incluído, e não só o link. */
 .inbox .swipe-row__clip:hover .swipe-row__surface { background: var(--superficie-2); }
-.inbox li.pede-atencao .swipe-row a { background: none; }
 .inbox .swipe-row__action--commit { font-weight: 600; }
 
 /* Botão de ação na linha (desktop); no celular, o gesto é o caminho. */
@@ -510,8 +513,11 @@ main {
    cabeçalho subiria junto com as linhas. */
 .caixa-lista {
   position: sticky;
-  top: calc(var(--topo) + 1rem);
-  max-height: calc(100vh - var(--topo) - 2rem);
+  /* Mesmo topo do padding do `main`: se o `sticky` colasse em outro
+     valor, a lista subiria 15 px ao rolar e perderia o alinhamento
+     com o pé do compositor. */
+  top: var(--topo);
+  max-height: calc(100vh - var(--topo) - 2 * var(--respiro));
   display: flex;
   flex-direction: column;
   overflow: clip;
@@ -525,10 +531,21 @@ main {
   min-height: 0;
   padding-bottom: 1rem;
   overscroll-behavior: contain;
+  /* Sem barra à vista: a lista continua rolando por roda, teclado e toque. */
+  scrollbar-width: none;
 }
+.caixa-lista .inbox::-webkit-scrollbar { width: 0; height: 0; }
 .caixa-lista .titulo-tela { font-size: 1.25rem; margin-bottom: 0.75rem; }
 .caixa-lista .titulo-tela .contagem { font-size: 0.8rem; }
 .caixa > .vazio { padding-top: 6rem; }
+/* Com conversa aberta o respiro de baixo do `main` some e quem define a última
+   linha é o cartão do compositor: a lista termina junto com ele. O recuo +
+   respiro interno fazem a caixa já nascer na linha de 60 sem mover o conteúdo. */
+.caixa:has(.historico) .caixa-lista {
+  margin-top: calc(-1 * var(--respiro));
+  padding-top: calc(2px + var(--respiro));
+  max-height: calc(100vh - var(--topo) - var(--pe-compositor));
+}
 
 /* ---------------------------------------------------------------- conversa */
 .conversa { display: grid; grid-template-columns: minmax(0, 1fr) 20rem; gap: 1.5rem; align-items: start; }
@@ -536,6 +553,29 @@ main {
 .conversa.em-abas { grid-template-columns: minmax(0, 1fr); }
 .conversa.em-abas .abas-laterais { margin-top: 1rem; max-width: 24rem; }
 .conversa.em-abas .ficha, .conversa.em-abas .trilha { margin-top: 1rem; }
+/* A coluna da conversa ocupa a altura da tela e não cresce: quem rola é a lista
+   de mensagens, para o cabeçalho e o compositor não se moverem. Sem a altura
+   fechada, um chat vazio deixaria o compositor solto no meio da tela. Nas abas
+   Ficha/IA não há lista, então a coluna volta a crescer com o conteúdo. */
+.historico {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - var(--topo) - var(--respiro));
+}
+.historico:has(.mensagens) {
+  height: calc(100vh - var(--topo) - var(--respiro));
+}
+.historico:has(.mensagens) .mensagens {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* Sem barra à vista: rola por roda, teclado e toque. */
+  scrollbar-width: none;
+  padding-right: 0.35rem;
+}
+.historico:has(.mensagens) .mensagens::-webkit-scrollbar { width: 0; height: 0; }
+main:has(.historico) { padding-bottom: 0; }
 .historico > header {
   position: sticky;
   top: var(--topo);
@@ -636,13 +676,19 @@ main {
 .msg-sistema .autor { display: none; }
 .autor { font-size: 0.8rem; font-weight: 600; color: var(--suave); }
 /* Compositor: um cartão com o campo que cresce e a barra de atalhos embaixo. */
+/* `margin-top: auto` empurra o compositor para o pé da coluna quando as
+   mensagens não preenchem; o `sticky` cuida do caso em que preenchem. */
+.envio, .historico > button.principal {
+  margin-top: auto;
+}
 .envio {
   position: sticky;
   bottom: 0;
+  flex: none;
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
-  padding: 0.75rem 0 1rem;
+  padding: 0.75rem 0 var(--pe-compositor);
   background: linear-gradient(to bottom, transparent, var(--fundo) 0.75rem);
 }
 .compositor {
@@ -823,7 +869,10 @@ main {
   .acoes { margin-left: 0; width: 100%; }
   .mais-painel { right: auto; left: 0; }
 }
-.lateral { position: sticky; top: calc(var(--topo) + 1rem); display: flex; flex-direction: column; gap: 0.75rem; max-height: calc(100vh - var(--topo) - 2rem); overflow-y: auto; }
+/* Gruda na mesma linha do cabeçalho da conversa: em repouso as duas nascem em
+   90 (topo do `main`), ao rolar as duas param em 60 (a barra). O `padding-top`
+   igual ao do cabeçalho põe a pílula Ficha/IA na linha do telefone. */
+.lateral { position: sticky; top: var(--topo); display: flex; flex-direction: column; gap: 0.75rem; padding-top: 0.75rem; max-height: calc(100vh - var(--topo) - var(--respiro)); overflow-y: auto; }
 .abas-laterais { display: flex; gap: 0.25rem; padding: 0.25rem; background: var(--superficie-2); border-radius: var(--raio-l); }
 .abas-laterais button { flex: 1; border-color: transparent; background: none; }
 .abas-laterais button:hover:not(:disabled) { transform: none; box-shadow: none; background: var(--superficie); }
@@ -937,7 +986,15 @@ main {
 .barra-rascunho { position: sticky; bottom: max(0.75rem, env(safe-area-inset-bottom)); z-index: 6; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; padding: 0.6rem 0.75rem 0.6rem 1rem; background: var(--texto); color: var(--fundo); border-radius: var(--raio-l); box-shadow: var(--sombra-alta); }
 .barra-rascunho span { flex: 1; min-width: 10rem; font-weight: 600; }
 .barra-rascunho button:not(.principal) { background: transparent; color: inherit; border-color: color-mix(in srgb, var(--fundo) 40%, transparent); }
-.aviso-mudanca { margin: 0; padding: 0.75rem 0.9rem; background: color-mix(in srgb, var(--handoff) 12%, var(--superficie)); border-left: 3px solid var(--handoff); border-radius: var(--raio-s); }
+/* Aviso em linha: o recorte vem do tom e de um fio em volta, não de uma tarja
+   grossa de um lado só (que o detector chama de side-tab). */
+.aviso-mudanca {
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  background: color-mix(in srgb, var(--handoff) 12%, var(--superficie));
+  border: 1px solid color-mix(in srgb, var(--handoff) 70%, var(--borda));
+  border-radius: var(--raio-s);
+}
 .lista-mudancas { list-style: none; margin: 0.3rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.85rem; }
 .lista-mudancas li { display: flex; flex-wrap: wrap; gap: 0.25rem 0.6rem; }
 .lista-mudancas code { font-family: var(--fonte-mono); font-size: 0.78rem; overflow-wrap: anywhere; }
