@@ -33,24 +33,27 @@ export function Custos() {
           · IA em US$, de {dia(custos.de)} a {dia(custos.ate)}
         </span>
       </h1>
-      <dl className="totais">
+      {/* Uma faixa só, sem cartões: três números para conferir, não um painel de vitrine. */}
+      <dl className="resumo-custos">
         <div>
           <dt>Hoje</dt>
-          <dd>{dolar(custos.hoje?.custo_usd ?? 0)}</dd>
+          <dd className="dado">{dolar(custos.hoje?.custo_usd ?? 0)}</dd>
           <dd className="nota">
             {tokens(custos.hoje?.tokens ?? 0)} tokens · {custos.hoje?.turnos ?? 0} turnos
           </dd>
         </div>
         <div>
           <dt>No período</dt>
-          <dd>{dolar(custos.total.custo_usd)}</dd>
+          <dd className="dado">{dolar(custos.total.custo_usd)}</dd>
           <dd className="nota">
             {tokens(custos.total.tokens)} tokens · {custos.total.turnos} turnos
           </dd>
         </div>
         <div>
-          <dt>Por turno, em média</dt>
-          <dd>{dolar(custos.total.turnos ? custos.total.custo_usd / custos.total.turnos : 0)}</dd>
+          <dt>Média por turno</dt>
+          <dd className="dado">
+            {custos.total.turnos ? dolar(custos.total.custo_usd / custos.total.turnos) : "—"}
+          </dd>
         </div>
       </dl>
 
@@ -58,8 +61,8 @@ export function Custos() {
         <h2>Por dia</h2>
         {custos.dias.length === 0 ? (
           <Vazio
-            titulo="Nenhum turno no período."
-            texto="O custo aparece aqui assim que a IA responder."
+            titulo="Nenhum turno da IA neste período."
+            texto="O custo de cada dia aparece aqui quando a IA atende alguém, com o valor que o OpenRouter cobrou por turno."
           />
         ) : (
           <table>

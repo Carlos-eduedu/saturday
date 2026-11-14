@@ -79,7 +79,7 @@ p { text-wrap: pretty; }
 h2 { font-size: 1.25rem; margin: 0 0 0.75rem; }
 h3 { font-size: 1.05rem; margin: 0 0 0.5rem; }
 a { color: var(--destaque); text-underline-offset: 3px; }
-code, .telefone, time, small { font-family: var(--fonte-mono); }
+code, .telefone, time { font-family: var(--fonte-mono); }
 :focus-visible { outline: 2px solid var(--destaque); outline-offset: 2px; border-radius: var(--raio-s); }
 html { scroll-padding-top: calc(var(--topo) + 1rem); }
 
@@ -270,12 +270,14 @@ time, small { font-size: 0.8rem; color: var(--suave); }
   border-left: 1px solid var(--borda);
   padding-top: calc(var(--topo) + 2rem);
 }
+/* Itens como a navegação do desktop, só maiores para o polegar: texto normal,
+   sem caixa alta nem numeração (DESIGN.md, Navigation). */
 .sm-panel-item {
   color: var(--texto);
-  font-family: var(--fonte-titulo);
-  font-weight: 600;
-  font-size: clamp(2.25rem, 6vw, 3.25rem);
-  letter-spacing: -0.03em;
+  font-family: var(--fonte-texto);
+  font-weight: 500;
+  font-size: 1.15rem;
+  letter-spacing: 0;
 }
 .sm-panel-item:focus-visible { outline: 2px solid var(--destaque); outline-offset: 4px; border-radius: var(--raio-s); }
 /* Celular: a lista desce para perto do polegar, logo acima da conta, e cada
@@ -283,14 +285,14 @@ time, small { font-size: 0.8rem; color: var(--suave); }
 .sm-panel-inner { justify-content: flex-end; }
 .sm-panel-list { margin-top: auto; gap: 0.25rem; }
 .sm-panel-itemWrap { line-height: 1.15; }
-.sm-panel-item { display: block; padding: 0.3rem 3rem 0.3rem 0; min-height: var(--alvo); font-size: clamp(2rem, 9vw, 3rem); }
+.sm-panel-item { display: flex; align-items: center; padding: 0 0.85rem; min-height: 48px; border-radius: var(--raio-m); }
+.sm-panel-item:hover { background: var(--superficie-2); color: var(--texto); }
 .sm-socials { margin-top: 0; padding-top: 1.5rem; border-top: 1px solid var(--borda); }
 .staggered-menu-panel { padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain; }
-.sm-panel-item[aria-current="page"] { color: var(--destaque); }
-.sm-panel-list[data-numbering] .sm-panel-item::after { font-family: var(--fonte-mono); right: 0; top: 50%; transform: translateY(-50%); font-size: 0.8rem; }
+.sm-panel-item[aria-current="page"] { background: var(--destaque-suave); color: var(--destaque); }
 .sm-socials-title { color: var(--suave); font-family: var(--fonte-texto); font-size: 0.85rem; }
 .conta { display: flex; flex-direction: column; align-items: flex-start; gap: 0.6rem; }
-.cota { font-size: 0.85rem; color: var(--suave); font-family: var(--fonte-mono); }
+.cota { font-size: 0.85rem; color: var(--suave); font-variant-numeric: tabular-nums; }
 .cota-alerta { color: var(--handoff); font-weight: 600; }
 .quem { font-size: 0.85rem; color: var(--suave); }
 
@@ -374,10 +376,10 @@ main {
 .inbox .linha-conteudo { display: grid; grid-template-columns: 10.5rem minmax(0, 1fr); align-items: center; column-gap: 1.25rem; }
 .linha-identidade { display: flex; flex-direction: column; gap: 0.15rem; padding-right: 1.25rem; border-right: 1px solid var(--borda); }
 .linha-identidade .telefone { font-size: 0.95rem; font-weight: 500; color: var(--texto); font-variant-numeric: tabular-nums; white-space: nowrap; }
-/* Exceção à escala: sob a identidade, na coluna fixa de 21rem, 0,75rem é o que
-   mantém "WhatsApp · janela fechada" numa linha só. */
-.linha-canal { display: flex; flex-wrap: wrap; gap: 0 0.5rem; font-size: 0.75rem; color: var(--suave); }
-.linha-canal .janela { font-size: 0.75rem; }
+/* Sob a identidade só aparece um rótulo curto ("Evolution" ou "janela
+   fechada"): cabe em 0,8rem, o menor tamanho legível da escala. */
+.linha-canal { display: flex; flex-wrap: wrap; gap: 0 0.5rem; font-size: 0.8rem; color: var(--suave); }
+.linha-canal .janela { font-size: 0.8rem; }
 .fala { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
 .fala .motivo { font-size: 0.8rem; color: var(--handoff); font-weight: 500; }
 /* A coluna de meta pode encolher: sem `min-width: 0` o selo com nome de quem
@@ -493,7 +495,22 @@ main {
 .lista-conversas { container: lista / inline-size; }
 @container lista (max-width: 599px) {
   .acao-linha { display: none; }
-  .inbox .swipe-row__toggle { display: inline-flex; }
+  /* O botão de ações fica à mostra no canto de cima: é o caminho por toque
+     além do gesto, e o sinal de que a linha tem ações. */
+  .inbox .swipe-row__toggle {
+    display: grid;
+    width: var(--alvo);
+    height: var(--alvo);
+    border-radius: var(--raio-m);
+    overflow: visible;
+    clip-path: none;
+    color: var(--suave);
+  }
+  .inbox .swipe-row__toggle:hover:not(:disabled) { transform: none; box-shadow: none; background: var(--superficie-2); color: var(--texto); }
+  .inbox .swipe-row .linha-identidade { padding-right: var(--alvo); }
+  /* Abas com contagem não cabem numa linha: quebram em vez de cortar no meio
+     da palavra sob o esmaecido. */
+  .filtros [role="tablist"] { flex-wrap: wrap; gap: 0 0.9rem; overflow: visible; mask-image: none; animation: none; }
   .inbox li a { grid-template-columns: minmax(0, 1fr); align-content: center; }
   .inbox .linha-conteudo { grid-template-columns: minmax(0, 1fr); row-gap: 0.2rem; }
   .linha-identidade { flex-direction: row; gap: 0.6rem; align-items: baseline; padding-right: 0; border-right: 0; }
@@ -508,7 +525,13 @@ main {
 .alertas li button { margin-left: auto; }
 
 /* ---------------------------------------------------------------- caixa */
+/* Abaixo de 1024 px, uma tela de cada vez: com a conversa aberta, a lista fica
+   montada (sem recarregar ao voltar), só escondida. */
+@media (max-width: 1023px) {
+  .caixa.com-aberta > .caixa-lista { display: none; }
+}
 /* Desktop: lista à esquerda, rolando sozinha; a conversa usa a rolagem da página. */
+@media (min-width: 1024px) {
 .caixa { display: grid; grid-template-columns: 21rem minmax(0, 1fr); gap: 1.5rem; align-items: start; }
 /* Cabeçalho da lista (título, filas, busca) parado no topo; quem rola é só a
    lista. `clip` (e não `hidden`) impede qualquer rolagem da coluna — inclusive
@@ -528,7 +551,7 @@ main {
   padding: 2px 6px 0 2px;
   overscroll-behavior: contain;
 }
-.caixa-lista .lista-conversas { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.caixa-lista :is(.lista-conversas, .painel-fila) { display: flex; flex-direction: column; min-height: 0; flex: 1; }
 .caixa-lista .inbox {
   overflow-y: auto;
   min-height: 0;
@@ -549,12 +572,64 @@ main {
   padding-top: calc(2px + var(--respiro));
   max-height: calc(100vh - var(--topo) - var(--pe-compositor));
 }
+}
+
+/* --- inbox / alertas --- */
+/* Altura fixa do botão de atenção: trocar de fila não faz as abas pularem. */
+.cabeca-lista { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.75rem; min-height: var(--alvo); margin-bottom: 1.25rem; }
+.cabeca-lista .titulo-tela { margin: 0; }
+.lista-conversas.compacta .cabeca-lista { margin-bottom: 0.75rem; }
+/* "N pedem atenção" filtra a lista; apertado, mostra só essas. */
+.filtro-atencao {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0 0.85rem;
+  border-color: color-mix(in srgb, var(--handoff) 40%, var(--borda));
+  border-radius: 999px;
+  background: transparent;
+  color: var(--handoff);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.filtro-atencao:hover:not(:disabled) { transform: none; box-shadow: none; border-color: var(--handoff); background: color-mix(in srgb, var(--handoff) 8%, transparent); }
+.filtro-atencao[aria-pressed="true"] { border-color: var(--handoff); background: color-mix(in srgb, var(--handoff) 14%, var(--superficie)); }
+.filtros [role="tablist"] .aba-contagem { font-family: var(--fonte-mono); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+/* Na lista compacta, o botão Assumir volta só nas linhas em handoff. */
+.lista-conversas.compacta .acao-linha { display: inline-flex; align-items: center; margin-right: 0.75rem; }
+/* Trocando de fila, a lista anterior fica à mostra, esmaecida, até a nova chegar. */
+.painel-fila.recarregando { opacity: 0.55; transition: opacity 150ms ease 150ms; }
+/* Primeira carga: linhas de esqueleto no lugar de "Carregando…". */
+.inbox.esqueleto li {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.6rem;
+  min-height: 76px;
+  padding: 0.7rem 1.1rem;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-l);
+  background: var(--superficie);
+}
+.inbox.esqueleto span { display: block; height: 0.7rem; width: 40%; border-radius: 999px; background: var(--superficie-2); animation: esqueleto-pulsar 1.2s ease-in-out infinite alternate; }
+.inbox.esqueleto span + span { width: 75%; }
+@keyframes esqueleto-pulsar { to { opacity: 0.45; } }
+.dica-gesto { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.75rem; font-size: 0.85rem; color: var(--suave); }
+.dica-gesto svg { vertical-align: -3px; }
+.dica-gesto button { flex: none; margin-left: auto; padding: 0 0.6rem; border: 0; background: none; color: var(--destaque); font-weight: 600; }
+.dica-gesto button:hover:not(:disabled) { transform: none; box-shadow: none; text-decoration: underline; }
+.alertas-cabeca { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; margin-bottom: 1.25rem; }
+.alertas-cabeca .titulo-tela { margin: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .inbox.esqueleto span { animation: none; }
+  .painel-fila.recarregando { transition: none; }
+}
 
 /* ---------------------------------------------------------------- conversa */
 .conversa { display: grid; grid-template-columns: minmax(0, 1fr) 20rem; gap: 1.5rem; align-items: start; }
 @media (max-width: 1023px) { .conversa { grid-template-columns: minmax(0, 1fr); } }
 .conversa.em-abas { grid-template-columns: minmax(0, 1fr); }
-.conversa.em-abas .abas-laterais { margin-top: 1rem; max-width: 24rem; }
+.conversa.em-abas .abas-laterais { margin-top: 1rem; }
 .conversa.em-abas .ficha, .conversa.em-abas .trilha { margin-top: 1rem; }
 /* A coluna da conversa ocupa a altura da tela e não cresce: quem rola é a lista
    de mensagens, para o cabeçalho e o compositor não se moverem. Sem a altura
@@ -858,7 +933,6 @@ main:has(.historico) { padding-bottom: 0; }
   .historico h1 { font-size: 1.15rem; }
   .identidade { flex: 1; }
   .identidade p { gap: 0.25rem 0.6rem; font-size: 0.8rem; }
-  .conversa.em-abas .abas-laterais { max-width: none; }
   .mensagens { margin: 1rem 0; }
 }
 /* Toque: campo abaixo de 16px faz o iOS dar zoom ao focar. */
@@ -879,12 +953,29 @@ main:has(.historico) { padding-bottom: 0; }
 }
 /* Gruda na mesma linha do cabeçalho da conversa: em repouso as duas nascem em
    90 (topo do `main`), ao rolar as duas param em 60 (a barra). O `padding-top`
-   igual ao do cabeçalho põe a pílula Ficha/IA na linha do telefone. */
+   igual ao do cabeçalho põe as abas Ficha/IA na linha do telefone. */
 .lateral { position: sticky; top: var(--topo); display: flex; flex-direction: column; gap: 0.75rem; padding-top: 0.75rem; max-height: calc(100vh - var(--topo) - var(--respiro)); overflow-y: auto; }
-.abas-laterais { display: flex; gap: 0.25rem; padding: 0.25rem; background: var(--superficie-2); border-radius: var(--raio-l); }
-.abas-laterais button { flex: 1; border-color: transparent; background: none; }
-.abas-laterais button:hover:not(:disabled) { transform: none; box-shadow: none; background: var(--superficie); }
-.abas-laterais button.ativo { background: var(--superficie); color: var(--texto); box-shadow: var(--sombra); border-color: transparent; }
+.lateral > [role="tabpanel"] { display: flex; flex-direction: column; gap: 0.75rem; }
+/* Abas de página (componente Abas): sublinhadas, como as filas da Inbox. Um
+   estilo só para aba no painel; rolam de lado se faltar espaço, nunca cortam. */
+.abas-laterais { display: flex; gap: 0.75rem; border-bottom: 1px solid var(--borda); overflow-x: auto; scrollbar-width: none; }
+.abas-laterais button {
+  flex: none;
+  min-height: var(--alvo);
+  padding: 0 0.4rem;
+  margin-bottom: -1px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--suave);
+  white-space: nowrap;
+}
+.abas-laterais button:hover:not(:disabled) { transform: none; box-shadow: none; color: var(--texto); }
+.abas-laterais button.ativo { color: var(--destaque); border-bottom-color: var(--destaque); background: none; }
+.abas-laterais button:focus-visible { outline-offset: -2px; }
+/* As cinco abas do Agente cabem numa linha a 390px. */
+@media (max-width: 599px) { .abas-laterais { gap: 0.25rem; } }
 .ficha { padding: 1.25rem; }
 .ficha dl { margin: 0; }
 .ficha dt { font-size: 0.8rem; color: var(--suave); margin-top: 0.75rem; }
@@ -916,11 +1007,18 @@ main:has(.historico) { padding-bottom: 0; }
 
 /* Custos (só gestor) */
 .custos { display: flex; flex-direction: column; gap: 1.5rem; }
-.totais { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; margin: 0; }
-.totais > div { padding: 1.1rem 1.25rem; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio-l); }
-.totais dt { font-size: 0.85rem; color: var(--suave); }
-.totais dd { margin: 0.25rem 0 0; font-family: var(--fonte-titulo); font-size: 1.5rem; font-variant-numeric: tabular-nums; }
-.totais dd.nota { font-family: var(--fonte-texto); font-size: 0.85rem; }
+/* Resumo em faixa única com divisórias, sem cartões de vitrine. */
+.resumo-custos { display: flex; flex-wrap: wrap; margin: 0; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio-l); }
+.resumo-custos > div { flex: 1 1 12rem; padding: 0.85rem 1.25rem; }
+.resumo-custos > div + div { border-left: 1px solid var(--borda); }
+.resumo-custos dt { font-size: 0.85rem; color: var(--suave); }
+.resumo-custos dd { margin: 0.15rem 0 0; }
+.resumo-custos dd.dado { font-size: 1.15rem; color: var(--texto); }
+.resumo-custos dd.nota { font-size: 0.8rem; }
+@media (max-width: 599px) {
+  .resumo-custos > div + div { border-left: none; border-top: 1px solid var(--borda); }
+}
+.custos td.num { font-family: var(--fonte-mono); font-size: 0.85rem; }
 .custos section { padding: 1.25rem; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio-l); }
 .custos table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .custos th { text-align: left; font-size: 0.8rem; font-weight: 500; color: var(--suave); padding: 0.5rem; border-bottom: 1px solid var(--borda); }
@@ -928,14 +1026,11 @@ main:has(.historico) { padding-bottom: 0; }
 .custos tbody tr:last-child td { border-bottom: none; }
 .custos .num { text-align: right; }
 .caras { margin: 0; padding-left: 1.25rem; display: flex; flex-direction: column; gap: 0.4rem; }
-.caras li span { margin-left: 0.75rem; color: var(--suave); font-variant-numeric: tabular-nums; }
+.caras li span { margin-left: 0.75rem; color: var(--suave); font-family: var(--fonte-mono); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
 
 /* ---------------------------------------------------------------- agente */
 .agente { display: flex; flex-direction: column; gap: 1rem; }
-/* Cinco abas: o trilho acompanha o conteúdo e, no celular, rola de lado (a aba
-   cortada na borda mostra que há mais). */
-.agente > .abas-laterais { width: fit-content; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
-.agente > .abas-laterais button { flex: none; white-space: nowrap; }
+.painel-aba { display: flex; flex-direction: column; gap: 1rem; }
 .agente .nota { margin: 0; font-size: 0.85rem; color: var(--suave); }
 .grafo-tela { display: flex; flex-direction: column; gap: 0.75rem; }
 /* O grafo é mais largo que o celular: rola dentro do quadro, nunca a página. */
@@ -1132,7 +1227,7 @@ main:has(.historico) { padding-bottom: 0; }
 .edicao-usuario > button, .edicao-usuario > div > button { align-self: flex-start; }
 .usuarios tr.desativado td { color: var(--suave); }
 .situacao-usuario { font-weight: 500; }
-.situacao-ativo { color: var(--ia); }
+.situacao-ativo { color: var(--texto); }
 .situacao-bloqueado { color: var(--handoff); }
 .situacao-desativado { color: var(--suave); }
 
@@ -1146,7 +1241,7 @@ main:has(.historico) { padding-bottom: 0; }
 /* Aba Granatech */
 .granatech .filtros .form-usuario { margin-top: 0; }
 .granatech .acoes { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
-.granatech .acoes button small { font-weight: 400; color: var(--suave); }
+.granatech .acoes button .motivo-acao { font-weight: 400; color: var(--suave); }
 .ficha-granatech { display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 1rem; margin: 0 0 1rem; }
 .ficha-granatech dt { color: var(--suave); font-size: 0.85rem; }
 .ficha-granatech dd { margin: 0; display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
@@ -1281,4 +1376,118 @@ main:has(.historico) { padding-bottom: 0; }
 @media (max-width: 599px) {
   .chip-anexo .nome { max-width: 12rem; }
   .chip-anexo audio { max-width: 12rem; }
+}
+
+/* --- sistema / páginas --- */
+/* Pular para o conteúdo: escondido até receber foco pelo teclado. */
+.pular {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--alvo);
+  padding: 0 1rem;
+  border-radius: var(--raio-m);
+  background: var(--destaque);
+  color: var(--destaque-texto);
+  font-weight: 500;
+  text-decoration: none;
+  transform: translateY(-200%);
+}
+.pular:focus-visible { transform: none; outline-offset: 2px; }
+#conteudo:focus { outline: none; }
+/* No celular o painel ocupa a largura toda: a borda esquerda virava um fio solto. */
+@media (max-width: 1023px) { .staggered-menu-panel { border-left: none; } }
+
+/* Mono só para dado (DESIGN.md, Mono É Dado): <small> é texto; o que guarda
+   número, telefone, ID ou hora leva .dado (ou fica em <time>/<code>). */
+.dado { font-family: var(--fonte-mono); font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+small.dado { font-size: 0.8rem; }
+.ficha-granatech dd.dado { font-size: 0.875rem; }
+.canais td.dado::before { font-family: var(--fonte-texto); }
+/* Link sem o respiro de 0,25rem do button.link: alinha com o texto das outras linhas. */
+.ficha-granatech button.link { padding: 0; }
+.ficha-granatech button.link.dado { font-family: var(--fonte-mono); font-size: 0.875rem; }
+.progresso-rodada small { font-variant-numeric: tabular-nums; }
+
+/* Números da Meta: linhas com rótulo, não lista com marcador. */
+.canais ul.lista-numeros { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; }
+.lista-numeros li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.75rem; padding: 0.6rem 0; border-bottom: 1px solid var(--borda); }
+.lista-numeros li:last-child { border-bottom: none; }
+.rotulo-dado { font-size: 0.85rem; color: var(--suave); min-width: 11rem; }
+
+/* Granatech: filtros recolhidos no celular, homologação recolhida no fim. */
+.granatech .abas-laterais { margin-bottom: 1rem; }
+.filtros-granatech { margin-bottom: 1rem; }
+.filtros-granatech .form-usuario { margin-top: 0; }
+.alternar-filtros { display: none; }
+@media (max-width: 767px) {
+  .alternar-filtros { display: inline-flex; align-items: center; }
+  .filtros-granatech:not(.aberto) .form-usuario { display: none; }
+  .filtros-granatech.aberto .form-usuario { margin-top: 0.75rem; }
+  .alternar-filtros[aria-expanded="true"] { background: var(--superficie-2); }
+}
+.canais > details.homologacao {
+  padding: 0 1.25rem;
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-l);
+}
+.homologacao > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.6rem;
+  min-height: var(--alvo);
+  padding: 0.85rem 0;
+  cursor: pointer;
+  list-style: none;
+}
+.homologacao > summary::-webkit-details-marker { display: none; }
+.homologacao > summary .seta { align-self: center; color: var(--suave); transition: transform 120ms ease; }
+.homologacao[open] > summary .seta { transform: rotate(90deg); }
+.homologacao > summary h2 { margin: 0; font-size: 1.1rem; }
+.homologacao[open] { padding-bottom: 1.25rem; }
+.oferta-completa summary { width: fit-content; min-height: var(--alvo); display: flex; align-items: center; color: var(--suave); font-size: 0.85rem; cursor: pointer; }
+.login .erro { margin: 0; font-size: 0.9rem; }
+.login > .nota:last-child { margin: 0; font-size: 0.8rem; }
+
+/* --- conversa --- */
+/* Esqueleto: balões no lugar das mensagens enquanto a conversa chega. A
+   pulsação some com redução de movimento (regra global). */
+.esqueleto-topo { width: min(18rem, 60%); height: 3.25rem; margin: 0.75rem 0; border-radius: var(--raio-m); background: var(--superficie-2); }
+.esqueleto-msg { width: min(26rem, 70%); height: 3.5rem; background: var(--superficie-2); border-color: transparent; animation: esqueleto-pulso 1.6s ease-in-out infinite; }
+.esqueleto-msg:nth-child(2n) { width: min(20rem, 55%); }
+.esqueleto-msg:nth-child(3) { height: 5rem; }
+.esqueleto-blocos { display: flex; flex-direction: column; gap: 0.5rem; }
+.esqueleto-blocos > span { height: 4.5rem; border-radius: var(--raio-l); background: var(--superficie-2); animation: esqueleto-pulso 1.6s ease-in-out infinite; }
+@keyframes esqueleto-pulso { 50% { opacity: 0.55; } }
+
+/* De onde veio a fala da IA com valores e se ela bate com a oferta vigente. */
+.conferencia { display: flex; flex-wrap: wrap; gap: 0.15rem 0.35rem; margin: 0.4rem 0 0.15rem; padding-top: 0.4rem; border-top: 1px solid color-mix(in srgb, var(--ia) 25%, transparent); font-size: 0.8rem; color: var(--suave); }
+.conferencia .atencao { color: var(--handoff); font-weight: 600; }
+/* O ponto fica no fim do item: quebrando a linha, ele não abre a seguinte. */
+.conferencia > :not(:last-child)::after { content: " ·"; color: var(--suave); font-weight: 400; }
+
+/* Celular: o cabeçalho é uma linha (voltar, telefone, estado, Mais); canal e
+   etapa vão para o Mais, e Assumir/Devolver ficam no envio, perto do polegar.
+   Espera, motivo e janela fechada ficam embaixo, só quando existem. */
+.mais-contexto, .mais-celular, .devolver-rodape { display: none; }
+.compositor .devolver-rodape + .enviar { margin-left: 0.5rem; }
+@media (max-width: 767px) {
+  .historico > header { padding-block: 0.25rem 0.5rem; }
+  .identidade { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 0.15rem 0.5rem; }
+  .identidade p { display: contents; }
+  .identidade .contexto { display: none; }
+  .historico > header.tem-envio .acao-primaria { display: none; }
+  .acoes { margin-left: auto; width: auto; flex-wrap: nowrap; align-self: flex-start; }
+  .mais-painel { left: auto; right: 0; }
+  .mais-contexto { display: block; margin: 0; color: var(--suave); font-size: 0.85rem; }
+  .mais-celular { display: inline-flex; align-items: center; justify-content: center; }
+  .devolver-rodape { display: inline-flex; }
+}
+@media (max-width: 599px) {
+  .compositor .devolver-rodape { margin-left: auto; }
 }

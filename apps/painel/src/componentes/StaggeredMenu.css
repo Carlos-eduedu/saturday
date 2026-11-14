@@ -271,12 +271,10 @@
 .sm-panel-item {
   position: relative;
   color: #000;
-  font-weight: 600;
-  font-size: 4rem;
+  font-weight: 500;
+  font-size: 1.15rem;
   cursor: pointer;
-  line-height: 1;
-  letter-spacing: -2px;
-  text-transform: uppercase;
+  line-height: 1.3;
   transition:
     background 0.15s,
     color 0.15s;
@@ -388,13 +386,14 @@
 .staggered-menu-wrapper[data-open] .sm-prelayer { transition-delay: calc(var(--i, 0) * 10ms), 0s; }
 .staggered-menu-wrapper[data-open] .staggered-menu-panel { transition-delay: 20ms, 0s; }
 
-/* Itens: sobem girando de leve, um depois do outro. Ao fechar voltam sem animar. */
-/* Fechado: os itens só voltam para baixo depois que o painel saiu (150 ms). */
-.sm-panel-itemLabel { transform: translateY(140%) rotate(10deg); transition: transform 0s linear 150ms; }
+/* Itens: entram com um deslize curto, quase juntos. Ao fechar voltam sem animar,
+   depois que o painel saiu (150 ms). */
+.sm-panel-itemLabel { transform: translateY(0.5rem); opacity: 0; transition: transform 0s linear 150ms, opacity 0s linear 150ms; }
 .staggered-menu-wrapper[data-open] .sm-panel-itemLabel {
   transform: none;
-  transition: transform 260ms var(--sm-abrir);
-  transition-delay: calc(40ms + var(--i, 0) * 18ms);
+  opacity: 1;
+  transition: transform 200ms var(--sm-abrir), opacity 200ms var(--sm-abrir);
+  transition-delay: calc(30ms + var(--i, 0) * 12ms);
 }
 .sm-panel-list[data-numbering] .sm-panel-item::after { --sm-num-opacity: 0; transition: opacity 0s linear 150ms; }
 .staggered-menu-wrapper[data-open] .sm-panel-list[data-numbering] .sm-panel-item::after {
@@ -416,5 +415,5 @@
   .sm-socials-title, .sm-panel-list[data-numbering] .sm-panel-item::after {
     transition: none !important;
   }
-  .staggered-menu-wrapper[data-open] .sm-panel-itemLabel { transform: none; }
+  .staggered-menu-wrapper[data-open] .sm-panel-itemLabel { transform: none; opacity: 1; }
 }

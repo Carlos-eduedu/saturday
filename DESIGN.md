@@ -130,7 +130,7 @@ Cinza frio com um único cobalto de ação, mais três cores de estado com signi
 - **Grafite Suave** (#5d6470): texto secundário, rótulos, horas; 5,2:1 sobre o fundo.
 - **Cinza Frio de Fundo** (#eef0f3): fundo da página.
 - **Superfície** (#ffffff): cartões, linhas, campos.
-- **Superfície Recuada** (#e2e5ea): trilho de abas, gaveta do arrastar, hover de linha.
+- **Superfície Recuada** (#e2e5ea): gaveta do arrastar, hover de linha.
 - **Borda** (#d3d7de): contorno de cartões e campos, divisórias.
 
 ### Named Rules
@@ -154,7 +154,7 @@ Cinza frio com um único cobalto de ação, mais três cores de estado com signi
 - **Data** (400, 0.85rem, mono, números tabulares): telefones mascarados, horas, custos, tokens, IDs.
 
 ### Named Rules
-**The Mono É Dado Rule.** Fonte mono só para dados e medidas (telefone, hora, custo, ID), nunca como enfeite "técnico".
+**The Mono É Dado Rule.** Fonte mono só para dados e medidas (telefone, hora, custo, ID, contagem), nunca como enfeite "técnico". `<small>` é texto; o dado vai em `<time>`, `<code>` ou na classe `.dado` (mono, 0.875rem, números tabulares).
 
 ## Layout
 
@@ -165,7 +165,7 @@ Coluna única centrada com largura máxima de 82rem e respiro lateral de 1–2re
 Híbrido: superfícies brancas sobre o fundo cinza com sombra quase imperceptível em repouso; a sombra cresce só como resposta ao ponteiro.
 
 ### Shadow Vocabulary
-- **Repouso** (`box-shadow: 0 1px 2px rgb(11 12 14 / 6%), 0 4px 12px rgb(11 12 14 / 4%)`): cartões, linhas da lista, aba ativa.
+- **Repouso** (`box-shadow: 0 1px 2px rgb(11 12 14 / 6%), 0 4px 12px rgb(11 12 14 / 4%)`): cartões, linhas da lista.
 - **Elevada** (`box-shadow: 0 2px 4px rgb(11 12 14 / 8%), 0 10px 24px rgb(11 12 14 / 8%)`): linha da lista no hover e o aviso flutuante de "Desfazer".
 
 ### Named Rules
@@ -202,13 +202,16 @@ Cantos suaves em três passos: 6px para foco e detalhes, 10px para botões e cam
 
 ### Navigation
 - **Desktop:** links no topo, 44px de altura; hover com Superfície Recuada; página atual com Cobalto de Ação Suave e texto cobalto.
-- **Celular:** botão "Menu" abre um painel lateral (StaggeredMenu) com os itens grandes e numerados e a conta no pé.
+- **Celular:** botão "Menu" abre um painel lateral (StaggeredMenu) calmo: itens em caixa de frase, Red Hat Text 500 a ~1.15rem, linhas de 48px, sem numeração; a página atual em Cobalto de Ação Suave com texto cobalto; entrada com fade curto; a conta no pé.
+
+### Abas
+Um estilo só de aba de página (Agente, Granatech, Ficha e IA da conversa): texto em grafite sobre um fio de 1px em Borda; a aba atual em cobalto com sublinhado de 2px. Sem trilho, fundo ou sombra. Setas, Home e End trocam de aba; o conteúdo fica num `tabpanel` ligado à aba. Rolam de lado se faltar espaço, nunca cortam.
 
 ### Linha de conversa (assinatura)
 Prévia da última fala com o autor colorido como conteúdo principal; telefone mascarado e canal em segundo plano; à direita, rótulo de atenção, etapa, selo de estado e espera relativa ("cliente espera há 12 min"). No desktop tem o botão Assumir/Devolver; arrastar para a esquerda é atalho (no celular, o caminho). Assumir e devolver valem na hora, na lista e no cabeçalho da conversa; por 5s o aviso "Desfazer" devolve a conversa ao estado de antes. O botão Assumir só é principal (cobalto) na linha que pede atenção.
 
 ### Acompanhamento na conversa
-Ao lado das mensagens, antes da Ficha: a oferta vigente (liberado, parcelas, taxa e CET, seguro), a proposta no banco e as provas de consentimento, para conferir a fala da IA sem trocar de tela. Valores em mono. Quando a proposta do banco não bate com a oferta, uma faixa âmbar diz "Difere da oferta vigente".
+Ao lado das mensagens, antes da Ficha: a oferta vigente (liberado, parcelas, taxa e CET, seguro), a proposta no banco e as provas de consentimento, para conferir a fala da IA sem trocar de tela. Valores em mono. A situação da proposta usa o mesmo rótulo em português da aba Granatech (um mapa só); a formalização no link do banco se chama "assinatura" ("Aguardando assinatura", "Refazer assinatura"). Quando a proposta do banco não bate com a oferta, uma faixa âmbar diz "Difere da oferta vigente".
 
 ### Balões da conversa
 Cliente à esquerda em branco; IA à direita em verde tingido; equipe à direita em cobalto suave; sistema centrado, sem balão, em grafite.

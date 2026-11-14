@@ -131,20 +131,6 @@ export function reais(valor: string | number | null | undefined): string {
   return numero.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-// Status da proposta na Granatech, como a equipe fala deles.
-export const STATUS_PROPOSTA: Record<string, string> = {
-  PENDING_CONFIRMATION: "Aguardando confirmação",
-  PENDING_USER_REVIEW: "Aguardando revisão",
-  PENDING_FORMALIZATION: "Aguardando assinatura",
-  PENDING_BANK_ANALYSIS: "Banco analisando",
-  PENDING_PAYMENT: "Pagamento a caminho",
-  PENDING_REFORMALIZATION: "Refazer assinatura",
-  REPROVED: "Reprovada",
-  CANCELED: "Cancelada",
-  CANCELED_BY_CLIENT: "Cancelada pelo cliente",
-  PAYED: "Paga",
-};
-
 export const TIPOS_DE_PROVA: Record<string, string> = {
   consulta: "Autorizou a consulta",
   proposta: "Aceitou a proposta",
@@ -163,6 +149,10 @@ export function dolar(valor: number): string {
 
 export const tokens = (n: number) => n.toLocaleString("pt-BR");
 
+// Taxa ao mês como a equipe lê: "4,00% a.m.". Mesmo formato da Ficha.
+export const porcento = (valor: string | number) =>
+  `${Number(valor).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}% a.m.`;
+
 // O que o atendente lê no lugar do código da Granatech. O que não estiver aqui
 // aparece como veio: melhor o código cru do que um rótulo errado.
 export const SITUACAO_DA_CONSULTA: Record<string, string> = {
@@ -177,22 +167,25 @@ export const SITUACAO_DA_CONSULTA: Record<string, string> = {
   WORKER_MUST_CANCEL_RETURN_REQUEST: "Cancelamento pendente",
 };
 
+// Situação da proposta na Granatech, num mapa só para a Ficha e a aba
+// Granatech: o mesmo código lê igual nas duas telas. "Assinatura" é o que o
+// cliente faz na formalização (biometria e aceite no link do banco).
 export const SITUACAO_DA_PROPOSTA: Record<string, string> = {
   PENDING_CONFIRMATION: "Aguardando confirmação",
   AGUARDANDO_CONFIRMACAO: "Aguardando confirmação",
   PENDING_USER_REVIEW: "Aguardando revisão",
   AGUARDANDO_REVISAO_USUARIO: "Aguardando revisão",
-  PENDING_FORMALIZATION: "Aguardando formalização",
-  AGUARDANDO_FORMALIZACAO: "Aguardando formalização",
+  PENDING_FORMALIZATION: "Aguardando assinatura",
+  AGUARDANDO_FORMALIZACAO: "Aguardando assinatura",
   PENDING_BANK_ANALYSIS: "Em análise no banco",
   AGUARDANDO_ANALISE_BANCO: "Em análise no banco",
-  PENDING_PAYMENT: "Aguardando pagamento",
-  PENDING_REFORMALIZATION: "Refazer a identidade",
-  REFAZER_SEGURANCA_IDENTIDADE: "Refazer a identidade",
-  SUCESSO_SEGURANCA_IDENTIDADE: "Identidade aprovada",
+  PENDING_PAYMENT: "Pagamento a caminho",
+  PENDING_REFORMALIZATION: "Refazer assinatura",
+  REFAZER_SEGURANCA_IDENTIDADE: "Refazer assinatura",
+  SUCESSO_SEGURANCA_IDENTIDADE: "Assinatura aprovada",
   BLOQUEIO_DE_SALDO_EM_ANDAMENTO: "Bloqueando o saldo",
   BLOQUEIO_SALDO: "Saldo bloqueado",
-  FORMALIZACAO_EM_ANDAMENTO: "Formalização em andamento",
+  FORMALIZACAO_EM_ANDAMENTO: "Assinatura em andamento",
   FALHA_PAGAMENTO: "Falha no pagamento",
   REPROVED: "Reprovada",
   REPROVADO: "Reprovada",

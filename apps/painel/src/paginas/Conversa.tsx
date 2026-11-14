@@ -9,14 +9,16 @@ import {
   type Eu,
   exportarUrl,
   type Ficha,
+  type Mensagem,
   mensagemDeFalha,
   midiaUrl,
   type Trilha,
+  type Turno,
   type Usuario,
 } from "../api";
 import { useConfirmar } from "../componentes/Confirmar";
 import { pedidoDeTomada, textoDoAviso, useAvisoDesfazer } from "../componentes/Desfazer";
-import { Abas } from "../componentes/Abas";
+import { Abas, idAba } from "../componentes/Abas";
 import { Compositor } from "../componentes/Compositor";
 import { Falha } from "../componentes/Falha";
 import { ItemTurno } from "../componentes/ItemTurno";
@@ -26,13 +28,16 @@ import {
   dolar,
   ETAPAS,
   MOTIVOS_HANDOFF,
+  NOS,
+  porcento,
   reais,
   rotulo,
-  STATUS_PROPOSTA,
+  SITUACAO_DA_PROPOSTA,
   TIPOS_DE_PROVA,
   tokens,
 } from "../rotulos";
 import { useAvisos } from "../tempoReal";
+import { centavosCitados, foraDaOferta, origemDaMensagem, reaisDeCentavos } from "./conferencia";
 import { formatarHora, ROTULO_ATENDIMENTO, textoDaEspera } from "./Inbox";
 
 const AUTOR = { cliente: "Cliente", ia: "IA", atendente: "Equipe", sistema: "Sistema" };
@@ -53,22 +58,25 @@ const STATUS_ENTREGA: Record<string, string> = {
 // Conteúdo que `painel/acoes.enviar_anexo` grava quando o anexo vai sem legenda.
 const ANEXO_SEM_LEGENDA = /^\[(imagem|documento|áudio) .+\]$/;
 
+// Dado revelado volta a ficar mascarado sozinho depois disto.
+const REMASCARAR_MS = 60_000;
+
 type Aba = "mensagens" | "ficha" | "ia";
 
-// `fichaEmAba`: sem espaço para a coluna lateral (conversa ao lado da lista),
-// ficha e trilha da IA viram abas ao lado das mensagens.
-export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: boolean }) {
-  const { id = "" } = useParams();
-  const [aba, setAba] = useState<Aba>("mensagens");
-  const [conversa, setConversa] = useState<Detalhe | null>(null);
-  const [erro, setErro] = useState("");
-
+// Carrega um recurso da conversa e recarrega com os avisos do tempo real.
+// Trocar de conversa esconde o que era da anterior; recarregar mantém à vista
+// o que já estava (e uma falha ao recarregar também).
+function useDaConversa<T>(id: string, buscar: (id: string) => Promise<T>, oQue: string) {
+  const [estado, setEstado] = useState<{ id: string; dado: T } | null>(null);
+  const [erro, setErro] = useState<{ id: string; texto: string } | null>(null);
   const carregar = useCallback(() => {
-    api
-      .conversa(id)
-      .then(setConversa)
-      .catch((e: unknown) => setErro(mensagemDeFalha(e, "carregar a conversa")));
-  }, [id]);
+    buscar(id)
+      .then((dado) => {
+        setEstado({ id, dado });
+        setErro(null);
+      })
+      .catch((e: unknown) => setErro({ id, texto: mensagemDeFalha(e, oQue) }));
+  }, [id, buscar, oQue]);
   useEffect(carregar, [carregar]);
   useAvisos(
     useCallback(
@@ -76,12 +84,46 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
       [id, carregar],
     ),
   );
+  return {
+    dado: estado?.id === id ? estado.dado : null,
+    erro: erro?.id === id ? erro.texto : "",
+    carregar,
+  };
+}
+
+// Prévia curta para o leitor de tela anunciar a mensagem que chegou.
+function previa(m: Mensagem): string {
+  const texto = m.conteudo.replace(/\s+/g, " ").trim();
+  if (!texto || (m.anexos.length > 0 && ANEXO_SEM_LEGENDA.test(m.conteudo))) return "enviou um anexo";
+  return texto.length > 120 ? `${texto.slice(0, 119)}…` : texto;
+}
+
+// Teclas soltas só valem fora de campos e de diálogos abertos.
+function emCampo(alvo: EventTarget | null): boolean {
+  return (
+    alvo instanceof HTMLElement &&
+    (alvo.isContentEditable || alvo.closest("input, textarea, select, dialog") !== null)
+  );
+}
+
+// `fichaEmAba`: sem espaço para a coluna lateral (conversa ao lado da lista),
+// ficha e trilha da IA viram abas ao lado das mensagens.
+export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: boolean }) {
+  const { id = "" } = useParams();
+  const [aba, setAba] = useState<Aba>("mensagens");
+  const carga = useDaConversa(id, api.conversa, "carregar a conversa");
+  const conversa = carga.dado;
+  // Ficha e trilha sobem até aqui: a fala da IA é conferida com a oferta e o
+  // turno que a gerou, e a coluna lateral mostra os mesmos dados.
+  const ficha = useDaConversa(id, api.ficha, "carregar a ficha");
+  const trilha = useDaConversa(id, api.turnos, "carregar a trilha da IA");
+  const [erro, setErro] = useState("");
 
   async function agir(acao: () => Promise<unknown>) {
     setErro("");
     try {
       await acao();
-      carregar();
+      carga.carregar();
     } catch (e) {
       setErro(mensagemDeFalha(e));
     }
@@ -117,6 +159,22 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
     // Assumir libera o campo de escrever: o fim pode mudar de lugar.
   }, [ultima, conversa?.atendimento]);
 
+  // Mensagem nova na conversa aberta vira um aviso educado ao leitor de tela.
+  // A primeira carga não anuncia nada, nem o que a própria pessoa enviou.
+  const [anuncio, setAnuncio] = useState("");
+  const vista = useRef<{ id: string; ultima: number } | null>(null);
+  useEffect(() => {
+    if (!conversa) return;
+    const antes = vista.current;
+    vista.current = { id, ultima: ultima ?? 0 };
+    if (antes?.id !== id) return;
+    const novas = conversa.mensagens.filter((m) => m.id > antes.ultima && m.usuario_id !== eu.id);
+    const m = novas[novas.length - 1];
+    if (!m) return;
+    const mais = novas.length > 1 ? ` (e mais ${novas.length - 1})` : "";
+    setAnuncio(`${AUTOR[m.autor]}: ${previa(m)}${mais}`);
+  }, [conversa, id, ultima, eu.id]);
+
   // Quem está com a conversa: para o selo, a transferência e a confirmação de tomada.
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   useEffect(() => {
@@ -137,14 +195,34 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
     return agir(acao).finally(() => setOcupado(false));
   }
 
-  if (!conversa)
-    return erro ? (
-      <Falha titulo="Não deu para abrir a conversa." texto={erro} aoTentar={carregar} />
+  // Atalhos de teclado: "a" assume e "d" devolve, quando a ação está liberada.
+  // O ouvinte fica fixo; o que cada tecla faz é atualizado a cada render.
+  const atalho = useRef<(tecla: string) => boolean>(() => false);
+  useEffect(() => {
+    const ouvir = (e: globalThis.KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.repeat || emCampo(e.target)) return;
+      if (document.querySelector("dialog[open]")) return;
+      if (atalho.current(e.key.toLowerCase())) e.preventDefault();
+    };
+    document.addEventListener("keydown", ouvir);
+    return () => document.removeEventListener("keydown", ouvir);
+  }, []);
+
+  if (!conversa) {
+    atalho.current = () => false;
+    return carga.erro ? (
+      <Falha titulo="Não deu para abrir a conversa." texto={carga.erro} aoTentar={carga.carregar} />
     ) : (
-      <p className="centro">Carregando…</p>
+      <EsqueletoConversa fichaEmAba={fichaEmAba} />
     );
+  }
   const minha = conversa.atendimento === "assumida" && conversa.atendente_id === eu.id;
   const dono = usuarios.find((u) => u.id === conversa.atendente_id)?.nome ?? "outra pessoa";
+  const podeAssumir = !minha && (conversa.atendimento !== "assumida" || eu.perfil === "gestor");
+  const podeDevolver =
+    conversa.atendimento !== "ia" &&
+    (conversa.atendimento === "handoff" || minha || eu.perfil === "gestor");
+  const temEnvio = conversa.canal === "whatsapp" || conversa.canal === "evolution";
 
   // Assumir e devolver valem na hora; o aviso deixa desfazer por 5 s.
   async function mudar(acao: "assumir" | "devolver") {
@@ -160,15 +238,24 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
       avisar({
         id,
         texto: textoDoAviso(acao, conversa?.telefone ?? conversa?.canal ?? ""),
-        depois: carregar,
+        depois: carga.carregar,
       });
     });
   }
+  atalho.current = (tecla) => {
+    if (ocupado) return false;
+    if (tecla === "a" && podeAssumir) void mudar("assumir");
+    else if (tecla === "d" && podeDevolver) void mudar("devolver");
+    else return false;
+    return true;
+  };
+
+  const turnos = trilha.dado?.turnos;
 
   return (
     <div className={fichaEmAba ? "conversa em-abas" : "conversa"}>
       <section className="historico">
-        <header>
+        <header className={temEnvio ? "tem-envio" : undefined}>
           <Link className="voltar" to="/">
             <HugeiconsIcon icon={ArrowLeft01Icon} size={18} strokeWidth={2} />
             <span className="voltar-texto">Conversas</span>
@@ -180,8 +267,10 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
                 {ROTULO_ATENDIMENTO[conversa.atendimento]}
                 {conversa.atendente_id && (minha ? " (você)" : ` · ${dono}`)}
               </span>
-              <span>{conversa.canal === "evolution" ? "Evolution" : "WhatsApp oficial"}</span>
-              {conversa.etapa && <span>{rotulo(ETAPAS, conversa.etapa)}</span>}
+              <span className="contexto">
+                {conversa.canal === "evolution" ? "Evolution" : "WhatsApp oficial"}
+              </span>
+              {conversa.etapa && <span className="contexto">{rotulo(ETAPAS, conversa.etapa)}</span>}
               {/* Janela aberta é o normal: só a fechada muda o que dá para enviar. */}
               {conversa.canal === "whatsapp" && !conversa.janela_aberta && (
                 <span className="janela fechada">janela fechada</span>
@@ -196,9 +285,10 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
           </div>
           <Acoes
             conversa={conversa}
-            eu={eu}
-            minha={minha}
             usuarios={usuarios}
+            podeAssumir={podeAssumir}
+            podeDevolver={podeDevolver}
+            podeMexer={minha || eu.perfil === "gestor"}
             agir={agirUmaVez}
             ocupado={ocupado}
             mudar={mudar}
@@ -209,6 +299,9 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
             </p>
           )}
         </header>
+        <p className="sr" aria-live="polite">
+          {anuncio}
+        </p>
         {fichaEmAba && (
           <Abas
             rotulo="Conversa"
@@ -219,12 +312,26 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
             ]}
             valor={aba}
             mudar={setAba}
+            painel="conversa-painel"
           />
         )}
-        {fichaEmAba && aba === "ficha" && <FichaCliente id={id} />}
-        {fichaEmAba && aba === "ia" && <TrilhaIa id={id} />}
+        {fichaEmAba && aba === "ficha" && (
+          <div role="tabpanel" id="conversa-painel" aria-labelledby={idAba("conversa-painel", aba)}>
+            <FichaCliente key={id} id={id} ficha={ficha.dado} erro={ficha.erro} carregar={ficha.carregar} />
+          </div>
+        )}
+        {fichaEmAba && aba === "ia" && (
+          <div role="tabpanel" id="conversa-painel" aria-labelledby={idAba("conversa-painel", aba)}>
+            <TrilhaIa trilha={trilha.dado} erro={trilha.erro} carregar={trilha.carregar} />
+          </div>
+        )}
         {(!fichaEmAba || aba === "mensagens") && (
-          <>
+          // Sem abas, as mensagens são só a coluna principal, não um painel de aba.
+          <div
+            role={fichaEmAba ? "tabpanel" : undefined}
+            id={fichaEmAba ? "conversa-painel" : undefined}
+            aria-labelledby={fichaEmAba ? idAba("conversa-painel", aba) : undefined}
+          >
             <ol className="mensagens" ref={lista}>
               {conversa.mensagens.map((m) => (
                 <li key={m.id} className={`msg msg-${m.direcao} msg-${m.autor}`}>
@@ -247,8 +354,11 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
                       </a>
                     );
                   })}
+                  {m.autor === "ia" && turnos && (
+                    <Conferencia m={m} turnos={turnos} ficha={ficha.dado} />
+                  )}
                   <small>
-                    {formatarHora(m.criada_em)}
+                    <time dateTime={m.criada_em}>{formatarHora(m.criada_em)}</time>
                     {m.status_entrega && (
                       <span className={m.status_entrega === "failed" ? "status falhou" : "status"}>
                         {" · "}
@@ -259,23 +369,14 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
                 </li>
               ))}
             </ol>
-            {(conversa.canal === "whatsapp" || conversa.canal === "evolution") && (
+            {temEnvio && (
               <Compositor
                 conversa={conversa}
                 eu={eu}
                 minha={minha}
                 focar={focarEnvio}
-                assumir={
-                  !minha && (conversa.atendimento !== "assumida" || eu.perfil === "gestor")
-                    ? {
-                        acao: () => {
-                          setFocarEnvio(true);
-                          mudar("assumir");
-                        },
-                        ocupado,
-                      }
-                    : undefined
-                }
+                assumir={podeAssumir ? { acao: () => mudar("assumir"), ocupado } : undefined}
+                devolver={podeDevolver ? { acao: () => mudar("devolver"), ocupado } : undefined}
                 agir={(acao) => {
                   // Quem envia quer ver a própria mensagem, mesmo lendo mais acima.
                   noFim.current = true;
@@ -284,43 +385,135 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
               />
             )}
             <div ref={fim} />
-          </>
+          </div>
         )}
       </section>
-      {!fichaEmAba && <Lateral id={id} />}
+      {!fichaEmAba && (
+        <Lateral id={id} ficha={ficha} trilha={trilha} />
+      )}
     </div>
+  );
+}
+
+// Enquanto a conversa chega: balões no lugar das mensagens, sem texto solto.
+function EsqueletoConversa({ fichaEmAba }: { fichaEmAba: boolean }) {
+  return (
+    <div className={fichaEmAba ? "conversa em-abas" : "conversa"}>
+      <section className="historico" aria-busy="true">
+        <p className="sr" role="status">
+          Carregando a conversa…
+        </p>
+        <div className="esqueleto-topo" aria-hidden="true" />
+        <ol className="mensagens" aria-hidden="true">
+          {(["entrada", "saida", "entrada", "saida", "entrada"] as const).map((direcao, i) => (
+            <li key={i} className={`msg msg-${direcao} esqueleto-msg`} />
+          ))}
+        </ol>
+      </section>
+      {!fichaEmAba && (
+        <aside className="lateral" aria-hidden="true">
+          <div className="esqueleto-blocos">
+            <span />
+            <span />
+          </div>
+        </aside>
+      )}
+    </div>
+  );
+}
+
+function EsqueletoBlocos({ rotulo: texto }: { rotulo: string }) {
+  return (
+    <div className="esqueleto-blocos" aria-busy="true">
+      <p className="sr" role="status">
+        {texto}
+      </p>
+      <span aria-hidden="true" />
+      <span aria-hidden="true" />
+      <span aria-hidden="true" />
+    </div>
+  );
+}
+
+// De onde veio a fala da IA que cita reais e se os valores batem com a oferta
+// vigente. Valores são do código (AGENTS.md, regra 2): fala do modelo com
+// reais, ou valor fora da oferta, pede conferência.
+function Conferencia({ m, turnos, ficha }: { m: Mensagem; turnos: Turno[]; ficha: Ficha | null }) {
+  const oferta = ficha?.oferta ?? null;
+  const proposta = ficha?.proposta;
+  const citados = centavosCitados(m.conteudo);
+  if (citados.length === 0) return null;
+  const origem = origemDaMensagem(m, turnos);
+  const fora = foraDaOferta(citados, oferta);
+  const nos = origem.tipo === "sem-registro" ? [] : origem.turno.caminho.filter((n) => !n.startsWith("__"));
+  return (
+    <p className="conferencia">
+      {origem.tipo === "codigo" && (
+        <span title={nos.map((n) => rotulo(NOS, n)).join(" → ")}>
+          Código · {rotulo(NOS, nos[nos.length - 1] ?? "")}
+        </span>
+      )}
+      {origem.tipo === "modelo" && <strong className="atencao">Turno com o modelo (FAQ)</strong>}
+      {origem.tipo === "sem-registro" && <span>Sem turno registrado</span>}
+      {fora === null ? (
+        <span>
+          sem oferta vigente
+          {proposta && ` · proposta: ${proposta.numero_parcelas} × ${reais(proposta.valor_parcela)}`}
+        </span>
+      ) : fora.length > 0 ? (
+        <strong className="atencao">Difere da oferta: {fora.map(reaisDeCentavos).join(", ")}</strong>
+      ) : (
+        <span>confere com a oferta</span>
+      )}
+    </p>
   );
 }
 
 function Acoes({
   conversa,
-  eu,
-  minha,
   usuarios,
+  podeAssumir,
+  podeDevolver,
+  podeMexer,
   agir,
   mudar,
   ocupado,
 }: {
   conversa: Detalhe;
-  eu: Eu;
-  minha: boolean;
   usuarios: Usuario[];
+  podeAssumir: boolean;
+  podeDevolver: boolean;
+  podeMexer: boolean;
   agir: (acao: () => Promise<unknown>) => Promise<void>;
   mudar: (acao: "assumir" | "devolver") => void;
   ocupado: boolean;
 }) {
   const [destino, setDestino] = useState("");
-  const podeMexer = minha || eu.perfil === "gestor";
 
   return (
     <div className="acoes">
-      {!minha && (conversa.atendimento !== "assumida" || eu.perfil === "gestor") && (
-        <button type="button" disabled={ocupado} onClick={() => mudar("assumir")}>
+      {/* No celular, Assumir e Devolver ficam no envio, perto do polegar. */}
+      {podeAssumir && (
+        <button
+          type="button"
+          className="acao-primaria"
+          disabled={ocupado}
+          onClick={() => mudar("assumir")}
+          title="Assumir (tecla A)"
+          aria-keyshortcuts="A"
+        >
           Assumir
         </button>
       )}
-      {conversa.atendimento !== "ia" && (conversa.atendimento === "handoff" || podeMexer) && (
-        <button type="button" disabled={ocupado} onClick={() => mudar("devolver")}>
+      {podeDevolver && (
+        <button
+          type="button"
+          className="acao-primaria"
+          disabled={ocupado}
+          onClick={() => mudar("devolver")}
+          title="Devolver para a IA (tecla D)"
+          aria-keyshortcuts="D"
+        >
           Devolver para a IA
         </button>
       )}
@@ -333,6 +526,11 @@ function Acoes({
       >
         <summary>Mais</summary>
         <div className="mais-painel">
+          {/* No celular o cabeçalho é uma linha só: canal e etapa vêm para cá. */}
+          <p className="mais-contexto">
+            {conversa.canal === "evolution" ? "Evolution" : "WhatsApp oficial"}
+            {conversa.etapa && ` · ${rotulo(ETAPAS, conversa.etapa)}`}
+          </p>
           {conversa.atendimento === "assumida" && podeMexer && (
             <span className="transferir">
               <label>
@@ -357,6 +555,12 @@ function Acoes({
               </button>
             </span>
           )}
+          {/* No celular o cabeçalho não tem Devolver: fica aqui e, para o dono, também no envio. */}
+          {podeDevolver && (
+            <button type="button" className="mais-celular" disabled={ocupado} onClick={() => mudar("devolver")}>
+              Devolver para a IA
+            </button>
+          )}
           <a className="botao" href={exportarUrl(conversa.id)}>
             Exportar conversa (.md)
           </a>
@@ -366,8 +570,10 @@ function Acoes({
   );
 }
 
+type Recurso<T> = { dado: T | null; erro: string; carregar: () => void };
+
 // Coluna da direita: a Ficha do cliente ou a trilha da IA, turno a turno.
-function Lateral({ id }: { id: string }) {
+function Lateral({ id, ficha, trilha }: { id: string; ficha: Recurso<Ficha>; trilha: Recurso<Trilha> }) {
   const [aba, setAba] = useState<"ficha" | "ia">("ficha");
   return (
     <aside className="lateral">
@@ -379,38 +585,26 @@ function Lateral({ id }: { id: string }) {
         ]}
         valor={aba}
         mudar={setAba}
+        painel="lateral-painel"
       />
-      {aba === "ficha" ? <FichaCliente id={id} /> : <TrilhaIa id={id} />}
+      <div role="tabpanel" id="lateral-painel" aria-labelledby={idAba("lateral-painel", aba)}>
+        {aba === "ficha" ? (
+          <FichaCliente key={id} id={id} ficha={ficha.dado} erro={ficha.erro} carregar={ficha.carregar} />
+        ) : (
+          <TrilhaIa trilha={trilha.dado} erro={trilha.erro} carregar={trilha.carregar} />
+        )}
+      </div>
     </aside>
   );
 }
 
-function TrilhaIa({ id }: { id: string }) {
-  const [trilha, setTrilha] = useState<Trilha | null>(null);
-  const [erro, setErro] = useState("");
-  const carregar = useCallback(() => {
-    api
-      .turnos(id)
-      .then((t) => {
-        setTrilha(t);
-        setErro("");
-      })
-      .catch((e: unknown) => setErro(mensagemDeFalha(e, "carregar a trilha da IA")));
-  }, [id]);
-  useEffect(carregar, [carregar]);
-  useAvisos(
-    useCallback(
-      (aviso) => (aviso.conversa === id || aviso.tipo === "reconectado") && carregar(),
-      [id, carregar],
-    ),
-  );
-
+function TrilhaIa({ trilha, erro, carregar }: { trilha: Trilha | null; erro: string; carregar: () => void }) {
   // Falhar ao recarregar mantém a última trilha à vista.
   if (!trilha)
     return erro ? (
       <Falha titulo="Não deu para carregar a trilha da IA." texto={erro} aoTentar={carregar} />
     ) : (
-      <p className="centro">Carregando…</p>
+      <EsqueletoBlocos rotulo="Carregando a trilha da IA…" />
     );
   if (trilha.turnos.length === 0)
     return (
@@ -441,29 +635,32 @@ function TrilhaIa({ id }: { id: string }) {
   );
 }
 
-function FichaCliente({ id }: { id: string }) {
-  const [ficha, setFicha] = useState<Ficha | null>(null);
+// `key={id}` em quem usa: trocar de conversa remonta e volta a mascarar tudo.
+function FichaCliente({
+  id,
+  ficha,
+  erro: erroCarga,
+  carregar,
+}: {
+  id: string;
+  ficha: Ficha | null;
+  erro: string;
+  carregar: () => void;
+}) {
   const [revelados, setRevelados] = useState<Partial<Record<CampoSensivel, string>>>({});
-
-  // Falhar ao recarregar mantém a última ficha: some só o que nunca chegou.
-  const [erroCarga, setErroCarga] = useState("");
-  const carregar = useCallback(() => {
-    api
-      .ficha(id)
-      .then((f) => {
-        setFicha(f);
-        setErroCarga("");
-      })
-      .catch((e: unknown) =>
-        setErroCarga(e instanceof Error ? e.message : "Não deu para carregar a ficha."),
-      );
-  }, [id]);
+  // O dado revelado não fica à vista o turno todo: volta a ser mascarado sozinho.
   useEffect(() => {
-    setRevelados({});
-    carregar();
-  }, [id, carregar]);
-  // A oferta e a proposta mudam durante a conversa: a ficha acompanha.
-  useAvisos(useCallback((aviso) => aviso.conversa === id && carregar(), [id, carregar]));
+    if (Object.keys(revelados).length === 0) return;
+    const timer = window.setTimeout(() => setRevelados({}), REMASCARAR_MS);
+    return () => window.clearTimeout(timer);
+  }, [revelados]);
+  function ocultar(campo: CampoSensivel) {
+    setRevelados((atual) => {
+      const resto = { ...atual };
+      delete resto[campo];
+      return resto;
+    });
+  }
 
   const [erroRevelar, setErroRevelar] = useState("");
   // Cada clique em Revelar grava auditoria: um pedido por vez.
@@ -483,17 +680,18 @@ function FichaCliente({ id }: { id: string }) {
     setRevelando(null);
   }
 
+  // Falhar ao recarregar mantém a última ficha: some só o que nunca chegou.
   if (!ficha)
     return erroCarga ? (
       <Falha titulo="Não deu para carregar a ficha." texto={erroCarga} aoTentar={carregar} />
     ) : (
-      <p className="centro">Carregando…</p>
+      <EsqueletoBlocos rotulo="Carregando a ficha…" />
     );
   return (
     <>
       <Acompanhamento ficha={ficha} />
       <div className="ficha">
-        <h2>Ficha</h2>
+        <h2>Dados do cliente</h2>
         <dl>
           {ficha.nome && (
             <div>
@@ -508,7 +706,16 @@ function FichaCliente({ id }: { id: string }) {
                 <dt>{CAMPOS[campo]}</dt>
                 <dd>
                   {revelados[campo] ?? ficha.dados[campo]}
-                  {!revelados[campo] && (
+                  {revelados[campo] ? (
+                    <button
+                      type="button"
+                      className="link"
+                      onClick={() => ocultar(campo)}
+                      aria-label={`Ocultar ${CAMPOS[campo]}`}
+                    >
+                      Ocultar
+                    </button>
+                  ) : (
                     <button
                       type="button"
                       className="link"
@@ -547,15 +754,13 @@ function FichaCliente({ id }: { id: string }) {
           </p>
         )}
         <p className="nota" id="aviso-auditoria">
-          Revelar um dado fica registrado na auditoria, em seu nome.
+          Revelar um dado fica registrado na auditoria, em seu nome, e ele volta a ser mascarado em
+          1 minuto.
         </p>
       </div>
     </>
   );
 }
-
-const porcento = (valor: string) =>
-  `${Number(valor).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}% a.m.`;
 
 // O que a IA disse em valores, ao lado da fala: oferta vigente, proposta no
 // banco e as provas do SIM. Só aparece quando a jornada chegou a algum deles.
@@ -601,7 +806,7 @@ function Acompanhamento({ ficha }: { ficha: Ficha }) {
             <div>
               <dt>Status</dt>
               <dd className="texto">
-                {proposta.status ? rotulo(STATUS_PROPOSTA, proposta.status) : "Ainda sem status"}
+                {proposta.status ? rotulo(SITUACAO_DA_PROPOSTA, proposta.status) : "Ainda sem status"}
               </dd>
             </div>
             <div>

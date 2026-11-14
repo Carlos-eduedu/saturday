@@ -6,7 +6,7 @@ import React, { useEffect, useId, useLayoutEffect, useRef, useState, type CSSPro
 import { useMidia } from '../midia';
 import { type Curva, Valor } from './movimento';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Delete02Icon } from '@hugeicons/core-free-icons';
+import { Delete02Icon, MoreHorizontalIcon } from '@hugeicons/core-free-icons';
 
 import './SwipeRow.css';
 
@@ -51,6 +51,8 @@ export interface SwipeRowProps {
   closeOnAction?: boolean;
   haptic?: boolean;
   label?: string;
+  /** Nome do botão que mostra as ações (teclado e toque), ex.: "Ações de (11) …-0987". */
+  toggleLabel?: string;
   className?: string;
   style?: CSSProperties;
 }
@@ -133,6 +135,7 @@ const SwipeRow: React.FC<SwipeRowProps> = ({
   closeOnAction = true,
   haptic = true,
   label = 'Item da lista',
+  toggleLabel,
   className = '',
   style
 }) => {
@@ -393,10 +396,18 @@ const SwipeRow: React.FC<SwipeRowProps> = ({
       commit(primary, true);
     }
   };
+  // Teclado abre na hora; toque e clique deslizam como o gesto (o `settle`
+  // respeita a redução de movimento).
   const onToggleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    if (e.detail !== 0 || disabled || phase !== 'idle' || n === 0) return;
-    if (open) closeNow();
-    else openNow();
+    if (disabled || phase !== 'idle' || n === 0) return;
+    if (e.detail === 0) {
+      if (open) closeNow();
+      else openNow();
+      return;
+    }
+    setOpen(!open);
+    settle(open ? 0 : D);
+    if (!open) setSay(n === 1 ? '1 ação à mostra' : `${n} ações à mostra`);
   };
 
   const railId = `${uid}-rail`;
@@ -472,18 +483,24 @@ const SwipeRow: React.FC<SwipeRowProps> = ({
         </div>
         <div ref={surface} className="swipe-row__surface" onPointerDown={down}>
           {children}
-          <button
-            type="button"
-            className="swipe-row__toggle"
-            tabIndex={disabled ? -1 : 0}
-            aria-expanded={open}
-            aria-controls={railId}
-            aria-keyshortcuts={s < 0 ? 'ArrowLeft' : 'ArrowRight'}
-            onKeyDown={onToggleKey}
-            onClick={onToggleClick}
-          >
-            {n} {n === 1 ? 'ação' : 'ações'}
-          </button>
+          {/* Sem ações, nada a mostrar: o botão só ocuparia um passo do Tab. */}
+          {n > 0 && (
+            <button
+              type="button"
+              className="swipe-row__toggle"
+              tabIndex={disabled ? -1 : 0}
+              aria-label={toggleLabel ?? `Ações de ${label}`}
+              aria-expanded={open}
+              aria-controls={railId}
+              aria-keyshortcuts={s < 0 ? 'ArrowLeft' : 'ArrowRight'}
+              onKeyDown={onToggleKey}
+              onClick={onToggleClick}
+              // Tocar no botão não começa o arrasto da superfície.
+              onPointerDown={e => e.stopPropagation()}
+            >
+              <HugeiconsIcon icon={MoreHorizontalIcon} size={20} strokeWidth={2} />
+            </button>
+          )}
         </div>
       </div>
       <span className="swipe-row__sr" aria-live="polite">

@@ -23,8 +23,8 @@ export const textoDoAviso = (acao: "assumir" | "devolver", conversa: string) =>
   acao === "assumir" ? `Você assumiu ${conversa}` : `Você devolveu ${conversa} para a IA`;
 
 export const pedidoDeTomada = (dono: string): Pedido => ({
-  titulo: "Assumir esta conversa?",
-  texto: `Ela está com ${dono}. Essa pessoa deixa de ser a dona dela.`,
+  titulo: `Assumir a conversa de ${dono}?`,
+  texto: "Essa pessoa deixa de ser a dona dela e a IA continua calada.",
   acao: "Assumir",
 });
 

@@ -8,7 +8,7 @@ import {
   type NoDoGrafo,
   type SituacaoExecucao,
 } from "../api";
-import { Abas } from "../componentes/Abas";
+import { Abas, idAba } from "../componentes/Abas";
 import { Dialogo } from "../componentes/Dialogo";
 import { Falha } from "../componentes/Falha";
 import GlideSelect from "../componentes/GlideSelect";
@@ -56,7 +56,9 @@ export function Agente() {
         ]}
         valor={aba}
         mudar={setAba}
+        painel="agente-painel"
       />
+      <div role="tabpanel" id="agente-painel" aria-labelledby={idAba("agente-painel", aba)} className="painel-aba">
       {aba === "grafo" &&
         (erro ? (
           <Falha titulo="Não deu para carregar o grafo." texto={erro} aoTentar={carregar} />
@@ -87,6 +89,7 @@ export function Agente() {
           }}
         />
       )}
+      </div>
     </div>
   );
 }

@@ -19,9 +19,9 @@ function situacao(u: UsuarioGestao): string {
       hour: "2-digit",
       minute: "2-digit",
     });
-    return `bloqueado até ${hora}`;
+    return `Bloqueado até ${hora}`;
   }
-  return u.situacao;
+  return u.situacao.charAt(0).toUpperCase() + u.situacao.slice(1);
 }
 
 export function Usuarios({ eu }: { eu: Eu }) {
@@ -30,6 +30,7 @@ export function Usuarios({ eu }: { eu: Eu }) {
   const [erro, setErro] = useState("");
   const [aviso, setAviso] = useState("");
   const [editando, setEditando] = useState<string | null>(null);
+  // Quem espera a confirmação de desativar.
 
   const carregar = useCallback(() => {
     api
@@ -93,7 +94,7 @@ export function Usuarios({ eu }: { eu: Eu }) {
                 <tr key={u.id} className={u.situacao === "desativado" ? "desativado" : undefined}>
                   <td>
                     {u.nome}
-                    {u.id === eu.id && <small> (você)</small>}
+                    {u.id === eu.id && <span className="nota"> (você)</span>}
                   </td>
                   <td data-rotulo="E-mail">{u.email}</td>
                   <td data-rotulo="Perfil">{ROTULO_PERFIL[u.perfil]}</td>

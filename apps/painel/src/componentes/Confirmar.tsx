@@ -57,7 +57,8 @@ export function ConfirmarProvider({ children }: { children: ReactNode }) {
             </>
           }
         >
-          <p>{aberto.texto}</p>
+          {/* Texto simples vira parágrafo; conteúdo rico (lista, condições) vem pronto. */}
+          {typeof aberto.texto === "string" ? <p>{aberto.texto}</p> : aberto.texto}
         </Dialogo>
       )}
     </Contexto.Provider>

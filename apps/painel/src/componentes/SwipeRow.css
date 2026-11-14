@@ -175,7 +175,10 @@
 
 .swipe-row__toggle {
   position: absolute;
-  top: 50%;
+  top: 4px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
   width: 1px;
   height: 1px;
   margin: 0;
@@ -187,27 +190,28 @@
   color: var(--sr-text);
   font: inherit;
   outline: none;
+  touch-action: manipulation;
 }
 
 .swipe-row[data-direction='left'] .swipe-row__toggle {
-  right: 12px;
+  right: 4px;
 }
 
 .swipe-row[data-direction='right'] .swipe-row__toggle {
-  left: 12px;
+  left: 4px;
 }
 
+/* No foco, alvo de 44 px no canto de cima: fica longe do horário e do
+   conteúdo do meio da linha. */
 .swipe-row__toggle:focus-visible {
-  width: auto;
-  height: 24px;
-  padding: 0 10px;
-  border-radius: 12px;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
   overflow: visible;
   clip-path: none;
-  background: color-mix(in srgb, var(--sr-text) 12%, transparent);
-  font-size: 12px;
-  white-space: nowrap;
-  transform: translateY(-50%);
+  background: color-mix(in srgb, var(--sr-text) 10%, var(--sr-row));
+  outline: 2px solid currentColor;
+  outline-offset: -2px;
 }
 
 .swipe-row__sr {

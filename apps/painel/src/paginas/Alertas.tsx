@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { type Alerta, api, mensagemDeFalha } from "../api";
+import { useConfirmar } from "../componentes/Confirmar";
 import { Falha } from "../componentes/Falha";
 import { Vazio } from "../componentes/Vazio";
 import { useAvisos } from "../tempoReal";
@@ -38,8 +39,41 @@ export function Alertas() {
   useEffect(carregar, [carregar]);
   useAvisos(useCallback((aviso) => aviso.tipo !== "mensagem" && carregar(), [carregar]));
 
+  // Resolver todos: um por um, com a rota de sempre (cada um vai para a
+  // auditoria). Falha num não para os outros; o aviso diz quantos ficaram.
+  const confirmar = useConfirmar();
+  const [emLote, setEmLote] = useState(false);
+  async function resolverTodos(lista: Alerta[]) {
+    const ok = await confirmar({
+      titulo: `Resolver os ${lista.length} alertas abertos?`,
+      texto:
+        "Cada um sai da lista e fica registrado na auditoria em seu nome. Resolver um alerta não muda a " +
+        'conversa: quem está em handoff continua na fila "Aguardando humano".',
+      acao: `Resolver ${lista.length} alertas`,
+    });
+    if (!ok) return;
+    setEmLote(true);
+    let falhas = 0;
+    let primeira: unknown = null;
+    for (const a of lista) {
+      try {
+        await api.resolverAlerta(a.id);
+      } catch (e) {
+        falhas += 1;
+        primeira ??= e;
+      }
+    }
+    setEmLote(false);
+    setErro(
+      falhas === 0
+        ? ""
+        : `${falhas} de ${lista.length} alertas ficaram abertos. ${mensagemDeFalha(primeira, "resolver os alertas")}`,
+    );
+    carregar();
+  }
+
   async function resolver(id: number) {
-    if (resolvendo !== null) return;
+    if (resolvendo !== null || emLote) return;
     setResolvendo(id);
     try {
       await api.resolverAlerta(id);
@@ -61,9 +95,16 @@ export function Alertas() {
 
   return (
     <section>
-      <h1 className="titulo-tela">
-        Alertas <span className="contagem">· {alertas.length}</span>
-      </h1>
+      <div className="alertas-cabeca">
+        <h1 className="titulo-tela">
+          Alertas <span className="contagem">· {alertas.length}</span>
+        </h1>
+        {alertas.length > 1 && (
+          <button type="button" disabled={resolvendo !== null || emLote} onClick={() => resolverTodos(alertas)}>
+            {emLote ? "Resolvendo…" : "Resolver todos"}
+          </button>
+        )}
+      </div>
       {erro && (
         <p className="erro" role="alert">
           {erro}
@@ -72,7 +113,7 @@ export function Alertas() {
       {alertas.length === 0 ? (
         <Vazio
           titulo="Nenhum alerta aberto."
-          texto="Handoffs, envios que falharam e instâncias que caíram aparecem aqui."
+          texto="Cada handoff novo, envio que falhou ou instância que caiu abre um alerta aqui até alguém resolver. Conversas aguardando humano ficam na fila de Conversas."
         />
       ) : (
         <ul className="alertas">
@@ -84,7 +125,7 @@ export function Alertas() {
               {a.conversa_id && <Link to={`/conversas/${a.conversa_id}`}>Abrir conversa</Link>}
               <button
                 type="button"
-                disabled={resolvendo !== null}
+                disabled={resolvendo !== null || emLote}
                 onClick={() => resolver(a.id)}
               >
                 {resolvendo === a.id ? "Resolvendo…" : "Resolver"}

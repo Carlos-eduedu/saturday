@@ -62,6 +62,7 @@ export function Compositor({
   focar,
   agir,
   assumir,
+  devolver,
 }: {
   conversa: Detalhe;
   eu: Eu;
@@ -71,6 +72,8 @@ export function Compositor({
   // Presente quando quem vê pode assumir: o botão fica onde o polegar já está,
   // e no celular o cabeçalho com o Assumir rola para longe.
   assumir?: { acao: () => void; ocupado: boolean };
+  // Idem para devolver à IA: no celular aparece ao lado do Enviar.
+  devolver?: { acao: () => void; ocupado: boolean };
 }) {
   const [texto, setTexto] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -264,7 +267,7 @@ export function Compositor({
                 {!audio && (
                   <span className="dados-anexo">
                     <span className="nome">{anexo.arquivo.name}</span>
-                    <small>{tamanho(anexo.arquivo.size)}</small>
+                    <small className="dado">{tamanho(anexo.arquivo.size)}</small>
                   </span>
                 )}
                 <button
@@ -289,7 +292,9 @@ export function Compositor({
           <div className="gravando" role="status">
             <span className="ponto" aria-hidden="true" />
             Gravando <time>{relogio(gravador.segundos)}</time>
-            <small>até {relogio(LIMITE_GRAVACAO_S)}</small>
+            <small>
+              até <time>{relogio(LIMITE_GRAVACAO_S)}</time>
+            </small>
           </div>
         )}
         {janelaAberta && !gravador.gravando && !audio && (
@@ -305,6 +310,7 @@ export function Compositor({
             disabled={!minha}
             placeholder={placeholder}
             aria-label="Mensagem"
+            aria-keyshortcuts="Control+Enter Meta+Enter"
             aria-controls={sugestoes.length > 0 ? "respostas-rapidas" : undefined}
             aria-expanded={sugestoes.length > 0}
             aria-autocomplete="list"
@@ -378,6 +384,8 @@ export function Compositor({
               className="principal enviar"
               disabled={assumir.ocupado}
               onClick={assumir.acao}
+              title="Assumir (tecla A)"
+              aria-keyshortcuts="A"
             >
               Assumir para responder
             </button>
@@ -388,10 +396,24 @@ export function Compositor({
                   Ctrl ou ⌘ + Enter envia
                 </span>
               )}
+              {minha && devolver && (
+                <button
+                  type="button"
+                  className="devolver-rodape"
+                  disabled={devolver.ocupado}
+                  onClick={devolver.acao}
+                  aria-label="Devolver para a IA"
+                  title="Devolver para a IA (tecla D)"
+                  aria-keyshortcuts="D"
+                >
+                  Devolver
+                </button>
+              )}
               <button
                 type="submit"
                 className="enviar"
                 disabled={!minha || enviando || (!texto.trim() && !anexo)}
+                title="Enviar (Ctrl ou ⌘ + Enter)"
               >
                 <HugeiconsIcon icon={SentIcon} size={18} strokeWidth={2} />
                 {enviando ? "Enviando…" : "Enviar"}
@@ -611,7 +633,11 @@ function EditarFicha({
           <label>
             Nascimento
             <input type="date" {...campo("nascimento")} />
-            {ficha?.dados.data_nascimento && <small>Hoje: {ficha.dados.data_nascimento}</small>}
+            {ficha?.dados.data_nascimento && (
+              <small>
+                Hoje: <time>{ficha.dados.data_nascimento}</time>
+              </small>
+            )}
           </label>
           <label>
             Sexo

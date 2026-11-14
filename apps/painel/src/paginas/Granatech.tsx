@@ -1,11 +1,12 @@
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useConfirmar } from "../componentes/Confirmar";
-import { Dialogo } from "../componentes/Dialogo";
-import { CancelCircleIcon, CheckmarkCircle02Icon, Download04Icon } from "@hugeicons/core-free-icons";
+import { ArrowRight01Icon, CancelCircleIcon, CheckmarkCircle02Icon, Download04Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "react-router";
 import LatticeLoader, { type StatusLattice } from "../componentes/LatticeLoader";
+import { Abas, idAba } from "../componentes/Abas";
 import { CamposConta, CONTA_VAZIA } from "../componentes/CamposConta";
+import { Dialogo } from "../componentes/Dialogo";
 import { Falha } from "../componentes/Falha";
 import { Vazio } from "../componentes/Vazio";
 import {
@@ -35,6 +36,7 @@ import {
   SITUACOES_DA_CONSULTA,
   SITUACOES_DA_PROPOSTA,
   situacaoDaProposta,
+  porcento,
 } from "../rotulos";
 import { type Aviso, useAvisos } from "../tempoReal";
 
@@ -122,32 +124,28 @@ export function Granatech({ eu }: { eu: Eu }) {
       {aviso && <p className="confere">{aviso}</p>}
 
       <section>
-        <div className="filtros">
-          <div role="tablist" aria-label="Listas da Granatech">
-            {(["propostas", "consultas"] as const).map((a) => (
-              <button
-                key={a}
-                type="button"
-                role="tab"
-                aria-selected={aba === a}
-                className={aba === a ? "ativo" : undefined}
-                onClick={() => {
-                  setAba(a);
-                  setSelecao(null);
-                  setFiltro((f) => ({ ...f, status: undefined }));
-                }}
-              >
-                {a === "propostas" ? "Propostas" : "Consultas"}
-              </button>
-            ))}
-          </div>
-          <Filtros aba={aba} aoFiltrar={setFiltro} />
+        <Abas
+          rotulo="Listas da Granatech"
+          opcoes={[
+            ["propostas", "Propostas"],
+            ["consultas", "Consultas"],
+          ]}
+          valor={aba}
+          mudar={(a) => {
+            setAba(a);
+            setSelecao(null);
+            setFiltro((f) => ({ ...f, status: undefined }));
+          }}
+          painel="granatech-lista"
+        />
+        <div role="tabpanel" id="granatech-lista" aria-labelledby={idAba("granatech-lista", aba)}>
+          <Filtros aba={aba} ativos={filtrosAtivos(filtro)} aoFiltrar={setFiltro} />
+          {aba === "consultas" ? (
+            <ListaConsultas linhas={consultas} selecionar={(id) => setSelecao({ aba, id })} />
+          ) : (
+            <ListaPropostas linhas={propostas} selecionar={(id) => setSelecao({ aba, id })} />
+          )}
         </div>
-        {aba === "consultas" ? (
-          <ListaConsultas linhas={consultas} selecionar={(id) => setSelecao({ aba, id })} />
-        ) : (
-          <ListaPropostas linhas={propostas} selecionar={(id) => setSelecao({ aba, id })} />
-        )}
       </section>
 
       {selecao?.aba === "consultas" && (
@@ -258,9 +256,15 @@ function Homologacao() {
       .finally(carregar);
   }
 
+  // Ferramenta de desenvolvimento: fica recolhida no fim da página para não
+  // disputar espaço com a operação.
   return (
-    <section>
-      <h2>Homologação</h2>
+    <details className="homologacao">
+      <summary>
+        <HugeiconsIcon icon={ArrowRight01Icon} size={18} strokeWidth={2} className="seta" aria-hidden="true" />
+        <h2>Homologação</h2>
+        <span className="nota">ferramenta de desenvolvimento</span>
+      </summary>
       <p className="nota">
         Gera as evidências que a Granatech pede em cada fase, contra <code>{dados.base_granatech}</code>.
         Os webhooks só chegam se a Granatech estiver apontada para{" "}
@@ -322,7 +326,7 @@ function Homologacao() {
       {aberta !== null && (
         <DetalheRodada key={aberta} id={aberta} versao={versao} aoFechar={() => setAberta(null)} />
       )}
-    </section>
+    </details>
   );
 }
 
@@ -372,7 +376,7 @@ function ProgressoRodada({ estados }: { estados: EstadoItem[] }) {
           <span key={i} data-estado={e} />
         ))}
       </span>
-      <small>
+      <small className="dado">
         {feitos}/{estados.length}
         {falhas > 0 && <span className="falhas"> · {falhas} falhou</span>}
       </small>
@@ -570,7 +574,21 @@ function ConteudoRodada({ rodada }: { rodada: RodadaDetalhe }) {
   );
 }
 
-function Filtros({ aba, aoFiltrar }: { aba: Aba; aoFiltrar: (f: FiltroGranatech) => void }) {
+const filtrosAtivos = (f: FiltroGranatech) => [f.status, f.desde, f.ate, f.cpf].filter(Boolean).length;
+
+// No celular os quatro campos tomavam a tela inteira: ficam atrás de "Filtrar",
+// com a contagem do que está valendo. No desktop o formulário fica sempre aberto
+// (o botão some pelo CSS).
+function Filtros({
+  aba,
+  ativos,
+  aoFiltrar,
+}: {
+  aba: Aba;
+  ativos: number;
+  aoFiltrar: (f: FiltroGranatech) => void;
+}) {
+  const [aberto, setAberto] = useState(false);
   const [status, setStatus] = useState("");
   const [desde, setDesde] = useState("");
   const [ate, setAte] = useState("");
@@ -586,10 +604,21 @@ function Filtros({ aba, aoFiltrar }: { aba: Aba; aoFiltrar: (f: FiltroGranatech)
   function filtrar(evento: FormEvent) {
     evento.preventDefault();
     aoFiltrar({ status, desde, ate, cpf: cpf.replace(/\D/g, "") });
+    setAberto(false);
   }
 
   return (
-    <form className="form-usuario" onSubmit={filtrar}>
+    <div className={aberto ? "filtros-granatech aberto" : "filtros-granatech"}>
+      <button
+        type="button"
+        className="alternar-filtros"
+        aria-expanded={aberto}
+        aria-controls="filtros-granatech"
+        onClick={() => setAberto((a) => !a)}
+      >
+        {ativos > 0 ? `Filtrar · ${ativos} ${ativos === 1 ? "ativo" : "ativos"}` : "Filtrar"}
+      </button>
+    <form id="filtros-granatech" className="form-usuario" onSubmit={filtrar}>
       <label>
         Status
         <select value={status} onChange={(e) => setStatus(e.target.value)}>
@@ -618,8 +647,9 @@ function Filtros({ aba, aoFiltrar }: { aba: Aba; aoFiltrar: (f: FiltroGranatech)
           autoComplete="off"
         />
       </label>
-      <button type="submit">Filtrar</button>
+      <button type="submit">Aplicar filtros</button>
     </form>
+    </div>
   );
 }
 
@@ -656,7 +686,7 @@ function ListaConsultas({
         {linhas.map((c) => (
           <tr key={c.id}>
             <td>{dataHora(c.criada_em)}</td>
-            <td data-rotulo="CPF">{c.cpf}</td>
+            <td data-rotulo="CPF" className="dado">{c.cpf}</td>
             <td data-rotulo="Status">{rotulo(SITUACAO_DA_CONSULTA, c.status)}</td>
             <td data-rotulo="Detalhe">{c.tem_detalhe ? "gravado" : "—"}</td>
             <td data-rotulo="Conversa">
@@ -700,12 +730,12 @@ function ListaPropostas({
         {linhas.map((p) => (
           <tr key={p.id}>
             <td>{dataHora(p.intencao_em)}</td>
-            <td data-rotulo="CPF">{p.cpf}</td>
+            <td data-rotulo="CPF" className="dado">{p.cpf}</td>
             <td data-rotulo="Envio">{p.estado_envio}</td>
             <td data-rotulo="Status">
               {situacaoDaProposta(p.status, p.tipo_notificacao)}
             </td>
-            <td data-rotulo="Parcelas">
+            <td data-rotulo="Parcelas" className="dado">
               {p.numero_parcelas} × {reais(p.valor_parcela)}
             </td>
             <td data-rotulo="Conversa">
@@ -759,7 +789,7 @@ function Cpf({ consultaId, mascarado }: { consultaId: number; mascarado: string 
   const [erro, setErro] = useState("");
   return (
     <span>
-      {valor ?? mascarado}{" "}
+      <span className="dado">{valor ?? mascarado}</span>{" "}
       {valor === null && (
         <button
           type="button"
@@ -812,7 +842,7 @@ function BotaoAcao({
       onClick={onClick}
     >
       {texto}
-      {motivo != null && <small> ({motivo})</small>}
+      {motivo != null && <span className="motivo-acao"> ({motivo})</span>}
     </button>
   );
 }
@@ -880,7 +910,7 @@ function DetalheConsulta({
           {c.propostas.length === 0
             ? "—"
             : c.propostas.map((p) => (
-                <button key={p} type="button" className="link" onClick={() => abrirProposta(p)}>
+                <button key={p} type="button" className="link dado" onClick={() => abrirProposta(p)}>
                   #{p}
                 </button>
               ))}
@@ -982,15 +1012,12 @@ function DetalheProposta({
         <dd>
           {situacaoDaProposta(p.status, p.tipo_notificacao)}
         </dd>
-        <dt>Parcelas</dt>
-        <dd>
-          {p.numero_parcelas} × {reais(p.valor_parcela)}
-        </dd>
+        <Condicoes p={p} />
         <dt>Etapa da conversa</dt>
         <dd>{p.etapa ? rotulo(ETAPAS, p.etapa) : "—"}</dd>
         <dt>Consulta</dt>
         <dd>
-          <button type="button" className="link" onClick={() => abrirConsulta(p.consulta_id)}>
+          <button type="button" className="link dado" onClick={() => abrirConsulta(p.consulta_id)}>
             #{p.consulta_id}
           </button>
         </dd>
@@ -1001,10 +1028,10 @@ function DetalheProposta({
       </dl>
 
       {p.oferta && (
-        <>
-          <h3>Oferta aceita</h3>
+        <details className="oferta-completa">
+          <summary>Simulação completa, como veio da Granatech</summary>
           <pre className="nota">{JSON.stringify(p.oferta, null, 2)}</pre>
-        </>
+        </details>
       )}
 
       <h3>Linha do tempo</h3>
@@ -1051,6 +1078,7 @@ function DetalheProposta({
       )}
       {painel === "cancelar" && (
         <Cancelar
+          p={p}
           aoConfirmar={(motivo) => {
             setPainel(null);
             agir(
@@ -1074,10 +1102,38 @@ function DetalheProposta({
   );
 }
 
+// Liberado, taxa, seguro e CET vêm da oferta que a IA mostrou ao cliente (só
+// existe enquanto a conversa aponta para esta proposta); sem ela, só as parcelas.
+function Condicoes({ p }: { p: PropostaGranatechDetalhe }) {
+  const o = p.oferta as Record<string, string | number | boolean | null> | null;
+  return (
+    <>
+      <dt>Parcelas</dt>
+      <dd className="dado">
+        {p.numero_parcelas} × {reais(p.valor_parcela)}
+      </dd>
+      {o && (
+        <>
+          <dt>Liberado</dt>
+          <dd className="dado">{reais(o.liberado as string)}</dd>
+          <dt>Taxa</dt>
+          <dd className="dado">
+            {porcento(o.taxa_mensal as string)} · CET {porcento(o.cet_mensal as string)}
+          </dd>
+          <dt>Seguro</dt>
+          <dd className="dado">{o.seguro_aplicado ? reais(o.valor_seguro as string) : "sem seguro"}</dd>
+        </>
+      )}
+    </>
+  );
+}
+
 function Cancelar({
+  p,
   aoConfirmar,
   aoFechar,
 }: {
+  p: PropostaGranatechDetalhe;
   aoConfirmar: (motivo: string) => void;
   aoFechar: () => void;
 }) {
@@ -1085,9 +1141,19 @@ function Cancelar({
   const confirmar = useConfirmar();
   async function enviar(evento: FormEvent) {
     evento.preventDefault();
+    // A confirmação repete as condições: cancela-se o que o cliente aceitou.
     const ok = await confirmar({
       titulo: "Cancelar a proposta na Granatech?",
-      texto: "Não dá para desfazer.",
+      texto: (
+        <>
+          <p>Não dá para desfazer. O cliente é avisado quando a Granatech confirmar.</p>
+          <dl className="ficha-granatech">
+            <dt>Proposta</dt>
+            <dd className="dado">{p.id_externo ?? `#${p.id}`}</dd>
+            <Condicoes p={p} />
+          </dl>
+        </>
+      ),
       acao: "Cancelar proposta",
       perigo: true,
     });

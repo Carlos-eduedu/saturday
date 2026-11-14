@@ -1,7 +1,9 @@
 // Do React Bits (registro @react-bits, StaggeredMenu-TS-CSS). Adaptado ao painel:
 // itens com Link do react-router (sem recarregar a página), logo e rodapé como
-// nós, textos em português, Esc fecha, painel inerte fechado e sem animação com
-// redução de movimento.
+// nós, textos em português, Esc fecha, foco preso no menu aberto, painel inerte
+// fechado e sem animação com redução de movimento. Sem ouvinte de clique fora:
+// no celular o painel ocupa a tela toda, e fechar é pelo botão, por Esc ou ao
+// escolher um item.
 'use client';
 
 import React, { type CSSProperties, type ReactNode, useCallback, useRef, useState } from 'react';
@@ -33,7 +35,6 @@ export interface StaggeredMenuProps {
   openMenuButtonColor?: string;
   accentColor?: string;
   changeMenuColorOnOpen?: boolean;
-  closeOnClickAway?: boolean;
   onMenuOpen?: () => void;
   onMenuClose?: () => void;
   isFixed?: boolean;
@@ -56,7 +57,6 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
   changeMenuColorOnOpen = true,
   accentColor = '#5227FF',
   isFixed = false,
-  closeOnClickAway = true,
   onMenuOpen,
   onMenuClose,
   logo,
@@ -82,37 +82,43 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
   }, [open, onMenuClose]);
 
   React.useEffect(() => {
-    if (!closeOnClickAway || !open) return;
-
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        panelRef.current &&
-        !panelRef.current.contains(event.target as Node) &&
-        toggleBtnRef.current &&
-        !toggleBtnRef.current.contains(event.target as Node)
-      ) {
-        closeMenu();
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [closeOnClickAway, open, closeMenu]);
-
-  React.useEffect(() => {
     if (!open) return;
     const aoTeclar = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      closeMenu();
-      toggleBtnRef.current?.focus();
+      if (e.key === 'Escape') {
+        closeMenu();
+        toggleBtnRef.current?.focus();
+        return;
+      }
+      // Foco preso entre o botão Fechar e o painel enquanto o menu está aberto.
+      if (e.key !== 'Tab' || !panelRef.current || !toggleBtnRef.current) return;
+      const focaveis = [
+        toggleBtnRef.current,
+        ...panelRef.current.querySelectorAll<HTMLElement>('a[href], button:not([disabled])'),
+      ];
+      const primeiro = focaveis[0];
+      const ultimo = focaveis[focaveis.length - 1];
+      const ativo = document.activeElement;
+      if (e.shiftKey && (ativo === primeiro || !focaveis.includes(ativo as HTMLElement))) {
+        e.preventDefault();
+        ultimo.focus();
+      } else if (!e.shiftKey && (ativo === ultimo || !focaveis.includes(ativo as HTMLElement))) {
+        e.preventDefault();
+        primeiro.focus();
+      }
     };
     document.addEventListener('keydown', aoTeclar);
+    // Virou desktop com o menu aberto (tablet girado): o menu some pelo CSS,
+    // então fecha de verdade para não deixar a página inerte.
+    const desktop = window.matchMedia('(min-width: 1024px)');
+    const aoMudar = () => desktop.matches && closeMenu();
+    desktop.addEventListener('change', aoMudar);
     // Sem rolar: o item ainda está fora da tela, deslizando; rolar o invólucro
     // arrastava o topo junto e quebrava a abertura.
     panelRef.current?.querySelector<HTMLElement>('.sm-panel-item')?.focus({ preventScroll: true });
-    return () => document.removeEventListener('keydown', aoTeclar);
+    return () => {
+      document.removeEventListener('keydown', aoTeclar);
+      desktop.removeEventListener('change', aoMudar);
+    };
   }, [open, closeMenu]);
 
   return (

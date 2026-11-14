@@ -65,6 +65,8 @@ export function App() {
 function Logado({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
   useEffect(() => iniciarTempoReal(), []);
   const { pathname } = useLocation();
+  // Menu do celular aberto: a página atrás sai do Tab e do leitor de tela.
+  const [menuAberto, setMenuAberto] = useState(false);
   const emConversas = pathname === "/" || pathname.startsWith("/conversas");
   const itens = [
     { label: "Conversas", ariaLabel: "Ir para as conversas", link: "/", ativo: emConversas },
@@ -112,13 +114,19 @@ function Logado({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
 
   return (
     <div className="app">
+      {/* Primeiro item do Tab: pula o topo e a navegação. */}
+      <a href="#conteudo" className="pular">
+        Pular para o conteúdo
+      </a>
       <StaggeredMenu
         isFixed
+        onMenuOpen={() => setMenuAberto(true)}
+        onMenuClose={() => setMenuAberto(false)}
         position="right"
         items={itens}
         displaySocials={false}
-        displayItemNumbering
-        colors={["var(--superficie-2)", "var(--destaque)"]}
+        displayItemNumbering={false}
+        colors={["var(--superficie-2)"]}
         accentColor="var(--destaque)"
         menuButtonColor="var(--texto)"
         openMenuButtonColor="var(--texto)"
@@ -158,7 +166,7 @@ function Logado({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
           </div>
         }
       />
-      <main>
+      <main id="conteudo" tabIndex={-1} inert={menuAberto || undefined}>
         <ConfirmarProvider>
         <Routes>
           <Route path="/" element={<Caixa eu={eu} />} />
