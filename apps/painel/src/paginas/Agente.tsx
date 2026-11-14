@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import {
   api,
@@ -9,6 +9,7 @@ import {
   type SituacaoExecucao,
 } from "../api";
 import { Abas } from "../componentes/Abas";
+import { Dialogo } from "../componentes/Dialogo";
 import { Falha } from "../componentes/Falha";
 import GlideSelect from "../componentes/GlideSelect";
 import { ItemTurno } from "../componentes/ItemTurno";
@@ -150,6 +151,9 @@ function posicionar(grafo: Grafo): { pos: Map<string, Posicao>; largura: number;
   return { pos, largura, altura: camadas.length * (ALTURA_NO + VAO_Y) - VAO_Y + 2 * MARGEM };
 }
 
+// Duração de cada passo da progressão: o caminho inteiro cabe em ~3 s.
+const passoDaRota = (n: number) => Math.min(280, Math.round(3000 / Math.max(1, n)));
+
 function VisaoGrafo({
   grafo,
   destaque,
@@ -163,25 +167,67 @@ function VisaoGrafo({
 }) {
   const { pos, largura, altura } = useMemo(() => posicionar(grafo), [grafo]);
   const [escolhido, setEscolhido] = useState<string | null>(null);
+  // Muda a chave do desenho para refazer a progressão do começo.
+  const [repeticao, setRepeticao] = useState(0);
 
-  // A execução passa da entrada ao primeiro nó e do último ao fim.
+  // A execução passa da entrada ao primeiro nó e do último ao fim. A posição
+  // de cada nó no caminho marca quando ele acende na progressão.
   const caminho = destaque ? [INICIO, ...destaque, FIM] : [];
-  const naRota = (de: string, para: string) =>
-    caminho.some((id, i) => id === de && caminho[i + 1] === para);
+  const ordemNaRota = new Map(caminho.map((id, i) => [id, i] as const));
+  const passo = passoDaRota(caminho.length);
+  const trechoDaRota = (de: string, para: string) => {
+    const i = ordemNaRota.get(de);
+    return i !== undefined && caminho[i + 1] === para ? i : -1;
+  };
+  // Sem caminho, o grafo entra camada a camada, da entrada ao fim.
+  const camadaDe = (y: number) => Math.round((y - MARGEM) / (ALTURA_NO + VAO_Y));
   const no = grafo.nos.find((n) => n.id === escolhido) ?? null;
+  const tempo = (ms: number) => ({ "--atraso": `${ms}ms`, "--passo": `${passo}ms` }) as CSSProperties;
+
+  // O grafo é mais largo que o celular: durante a progressão, o quadro segue
+  // o nó que acende; sem caminho, abre centrado na entrada.
+  const quadro = useRef<HTMLDivElement>(null);
+  const chaveRota = caminho.join(">");
+  useEffect(() => {
+    const q = quadro.current;
+    if (!q) return;
+    const nos = chaveRota ? chaveRota.split(">") : [];
+    if (!nos.length) {
+      q.scrollLeft = (q.scrollWidth - q.clientWidth) / 2;
+      return;
+    }
+    const suave = matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+    const timers = nos.map((id, i) =>
+      window.setTimeout(() => {
+        q.querySelector(`[data-no="${CSS.escape(id)}"]`)?.scrollIntoView({
+          behavior: suave,
+          block: "nearest",
+          inline: "center",
+        });
+      }, i * passoDaRota(nos.length)),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [chaveRota, repeticao]);
 
   return (
     <div className="grafo-tela">
       {destaque && (
         <p className="grafo-destaque">
           Mostrando o caminho de uma execução: {destaque.map((n) => rotulo(NOS, n)).join(" → ")}
-          <button type="button" onClick={limparDestaque}>
-            Limpar
-          </button>
+          <span className="grafo-destaque__acoes">
+            <button type="button" onClick={() => setRepeticao((r) => r + 1)}>
+              Repetir
+            </button>
+            <button type="button" onClick={limparDestaque}>
+              Limpar
+            </button>
+          </span>
         </p>
       )}
-      <div className="grafo-quadro">
+      <div className="grafo-quadro" ref={quadro}>
         <svg
+          key={`${chaveRota}#${repeticao}`}
+          className={destaque ? "percorrendo" : "revelando"}
           viewBox={`0 0 ${largura} ${altura}`}
           width={largura}
           height={altura}
@@ -191,9 +237,6 @@ function VisaoGrafo({
           <defs>
             <marker id="seta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
               <path d="M0,0 L10,5 L0,10 z" className="grafo-seta" />
-            </marker>
-            <marker id="seta-rota" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
-              <path d="M0,0 L10,5 L0,10 z" className="grafo-seta rota" />
             </marker>
           </defs>
           {grafo.arestas.map((a) => {
@@ -205,36 +248,52 @@ function VisaoGrafo({
             const x2 = para.x + LARGURA_NO / 2;
             const y2 = para.y;
             const meio = (y1 + y2) / 2;
-            const rota = naRota(a.de, a.para);
+            const d = `M${x1},${y1} C${x1},${meio} ${x2},${meio} ${x2},${y2}`;
+            const trecho = trechoDaRota(a.de, a.para);
+            if (trecho < 0)
+              return (
+                <path
+                  key={`${a.de}-${a.para}`}
+                  d={d}
+                  className={`grafo-aresta${a.condicional ? " condicional" : ""}`}
+                  markerEnd="url(#seta)"
+                  style={tempo(camadaDe(de.y) * 70)}
+                />
+              );
+            // Trecho do caminho: a linha se traça de um nó ao outro e a ponta
+            // aparece quando chega. A curva sempre entra no nó na vertical.
             return (
-              <path
-                key={`${a.de}-${a.para}`}
-                d={`M${x1},${y1} C${x1},${meio} ${x2},${meio} ${x2},${y2}`}
-                className={`grafo-aresta${a.condicional ? " condicional" : ""}${rota ? " rota" : ""}`}
-                markerEnd={rota ? "url(#seta-rota)" : "url(#seta)"}
-              />
+              <g key={`${a.de}-${a.para}`} className="grafo-trecho" style={tempo(trecho * passo)}>
+                <path d={d} className="grafo-aresta" />
+                <path d={d} className="grafo-traco" pathLength={1} />
+                <path d={`M${x2 - 5},${y2 - 9} L${x2 + 5},${y2 - 9} L${x2},${y2} z`} className="grafo-ponta" />
+              </g>
             );
           })}
           {grafo.nos.map((n) => {
             const p = pos.get(n.id);
             if (!p) return null;
             const extremo = n.id === INICIO || n.id === FIM;
+            const ordem = ordemNaRota.get(n.id);
             const classes = [
               "grafo-no",
               extremo && "extremo",
-              caminho.includes(n.id) && "rota",
+              ordem !== undefined && "rota",
               escolhido === n.id && "escolhido",
             ]
               .filter(Boolean)
               .join(" ");
+            const raio = extremo ? ALTURA_NO / 2 : 10;
             return (
               <g
                 key={n.id}
+                data-no={n.id}
                 className={classes}
                 transform={`translate(${p.x},${p.y})`}
+                style={tempo(ordem !== undefined ? ordem * passo : camadaDe(p.y) * 70)}
                 role="button"
                 tabIndex={0}
-                aria-pressed={escolhido === n.id}
+                aria-haspopup="dialog"
                 aria-label={`${rotulo(NOS, n.id)}, ${n.passagens_24h} passagens em 24 horas`}
                 onClick={() => setEscolhido(n.id)}
                 onKeyDown={(e) => {
@@ -244,7 +303,10 @@ function VisaoGrafo({
                   }
                 }}
               >
-                <rect width={LARGURA_NO} height={ALTURA_NO} rx={extremo ? ALTURA_NO / 2 : 10} />
+                {ordem !== undefined && (
+                  <rect className="grafo-halo" width={LARGURA_NO} height={ALTURA_NO} rx={raio} />
+                )}
+                <rect width={LARGURA_NO} height={ALTURA_NO} rx={raio} />
                 <text x={12} y={20} className="grafo-nome">
                   {rotulo(NOS, n.id)}
                 </text>
@@ -277,40 +339,41 @@ function DetalheNo({
 }) {
   const extremo = no.id === INICIO || no.id === FIM;
   return (
-    <section className="grafo-detalhe" aria-label={`Detalhes de ${rotulo(NOS, no.id)}`}>
-      <header>
-        <h2>{rotulo(NOS, no.id)}</h2>
+    <Dialogo
+      titulo={rotulo(NOS, no.id)}
+      aoFechar={fechar}
+      rodape={
+        !extremo && (
+          <button type="button" onClick={() => verExecucoes(no.id)}>
+            Ver execuções que passaram aqui
+          </button>
+        )
+      }
+    >
+      <div className="grafo-detalhe">
         <code>{no.id}</code>
-        <button type="button" className="fechar" aria-label="Fechar detalhes" onClick={fechar}>
-          ×
-        </button>
-      </header>
-      {no.descricao && <p>{no.descricao}</p>}
-      <dl>
-        <div>
-          <dt>Modelo</dt>
-          <dd>
-            {no.modelo ? (
-              <>
-                {no.modelo.valor || <span className="erro">não configurado</span>}{" "}
-                <span className="nota">({no.modelo.variavel})</span>
-              </>
-            ) : (
-              "Nenhum: decisão em código"
-            )}
-          </dd>
-        </div>
-        <div>
-          <dt>Passagens nas últimas 24 h</dt>
-          <dd>{no.passagens_24h}</dd>
-        </div>
-      </dl>
-      {!extremo && (
-        <button type="button" onClick={() => verExecucoes(no.id)}>
-          Ver execuções que passaram aqui
-        </button>
-      )}
-    </section>
+        {no.descricao && <p>{no.descricao}</p>}
+        <dl>
+          <div>
+            <dt>Modelo</dt>
+            <dd>
+              {no.modelo ? (
+                <>
+                  {no.modelo.valor || <span className="erro">não configurado</span>}{" "}
+                  <span className="nota">({no.modelo.variavel})</span>
+                </>
+              ) : (
+                "Nenhum: decisão em código"
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt>Passagens nas últimas 24 h</dt>
+            <dd>{no.passagens_24h}</dd>
+          </div>
+        </dl>
+      </div>
+    </Dialogo>
   );
 }
 
