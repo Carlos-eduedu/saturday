@@ -445,15 +445,20 @@ function Conferencia({ m, turnos, ficha }: { m: Mensagem; turnos: Turno[]; ficha
   if (citados.length === 0) return null;
   const origem = origemDaMensagem(m, turnos);
   const fora = foraDaOferta(citados, oferta);
-  const nos = origem.tipo === "sem-registro" ? [] : origem.turno.caminho.filter((n) => !n.startsWith("__"));
+  const turno = origem.tipo === "sem-registro" ? undefined : origem.turno;
+  const nos = turno ? turno.caminho.filter((n) => !n.startsWith("__")) : [];
+  const caminho = nos.map((n) => rotulo(NOS, n)).join(" → ");
   return (
     <p className="conferencia">
+      {origem.tipo === "fixa" && <span title={caminho}>Mensagem fixa · {origem.chave}</span>}
       {origem.tipo === "codigo" && (
-        <span title={nos.map((n) => rotulo(NOS, n)).join(" → ")}>
-          Código · {rotulo(NOS, nos[nos.length - 1] ?? "")}
-        </span>
+        <span title={caminho}>Código · {rotulo(NOS, nos[nos.length - 1] ?? "")}</span>
       )}
-      {origem.tipo === "modelo" && <strong className="atencao">Turno com o modelo (FAQ)</strong>}
+      {origem.tipo === "modelo" && (
+        <strong className="atencao" title={caminho}>
+          {origem.exato ? "Modelo (FAQ)" : "Turno com o modelo (FAQ)"}
+        </strong>
+      )}
       {origem.tipo === "sem-registro" && <span>Sem turno registrado</span>}
       {fora === null ? (
         <span>

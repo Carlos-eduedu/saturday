@@ -15,9 +15,12 @@ export function centavosCitados(texto: string): number[] {
 // A oferta guarda valores como texto ("300.00").
 const centavos = (valor: string) => Math.round(Number(valor) * 100);
 
-// Turno e resposta são gravados na mesma transação: o `now()` do Postgres dá o
-// mesmo horário aos dois. A folga de 1 s cobre arredondamento na serialização.
+// A fala guarda o turno que a produziu (decisão 0018). Linhas anteriores, sem
+// `turno_id`, caem no horário: turno e resposta são gravados na mesma
+// transação e o `now()` do Postgres dá o mesmo horário aos dois. A folga de
+// 1 s cobre arredondamento na serialização.
 export function turnoDaMensagem(mensagem: Mensagem, turnos: Turno[]): Turno | undefined {
+  if (mensagem.turno_id !== null) return turnos.find((t) => t.id === mensagem.turno_id);
   const em = Date.parse(mensagem.criada_em);
   let melhor: Turno | undefined;
   let menor = 1000;
@@ -32,16 +35,25 @@ export function turnoDaMensagem(mensagem: Mensagem, turnos: Turno[]): Turno | un
 }
 
 export type Origem =
+  | { tipo: "fixa"; chave: string; turno?: Turno }
+  | { tipo: "modelo"; exato: boolean; turno?: Turno }
   | { tipo: "codigo"; turno: Turno }
-  | { tipo: "modelo"; turno: Turno }
   | { tipo: "sem-registro" };
 
-// O modelo (FAQ) nunca deveria escrever valores: um turno que chamou o `llm`
-// e respondeu com reais pede conferência.
+// O modelo (FAQ) nunca deveria escrever valores: fala do modelo com reais
+// pede conferência. Com `turno_id`, a chave diz se a fala é fixa ou do modelo;
+// sem ele (linha antiga), um turno que chamou o `llm` conta como do modelo.
 export function origemDaMensagem(mensagem: Mensagem, turnos: Turno[]): Origem {
   const turno = turnoDaMensagem(mensagem, turnos);
+  if (mensagem.turno_id !== null) {
+    return mensagem.chave_mensagem
+      ? { tipo: "fixa", chave: mensagem.chave_mensagem, turno }
+      : { tipo: "modelo", exato: true, turno };
+  }
   if (!turno) return { tipo: "sem-registro" };
-  return turno.chamadas.some((c) => c.nome === "llm") ? { tipo: "modelo", turno } : { tipo: "codigo", turno };
+  return turno.chamadas.some((c) => c.nome === "llm")
+    ? { tipo: "modelo", exato: false, turno }
+    : { tipo: "codigo", turno };
 }
 
 // Valores citados que não aparecem na oferta vigente (liberado, parcela ou

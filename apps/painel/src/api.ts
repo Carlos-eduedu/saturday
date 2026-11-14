@@ -49,6 +49,10 @@ export interface Mensagem {
   conteudo: string;
   status_entrega: string | null;
   criada_em: string;
+  // Procedência da fala da IA (decisão 0018): chave nula com turno = o modelo
+  // escreveu; os dois nulos = linha anterior à decisão.
+  turno_id: number | null;
+  chave_mensagem: string | null;
   anexos: { mime_type: string; nome?: string | null }[];
 }
 
