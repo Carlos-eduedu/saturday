@@ -10,7 +10,9 @@ from conftest import resultado_jev
 from sqlalchemy import func, select, update
 
 from saturday.canais.base import OrigemCanal
+from saturday.dados import repositorios
 from saturday.dados.modelos import (
+    Alerta,
     Auditoria,
     Consentimento,
     ConsultaGranatech,
@@ -441,6 +443,88 @@ def test_exportar_exige_sessao(client_pg, service_pg, fabrica, conversa):
 
 
 # ------------------------------------------------------------------ alertas, cota, mídia
+
+
+def _alertas_abertos(fabrica):
+    with abrir(fabrica) as s:
+        return sorted(
+            (a.tipo, a.id) for a in s.scalars(select(Alerta).where(Alerta.resolvido_em.is_(None)))
+        )
+
+
+def _abrir_alerta(fabrica, alvo, tipo):
+    with abrir(fabrica) as s:
+        return repositorios.abrir_alerta(s, tipo, conversa_id=uuid.UUID(alvo)).id
+
+
+def test_assumir_resolve_o_handoff_e_desfazer_reabre(
+    client_pg, service_pg, fakes, fabrica, ana, conversa
+):
+    fakes.jev.resultado = resultado_jev("humano", 0.95)
+    _cliente_escreve(service_pg, conversa, "humano")
+    alvo = _conversa_id(fabrica, conversa)
+    [(tipo, alerta_id)] = _alertas_abertos(fabrica)
+    assert tipo == "handoff"
+    evento = _abrir_alerta(fabrica, alvo, "evento_com_humano")
+
+    csrf = _entrar(client_pg, "ana@exemplo.test")
+    client_pg.post(f"/admin/conversas/{alvo}/assumir", headers=csrf)
+    assert _alertas_abertos(fabrica) == [("evento_com_humano", evento)]
+    with abrir(fabrica) as s:
+        assumiu = s.scalars(select(Auditoria).where(Auditoria.acao == "assumir")).one()
+        assert assumiu.detalhe["alertas"] == [alerta_id]
+        assert s.get(Alerta, alerta_id).resolvido_por == uuid.UUID(ana)
+
+    assert client_pg.post(f"/admin/conversas/{alvo}/desfazer", headers=csrf).status_code == 204
+    assert _alertas_abertos(fabrica) == sorted(
+        [("handoff", alerta_id), ("evento_com_humano", evento)]
+    )
+    with abrir(fabrica) as s:
+        desfez = s.scalars(select(Auditoria).where(Auditoria.acao == "desfazer")).one()
+        assert desfez.detalhe["alertas_reabertos"] == [alerta_id]
+        assert s.get(Alerta, alerta_id).resolvido_por is None
+
+
+def test_desfazer_de_auditoria_antiga_abre_o_alerta_de_handoff(
+    client_pg, service_pg, fabrica, ana, conversa
+):
+    _cliente_escreve(service_pg, conversa, "oi")
+    alvo = _conversa_id(fabrica, conversa)
+    with abrir(fabrica) as s:
+        s.get(Conversa, uuid.UUID(alvo)).atendimento = "handoff"
+    csrf = _entrar(client_pg, "ana@exemplo.test")
+    client_pg.post(f"/admin/conversas/{alvo}/assumir", headers=csrf)
+    with abrir(fabrica) as s:
+        # Linha gravada antes da decisão 0018: sem a lista de alertas.
+        s.execute(
+            update(Auditoria)
+            .where(Auditoria.acao == "assumir")
+            .values(detalhe={"antes": "handoff", "de": None})
+        )
+
+    assert client_pg.post(f"/admin/conversas/{alvo}/desfazer", headers=csrf).status_code == 204
+    assert [tipo for tipo, _ in _alertas_abertos(fabrica)] == ["handoff"]
+
+
+def test_devolver_resolve_sem_resposta_e_transferir_nao_mexe(
+    client_pg, service_pg, fabrica, ana, conversa
+):
+    bia = _criar(fabrica, "bia@exemplo.test")
+    _cliente_escreve(service_pg, conversa, "oi")
+    alvo = _conversa_id(fabrica, conversa)
+    csrf = _entrar(client_pg, "ana@exemplo.test")
+    client_pg.post(f"/admin/conversas/{alvo}/assumir", headers=csrf)
+    sem_resposta = _abrir_alerta(fabrica, alvo, "sem_resposta")
+    handoff = _abrir_alerta(fabrica, alvo, "handoff")
+
+    client_pg.post(f"/admin/conversas/{alvo}/transferir", headers=csrf, json={"usuario_id": bia})
+    assert _alertas_abertos(fabrica) == sorted(
+        [("sem_resposta", sem_resposta), ("handoff", handoff)]
+    )
+
+    csrf = _entrar(client_pg, "bia@exemplo.test")
+    assert client_pg.post(f"/admin/conversas/{alvo}/devolver", headers=csrf).status_code == 204
+    assert _alertas_abertos(fabrica) == []
 
 
 def test_alerta_de_handoff_e_resolvido_com_auditoria(

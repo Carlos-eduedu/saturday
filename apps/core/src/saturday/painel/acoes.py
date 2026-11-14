@@ -32,6 +32,7 @@ from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.dados.trava import travar_conversa
 from saturday.painel import midia
 from saturday.painel.auditoria import auditar
+from saturday.painel.supervisao import TIPOS_DE_HANDOFF
 from saturday.storage.base import Storage
 
 logger = logging.getLogger(__name__)
@@ -80,6 +81,10 @@ def conversa_travada(
 ACOES_DE_ATENDIMENTO = ("assumir", "devolver", "transferir", "desfazer")
 # Folga sobre os 5 s em que o painel mostra "Desfazer".
 PRAZO_DESFAZER = timedelta(seconds=15)
+# Alertas que cada ação dá por tratados (docs/decisoes/0018). Transferir não
+# resolve nada, e `evento_com_humano` nunca se resolve sozinho.
+ALERTAS_DE_ASSUMIR = TIPOS_DE_HANDOFF
+ALERTAS_DE_DEVOLVER = (*TIPOS_DE_HANDOFF, "sem_resposta")
 
 
 def _estado(conversa: Conversa) -> dict[str, Any]:
@@ -104,7 +109,8 @@ def assumir(sessao: Session, conversa: Conversa, usuario_id: uuid.UUID, gestor: 
         _exigir_dono(conversa, usuario_id, gestor)
     antes = _estado(conversa)
     repositorios.mudar_atendimento(sessao, conversa, "assumida", atendente_id=usuario_id)
-    auditar(sessao, usuario_id, "assumir", str(conversa.id), antes)
+    alertas = repositorios.resolver_alertas(sessao, conversa.id, ALERTAS_DE_ASSUMIR, usuario_id)
+    auditar(sessao, usuario_id, "assumir", str(conversa.id), {**antes, "alertas": alertas})
 
 
 def devolver(sessao: Session, conversa: Conversa, usuario_id: uuid.UUID, gestor: bool) -> None:
@@ -114,7 +120,8 @@ def devolver(sessao: Session, conversa: Conversa, usuario_id: uuid.UUID, gestor:
         _exigir_dono(conversa, usuario_id, gestor)
     antes = _estado(conversa)
     repositorios.mudar_atendimento(sessao, conversa, "ia")
-    auditar(sessao, usuario_id, "devolver", str(conversa.id), antes)
+    alertas = repositorios.resolver_alertas(sessao, conversa.id, ALERTAS_DE_DEVOLVER, usuario_id)
+    auditar(sessao, usuario_id, "devolver", str(conversa.id), {**antes, "alertas": alertas})
 
 
 def desfazer(sessao: Session, conversa: Conversa, usuario_id: uuid.UUID) -> None:
@@ -122,6 +129,7 @@ def desfazer(sessao: Session, conversa: Conversa, usuario_id: uuid.UUID) -> None
 
     Só vale por `PRAZO_DESFAZER` e enquanto nada mais mexeu no atendimento: a
     ação desfeita precisa ser a última da conversa e o estado, o que ela deixou.
+    Os alertas que a ação resolveu voltam a ficar abertos (docs/decisoes/0018).
     """
 
     ultima = sessao.scalars(
@@ -148,8 +156,23 @@ def desfazer(sessao: Session, conversa: Conversa, usuario_id: uuid.UUID) -> None
         destino = sessao.get(UsuarioPainel, dono) if dono else None
         if destino is None or not destino.ativo:
             raise AcaoRecusada(409, "não dá mais para desfazer: quem estava com ela saiu")
-    repositorios.mudar_atendimento(sessao, conversa, str(antes.get("antes")), atendente_id=dono)
-    auditar(sessao, usuario_id, "desfazer", str(conversa.id), {"acao": ultima.acao})
+    destino_atendimento = str(antes.get("antes"))
+    repositorios.mudar_atendimento(sessao, conversa, destino_atendimento, atendente_id=dono)
+    if "alertas" in antes:
+        reabertos = repositorios.reabrir_alertas(sessao, [int(i) for i in antes["alertas"]])
+    elif destino_atendimento == "handoff":
+        # Auditoria anterior à decisão 0018, sem os ids: o handoff volta com alerta.
+        alerta = repositorios.abrir_alerta(sessao, "handoff", conversa_id=conversa.id, unico=True)
+        reabertos = [alerta.id]
+    else:
+        reabertos = []
+    auditar(
+        sessao,
+        usuario_id,
+        "desfazer",
+        str(conversa.id),
+        {"acao": ultima.acao, "alertas_reabertos": reabertos},
+    )
 
 
 def transferir(

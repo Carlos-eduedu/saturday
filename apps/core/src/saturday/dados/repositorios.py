@@ -6,7 +6,7 @@ import json
 import uuid
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -213,3 +213,46 @@ def abrir_alerta(
     sessao.flush()
     notificar(sessao, "alerta", alerta=alerta.id)
     return alerta
+
+
+def resolver_alertas(
+    sessao: Session,
+    conversa_id: uuid.UUID,
+    tipos: tuple[str, ...],
+    usuario_id: uuid.UUID,
+) -> list[int]:
+    """Resolve os alertas abertos desses tipos na conversa, em nome de quem agiu."""
+
+    ids = list(
+        sessao.scalars(
+            update(Alerta)
+            .where(
+                Alerta.conversa_id == conversa_id,
+                Alerta.tipo.in_(tipos),
+                Alerta.resolvido_em.is_(None),
+            )
+            .values(resolvido_por=usuario_id, resolvido_em=func.now())
+            .returning(Alerta.id)
+        )
+    )
+    for alerta_id in ids:
+        notificar(sessao, "alerta", alerta=alerta_id)
+    return ids
+
+
+def reabrir_alertas(sessao: Session, ids: list[int]) -> list[int]:
+    """Volta a abrir alertas resolvidos (o desfazer da ação que os resolveu)."""
+
+    if not ids:
+        return []
+    reabertos = list(
+        sessao.scalars(
+            update(Alerta)
+            .where(Alerta.id.in_(ids), Alerta.resolvido_em.is_not(None))
+            .values(resolvido_por=None, resolvido_em=None)
+            .returning(Alerta.id)
+        )
+    )
+    for alerta_id in reabertos:
+        notificar(sessao, "alerta", alerta=alerta_id)
+    return reabertos

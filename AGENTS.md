@@ -68,7 +68,9 @@ automaticamente e é o que publica a porta no ambiente local.
   Vite, TS, servido por nginx com proxy na mesma origem); login argon2id com
   bloqueio, sessão no banco e CSRF; estado de atendimento (`ia`, `handoff`,
   `assumida`) em `conversas` (docs/decisoes/0003); assumir, devolver, transferir
-  e responder; ficha mascarada com revelar auditado; alertas; contador de cota;
+  e responder; ficha mascarada com revelar auditado; alertas (o de handoff se
+  resolve ao assumir ou devolver e volta com o desfazer, docs/decisoes/0018);
+  contador de cota;
   tempo real por `pg_notify` + SSE. Depois, fora das fases: aba Usuários (só
   gestor) para cadastrar, editar, redefinir senha, desbloquear, desativar e
   reativar; excluir é desativar (docs/decisoes/0012). Aba Granatech para

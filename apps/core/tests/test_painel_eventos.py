@@ -42,6 +42,22 @@ def test_aviso_so_sai_no_commit(fabrica, pg_url, conversa):
         assert _avisos(conexao) == [{"tipo": "alerta", "alerta": str(alerta.id)}]
 
 
+def test_resolver_e_reabrir_alerta_avisam_o_painel(fabrica, pg_url, conversa):
+    with abrir(fabrica) as s:
+        conversa_id = repositorios.obter_ou_criar_conversa(s, conversa).id
+        usuario_id = sessoes.criar_usuario(s, "ana@exemplo.test", "x" * 12, "atendente").id
+        alerta = repositorios.abrir_alerta(s, "handoff", conversa_id=conversa_id)
+    with _ouvinte(pg_url) as conexao:
+        with abrir(fabrica) as s:
+            ids = repositorios.resolver_alertas(s, conversa_id, ("handoff",), usuario_id)
+        assert ids == [alerta.id]
+        assert _avisos(conexao) == [{"tipo": "alerta", "alerta": str(alerta.id)}]
+
+        with abrir(fabrica) as s:
+            assert repositorios.reabrir_alertas(s, ids) == ids
+        assert _avisos(conexao) == [{"tipo": "alerta", "alerta": str(alerta.id)}]
+
+
 def test_difusor_repassa_o_aviso_para_quem_assina(fabrica, pg_url):
     async def cenario():
         difusor = Difusor(pg_url)
