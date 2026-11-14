@@ -36,7 +36,8 @@ texto digitado, PDF e Markdown/TXT.
 ## Consequências
 
 - Trocar a imagem de um banco que já roda em `postgres:17-alpine` muda a
-  biblioteca de ordenação de texto (musl → glibc): depois da troca, rode
-  `REINDEX DATABASE saturday`. Faça backup antes.
+  biblioteca de ordenação de texto (musl → glibc). A migração `c5a9e3f7b1d4`
+  roda `REINDEX DATABASE` uma vez, fora de transação. Troca testada com o mesmo
+  volume (alpine → pgvector) antes de publicar. Faça backup antes mesmo assim.
 - Uma fonte editada sai da busca até terminar a reindexação (segundos).
 - Conteúdo das fontes é informação pública da MEX; não suba dado pessoal nelas.
