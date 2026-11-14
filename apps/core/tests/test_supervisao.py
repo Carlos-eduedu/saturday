@@ -8,9 +8,9 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.agent.service import etapa_do_estado
 from saturday.dados import repositorios
-from saturday.dados.modelos import Conversa, Mensagem
+from saturday.dados.modelos import Conversa, Mensagem, UsuarioPainel
 from saturday.dados.sessao import sessao as abrir
-from saturday.painel.supervisao import PREVIA_MAXIMA, ordenar, supervisao
+from saturday.painel.supervisao import PREVIA_MAXIMA, contagens, ordenar, supervisao
 
 AGORA = datetime(2026, 11, 12, 15, 0, tzinfo=UTC)
 
@@ -113,3 +113,60 @@ def test_atencao_previa_e_ordem(fabrica: sessionmaker[Session]) -> None:
         # Atenção primeiro, pela espera mais longa; depois por atividade recente.
         assert ordem[:4] == ["teste:esperando", "teste:falhou", "teste:oferta", "teste:handoff"]
         assert ordem[4:] == ["teste:recente", "teste:calma"]
+
+
+def test_contagens_batem_com_a_supervisao(fabrica: sessionmaker[Session]) -> None:
+    with abrir(fabrica) as sessao:
+        eu = UsuarioPainel(email="ana@exemplo.test", nome="Ana", senha_hash="x", perfil="atendente")
+        outro = UsuarioPainel(
+            email="bia@exemplo.test", nome="Bia", senha_hash="x", perfil="atendente"
+        )
+        sessao.add_all([eu, outro])
+        sessao.flush()
+
+        calma = _conversa(sessao, "calma")
+        _mensagem(sessao, calma, "entrada", 30)
+        _mensagem(sessao, calma, "saida", 29)
+        # Respondida e depois falhou: só a última saída conta.
+        recuperada = _conversa(sessao, "recuperada")
+        _mensagem(sessao, recuperada, "saida", 20, status_entrega="failed")
+        _mensagem(sessao, recuperada, "saida", 19, status_entrega="delivered")
+        recente = _conversa(sessao, "recente")
+        _mensagem(sessao, recente, "entrada", 2)
+        vazia = _conversa(sessao, "vazia")
+
+        esperando = _conversa(sessao, "esperando", atendimento="assumida")
+        esperando.atendente_id = eu.id
+        _mensagem(sessao, esperando, "entrada", 12)
+        de_outro = _conversa(sessao, "de-outro", atendimento="assumida")
+        de_outro.atendente_id = outro.id
+        _mensagem(sessao, de_outro, "saida", 1)
+        handoff = _conversa(sessao, "handoff", atendimento="handoff")
+        oferta = _conversa(sessao, "oferta", etapa="oferta")
+        falhou = _conversa(sessao, "falhou")
+        _mensagem(sessao, falhou, "saida", 4, status_entrega="failed")
+        sessao.flush()
+
+        conversas = [
+            calma,
+            recuperada,
+            recente,
+            vazia,
+            esperando,
+            de_outro,
+            handoff,
+            oferta,
+            falhou,
+        ]
+        campos = supervisao(sessao, conversas, AGORA)
+        pedem = sum(1 for c in conversas if campos[c.id]["atencao"])
+
+        assert contagens(sessao, eu.id, AGORA) == {
+            "todas": 9,
+            "ia": 6,
+            "handoff": 1,
+            "assumida": 2,
+            "minhas": 1,
+            "atencao": pedem,
+        }
+        assert pedem == 4

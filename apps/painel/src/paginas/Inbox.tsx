@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 import { Link, useNavigate } from "react-router";
-import { api, type Eu, mensagemDeFalha, type Resumo, type Usuario } from "../api";
+import { api, type Contagens, type Eu, mensagemDeFalha, type Resumo, type Usuario } from "../api";
 import {
   AiChat02Icon,
   Cancel01Icon,
@@ -62,7 +62,7 @@ const ACOES: Record<Acao, SwipeAction> = {
   },
 };
 
-const FILAS = [
+const FILAS: { valor: "" | Exclude<keyof Contagens, "todas" | "atencao">; rotulo: string }[] = [
   { valor: "", rotulo: "Todas" },
   { valor: "ia", rotulo: "Com a IA" },
   { valor: "handoff", rotulo: "Aguardando humano" },
@@ -114,17 +114,6 @@ function marcarDica(): void {
   }
 }
 
-// Quantas conversas há em cada fila. shortcut: conta só as 200 mais recentes
-// (o limite da API); com mais que isso, pedir as contagens prontas à API.
-function contarFilas(todas: Resumo[], eu: Eu): Record<string, number> {
-  const n: Record<string, number> = { "": todas.length, ia: 0, handoff: 0, assumida: 0, minhas: 0 };
-  for (const c of todas) {
-    n[c.atendimento] += 1;
-    if (c.atendimento === "assumida" && c.atendente_id === eu.id) n.minhas += 1;
-  }
-  return n;
-}
-
 // Quando chegou a última fala do cliente, por conversa: comparar duas cargas
 // diz quem escreveu de novo, sem anunciar cada aviso do tempo real.
 const falasDoCliente = (lista: Resumo[]) =>
@@ -166,9 +155,8 @@ export function Inbox({
   const [busca, setBusca] = useState("");
   // null = ainda não carregou: não mostra "nenhuma conversa" antes de saber.
   const [conversas, setConversas] = useState<Resumo[] | null>(null);
-  // Todas as filas, sem busca: contagens das abas, título da aba do navegador e
-  // os anúncios de mensagem nova.
-  const [todas, setTodas] = useState<Resumo[] | null>(null);
+  // Contagens das abas e do título da aba do navegador, em toda a base.
+  const [contagens, setContagens] = useState<Contagens | null>(null);
   // De que fila e busca é a lista à mostra: trocar de fila mantém a anterior,
   // esmaecida, até a nova chegar (em vez de piscar "Carregando…").
   const [carregada, setCarregada] = useState("");
@@ -178,12 +166,15 @@ export function Inbox({
   // Leitor de tela: avisa quem escreveu, agrupado em 1,5 s, e não a cada aviso.
   const [anuncio, setAnuncio] = useState("");
   const falasAntes = useRef<Map<string, string> | null>(null);
+  // De que fila e busca são as falas guardadas: trocar de lista não é mensagem nova.
+  const listaAntes = useRef("");
   const novas = useRef<string[]>([]);
   const relogioAnuncio = useRef(0);
   useEffect(() => () => window.clearTimeout(relogioAnuncio.current), []);
-  const anunciar = useCallback((lista: Resumo[]) => {
-    const antes = falasAntes.current;
+  const anunciar = useCallback((lista: Resumo[], chave: string) => {
+    const antes = listaAntes.current === chave ? falasAntes.current : null;
     falasAntes.current = falasDoCliente(lista);
+    listaAntes.current = chave;
     if (!antes) return;
     for (const [id, em] of falasAntes.current) {
       if (!em || antes.get(id) === em) continue;
@@ -208,14 +199,14 @@ export function Inbox({
   const ultimoPedido = useRef(0);
   const carregar = useCallback(() => {
     const pedido = ++ultimoPedido.current;
-    const filtrada = fila !== "" || busca !== "";
-    Promise.all([api.conversas(fila, busca), filtrada ? api.conversas("", "") : null])
-      .then(([lista, semFiltro]) => {
+    Promise.all([api.conversas(fila, busca), api.contagens()])
+      .then(([lista, contadas]) => {
         if (pedido !== ultimoPedido.current) return;
         setConversas(lista);
-        setTodas(semFiltro ?? lista);
+        setContagens(contadas);
         setCarregada(`${fila}|${busca}`);
-        anunciar(semFiltro ?? lista);
+        // Só a lista à mostra anuncia mensagem nova.
+        anunciar(lista, `${fila}|${busca}`);
         setErro("");
       })
       .catch((e: unknown) => {
@@ -239,10 +230,9 @@ export function Inbox({
   const visiveis = filtrandoAtencao
     ? (conversas ?? []).filter((c) => c.atencao.length > 0)
     : conversas;
-  const contagens = todas ? contarFilas(todas, eu) : null;
 
   // A aba do navegador mostra quantas pedem atenção: dá para ver de outra aba.
-  const atencaoTotal = (todas ?? []).filter((c) => c.atencao.length > 0).length;
+  const atencaoTotal = contagens?.atencao ?? 0;
   useEffect(() => {
     document.title = atencaoTotal > 0 ? `(${atencaoTotal}) ${TITULO}` : TITULO;
   }, [atencaoTotal]);
@@ -439,7 +429,7 @@ export function Inbox({
                 {contagens && (
                   <>
                     {" "}
-                    <span className="aba-contagem">{contagens[f.valor]}</span>
+                    <span className="aba-contagem">{contagens[f.valor || "todas"]}</span>
                   </>
                 )}
               </button>

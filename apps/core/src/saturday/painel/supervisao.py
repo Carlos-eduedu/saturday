@@ -12,7 +12,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import and_, func, or_, select, true
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.orm import Session
 
@@ -113,6 +113,52 @@ def supervisao(
             "atencao": atencao,
         }
     return resultado
+
+
+def contagens(sessao: Session, usuario_id: uuid.UUID, agora: datetime) -> dict[str, int]:
+    """Quantas conversas há em cada fila e quantas pedem atenção, em toda a base.
+
+    `atencao` repete em SQL as regras de `supervisao()`; `test_supervisao` trava
+    as duas definições juntas.
+    """
+
+    ultima = (
+        select(Mensagem.direcao, Mensagem.criada_em)
+        .where(Mensagem.conversa_id == Conversa.id)
+        .order_by(Mensagem.criada_em.desc(), Mensagem.id.desc())
+        .limit(1)
+        .lateral()
+    )
+    ultima_saida = (
+        select(Mensagem.status_entrega)
+        .where(Mensagem.conversa_id == Conversa.id, Mensagem.direcao == "saida")
+        .order_by(Mensagem.criada_em.desc(), Mensagem.id.desc())
+        .limit(1)
+        .lateral()
+    )
+    atencao = or_(
+        and_(ultima.c.direcao == "entrada", ultima.c.criada_em < agora - ESPERA_ATENCAO),
+        Conversa.atendimento == "handoff",
+        Conversa.etapa.in_(ETAPAS_DE_DINHEIRO),
+        ultima_saida.c.status_entrega == "failed",
+    )
+    contar = func.count().filter
+    linha = sessao.execute(
+        select(
+            func.count().label("todas"),
+            contar(Conversa.atendimento == "ia").label("ia"),
+            contar(Conversa.atendimento == "handoff").label("handoff"),
+            contar(Conversa.atendimento == "assumida").label("assumida"),
+            contar(Conversa.atendimento == "assumida", Conversa.atendente_id == usuario_id).label(
+                "minhas"
+            ),
+            contar(atencao).label("atencao"),
+        )
+        .select_from(Conversa)
+        .outerjoin(ultima, true())
+        .outerjoin(ultima_saida, true())
+    ).one()
+    return dict(linha._mapping)
 
 
 def ordenar(resumos: list[dict[str, Any]]) -> list[dict[str, Any]]:

@@ -263,6 +263,14 @@ def listar_conversas(
         return supervisao.ordenar(resumos)
 
 
+@router.get("/conversas/contagens")
+def contar_conversas(usuario: Logado, fabrica: Fabrica) -> dict[str, int]:
+    """Contagens das filas do inbox em toda a base, não só nas da lista."""
+
+    with abrir_sessao(fabrica) as sessao:
+        return supervisao.contagens(sessao, usuario.id, datetime.now(UTC))
+
+
 @router.get("/conversas/{conversa_id}")
 def ver_conversa(conversa_id: uuid.UUID, _usuario: Logado, fabrica: Fabrica) -> dict[str, Any]:
     with abrir_sessao(fabrica) as sessao:

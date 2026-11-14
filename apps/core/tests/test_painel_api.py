@@ -291,6 +291,30 @@ def test_inbox_filtra_por_fila_e_marca_lida(client_pg, service_pg, fabrica, ana,
     assert client_pg.get("/admin/conversas", params={"busca": "4321"}).json()[0]["id"] == alvo
 
 
+def test_contagens_das_filas_e_a_fila_minhas(client_pg, service_pg, fabrica, ana, conversa):
+    _cliente_escreve(service_pg, conversa, "oi")
+    alvo = _conversa_id(fabrica, conversa)
+    assert client_pg.get("/admin/conversas/contagens").status_code == 401
+    csrf = _entrar(client_pg, "ana@exemplo.test")
+
+    contagens = client_pg.get("/admin/conversas/contagens").json()
+    assert contagens == {
+        "todas": 1,
+        "ia": 1,
+        "handoff": 0,
+        "assumida": 0,
+        "minhas": 0,
+        "atencao": 0,
+    }
+
+    client_pg.post(f"/admin/conversas/{alvo}/assumir", headers=csrf)
+    contagens = client_pg.get("/admin/conversas/contagens").json()
+    assert (contagens["ia"], contagens["assumida"], contagens["minhas"]) == (0, 1, 1)
+    _criar(fabrica, "bia@exemplo.test")
+    _entrar(client_pg, "bia@exemplo.test")
+    assert client_pg.get("/admin/conversas/contagens").json()["minhas"] == 0
+
+
 # ------------------------------------------------------------------ aceite 2
 
 

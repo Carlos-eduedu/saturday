@@ -13,6 +13,16 @@ export interface Eu {
   csrf: string;
 }
 
+/** Contagens das filas do inbox em toda a base (`/conversas/contagens`). */
+export interface Contagens {
+  todas: number;
+  ia: number;
+  handoff: number;
+  assumida: number;
+  minhas: number;
+  atencao: number;
+}
+
 export interface Resumo {
   id: string;
   canal: string;
@@ -597,6 +607,7 @@ export const api = {
     if (busca) params.set("busca", busca);
     return chamar<Resumo[]>("GET", `/conversas?${params}`);
   },
+  contagens: () => chamar<Contagens>("GET", "/conversas/contagens"),
   conversa: (id: string) => chamar<Detalhe>("GET", `/conversas/${id}`),
   assumir: (id: string) => chamar<void>("POST", `/conversas/${id}/assumir`),
   devolver: (id: string) => chamar<void>("POST", `/conversas/${id}/devolver`),

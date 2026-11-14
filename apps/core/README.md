@@ -165,11 +165,12 @@ nunca pelo `conversation_id`, que no WhatsApp carrega o telefone.
 | `POST` | `/admin/logout` | Apaga a sessão. |
 | `GET` | `/admin/eu` | Usuário, perfil e token CSRF. |
 | `GET` | `/admin/usuarios` | Destinos de transferência. |
-| `GET` | `/admin/conversas?fila=ia\|handoff\|assumida\|minhas&busca=` | Inbox, com `nao_lida` e `janela_aberta`. |
+| `GET` | `/admin/conversas?fila=ia\|handoff\|assumida\|minhas&busca=` | Inbox, com `nao_lida` e `janela_aberta` (as 200 mais recentes). |
+| `GET` | `/admin/conversas/contagens` | Quantas conversas há em cada fila (`todas`, `ia`, `handoff`, `assumida`, `minhas`) e quantas pedem atenção (`atencao`), em toda a base. |
 | `GET` | `/admin/conversas/{id}` | Histórico com autor e status de entrega; marca como vista. |
-| `POST` | `/admin/conversas/{id}/assumir` | Atendente assume da IA ou do handoff; o gestor toma de outro atendente. |
-| `POST` | `/admin/conversas/{id}/desfazer` | Desfaz o último assumir ou devolver de quem pede, por até 15 s e enquanto nada mais mexeu no atendimento; a conversa volta ao estado de antes (IA, handoff ou o dono anterior). |
-| `POST` | `/admin/conversas/{id}/devolver` | Devolve para a IA (só o dono, ou o gestor). |
+| `POST` | `/admin/conversas/{id}/assumir` | Atendente assume da IA ou do handoff; o gestor toma de outro atendente. Resolve os alertas `handoff` e `erro_interno` da conversa (docs/decisoes/0018). |
+| `POST` | `/admin/conversas/{id}/desfazer` | Desfaz o último assumir ou devolver de quem pede, por até 15 s e enquanto nada mais mexeu no atendimento; a conversa volta ao estado de antes (IA, handoff ou o dono anterior), com os alertas que a ação resolveu reabertos. |
+| `POST` | `/admin/conversas/{id}/devolver` | Devolve para a IA (só o dono, ou o gestor). Resolve os alertas `handoff`, `erro_interno` e `sem_resposta` da conversa. |
 | `POST` | `/admin/conversas/{id}/transferir` | `{usuario_id}`; só conversa assumida. |
 | `POST` | `/admin/conversas/{id}/mensagens` | `{texto}` ou `{modelo}`; só o dono, só WhatsApp. Janela fechada aceita só modelo. |
 | `GET` | `/admin/conversas/{id}/ficha` | Dados mascarados, mais a oferta vigente (só valores), a última proposta na Granatech com `difere_da_oferta` e as provas de consentimento (sem o CPF). |
