@@ -58,21 +58,26 @@ def turnos(conversa_id: uuid.UUID, usuario: Logado, fabrica: Fabrica) -> dict[st
     return {
         "custo_usd": float(total[0]) if gestor else None,
         "tokens": int(total[1]) if gestor else None,
-        "turnos": [
-            {
-                "id": t.id,
-                "criado_em": t.criado_em,
-                "caminho": t.caminho,
-                "status": t.status,
-                "motivo": t.motivo,
-                "etapa": t.etapa,
-                "classificacao": t.classificacao,
-                "chamadas": t.chamadas if gestor else [_sem_custo(c) for c in t.chamadas],
-                "custo_usd": t.custo_usd if gestor else None,
-                "tokens": t.tokens if gestor else None,
-            }
-            for t in linhas
-        ],
+        "turnos": [turno_json(t, gestor) for t in linhas],
+    }
+
+
+def turno_json(t: Turno, gestor: bool) -> dict[str, Any]:
+    """Um turno para o painel; custo e tokens só para gestor."""
+
+    return {
+        "id": t.id,
+        "criado_em": t.criado_em,
+        "caminho": t.caminho,
+        "status": t.status,
+        "motivo": t.motivo,
+        "etapa": t.etapa,
+        "classificacao": t.classificacao,
+        "chamadas": t.chamadas if gestor else [_sem_custo(c) for c in t.chamadas],
+        "custo_usd": t.custo_usd if gestor else None,
+        "tokens": t.tokens if gestor else None,
+        "duracao_ms": t.duracao_ms,
+        "erro": t.erro,
     }
 
 

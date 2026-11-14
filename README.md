@@ -39,6 +39,10 @@ os termos estão no [`GLOSSARY.md`](GLOSSARY.md). A aba **Granatech** lista
 consultas e propostas e deixa o gestor reconciliar, reenviar o link de
 biometria, cancelar, corrigir a conta e atualizar o detalhe
 ([decisão 0013](docs/decisoes/0013-acoes-do-painel-na-granatech-por-turno-de-sistema.md)).
+A aba **Agente** (`/admin/agente/*`, só leitura por enquanto) desenha o grafo
+compilado (`agent/graph.py`, nó a nó com descrição, modelo e passagens em 24 h)
+e lista as execuções (`turnos`) de todas as conversas ao vivo, com filtro por
+nó e situação, duração, erro (só o nome da exceção) e o caminho no grafo.
 No compositor da conversa, o botão de atalhos edita a ficha (nome, nascimento,
 sexo, e-mail, celular, CPF e conta, com auditoria só dos nomes dos campos; o CPF
 trava depois da consulta e a conta depois da proposta), envia modelo e exporta

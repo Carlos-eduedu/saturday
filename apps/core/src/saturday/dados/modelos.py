@@ -424,6 +424,10 @@ class Turno(Base):
     chamadas: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
     custo_usd: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Tempo do grafo no turno; vazio nos turnos gravados antes da aba Agente.
+    duracao_ms: Mapped[int | None] = mapped_column(Integer)
+    # Só o nome da exceção (ex.: `TimeoutError`) quando o turno quebrou: nunca a mensagem.
+    erro: Mapped[str | None] = mapped_column(String(64))
 
 
 class HomologacaoGranatech(Base):

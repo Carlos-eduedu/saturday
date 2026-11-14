@@ -106,6 +106,8 @@ def _resultado_falha(extrato: dict[str, Any], motivo: str, prazo: int = PRAZO_C6
 
 
 def pedir_texto(state: AgentState) -> dict[str, Any]:
+    """Mensagem sem texto que dê para ler: pede ao cliente que escreva."""
+
     return {
         "status": "answered",
         "answer": MENSAGEM_SEM_TEXTO,
@@ -132,6 +134,8 @@ def _entra_no_clt(state: AgentState, publico: str, contexto: AgentContext) -> bo
 
 
 def classify_intent(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
+    """Classifica intenção e público da mensagem pelo Jev; erro do Jev segue para o LLM."""
+
     try:
         resultado = runtime.context.jev.classify(
             state.get("user_message", ""),
@@ -190,6 +194,8 @@ def classify_intent(state: AgentState, runtime: Runtime[AgentContext]) -> dict[s
 
 
 def generate_answer(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
+    """Responde a dúvida pelo LLM, ancorado na FAQ; sem resposta segura, vai para handoff."""
+
     try:
         resposta = runtime.context.llm.responder(
             _historico(state),
@@ -228,6 +234,8 @@ def generate_answer(state: AgentState, runtime: Runtime[AgentContext]) -> dict[s
 
 
 def boas_vindas(state: AgentState) -> dict[str, Any]:
+    """Primeira mensagem sem jornada: apresenta o atendimento."""
+
     return {
         "status": "answered",
         "answer": MENSAGEM_BOAS_VINDAS,
@@ -238,6 +246,8 @@ def boas_vindas(state: AgentState) -> dict[str, Any]:
 
 
 def handoff(state: AgentState) -> dict[str, Any]:
+    """Passa a conversa para a equipe com o motivo e avisa o cliente."""
+
     motivo = state.get("handoff_reason") or "sem_resposta"
     resposta = mensagem_handoff(motivo, state.get("answer"))
     return {
@@ -251,6 +261,8 @@ def handoff(state: AgentState) -> dict[str, Any]:
 
 
 def decline_offer(state: AgentState) -> dict[str, Any]:
+    """Cliente recusou a oferta do INSS: agradece e encerra a oferta."""
+
     return {
         "status": "answered",
         "answer": MENSAGEM_RECUSA,
@@ -279,6 +291,8 @@ def _perguntar_extrato(state: AgentState, pergunta: str) -> dict[str, Any]:
 
 
 def read_statement(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
+    """Lê o extrato do INSS (foto ou PDF) pelo modelo de visão e valida."""
+
     try:
         anexos = runtime.context.anexos.carregar_anexos(state.get("attachments") or [])
     except AnexoInvalido:
@@ -324,6 +338,8 @@ def read_statement(state: AgentState, runtime: Runtime[AgentContext]) -> dict[st
 
 
 def check_customer_data(state: AgentState) -> dict[str, Any]:
+    """Confere se faltam dados do cliente (nascimento, UF) para calcular."""
+
     cliente: dict[str, Any] = dict(state.get("cliente") or {})
     hoje = hoje_operacao()
     idade = calculo.idade_em_anos(cliente.get("data_nascimento"), hoje)
@@ -364,6 +380,8 @@ def _falha_coleta(state: AgentState, pergunta: str) -> dict[str, Any]:
 
 
 def collect_customer_data(state: AgentState) -> dict[str, Any]:
+    """Recebe o dado pedido (nascimento, UF) e valida em código."""
+
     aguardando = state.get("aguardando")
     cliente: dict[str, Any] = dict(state.get("cliente") or {})
     texto = state.get("user_message", "")
@@ -408,6 +426,8 @@ def _dados_cliente(cliente: Any) -> calculo.DadosCliente | None:
 
 
 def calculate_portability(state: AgentState) -> dict[str, Any]:
+    """Calcula a portabilidade INSS → C6 em código, sem LLM."""
+
     dados_hiscon = state.get("hiscon")
     if not dados_hiscon:
         return {
@@ -453,6 +473,8 @@ def calculate_portability(state: AgentState) -> dict[str, Any]:
 
 
 def present_offer(state: AgentState) -> dict[str, Any]:
+    """Monta a mensagem fixa da oferta de portabilidade."""
+
     resultado = state.get("portability_result") or {}
     uf = (state.get("cliente") or {}).get("uf")
     resposta = mensagem.mensagem_oferta(resultado, uf)

@@ -5,7 +5,14 @@
 import { useEffect } from "react";
 
 export interface Aviso {
-  tipo: "mensagem" | "conversa" | "alerta" | "granatech" | "homologacao" | "reconectado";
+  tipo:
+    | "mensagem"
+    | "conversa"
+    | "alerta"
+    | "granatech"
+    | "homologacao"
+    | "turno"
+    | "reconectado";
   conversa?: string;
   alerta?: string;
   rodada?: string;

@@ -276,10 +276,13 @@ class AgentService:
         estado: dict[str, Any],
         caminho: list[str],
         metricas: TurnMetrics | None,
+        inicio: float,
+        erro: str | None = None,
     ) -> None:
-        """Etapa na conversa (para a lista) e a trilha do turno (aba "IA").
+        """Etapa na conversa (para a lista) e a trilha do turno (abas "IA" e Agente).
 
-        Só códigos, números e tempos: nenhum texto do cliente ou do modelo.
+        Só códigos, números e tempos: nenhum texto do cliente ou do modelo. O
+        aviso `turno` atualiza ao vivo a lista de execuções do painel.
         """
 
         conversa.etapa = etapa_do_estado(estado)
@@ -304,8 +307,11 @@ class AgentService:
                 chamadas=resumo["chamadas"],
                 custo_usd=resumo["custo_total_usd"],
                 tokens=resumo.get("tokens_total", 0),
+                duracao_ms=round((time.monotonic() - inicio) * 1000),
+                erro=erro,
             )
         )
+        repositorios.notificar(sessao, "turno", conversa=conversa.id)
 
     def _log_turno(
         self,
@@ -556,11 +562,21 @@ class AgentService:
         caminho: list[str] = []
         try:
             self._stream(entrada, config, caminho)
-        except Exception:
+        except Exception as exc:
             logger.exception(
                 "erro_interno conversation_id=%s",
                 payload.conversation_id,
             )
+            if sessao is not None and conversa is not None:
+                self._registrar_turno(
+                    sessao,
+                    conversa,
+                    {**estado, "status": "handoff", "handoff_reason": "erro_interno"},
+                    caminho,
+                    metricas,
+                    inicio,
+                    erro=type(exc).__name__,
+                )
             self._registrar_resposta(
                 config,
                 ids_recentes,
@@ -586,7 +602,7 @@ class AgentService:
             metricas,
         )
         if sessao is not None and conversa is not None:
-            self._registrar_turno(sessao, conversa, final, caminho, metricas)
+            self._registrar_turno(sessao, conversa, final, caminho, metricas, inicio)
         resposta = self.evento(payload.conversation_id, final)
 
         if payload.message_id and resposta.answer:
@@ -650,7 +666,7 @@ class AgentService:
             final = dict(self.graph.get_state(config).values or {})
             self._log_turno(conversation_id, final, caminho, inicio, metricas)
             if sessao is not None and conversa is not None:
-                self._registrar_turno(sessao, conversa, final, caminho, metricas)
+                self._registrar_turno(sessao, conversa, final, caminho, metricas, inicio)
             resposta = self.evento(conversation_id, final)
             if sessao is not None and conversa is not None:
                 if forcar and conversa.atendimento != "ia" and resposta.status == "handoff":

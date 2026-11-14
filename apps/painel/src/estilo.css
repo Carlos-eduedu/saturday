@@ -830,6 +830,51 @@ main {
 .caras { margin: 0; padding-left: 1.25rem; display: flex; flex-direction: column; gap: 0.4rem; }
 .caras li span { margin-left: 0.75rem; color: var(--suave); font-variant-numeric: tabular-nums; }
 
+/* ---------------------------------------------------------------- agente */
+.agente { display: flex; flex-direction: column; gap: 1rem; }
+.agente > .abas-laterais { max-width: 20rem; }
+.agente .nota { margin: 0; font-size: 0.85rem; color: var(--suave); }
+.grafo-tela { display: flex; flex-direction: column; gap: 0.75rem; }
+/* O grafo é mais largo que o celular: rola dentro do quadro, nunca a página. */
+.grafo-quadro { overflow: auto; padding: 0.5rem; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio-l); }
+.grafo-quadro svg { display: block; margin: 0 auto; }
+.grafo-aresta { fill: none; stroke: var(--borda); stroke-width: 1.5; }
+.grafo-aresta.condicional { stroke-dasharray: 5 4; }
+.grafo-aresta.rota { stroke: var(--destaque); stroke-width: 2.5; stroke-dasharray: none; }
+.grafo-seta { fill: var(--borda); }
+.grafo-seta.rota { fill: var(--destaque); }
+.grafo-no { cursor: pointer; outline: none; }
+.grafo-no rect { fill: var(--superficie); stroke: var(--borda); stroke-width: 1.5; transition: stroke 120ms ease, fill 120ms ease; }
+.grafo-no.extremo rect { fill: var(--superficie-2); }
+.grafo-no:hover rect { stroke: var(--suave); }
+.grafo-no:focus-visible rect { stroke: var(--destaque); stroke-width: 3; }
+.grafo-no.rota rect { fill: var(--destaque-suave); stroke: var(--destaque); }
+.grafo-no.escolhido rect { stroke: var(--texto); stroke-width: 2.5; }
+.grafo-nome { font-family: var(--fonte-texto); font-size: 13px; font-weight: 600; fill: var(--texto); }
+.grafo-meta { font-family: var(--fonte-texto); font-size: 11px; fill: var(--suave); }
+.grafo-destaque { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; margin: 0; padding: 0.6rem 0.9rem; background: var(--destaque-suave); border-radius: var(--raio-m); font-size: 0.9rem; }
+.grafo-destaque button { margin-left: auto; }
+.grafo-detalhe { display: flex; flex-direction: column; gap: 0.75rem; padding: 1.1rem 1.25rem; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio-l); }
+.grafo-detalhe header { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.grafo-detalhe h2 { margin: 0; font-size: 1.15rem; }
+.grafo-detalhe code { font-family: var(--fonte-mono); font-size: 0.8rem; color: var(--suave); }
+.grafo-detalhe .fechar { margin-left: auto; width: var(--alvo); padding: 0; font-size: 1.25rem; line-height: 1; }
+.grafo-detalhe p { margin: 0; }
+.grafo-detalhe dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.75rem; margin: 0; }
+.grafo-detalhe dt { font-size: 0.8rem; color: var(--suave); }
+.grafo-detalhe dd { margin: 0.2rem 0 0; overflow-wrap: anywhere; }
+.grafo-detalhe > button { align-self: flex-start; }
+.execucoes { display: flex; flex-direction: column; gap: 0.75rem; }
+.execucoes-filtros { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem; }
+.execucoes-filtros label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.8rem; color: var(--suave); }
+.ao-vivo { margin-left: auto; display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: var(--ia); font-weight: 600; }
+.ao-vivo::before { content: ""; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: currentColor; }
+.trilha-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.turno.falhou { border-color: var(--erro); }
+.turno-duracao { font-variant-numeric: tabular-nums; color: var(--suave); }
+.turno-topo { flex-wrap: wrap; }
+.turno .erro { color: var(--erro); font-weight: 600; }
+
 /* ---------------------------------------------------------------- canais (decisão 0010) */
 .canais { display: flex; flex-direction: column; gap: 1.5rem; }
 .canais > section { padding: 1.25rem; }

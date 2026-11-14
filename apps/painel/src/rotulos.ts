@@ -97,6 +97,9 @@ export function relativo(iso: string, agora: number): string {
 }
 
 export const NOS: Record<string, string> = {
+  __start__: "Entrada",
+  __end__: "Fim",
+  boas_vindas: "Deu boas-vindas",
   classify_intent: "Classificou a mensagem",
   generate_answer: "Respondeu pela FAQ",
   clt: "Jornada CLT",

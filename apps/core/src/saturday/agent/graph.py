@@ -33,24 +33,31 @@ from saturday.agent.routing import (
 )
 from saturday.agent.state import AgentState
 
+# Nós do grafo, na ordem em que entram. A aba Agente do painel lê daqui a
+# descrição de cada nó (docstring).
+NOS: dict[str, Any] = {
+    "pedir_texto": pedir_texto,
+    "boas_vindas": boas_vindas,
+    "classify_intent": classify_intent,
+    "generate_answer": generate_answer,
+    "handoff": handoff,
+    "decline_offer": decline_offer,
+    "read_statement": read_statement,
+    "check_customer_data": check_customer_data,
+    "collect_customer_data": collect_customer_data,
+    "calculate_portability": calculate_portability,
+    "present_offer": present_offer,
+    "clt": clt,
+}
+
 
 def build_graph(checkpointer: Any = None) -> Any:
     """Monta e compila o grafo com o checkpointer recebido."""
 
     builder = StateGraph(AgentState, context_schema=AgentContext)
 
-    builder.add_node("pedir_texto", pedir_texto)
-    builder.add_node("boas_vindas", boas_vindas)
-    builder.add_node("classify_intent", classify_intent)
-    builder.add_node("generate_answer", generate_answer)
-    builder.add_node("handoff", handoff)
-    builder.add_node("decline_offer", decline_offer)
-    builder.add_node("read_statement", read_statement)
-    builder.add_node("check_customer_data", check_customer_data)
-    builder.add_node("collect_customer_data", collect_customer_data)
-    builder.add_node("calculate_portability", calculate_portability)
-    builder.add_node("present_offer", present_offer)
-    builder.add_node("clt", clt)
+    for nome, no in NOS.items():
+        builder.add_node(nome, no)
 
     builder.add_conditional_edges(
         START,

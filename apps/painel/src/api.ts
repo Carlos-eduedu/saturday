@@ -192,6 +192,34 @@ export interface Turno {
   chamadas: ChamadaTurno[];
   custo_usd: number | null;
   tokens: number | null;
+  // Vazios nos turnos gravados antes da aba Agente.
+  duracao_ms: number | null;
+  erro: string | null;
+}
+
+export interface Execucao extends Turno {
+  conversa_id: string;
+  telefone: string | null;
+  canal: string;
+}
+
+export interface Execucoes {
+  execucoes: Execucao[];
+  tem_mais: boolean;
+}
+
+export type SituacaoExecucao = "todas" | "erro" | "handoff";
+
+export interface NoDoGrafo {
+  id: string;
+  descricao: string | null;
+  modelo: { variavel: string; valor: string } | null;
+  passagens_24h: number;
+}
+
+export interface Grafo {
+  nos: NoDoGrafo[];
+  arestas: { de: string; para: string; condicional: boolean }[];
 }
 
 export interface Trilha {
@@ -500,6 +528,13 @@ export const api = {
   reativarUsuario: (id: string) => chamar<void>("POST", `/gestao/usuarios/${id}/reativar`),
   turnos: (id: string) => chamar<Trilha>("GET", `/conversas/${id}/turnos`),
   custos: () => chamar<Custos>("GET", "/custos"),
+  grafo: () => chamar<Grafo>("GET", "/agente/grafo"),
+  execucoes: (filtro: { no?: string; situacao: SituacaoExecucao; antes_de?: number }) => {
+    const q = new URLSearchParams({ situacao: filtro.situacao });
+    if (filtro.no) q.set("no", filtro.no);
+    if (filtro.antes_de) q.set("antes_de", String(filtro.antes_de));
+    return chamar<Execucoes>("GET", `/agente/execucoes?${q}`);
+  },
   criarInstancia: (nome: string) => chamar<Qr>("POST", "/canais/evolution", { nome }),
   conectarInstancia: (nome: string) => chamar<Qr>("POST", `/canais/evolution/${nome}/conectar`),
   qrInstancia: (nome: string) => chamar<Qr>("GET", `/canais/evolution/${nome}/qr`),
