@@ -607,6 +607,7 @@ class ClienteGranatech:
         consulta_id: int,
         corpo: dict[str, Any],
         conversa_id: Any = None,
+        condicoes: dict[str, Any] | None = None,
     ) -> str:
         """Cria a proposta uma única vez e devolve o id da Granatech.
 
@@ -614,6 +615,8 @@ class ClienteGranatech:
         devolve a mesma; se tem uma incerta, reconcilia antes de qualquer POST.
         Levanta ``ErroIncerto`` quando a reconciliação não acha a proposta:
         quem chama decide (handoff), nunca um novo POST automático.
+        ``condicoes`` (a simulação aceita) só entra na intenção nova: a
+        reconciliação mantém as da intenção original.
         """
 
         if not self._settings.granatech_proposta_ativa:
@@ -651,6 +654,7 @@ class ClienteGranatech:
                     valor_parcela=parcela,
                     numero_parcelas=prazo,
                     historico=[],
+                    condicoes=condicoes,
                 )
                 sessao.add(nova)
                 sessao.flush()

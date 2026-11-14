@@ -386,6 +386,7 @@ def test_ficha_mostra_oferta_proposta_e_provas(client_pg, service_pg, fabrica, a
                 valor_parcela=Decimal("300.00"),
                 numero_parcelas=36,
                 status="PENDING_FORMALIZATION",
+                condicoes=oferta,
             )
         )
 
@@ -405,6 +406,10 @@ def test_ficha_mostra_oferta_proposta_e_provas(client_pg, service_pg, fabrica, a
     )
     ficha = client_pg.get(f"/admin/conversas/{alvo}/ficha").json()
     assert ficha["proposta"]["difere_da_oferta"] is True
+    # As condições guardadas na proposta não mudam com a nova simulação, e saem sem IDs.
+    assert ficha["proposta"]["condicoes"] == {
+        k: v for k, v in oferta.items() if not k.startswith("id_")
+    }
 
 
 def test_revelar_cpf_grava_auditoria(client_pg, service_pg, fabrica, ana, conversa):

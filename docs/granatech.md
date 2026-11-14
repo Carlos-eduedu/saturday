@@ -83,6 +83,11 @@ que **voltou**, porque na dev `seguro=false` é ignorado.
 - se não achar, levanta `ErroIncerto` e não tenta de novo: quem chama decide
   (na Fase 6, handoff).
 
+A intenção guarda também a simulação que o cliente aceitou (`condicoes`), para o
+painel mostrar liberado, taxa, CET e seguro da proposta mesmo depois que a
+conversa seguir; a reconciliação não as sobrescreve. Propostas anteriores a
+isso ficam com `condicoes` nula e o painel usa a oferta do checkpoint.
+
 ## Webhook e worker
 
 `POST /webhooks/granatech` aceita o token em `?t=`, `Authorization: Bearer` ou

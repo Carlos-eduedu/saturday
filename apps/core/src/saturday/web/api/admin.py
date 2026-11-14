@@ -507,8 +507,11 @@ def _acompanhamento(sessao: Session, conversa: Conversa, estado: dict[str, Any])
     tela. A prova sai sem o CPF: ele já está na ficha, mascarado.
     """
 
+    def so_valores(dados: dict[str, Any] | None) -> dict[str, Any] | None:
+        return {campo: dados.get(campo) for campo in CAMPOS_DA_OFERTA} if dados else None
+
     guardada = (estado.get("clt") or {}).get("oferta") or {}
-    oferta = {campo: guardada.get(campo) for campo in CAMPOS_DA_OFERTA} if guardada else None
+    oferta = so_valores(guardada)
     proposta = sessao.scalars(
         select(PropostaGranatech)
         .where(PropostaGranatech.conversa_id == conversa.id)
@@ -532,6 +535,8 @@ def _acompanhamento(sessao: Session, conversa: Conversa, estado: dict[str, Any])
             "valor_parcela": str(proposta.valor_parcela),
             "numero_parcelas": proposta.numero_parcelas,
             "atualizada_em": proposta.atualizada_em,
+            # A simulação aceita, guardada na proposta (nula nas antigas).
+            "condicoes": so_valores(proposta.condicoes),
             "difere_da_oferta": bool(guardada)
             and (
                 Decimal(str(guardada["valor_parcela"])) != proposta.valor_parcela

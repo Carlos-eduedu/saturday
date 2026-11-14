@@ -529,3 +529,42 @@ def test_post_recusado_marca_falhou(
     assert not isinstance(erro.value, ErroIncerto)
     with fabrica() as sessao:
         assert sessao.scalars(select(PropostaGranatech.estado_envio)).one() == "falhou"
+
+
+def test_proposta_guarda_as_condicoes_aceitas(
+    cliente_proposta: ClienteGranatech, fabrica: sessionmaker[Session]
+) -> None:
+    consulta_id, id_consulta = _consulta_pronta(cliente_proposta)
+    condicoes = {"liberado": "4619.53", "valor_parcela": "300.00", "numero_parcelas": 36}
+
+    cliente_proposta.criar_proposta(
+        consulta_id=consulta_id, corpo=_corpo(id_consulta), condicoes=condicoes
+    )
+
+    with fabrica() as sessao:
+        assert sessao.scalars(select(PropostaGranatech.condicoes)).one() == condicoes
+
+
+def test_reconciliacao_nao_sobrescreve_as_condicoes(
+    cliente_proposta: ClienteGranatech,
+    simulador_granatech: ModuleType,
+    fabrica: sessionmaker[Session],
+) -> None:
+    consulta_id, id_consulta = _consulta_pronta(cliente_proposta)
+    _falha(simulador_granatech, rota="/propostas", metodo="POST", status=500)
+    aceitas = {"valor_parcela": "300.00", "numero_parcelas": 36}
+
+    with pytest.raises(ErroIncerto):
+        cliente_proposta.criar_proposta(
+            consulta_id=consulta_id, corpo=_corpo(id_consulta), condicoes=aceitas
+        )
+    # A nova tentativa só reconcilia: as condições continuam as da intenção.
+    with pytest.raises(ErroIncerto):
+        cliente_proposta.criar_proposta(
+            consulta_id=consulta_id,
+            corpo=_corpo(id_consulta),
+            condicoes={"valor_parcela": "250.00", "numero_parcelas": 48},
+        )
+
+    with fabrica() as sessao:
+        assert sessao.scalars(select(PropostaGranatech.condicoes)).one() == aceitas

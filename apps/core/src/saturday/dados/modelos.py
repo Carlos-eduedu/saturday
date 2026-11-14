@@ -328,6 +328,8 @@ class PropostaGranatech(Base):
     ``criada``, ``incerta`` (timeout ou 5xx: procurar na listagem antes de tentar
     de novo) ou ``falhou`` (erro comprovado). Parcela e prazo bastam para
     reconhecer a proposta na listagem; o corpo enviado não é guardado.
+    ``condicoes`` é a simulação que o cliente aceitou, para o painel mostrar as
+    condições mesmo depois que a conversa seguir (nula nas propostas antigas).
     """
 
     __tablename__ = "propostas_granatech"
@@ -346,6 +348,7 @@ class PropostaGranatech(Base):
     status: Mapped[str | None] = mapped_column(String(64))
     tipo_notificacao: Mapped[str | None] = mapped_column(String(64))
     historico: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
+    condicoes: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     intencao_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
     atualizada_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=AGORA, onupdate=AGORA

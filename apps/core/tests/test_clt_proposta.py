@@ -24,7 +24,14 @@ from test_clt_jornada import (  # noqa: F401 - fixtures
 from test_clt_jornada import nova as _nova_fase5  # noqa: F401
 
 from saturday.agent.clt.mensagens import texto
-from saturday.dados.modelos import Alerta, Consentimento, Conversa, Mensagem, Outbox
+from saturday.dados.modelos import (
+    Alerta,
+    Consentimento,
+    Conversa,
+    Mensagem,
+    Outbox,
+    PropostaGranatech,
+)
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.jobs import granatech as eventos_granatech
 
@@ -132,6 +139,9 @@ def test_jornada_completa_ate_o_pagamento(
         prova = sessao.scalars(select(Consentimento).where(Consentimento.tipo == "proposta")).one()
         assert prova.texto_mostrado == resumo
         assert prova.resposta_literal == "SIM"
+        # A simulação aceita fica na proposta (decisão do item 5).
+        condicoes = sessao.scalars(select(PropostaGranatech.condicoes)).one()
+        assert condicoes == jornada.clt()["oferta"]
 
     _evento(jornada, "PENDING_CONFIRMATION", "AGUARDANDO_CONFIRMACAO")
     assert jornada.ultima_saida() == texto("aviso_criada")

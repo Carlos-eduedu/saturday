@@ -1102,8 +1102,9 @@ function DetalheProposta({
   );
 }
 
-// Liberado, taxa, seguro e CET vêm da oferta que a IA mostrou ao cliente (só
-// existe enquanto a conversa aponta para esta proposta); sem ela, só as parcelas.
+// Liberado, taxa, seguro e CET vêm das condições que o cliente aceitou,
+// guardadas na proposta. Nas propostas antigas, vêm da oferta do checkpoint só
+// enquanto a conversa aponta para elas; sem nenhuma das duas, só as parcelas.
 function Condicoes({ p }: { p: PropostaGranatechDetalhe }) {
   const o = p.oferta as Record<string, string | number | boolean | null> | null;
   return (

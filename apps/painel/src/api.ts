@@ -86,6 +86,8 @@ export interface Ficha {
     valor_parcela: string;
     numero_parcelas: number;
     atualizada_em: string;
+    // A simulação que o cliente aceitou, guardada na proposta; nula nas antigas.
+    condicoes: Ficha["oferta"];
     difere_da_oferta: boolean;
   } | null;
   consentimentos: {

@@ -820,6 +820,26 @@ function Acompanhamento({ ficha }: { ficha: Ficha }) {
                 {proposta.numero_parcelas} × {reais(proposta.valor_parcela)}
               </dd>
             </div>
+            {proposta.condicoes && (
+              <>
+                <div>
+                  <dt>Liberado</dt>
+                  <dd>{reais(proposta.condicoes.liberado)}</dd>
+                </div>
+                <div>
+                  <dt>Taxa e CET</dt>
+                  <dd>
+                    {porcento(proposta.condicoes.taxa_mensal)} · CET {porcento(proposta.condicoes.cet_mensal)}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Seguro</dt>
+                  <dd>
+                    {proposta.condicoes.seguro_aplicado ? reais(proposta.condicoes.valor_seguro) : "Sem seguro"}
+                  </dd>
+                </div>
+              </>
+            )}
           </dl>
           {proposta.difere_da_oferta && (
             <p className="faixa-atencao">

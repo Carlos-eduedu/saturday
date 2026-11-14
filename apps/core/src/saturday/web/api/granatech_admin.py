@@ -318,7 +318,10 @@ def ver_proposta(
             **_linha_proposta(linha, cpf or ""),
             "historico": linha.historico,
             "etapa": clt.get("etapa"),
-            "oferta": clt.get("oferta") if clt.get("proposta") == linha.id_externo else None,
+            # Propostas antigas não guardam as condições: só a oferta do checkpoint,
+            # enquanto a conversa ainda aponta para esta proposta.
+            "oferta": linha.condicoes
+            or (clt.get("oferta") if clt.get("proposta") == linha.id_externo else None),
             "conta_ativa": conta_ativa,
             "acoes": acoes_da_proposta(linha, conta_ativa),
         }

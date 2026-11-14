@@ -287,6 +287,7 @@ def seguir_proposta(t: Turno) -> dict[str, Any]:
             consulta_id=t.granatech.id_local_da_consulta(str(t.clt["consulta"])),
             corpo=corpo,
             conversa_id=t.conversa_id,
+            condicoes=dict(oferta),
         )
     except ErroIncerto:
         # Regra 4: nunca um segundo POST automático.

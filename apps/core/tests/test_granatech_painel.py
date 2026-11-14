@@ -307,3 +307,20 @@ def test_atualizar_detalhe_destrava_a_consulta(painel: Any, fabrica: sessionmake
     with abrir_sessao(fabrica) as sessao:
         assert sessao.get(ConsultaGranatech, consulta_id).status == "SUCCESS"  # type: ignore[union-attr]
     assert client.post(rota, headers=cabecalhos).status_code == 409
+
+
+def test_detalhe_mostra_as_condicoes_depois_que_a_conversa_segue(
+    painel: Any, fabrica: sessionmaker[Session]
+) -> None:
+    jornada, client = painel()
+    _ate_proposta(jornada)
+    oferta = jornada.clt()["oferta"]
+    _entrar(client, fabrica, "atendente")
+    [linha] = client.get(f"{ROTA}/propostas").json()
+
+    # Nova jornada: o checkpoint não aponta mais para a proposta.
+    jornada.servico.graph.update_state(
+        jornada.servico.config(jornada.id), {"clt": {"etapa": "abertura"}}
+    )
+
+    assert client.get(f"{ROTA}/propostas/{linha['id']}").json()["oferta"] == oferta
