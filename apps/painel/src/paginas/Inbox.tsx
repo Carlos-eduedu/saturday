@@ -265,9 +265,7 @@ export function Inbox({
           {conversas.map((c) => (
             <li
               key={`${c.id}-${versao}`}
-              className={[c.nao_lida && "nao-lida", c.atencao.length > 0 && "pede-atencao"]
-                .filter(Boolean)
-                .join(" ")}
+              className={c.nao_lida ? "nao-lida" : undefined}
               onPointerDown={guardarInicio}
               onClick={(e) => abrirPelaSuperficie(e, c.id)}
             >
