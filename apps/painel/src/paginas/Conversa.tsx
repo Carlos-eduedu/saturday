@@ -9,6 +9,7 @@ import {
   type Eu,
   exportarUrl,
   type Ficha,
+  mensagemDeFalha,
   midiaUrl,
   type Trilha,
   type Usuario,
@@ -20,7 +21,6 @@ import { Falha } from "../componentes/Falha";
 import { ItemTurno } from "../componentes/ItemTurno";
 import { Vazio } from "../componentes/Vazio";
 import {
-  ATENCAO,
   PUBLICOS,
   dolar,
   ETAPAS,
@@ -66,7 +66,7 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
     api
       .conversa(id)
       .then(setConversa)
-      .catch((e: Error) => setErro(e.message));
+      .catch((e: unknown) => setErro(mensagemDeFalha(e, "carregar a conversa")));
   }, [id]);
   useEffect(carregar, [carregar]);
   useAvisos(
@@ -82,7 +82,7 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
       await acao();
       carregar();
     } catch (e) {
-      setErro((e as Error).message);
+      setErro(mensagemDeFalha(e));
     }
   }
 
@@ -164,13 +164,15 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
               </span>
               <span>{conversa.canal === "evolution" ? "Evolution" : "WhatsApp oficial"}</span>
               {conversa.etapa && <span>{rotulo(ETAPAS, conversa.etapa)}</span>}
-              {conversa.canal === "whatsapp" && (
-                <span className={conversa.janela_aberta ? "janela aberta" : "janela fechada"}>
-                  {conversa.janela_aberta ? "janela aberta" : "janela fechada"}
-                </span>
+              {/* Janela aberta é o normal: só a fechada muda o que dá para enviar. */}
+              {conversa.canal === "whatsapp" && !conversa.janela_aberta && (
+                <span className="janela fechada">janela fechada</span>
               )}
               {conversa.aguardando_desde && (
                 <span className="espera">{textoDaEspera(conversa, Date.now())}</span>
+              )}
+              {conversa.motivo_handoff && (
+                <span className="motivo">{rotulo(MOTIVOS_HANDOFF, conversa.motivo_handoff)}</span>
               )}
             </p>
           </div>
@@ -189,12 +191,6 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
             </p>
           )}
         </header>
-        {(conversa.atencao ?? []).length > 0 && (
-          <p className="faixa-atencao">
-            <strong>{(conversa.atencao ?? []).map((a) => rotulo(ATENCAO, a)).join(" · ")}</strong>
-            {conversa.motivo_handoff && ` — ${rotulo(MOTIVOS_HANDOFF, conversa.motivo_handoff)}`}
-          </p>
-        )}
         {fichaEmAba && (
           <Abas
             rotulo="Conversa"
@@ -381,7 +377,7 @@ function TrilhaIa({ id }: { id: string }) {
         setTrilha(t);
         setErro("");
       })
-      .catch((e: unknown) => setErro(e instanceof Error ? e.message : "falha ao carregar"));
+      .catch((e: unknown) => setErro(mensagemDeFalha(e, "carregar a trilha da IA")));
   }, [id]);
   useEffect(carregar, [carregar]);
   useAvisos(
@@ -463,7 +459,7 @@ function FichaCliente({ id }: { id: string }) {
       setRevelados((atual) => ({ ...atual, [campo]: valor }));
     } catch (e) {
       setErroRevelar(
-        e instanceof Error ? `Não deu para revelar: ${e.message}` : "Não deu para revelar.",
+        mensagemDeFalha(e, "revelar o dado"),
       );
     }
     setRevelando(null);

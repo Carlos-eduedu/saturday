@@ -8,7 +8,7 @@ import {
   useState,
 } from "react";
 import { Link, useNavigate } from "react-router";
-import { api, type Eu, type Resumo, type Usuario } from "../api";
+import { api, type Eu, mensagemDeFalha, type Resumo, type Usuario } from "../api";
 import { AiChat02Icon, UserCheck01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { confirmarTomada, textoDoAviso, useAvisoDesfazer } from "../componentes/Desfazer";
@@ -93,6 +93,11 @@ export function textoDaEspera(c: Resumo, agora: number): string {
 
 export const ROTULO_ATENDIMENTO = { ia: "IA", handoff: "Handoff", assumida: "Assumida" } as const;
 
+/** O único motivo que ganha rótulo na linha: falha de envio é invisível sem
+ *  ele. "Sem resposta" e "falando de valores" já aparecem no tempo, na etapa e
+ *  no fundo tingido — e a lista põe quem espera no topo. */
+const ATENCAO_PROPRIAS = new Set(["envio_falhou"]);
+
 // `compacta`: a lista estreita ao lado da conversa aberta (`aberta`), sem
 // assumir pela linha; quem age é o cabeçalho da conversa.
 export function Inbox({
@@ -126,7 +131,7 @@ export function Inbox({
       })
       .catch((e: unknown) => {
         if (pedido !== ultimoPedido.current) return;
-        setErro(e instanceof Error ? e.message : "Não deu para carregar as conversas.");
+        setErro(mensagemDeFalha(e, "carregar as conversas"));
       });
   }, [fila, busca]);
 
@@ -169,6 +174,9 @@ export function Inbox({
       .catch(() => undefined);
   }, []);
   const nomeDe = (id: string | null) => usuarios.find((u) => u.id === id)?.nome ?? "outra pessoa";
+  // No selo cabe o primeiro nome; o nome inteiro fica na confirmação de tomada
+  // e no cabeçalho da conversa, onde há espaço.
+  const primeiroNome = (id: string | null) => nomeDe(id).split(" ")[0];
 
   // Assumir e devolver valem na hora; o aviso deixa desfazer por 5 s.
   const avisar = useAvisoDesfazer();
@@ -188,7 +196,7 @@ export function Inbox({
       await (acao === "assumir" ? api.assumir(c.id) : api.devolver(c.id));
       avisar({ id: c.id, texto: textoDoAviso(acao, c.telefone ?? c.canal), depois: carregar });
     } catch (e) {
-      setErro(e instanceof Error ? e.message : "Não deu para concluir a ação. Tente de novo.");
+      setErro(mensagemDeFalha(e));
     }
     setAgindo("");
     setVersao((v) => v + 1);
@@ -264,6 +272,10 @@ export function Inbox({
               onClick={(e) => abrirPelaSuperficie(e, c.id)}
             >
               {(() => {
+                // Handoff e "falando de valores" já estão no selo e na etapa logo
+                // abaixo; repetir aqui gastava uma linha dizendo o mesmo. Sobra o
+                // que não aparece em outro lugar.
+                const atencao = c.atencao.filter((a) => ATENCAO_PROPRIAS.has(a));
                 const linha = (
                   <Link
                     to={`/conversas/${c.id}`}
@@ -275,14 +287,17 @@ export function Inbox({
                     <span className="linha-conteudo">
                       <span className="linha-identidade">
                         <span className="telefone">{c.telefone ?? c.canal}</span>
-                        <span className="linha-canal">
-                          <span>{c.canal === "evolution" ? "Evolution" : "WhatsApp"}</span>
-                          {c.canal === "whatsapp" && (
-                            <span className={c.janela_aberta ? "janela aberta" : "janela fechada"}>
-                              {c.janela_aberta ? "janela aberta" : "janela fechada"}
-                            </span>
-                          )}
-                        </span>
+                        {/* O canal e a janela só aparecem quando fogem do normal:
+                            WhatsApp com janela aberta não precisa de rótulo. */}
+                        {(c.canal === "evolution" || !c.janela_aberta) && (
+                          <span className="linha-canal">
+                            {c.canal === "evolution" ? (
+                              <span>Evolution</span>
+                            ) : (
+                              <span className="janela fechada">janela fechada</span>
+                            )}
+                          </span>
+                        )}
                       </span>
                       <span className="fala">
                         <span className="previa">
@@ -305,26 +320,30 @@ export function Inbox({
                       </span>
                     </span>
                     <span className="linha-meta">
-                      {c.atencao.length > 0 && (
+                      {atencao.length > 0 && (
                         <span className="atencao">
-                          {c.atencao.map((a) => rotulo(ATENCAO, a)).join(" · ")}
+                          {atencao.map((a) => rotulo(ATENCAO, a)).join(" · ")}
                         </span>
                       )}
                       <span className="linha-estado">
-                        {c.etapa && <span className="etapa">{rotulo(ETAPAS, c.etapa)}</span>}
+                        {/* Handoff já aparece no selo ao lado: repetir a etapa
+                            gastava uma linha para dizer o mesmo. */}
+                        {c.etapa && rotulo(ETAPAS, c.etapa) !== ROTULO_ATENDIMENTO[c.atendimento] && (
+                          <span className="etapa">{rotulo(ETAPAS, c.etapa)}</span>
+                        )}
                         <span className={`selo selo-${c.atendimento}`}>
                           {ROTULO_ATENDIMENTO[c.atendimento]}
                           {c.atendente_id &&
-                            (c.atendente_id === eu.id ? " (você)" : ` · ${nomeDe(c.atendente_id)}`)}
+                            (c.atendente_id === eu.id ? " (você)" : ` · ${primeiroNome(c.atendente_id)}`)}
                         </span>
-                        <time
-                          dateTime={c.aguardando_desde ?? c.ultima_atividade}
-                          title={formatarHora(c.aguardando_desde ?? c.ultima_atividade)}
-                          className={c.aguardando_desde ? "espera" : ""}
-                        >
-                          {textoDaEspera(c, agora)}
-                        </time>
                       </span>
+                      <time
+                        dateTime={c.aguardando_desde ?? c.ultima_atividade}
+                        title={formatarHora(c.aguardando_desde ?? c.ultima_atividade)}
+                        className={c.aguardando_desde ? "espera" : ""}
+                      >
+                        {relativo(c.aguardando_desde ?? c.ultima_atividade, agora)}
+                      </time>
                     </span>
                     {c.nao_lida && <span className="sr">não lida</span>}
                   </Link>

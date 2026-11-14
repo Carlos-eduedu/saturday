@@ -23,6 +23,10 @@
   --sombra-alta: 0 2px 4px rgb(11 12 14 / 8%), 0 10px 24px rgb(11 12 14 / 8%);
   --alvo: 44px;
   --topo: 60px;
+  /* Largura do conteúdo e o respiro lateral. O cabeçalho fixo usa os dois para
+     ficar alinhado com o que está embaixo. */
+  --largura: 96rem;
+  --margem: clamp(1rem, 2vw, 1.5rem);
 
   --fonte-titulo: "Red Hat Display Variable", system-ui, sans-serif;
   --fonte-texto: "Red Hat Text Variable", system-ui, sans-serif;
@@ -63,7 +67,9 @@ h1, h2, h3 {
   font-weight: 500;
   letter-spacing: -0.015em;
   line-height: 1.2;
+  text-wrap: balance;
 }
+p { text-wrap: pretty; }
 h2 { font-size: 1.25rem; margin: 0 0 0.75rem; }
 h3 { font-size: 1.05rem; margin: 0 0 0.5rem; }
 a { color: var(--destaque); text-underline-offset: 3px; }
@@ -143,7 +149,7 @@ input, select, textarea {
 input:hover, select:hover, textarea:hover { border-color: var(--suave); }
 input:focus, select:focus, textarea:focus { border-color: var(--destaque); box-shadow: 0 0 0 3px var(--destaque-suave); outline: none; }
 textarea { resize: vertical; }
-label { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.875rem; font-weight: 500; color: var(--suave); }
+label { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.85rem; font-weight: 500; color: var(--suave); }
 
 /* ---------------------------------------------------------------- cartão único */
 .cartao, .login, .inbox li a, .alertas li, .ficha, .canais > section {
@@ -162,7 +168,7 @@ label { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.875rem
 .titulo-tela .contagem { color: var(--suave); font-weight: 400; font-size: 1.1rem; }
 .status.falhou { color: var(--erro); font-weight: 600; }
 .erro { color: var(--erro); }
-.aviso, .nota { color: var(--suave); font-size: 0.875rem; }
+.aviso, .nota { color: var(--suave); font-size: 0.85rem; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 time, small { font-size: 0.8rem; color: var(--suave); }
 
@@ -184,7 +190,7 @@ time, small { font-size: 0.8rem; color: var(--suave); }
    painel desliza da direita com as páginas e a conta. */
 .staggered-menu-header {
   height: var(--topo);
-  padding: 0 max(clamp(1rem, 3vw, 2rem), calc((100% - 82rem) / 2 + clamp(1rem, 3vw, 2rem)));
+  padding: 0 max(var(--margem), calc((100% - var(--largura)) / 2 + var(--margem)));
   background: color-mix(in srgb, var(--superficie) 88%, transparent);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--borda);
@@ -280,8 +286,8 @@ time, small { font-size: 0.8rem; color: var(--suave); }
 .quem { font-size: 0.85rem; color: var(--suave); }
 
 main {
-  padding: calc(var(--topo) + clamp(1rem, 3vw, 2rem)) clamp(1rem, 3vw, 2rem) clamp(1rem, 3vw, 2rem);
-  max-width: 82rem;
+  padding: calc(var(--topo) + clamp(1rem, 3vw, 2rem)) var(--margem) clamp(1rem, 3vw, 2rem);
+  max-width: var(--largura);
   margin: 0 auto;
 }
 
@@ -325,7 +331,7 @@ main {
   border-radius: 0;
   background: none;
   color: var(--suave);
-  font-size: 0.875rem;
+  font-size: 0.85rem;
   white-space: nowrap;
 }
 .filtros [role="tablist"] button:hover:not(:disabled) { transform: none; box-shadow: none; color: var(--texto); }
@@ -359,18 +365,36 @@ main {
 .inbox .linha-conteudo { display: grid; grid-template-columns: 10.5rem minmax(0, 1fr); align-items: center; column-gap: 1.25rem; }
 .linha-identidade { display: flex; flex-direction: column; gap: 0.15rem; padding-right: 1.25rem; border-right: 1px solid var(--borda); }
 .linha-identidade .telefone { font-size: 0.95rem; font-weight: 500; color: var(--texto); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Exceção à escala: sob a identidade, na coluna fixa de 21rem, 0,75rem é o que
+   mantém "WhatsApp · janela fechada" numa linha só. */
 .linha-canal { display: flex; flex-wrap: wrap; gap: 0 0.5rem; font-size: 0.75rem; color: var(--suave); }
 .linha-canal .janela { font-size: 0.75rem; }
 .fala { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
-.fala .motivo { font-size: 0.78rem; color: var(--handoff); font-weight: 500; }
-.linha-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 0.3rem; }
-.linha-estado { display: flex; align-items: center; gap: 0.5rem; }
+.fala .motivo { font-size: 0.8rem; color: var(--handoff); font-weight: 500; }
+/* A coluna de meta pode encolher: sem `min-width: 0` o selo com nome de quem
+   atendeu empurrava o horário para fora do cartão. */
+.linha-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 0.3rem; min-width: 0; }
+.linha-estado { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; justify-content: flex-end; }
 .etapa { font-size: 0.8rem; font-weight: 500; color: var(--texto); }
-.linha-meta time { font-family: var(--fonte-texto); font-variant-numeric: tabular-nums; }
+/* O horário fecha a linha encostado à direita; os selos ficam à esquerda. */
+.linha-meta time { font-family: var(--fonte-texto); font-variant-numeric: tabular-nums; white-space: nowrap; margin-left: auto; }
+/* Quem espera ganha um ponto âmbar ao lado do horário, em vez de pintar o texto
+   inteiro: a cor vira marcador de 6px e o horário continua legível no tom do
+   resto da linha. */
 .linha-meta time.espera { color: var(--texto); font-weight: 500; }
+.linha-meta time.espera::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--handoff);
+  margin-right: 0.4rem;
+  vertical-align: middle;
+}
 /* Quem pede atenção: rótulo com o porquê e fundo tingido, nunca só cor. */
 .atencao {
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 600;
   padding: 0.1rem 0.55rem;
   border-radius: 999px;
@@ -384,7 +408,7 @@ main {
    texto âmbar e o verde caíam abaixo de 4,5:1. */
 .inbox li a[aria-current="page"] :is(.selo, .atencao) { background: color-mix(in srgb, currentColor 13%, var(--superficie)); }
 .selo {
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 500;
   padding: 0.15rem 0.6rem;
   border-radius: 999px;
@@ -468,7 +492,8 @@ main {
   .inbox .linha-conteudo { grid-template-columns: minmax(0, 1fr); row-gap: 0.2rem; }
   .linha-identidade { flex-direction: row; gap: 0.6rem; align-items: baseline; padding-right: 0; border-right: 0; }
   .linha-meta { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; }
-  .linha-meta .atencao { order: -1; width: 100%; text-align: left; }
+  /* Como no máximo cabem dois rótulos curtos, é pílula, não faixa inteira. */
+  .linha-meta .atencao { order: -1; align-self: flex-start; }
 }
 
 /* ---------------------------------------------------------------- alertas */
@@ -479,17 +504,30 @@ main {
 /* ---------------------------------------------------------------- caixa */
 /* Desktop: lista à esquerda, rolando sozinha; a conversa usa a rolagem da página. */
 .caixa { display: grid; grid-template-columns: 21rem minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+/* Cabeçalho da lista (título, filas, busca) parado no topo; quem rola é só a
+   lista. `clip` (e não `hidden`) impede qualquer rolagem da coluna — inclusive
+   a que o navegador faria sozinho ao trazer um elemento para a vista —, senão o
+   cabeçalho subiria junto com as linhas. */
 .caixa-lista {
   position: sticky;
   top: calc(var(--topo) + 1rem);
   max-height: calc(100vh - var(--topo) - 2rem);
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: clip;
   /* Respiro para a sombra das linhas não ser cortada pela rolagem. */
-  padding: 2px 6px 1rem 2px;
+  padding: 2px 6px 0 2px;
+  overscroll-behavior: contain;
+}
+.caixa-lista .lista-conversas { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.caixa-lista .inbox {
+  overflow-y: auto;
+  min-height: 0;
+  padding-bottom: 1rem;
   overscroll-behavior: contain;
 }
 .caixa-lista .titulo-tela { font-size: 1.25rem; margin-bottom: 0.75rem; }
-.caixa-lista .titulo-tela .contagem { font-size: 0.9rem; }
+.caixa-lista .titulo-tela .contagem { font-size: 0.8rem; }
 .caixa > .vazio { padding-top: 6rem; }
 
 /* ---------------------------------------------------------------- conversa */
@@ -515,6 +553,9 @@ main {
 .identidade { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
 .historico h1 { font-size: 1.45rem; margin: 0; font-family: var(--fonte-mono); font-weight: 500; letter-spacing: 0; }
 .identidade p { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; font-size: 0.85rem; color: var(--suave); }
+/* Por que a conversa caiu no humano: a única coisa do cabeçalho que os selos
+   ao lado não dizem. */
+.identidade p .motivo { color: var(--handoff); font-weight: 500; }
 /* Por que a conversa pede atenção, antes da primeira mensagem. */
 .faixa-atencao {
   margin: 1rem 0 0;
@@ -563,7 +604,9 @@ main {
 .mensagens { display: flex; flex-direction: column; gap: 0.6rem; margin: 1.25rem 0; }
 .msg {
   align-self: flex-start;
-  max-width: min(75%, 40rem);
+  /* 36rem a 15px fica na casa dos 70 caracteres por linha; 40rem passava do
+     limite confortável de leitura. */
+  max-width: min(75%, 36rem);
   padding: 0.65rem 0.9rem;
   border-radius: var(--raio-l) var(--raio-l) var(--raio-l) var(--raio-s);
   background: var(--superficie);
@@ -591,7 +634,7 @@ main {
   font-size: 0.85rem;
 }
 .msg-sistema .autor { display: none; }
-.autor { font-size: 0.75rem; font-weight: 600; color: var(--suave); }
+.autor { font-size: 0.8rem; font-weight: 600; color: var(--suave); }
 /* Compositor: um cartão com o campo que cresce e a barra de atalhos embaixo. */
 .envio {
   position: sticky;
@@ -787,14 +830,14 @@ main {
 .abas-laterais button.ativo { background: var(--superficie); color: var(--texto); box-shadow: var(--sombra); border-color: transparent; }
 .ficha { padding: 1.25rem; }
 .ficha dl { margin: 0; }
-.ficha dt { font-size: 0.78rem; color: var(--suave); margin-top: 0.75rem; }
+.ficha dt { font-size: 0.8rem; color: var(--suave); margin-top: 0.75rem; }
 .ficha dd { margin: 0; font-family: var(--fonte-mono); }
 .ficha dd.texto, .ficha dd .nota { font-family: var(--fonte-texto); }
 .ficha h2 { margin-top: 0; }
 .ficha h2:not(:first-child) { margin-top: 1.5rem; }
-.ficha .faixa-atencao { font-size: 0.875rem; }
+.ficha .faixa-atencao { font-size: 0.85rem; }
 .provas { display: flex; flex-direction: column; gap: 0.75rem; margin: 0.5rem 0 0; padding: 0; list-style: none; }
-.provas li { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.9rem; }
+.provas li { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.8rem; }
 .provas summary { width: fit-content; color: var(--suave); font-size: 0.85rem; cursor: pointer; }
 .provas details p { margin: 0.35rem 0 0; color: var(--suave); white-space: pre-wrap; }
 @media (max-width: 1023px) { .lateral { position: static; max-height: none; } }
@@ -810,7 +853,7 @@ main {
 .turno-caminho { font-weight: 500; }
 .turno-classificacao { color: var(--suave); }
 .turno-chamadas { list-style: none; margin: 0.4rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.2rem; }
-.turno-chamadas li { display: flex; flex-wrap: wrap; gap: 0.5rem; font-size: 0.78rem; color: var(--suave); font-variant-numeric: tabular-nums; }
+.turno-chamadas li { display: flex; flex-wrap: wrap; gap: 0.5rem; font-size: 0.8rem; color: var(--suave); font-variant-numeric: tabular-nums; }
 .turno-chamadas li span:first-child { color: var(--texto); font-weight: 500; min-width: 7.5rem; }
 .turno-chamadas li.falhou span:nth-child(2) { color: var(--erro); font-weight: 600; }
 
@@ -823,7 +866,7 @@ main {
 .totais dd.nota { font-family: var(--fonte-texto); font-size: 0.85rem; }
 .custos section { padding: 1.25rem; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio-l); }
 .custos table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-.custos th { text-align: left; font-size: 0.78rem; font-weight: 500; color: var(--suave); padding: 0.5rem; border-bottom: 1px solid var(--borda); }
+.custos th { text-align: left; font-size: 0.8rem; font-weight: 500; color: var(--suave); padding: 0.5rem; border-bottom: 1px solid var(--borda); }
 .custos td { padding: 0.5rem; border-bottom: 1px solid var(--borda); }
 .custos tbody tr:last-child td { border-bottom: none; }
 .custos .num { text-align: right; }
@@ -937,7 +980,7 @@ main {
 .canais table { width: 100%; border-collapse: collapse; }
 .canais th {
   text-align: left;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 500;
   color: var(--suave);
   padding: 0.5rem;
@@ -948,29 +991,10 @@ main {
 .canais td.acoes { display: table-cell; text-align: right; white-space: nowrap; }
 .canais td.acoes button + button { margin-left: 0.4rem; }
 .nova-instancia { display: flex; gap: 0.5rem; align-items: end; margin-top: 1.25rem; }
-/* QR e detalhes abrem dentro da seção Evolution, logo abaixo da tabela:
-   uma região separada por fio, não um cartão dentro do cartão. */
-.canais tr.aberta { background: var(--destaque-suave); }
-.painel-instancia {
-  display: flex; flex-direction: column; gap: 0.75rem; align-items: flex-start;
-  margin-top: 1rem; padding-top: 1.25rem; border-top: 1px solid var(--borda);
-  scroll-margin-top: 5rem;
-}
-.painel-instancia > * { margin: 0; }
-.painel-topo { display: flex; align-items: center; justify-content: space-between; gap: 1rem; width: 100%; }
-.painel-topo h3 { margin: 0; font-size: 1.1rem; scroll-margin-top: 5rem; }
-.painel-topo h3:focus { outline: none; }
-.detalhes-instancia { gap: 0; }
-.detalhes-instancia > .erro, .detalhes-instancia > .confere, .detalhes-instancia > .nota { margin-top: 0.75rem; }
-/* Webhook, eventos e configurações: cada grupo com o seu Salvar, separados por fio. */
-.grupo-detalhes { display: flex; flex-direction: column; gap: 0.75rem; align-items: flex-start; width: 100%; padding: 1.5rem 0; }
-.grupo-detalhes + .grupo-detalhes { border-top: 1px solid var(--borda); }
-.grupo-detalhes:last-child { padding-bottom: 0; }
-.grupo-detalhes > * { margin: 0; }
-.grupo-detalhes h4 { margin: 0; font-family: var(--fonte-titulo); font-size: 1rem; font-weight: 500; color: var(--texto); }
-.grupo-detalhes fieldset, .grupo-detalhes .grade-eventos { width: 100%; }
-.grupo-detalhes label:has(textarea) { width: 100%; max-width: 40rem; }
-.painel-topo h3 { font-size: 1.15rem; }
+.qr { padding: 1.25rem; border-color: var(--destaque); }
+.detalhes-instancia { display: flex; flex-direction: column; gap: 0.75rem; align-items: flex-start; }
+.detalhes-instancia > * { margin: 0; }
+.detalhes-instancia h3 { margin-top: 0.5rem; }
 .configuracoes { display: flex; flex-direction: column; gap: 0.5rem; width: 100%; }
 .configuracoes .opcao { flex-direction: row; align-items: center; gap: 0.6rem; color: var(--texto); font-weight: 400; min-height: var(--alvo); }
 .configuracoes .opcao input { min-height: 0; width: 1.15rem; height: 1.15rem; accent-color: var(--destaque); }
@@ -980,12 +1004,12 @@ main {
 .divergencias { color: var(--handoff); }
 .divergencias p, .divergencias ul { margin: 0.25rem 0; }
 .campos { display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 1rem; margin: 0; }
-.campos dt { color: var(--suave); font-size: 0.875rem; }
+.campos dt { color: var(--suave); font-size: 0.85rem; }
 .campos dd { margin: 0; overflow-wrap: anywhere; }
 .campos .esperado { display: block; }
 .esperado { color: var(--handoff); }
 .configuracoes fieldset { border: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
-.configuracoes legend { font-size: 0.875rem; font-weight: 500; color: var(--suave); padding: 0; margin-bottom: 0.25rem; }
+.configuracoes legend { font-size: 0.85rem; font-weight: 500; color: var(--suave); padding: 0; margin-bottom: 0.25rem; }
 /* O aviso desce de linha antes de partir o nome do evento ao meio. */
 .configuracoes .opcao { flex-wrap: wrap; row-gap: 0; }
 .configuracoes .opcao code { font-size: 0.85rem; overflow-wrap: break-word; min-width: 0; }
@@ -1015,7 +1039,6 @@ main {
 /* ---------------------------------------------------------------- usuários (decisão 0012) */
 .form-usuario { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: 0.75rem; align-items: end; margin-top: 1.25rem; }
 .form-usuario h3, .form-usuario > .nota { grid-column: 1 / -1; margin: 0; }
-.form-usuario h3 { font-size: 0.95rem; }
 .form-usuario small { font-weight: 400; }
 .form-usuario button { justify-self: start; }
 .edicao-usuario { display: flex; flex-direction: column; gap: 0.75rem; align-items: stretch; }

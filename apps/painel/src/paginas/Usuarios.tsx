@@ -1,6 +1,6 @@
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Vazio } from "../componentes/Vazio";
-import { api, type Eu, ErroApi, type Perfil, mensagemDeFalha, type UsuarioGestao } from "../api";
+import { api, type Eu, type Perfil, mensagemDeFalha, type UsuarioGestao } from "../api";
 import { Falha } from "../componentes/Falha";
 
 // Aba Usuários (decisão 0012), só para gestor: cadastrar, editar, redefinir
