@@ -10,6 +10,7 @@ import {
 } from "../api";
 import { Abas } from "../componentes/Abas";
 import { Falha } from "../componentes/Falha";
+import GlideSelect from "../componentes/GlideSelect";
 import { ItemTurno } from "../componentes/ItemTurno";
 import { Vazio } from "../componentes/Vazio";
 import { NOS, rotulo } from "../rotulos";
@@ -393,22 +394,30 @@ function ListaExecucoes({
       <div className="execucoes-filtros">
         <label>
           Situação
-          <select value={situacao} onChange={(e) => setSituacao(e.target.value as SituacaoExecucao)}>
-            <option value="todas">Todas</option>
-            <option value="erro">Com erro</option>
-            <option value="handoff">Passadas para a equipe</option>
-          </select>
+          <GlideSelect
+            ariaLabel="Situação"
+            value={situacao}
+            onChange={(v) => setSituacao(v as SituacaoExecucao)}
+            menuWidth={220}
+            options={[
+              { value: "todas", label: "Todas" },
+              { value: "erro", label: "Com erro" },
+              { value: "handoff", label: "Passadas para a equipe" },
+            ]}
+          />
         </label>
         <label>
           Passou pelo nó
-          <select value={filtroNo} onChange={(e) => mudarFiltroNo(e.target.value)}>
-            <option value="">Qualquer</option>
-            {nos.map((n) => (
-              <option key={n.id} value={n.id}>
-                {rotulo(NOS, n.id)}
-              </option>
-            ))}
-          </select>
+          <GlideSelect
+            ariaLabel="Passou pelo nó"
+            value={filtroNo}
+            onChange={mudarFiltroNo}
+            menuWidth={240}
+            options={[
+              { value: "", label: "Qualquer" },
+              ...nos.map((n) => ({ value: n.id, label: rotulo(NOS, n.id) })),
+            ]}
+          />
         </label>
         <span className="ao-vivo" title="A lista recebe as execuções novas sem recarregar">
           Ao vivo

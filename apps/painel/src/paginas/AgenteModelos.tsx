@@ -10,6 +10,7 @@ import {
 } from "../api";
 import { Dialogo } from "../componentes/Dialogo";
 import { Falha } from "../componentes/Falha";
+import GlideSelect from "../componentes/GlideSelect";
 import { duracao } from "../componentes/ItemTurno";
 import { Vazio } from "../componentes/Vazio";
 import { dolar, NOS, rotulo, tokens } from "../rotulos";
@@ -255,18 +256,27 @@ function CartaoPapel({
             : `do ambiente (${papel.variavel})`}
         </p>
       </header>
-      <label htmlFor={id}>Modelo</label>
+      {/* A lista do catálogo leva o nome pelo `ariaLabel`; o campo de texto, por aqui. */}
+      <label htmlFor={usaCatalogo ? undefined : id}>Modelo</label>
       {usaCatalogo ? (
-        <select id={id} value={valor} onChange={(e) => mudar(e.target.value)} disabled={!dados.pode_editar}>
-          {!opcoes.some((m) => m.id === valor) && (
-            <option value={valor}>{valor || "— nenhum —"} (fora do catálogo)</option>
-          )}
-          {opcoes.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.nome} · {porMilhao(m.preco_entrada)}
-            </option>
-          ))}
-        </select>
+        <GlideSelect
+          className="largo"
+          ariaLabel={`Modelo: ${papel.rotulo}`}
+          value={valor}
+          onChange={mudar}
+          disabled={!dados.pode_editar}
+          menuWidth={360}
+          options={[
+            ...(opcoes.some((m) => m.id === valor)
+              ? []
+              : [{ value: valor, label: valor || "— nenhum —", tag: "fora do catálogo" }]),
+            ...opcoes.map((m) => ({
+              value: m.id,
+              label: m.nome,
+              tag: `${porMilhao(m.preco_entrada)} entrada`,
+            })),
+          ]}
+        />
       ) : (
         <input
           id={id}
@@ -405,11 +415,17 @@ function Catalogo({
         </label>
         <label>
           Ordenar por
-          <select value={ordem} onChange={(e) => setOrdem(e.target.value as typeof ordem)}>
-            <option value="preco">Menor preço de entrada</option>
-            <option value="contexto">Maior contexto</option>
-            <option value="nome">Nome</option>
-          </select>
+          <GlideSelect
+            ariaLabel="Ordenar por"
+            value={ordem}
+            onChange={(v) => setOrdem(v as typeof ordem)}
+            menuWidth={220}
+            options={[
+              { value: "preco", label: "Menor preço de entrada" },
+              { value: "contexto", label: "Maior contexto" },
+              { value: "nome", label: "Nome" },
+            ]}
+          />
         </label>
         <label className="opcao">
           <input type="checkbox" checked={soImagem} onChange={(e) => setSoImagem(e.target.checked)} />
