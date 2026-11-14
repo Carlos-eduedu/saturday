@@ -116,6 +116,14 @@ def mensagem_handoff(motivo: str, resposta: str | None = None) -> str:
     return texto
 
 
+def chave_handoff(chave: str | None, resposta: str) -> str | None:
+    """Chave da fala de handoff, somando o aviso de fora do horário se ele foi junto."""
+
+    if chave and resposta.endswith(MENSAGEM_FORA_HORARIO):
+        return f"{chave}+textos:fora_horario"
+    return chave
+
+
 def mensagem_audio_ilegivel() -> str:
     """Áudio sem transcrição: pede o mesmo conteúdo por escrito."""
 

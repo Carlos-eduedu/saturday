@@ -296,6 +296,8 @@ def ver_conversa(conversa_id: uuid.UUID, _usuario: Logado, fabrica: Fabrica) -> 
                 "conteudo": m.conteudo,
                 "status_entrega": m.status_entrega,
                 "criada_em": m.criada_em,
+                "turno_id": m.turno_id,
+                "chave_mensagem": m.chave_mensagem,
                 "anexos": [
                     {"mime_type": a.get("mime_type"), "nome": a.get("nome")} for a in m.anexos or []
                 ],

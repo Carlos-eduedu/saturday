@@ -7,7 +7,7 @@ import json
 from sqlalchemy import select
 
 from saturday.canais.base import OrigemCanal
-from saturday.dados.modelos import Conversa, Turno
+from saturday.dados.modelos import Conversa, Mensagem, Turno
 from saturday.dados.sessao import sessao as abrir
 from saturday.metrics import iniciar_metricas, registrar_chamada, uso_do_payload
 from saturday.painel import sessoes
@@ -88,3 +88,28 @@ def test_trilha_para_todos_custo_so_para_gestor(client_pg, service_pg, fabrica, 
     assert custos["hoje"]["custo_usd"] == 0.5
     assert custos["conversas_mais_caras"][0]["id"] == alvo
     assert custos["conversas_mais_caras"][0]["telefone"] == "(11) *****-4321"
+
+
+def test_saida_da_ia_aponta_para_o_turno_da_rodada(service_pg, fakes, fabrica, conversa):
+    """Decisão 0018: cada fala da IA guarda o turno que a produziu e a chave."""
+
+    from conftest import resultado_jev
+
+    fakes.jev.resultado = resultado_jev(intent="saudacao")
+    service_pg.process_message(ChatRequest(conversation_id=conversa, message="oi"), WHATSAPP)
+    fakes.jev.resultado = resultado_jev()
+    service_pg.process_message(
+        ChatRequest(conversation_id=conversa, message="qual a taxa?"), WHATSAPP
+    )
+    with abrir(fabrica) as s:
+        conversa_db = s.scalar(select(Conversa).where(Conversa.conversation_id == conversa))
+        turnos = s.scalars(
+            select(Turno.id).where(Turno.conversa_id == conversa_db.id).order_by(Turno.id)
+        ).all()
+        saidas = s.scalars(
+            select(Mensagem)
+            .where(Mensagem.conversa_id == conversa_db.id, Mensagem.direcao == "saida")
+            .order_by(Mensagem.id)
+        ).all()
+    assert [m.turno_id for m in saidas] == list(turnos)
+    assert [m.chave_mensagem for m in saidas] == ["textos:boas_vindas", None]

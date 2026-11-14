@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.agent.context import AgentContext
 from saturday.agent.state import turno_inicial
-from saturday.agent.textos import mensagem_handoff
+from saturday.agent.textos import chave_handoff, mensagem_handoff
 from saturday.canais.base import CANAIS_WHATSAPP, OrigemCanal
 from saturday.dados import repositorios
 from saturday.dados.modelos import Conversa, Turno
@@ -278,40 +278,42 @@ class AgentService:
         metricas: TurnMetrics | None,
         inicio: float,
         erro: str | None = None,
-    ) -> None:
+    ) -> int:
         """Etapa na conversa (para a lista) e a trilha do turno (abas "IA" e Agente).
 
         Só códigos, números e tempos: nenhum texto do cliente ou do modelo. O
-        aviso `turno` atualiza ao vivo a lista de execuções do painel.
+        aviso `turno` atualiza ao vivo a lista de execuções do painel. Devolve o
+        id do turno, que vai na mensagem de saída (procedência, decisão 0018).
         """
 
         conversa.etapa = etapa_do_estado(estado)
         resumo = metricas.resumo() if metricas else {"chamadas": [], "custo_total_usd": 0.0}
         classificou = "classify_intent" in caminho
-        sessao.add(
-            Turno(
-                conversa_id=conversa.id,
-                caminho=list(caminho),
-                status=estado.get("status"),
-                motivo=estado.get("handoff_reason"),
-                etapa=conversa.etapa,
-                classificacao=(
-                    {
-                        "intencao": estado.get("intent"),
-                        "publico": estado.get("publico"),
-                        "confianca": estado.get("intent_confidence"),
-                    }
-                    if classificou
-                    else None
-                ),
-                chamadas=resumo["chamadas"],
-                custo_usd=resumo["custo_total_usd"],
-                tokens=resumo.get("tokens_total", 0),
-                duracao_ms=round((time.monotonic() - inicio) * 1000),
-                erro=erro,
-            )
+        turno = Turno(
+            conversa_id=conversa.id,
+            caminho=list(caminho),
+            status=estado.get("status"),
+            motivo=estado.get("handoff_reason"),
+            etapa=conversa.etapa,
+            classificacao=(
+                {
+                    "intencao": estado.get("intent"),
+                    "publico": estado.get("publico"),
+                    "confianca": estado.get("intent_confidence"),
+                }
+                if classificou
+                else None
+            ),
+            chamadas=resumo["chamadas"],
+            custo_usd=resumo["custo_total_usd"],
+            tokens=resumo.get("tokens_total", 0),
+            duracao_ms=round((time.monotonic() - inicio) * 1000),
+            erro=erro,
         )
+        sessao.add(turno)
+        sessao.flush()
         repositorios.notificar(sessao, "turno", conversa=conversa.id)
+        return turno.id
 
     def _log_turno(
         self,
@@ -568,8 +570,9 @@ class AgentService:
                 "erro_interno conversation_id=%s",
                 payload.conversation_id,
             )
+            turno_id = None
             if sessao is not None and conversa is not None:
-                self._registrar_turno(
+                turno_id = self._registrar_turno(
                     sessao,
                     conversa,
                     {**estado, "status": "handoff", "handoff_reason": "erro_interno"},
@@ -585,14 +588,20 @@ class AgentService:
                 payload.message_id,
                 mensagem_handoff("erro_interno"),
             )
-            if sessao is not None and conversa is not None:
-                self._abrir_handoff(sessao, conversa, "erro_interno", "erro_interno")
-            return self._fallback_erro_interno(
+            resposta = self._fallback_erro_interno(
                 payload.conversation_id,
                 config,
                 inicio=inicio,
                 caminho=caminho,
             )
+            if sessao is not None and conversa is not None:
+                self._abrir_handoff(sessao, conversa, "erro_interno", "erro_interno")
+                # O aviso vai ao cliente e ao histórico como qualquer handoff.
+                chave = chave_handoff("handoff:erro_interno", resposta.answer)
+                self._gravar_saida(
+                    sessao, conversa, resposta, {"chave_mensagem": chave}, turno_id=turno_id
+                )
+            return resposta
 
         final = dict(self.graph.get_state(config).values or {})
         self._log_turno(
@@ -602,8 +611,9 @@ class AgentService:
             inicio,
             metricas,
         )
+        turno_id = None
         if sessao is not None and conversa is not None:
-            self._registrar_turno(sessao, conversa, final, caminho, metricas, inicio)
+            turno_id = self._registrar_turno(sessao, conversa, final, caminho, metricas, inicio)
         resposta = self.evento(payload.conversation_id, final)
 
         if payload.message_id and resposta.answer:
@@ -619,7 +629,7 @@ class AgentService:
                     resposta.handoff_reason,
                     final.get("handoff_detalhe"),
                 )
-            self._gravar_saida(sessao, conversa, resposta, final)
+            self._gravar_saida(sessao, conversa, resposta, final, turno_id=turno_id)
         return resposta
 
     @staticmethod
@@ -666,8 +676,9 @@ class AgentService:
             self._stream(entrada, config, caminho)
             final = dict(self.graph.get_state(config).values or {})
             self._log_turno(conversation_id, final, caminho, inicio, metricas)
+            turno_id = None
             if sessao is not None and conversa is not None:
-                self._registrar_turno(sessao, conversa, final, caminho, metricas, inicio)
+                turno_id = self._registrar_turno(sessao, conversa, final, caminho, metricas, inicio)
             resposta = self.evento(conversation_id, final)
             if sessao is not None and conversa is not None:
                 if forcar and conversa.atendimento != "ia" and resposta.status == "handoff":
@@ -688,7 +699,7 @@ class AgentService:
                         final.get("handoff_detalhe"),
                     )
                 if resposta.answer or resposta.status == "handoff" or final.get("modelo_envio"):
-                    self._gravar_saida(sessao, conversa, resposta, final)
+                    self._gravar_saida(sessao, conversa, resposta, final, turno_id=turno_id)
             return resposta
 
     def _entrada_do_grafo(
@@ -736,12 +747,15 @@ class AgentService:
         conversa: Conversa,
         resposta: AgentReply,
         final: dict[str, Any] | None = None,
+        *,
+        turno_id: int | None = None,
     ) -> None:
         """Histórico da resposta e, quando houver canal, o envio no outbox.
 
         ``final`` (o estado do turno) pode pedir um modelo: ``modelo_envio`` sai
         sempre como modelo (marketing); ``modelo_aviso`` e ``link_aviso`` são o
-        aviso usado se a janela de 24 h estiver fechada.
+        aviso usado se a janela de 24 h estiver fechada. ``turno_id`` e a
+        ``chave_mensagem`` do estado dão a procedência da fala (decisão 0018).
         """
 
         final = final or {}
@@ -749,7 +763,13 @@ class AgentService:
             conversa.marketing = final["marketing"]
         modelo_envio = final.get("modelo_envio")
         conteudo = resposta.answer or (f"[modelo {modelo_envio}]" if modelo_envio else "")
-        mensagem_id = repositorios.registrar_saida(sessao, conversa, conteudo=conteudo)
+        mensagem_id = repositorios.registrar_saida(
+            sessao,
+            conversa,
+            conteudo=conteudo,
+            turno_id=turno_id,
+            chave_mensagem=final.get("chave_mensagem"),
+        )
         canal = self._canal_de_saida(conversa, resposta)
         if canal is None:
             return

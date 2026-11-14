@@ -294,3 +294,37 @@ def test_webhook_contem_portability_result(client, fakes: Fakes):
     payload = fakes.webhook.enviados[0]
     assert payload["portability_result"]["ok"] is True
     assert payload["portability_result"]["contratos"]
+
+
+def test_cada_fala_guarda_a_chave_da_mensagem_fixa(client, service, fakes: Fakes):
+    """Decisão 0018: fala fixa leva a chave; a resposta da FAQ (do modelo) fica nula."""
+
+    def chave(conversa: str) -> str | None:
+        return service.estado_atual(service.config(conversa)).get("chave_mensagem")
+
+    fakes.llm.extrato = dados_extrato()
+    conversa = cid()
+    client.post(
+        "/chat",
+        json={"conversation_id": conversa, "message": "extrato", "attachments": [anexo_pdf()]},
+    )
+    assert chave(conversa) == "textos:pergunta_data"
+    client.post(
+        "/chat",
+        json={"conversation_id": conversa, "message": "12/03/1962", "cliente": {"uf": "MS"}},
+    )
+    assert chave(conversa) == "inss:oferta"
+
+    fakes.jev.resultado = resultado_jev(resposta_oferta="duvida", resposta_conf=0.9)
+    resposta = client.post(
+        "/chat", json={"conversation_id": conversa, "message": "e qual a taxa?"}
+    ).json()
+    assert resposta["status"] == "answered"
+    assert chave(conversa) is None
+
+    fakes.jev.resultado = resultado_jev(resposta_oferta="aceita", resposta_conf=0.9)
+    client.post("/chat", json={"conversation_id": conversa, "message": "pode seguir"})
+    assert chave(conversa) in (
+        "handoff:aceitou_portabilidade",
+        "handoff:aceitou_portabilidade+textos:fora_horario",
+    )

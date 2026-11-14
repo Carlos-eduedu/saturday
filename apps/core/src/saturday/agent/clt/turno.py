@@ -12,7 +12,7 @@ from typing import Any
 from langchain_core.messages import AIMessage
 
 from saturday.agent.clt import leitura
-from saturday.agent.clt.mensagens import texto
+from saturday.agent.clt.mensagens import chave_de, texto
 from saturday.agent.context import AgentContext
 from saturday.agent.state import AgentState
 from saturday.bancos.granatech.cliente import ClienteGranatech
@@ -91,12 +91,14 @@ class Turno:
     # -- saídas -------------------------------------------------------
 
     def responder(self, *partes: str) -> dict[str, Any]:
-        resposta = "\n\n".join(p for p in partes if p)
+        # `str(...)`: o `Fixo` não pode chegar ao checkpoint.
+        resposta = str("\n\n".join(p for p in partes if p))
         return {
             "marketing": self.marketing,
             "clt": self.clt,
             "status": "answered",
             "answer": resposta,
+            "chave_mensagem": chave_de(*partes),
             "needs_human": False,
             "messages": [AIMessage(content=resposta)] if resposta else [],
         }
@@ -115,11 +117,13 @@ class Turno:
         """Passa a conversa para um humano; ``detalhe`` vai para o alerta."""
 
         logger.info("clt_handoff etapa=%s motivo=%s", self.clt.get("etapa"), motivo)
+        fala = resposta or texto("handoff")
         return {
             "clt": self.clt,
             "needs_human": True,
             "handoff_reason": motivo,
-            "answer": resposta or texto("handoff"),
+            "answer": str(fala),
+            "chave_mensagem": chave_de(fala),
             "handoff_detalhe": detalhe,
         }
 

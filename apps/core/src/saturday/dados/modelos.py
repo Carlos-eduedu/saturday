@@ -110,6 +110,12 @@ class Mensagem(Base):
     )
     conteudo: Mapped[str] = mapped_column(Text, nullable=False, default="")
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
+    # Procedência da fala da IA (decisão 0018): o turno que a produziu e a chave
+    # da mensagem fixa (`+` quando junta várias). Chave nula: o modelo escreveu.
+    turno_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("turnos.id", ondelete="SET NULL"), index=True
+    )
+    chave_mensagem: Mapped[str | None] = mapped_column(String(128))
 
 
 class Outbox(Base):

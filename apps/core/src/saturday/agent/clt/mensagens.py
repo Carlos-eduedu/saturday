@@ -45,11 +45,32 @@ def variaveis(modelo: str) -> set[str]:
     return {campo for _, campo, _, _ in Formatter().parse(modelo) if campo}
 
 
-def texto(chave: str, **valores: object) -> str:
+class Fixo(str):
+    """Texto de mensagem fixa que lembra a própria chave (procedência no painel).
+
+    Só vive dentro do turno: o estado e o banco recebem ``str`` puro, para que
+    o checkpoint nunca precise serializar a subclasse.
+    """
+
+    chave: str
+
+    def __new__(cls, valor: str, chave: str) -> Fixo:
+        fixo = super().__new__(cls, valor)
+        fixo.chave = chave
+        return fixo
+
+
+def texto(chave: str, **valores: object) -> Fixo:
     """Texto da chave com as variáveis preenchidas; faltando uma, levanta erro."""
 
     modelo = _carregar()[1][chave]
     faltando = variaveis(modelo) - valores.keys()
     if faltando:
         raise KeyError(f"mensagem {chave!r} sem as variáveis {sorted(faltando)}")
-    return modelo.format(**valores)
+    return Fixo(modelo.format(**valores), chave)
+
+
+def chave_de(*partes: str) -> str | None:
+    """Chaves das partes fixas, na ordem do texto, juntas com ``+``."""
+
+    return "+".join(p.chave for p in partes if p and isinstance(p, Fixo)) or None

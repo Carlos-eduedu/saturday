@@ -36,6 +36,7 @@ from saturday.dados.modelos import (
     Mensagem,
     Outbox,
     Recontato,
+    Turno,
 )
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.fontes.brasilapi import ErroBrasilAPI
@@ -164,6 +165,7 @@ def _montar(
     http: TestClient,
     fakes: Fakes,
     brasilapi: FakeBrasilAPI,
+    checkpointer: Any = None,
     **extras: Any,
 ) -> tuple[AgentService, ClienteGranatech]:
     settings = settings_granatech(**extras)
@@ -177,7 +179,7 @@ def _montar(
         fabrica=fabrica,
         dominio_publico=settings.dominio_publico,
     )
-    checkpointer = InMemorySaver()
+    checkpointer = checkpointer or InMemorySaver()
     servico = AgentService(
         graph=build_graph(checkpointer),
         context=contexto,
@@ -610,3 +612,57 @@ def test_flag_desligada_mantem_o_comportamento(service: AgentService, fakes: Fak
     )
     assert resposta.answer == fakes.llm.resposta.resposta
     assert not service.estado_atual(service.config("sem-clt")).get("clt")
+
+
+# ---------------------------------------------------------------- procedência
+
+
+def _sem_fixo(valor: Any) -> bool:
+    """Nenhum `Fixo` (subclasse de str) em lugar nenhum do estado."""
+
+    if isinstance(valor, str):
+        return type(valor) is str
+    if isinstance(valor, dict):
+        return all(_sem_fixo(k) and _sem_fixo(v) for k, v in valor.items())
+    if isinstance(valor, list | tuple):
+        return all(_sem_fixo(v) for v in valor)
+    conteudo = getattr(valor, "content", None)
+    return conteudo is None or _sem_fixo(conteudo)
+
+
+def test_procedencia_das_falas_com_checkpoint_no_postgres(
+    fabrica: sessionmaker[Session],
+    http_granatech: TestClient,
+    fakes_clt: Fakes,
+    brasilapi: FakeBrasilAPI,
+    checkpointer_pg: Any,
+) -> None:
+    """Decisão 0018: cada fala guarda turno e chave; o `Fixo` nunca vai ao checkpoint."""
+
+    servico, cliente = _montar(
+        fabrica, http_granatech, fakes_clt, brasilapi, checkpointer=checkpointer_pg
+    )
+    jornada = Jornada(servico, fabrica, cliente)
+    _ate_oferta(jornada)
+
+    estado = servico.estado_atual(servico.config(jornada.id))
+    assert estado["chave_mensagem"] == "aviso_teto+oferta"
+    assert _sem_fixo(estado)
+
+    with abrir_sessao(fabrica) as sessao:
+        conversa_id = jornada.conversa_uuid()
+        turnos = sessao.scalars(
+            select(Turno.id).where(Turno.conversa_id == conversa_id).order_by(Turno.id)
+        ).all()
+        saidas = sessao.scalars(
+            select(Mensagem)
+            .where(Mensagem.conversa_id == conversa_id, Mensagem.direcao == "saida")
+            .order_by(Mensagem.id)
+        ).all()
+    # Uma fala por turno, inclusive a do turno de sistema (`continuar`).
+    assert [m.turno_id for m in saidas] == list(turnos)
+    chaves = [m.chave_mensagem for m in saidas]
+    assert chaves[0] == "abertura+triagem_carteira"
+    assert "consentimento" in chaves
+    assert chaves[-3:] == ["consultando", "escolher_vinculo+opcao_vinculo", "aviso_teto+oferta"]
+    assert None not in chaves

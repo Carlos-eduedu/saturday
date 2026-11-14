@@ -25,6 +25,7 @@ from saturday.agent.textos import (
     PERGUNTA_DATA_INVALIDA,
     PERGUNTA_UF,
     PERGUNTA_UF_INVALIDA,
+    chave_handoff,
     mensagem_handoff,
 )
 from saturday.portabilidade import calculo, mensagem
@@ -82,10 +83,11 @@ def _resumo_portabilidade(state: AgentState) -> str | None:
     return "\n".join(linhas)
 
 
-def _pedido(pergunta: str, aguardando: str) -> dict[str, Any]:
+def _pedido(pergunta: str, aguardando: str, chave: str) -> dict[str, Any]:
     return {
         "status": "answered",
         "answer": pergunta,
+        "chave_mensagem": chave,
         "aguardando": aguardando,
         "needs_human": False,
         "messages": [AIMessage(content=pergunta)],
@@ -111,6 +113,7 @@ def pedir_texto(state: AgentState) -> dict[str, Any]:
     return {
         "status": "answered",
         "answer": MENSAGEM_SEM_TEXTO,
+        "chave_mensagem": "textos:sem_texto",
         "needs_human": False,
         "messages": [AIMessage(content=MENSAGEM_SEM_TEXTO)],
     }
@@ -218,6 +221,7 @@ def generate_answer(state: AgentState, runtime: Runtime[AgentContext]) -> dict[s
             return {
                 "status": "answered",
                 "answer": MENSAGEM_NAO_ENTENDI,
+                "chave_mensagem": "textos:nao_entendi",
                 "tentativas_resposta": tentativas,
                 "messages": [AIMessage(content=MENSAGEM_NAO_ENTENDI)],
             }
@@ -231,6 +235,8 @@ def generate_answer(state: AgentState, runtime: Runtime[AgentContext]) -> dict[s
     return {
         "status": "answered",
         "answer": resposta.resposta,
+        # Escrita pelo modelo: sem chave de mensagem fixa (decisão 0018).
+        "chave_mensagem": None,
         "tentativas_resposta": 0,
         "messages": [AIMessage(content=resposta.resposta)],
     }
@@ -242,6 +248,7 @@ def boas_vindas(state: AgentState) -> dict[str, Any]:
     return {
         "status": "answered",
         "answer": MENSAGEM_BOAS_VINDAS,
+        "chave_mensagem": "textos:boas_vindas",
         "needs_human": False,
         "tentativas_resposta": 0,
         "messages": [AIMessage(content=MENSAGEM_BOAS_VINDAS)],
@@ -252,12 +259,16 @@ def handoff(state: AgentState) -> dict[str, Any]:
     """Passa a conversa para a equipe com o motivo e avisa o cliente."""
 
     motivo = state.get("handoff_reason") or "sem_resposta"
-    resposta = mensagem_handoff(motivo, state.get("answer"))
+    anterior = state.get("answer")
+    resposta = mensagem_handoff(motivo, anterior)
+    # A fala que o nó anterior preparou mantém a chave dela.
+    chave = state.get("chave_mensagem") if anterior else f"handoff:{motivo}"
     return {
         "status": "handoff",
         "needs_human": True,
         "handoff_reason": motivo,
         "answer": resposta,
+        "chave_mensagem": chave_handoff(chave, resposta),
         "handoff_em": datetime.now(ZoneInfo(TZ_OPERACAO)).isoformat(),
         "messages": [AIMessage(content=resposta)],
     }
@@ -269,6 +280,7 @@ def decline_offer(state: AgentState) -> dict[str, Any]:
     return {
         "status": "answered",
         "answer": MENSAGEM_RECUSA,
+        "chave_mensagem": "textos:recusa",
         "oferta_pendente": False,
         "needs_human": False,
         "handoff_reason": None,
@@ -276,7 +288,7 @@ def decline_offer(state: AgentState) -> dict[str, Any]:
     }
 
 
-def _perguntar_extrato(state: AgentState, pergunta: str) -> dict[str, Any]:
+def _perguntar_extrato(state: AgentState, pergunta: str, chave: str) -> dict[str, Any]:
     tentativas = int(state.get("tentativas_extrato") or 0) + 1
     if tentativas >= 2:
         return {
@@ -288,6 +300,7 @@ def _perguntar_extrato(state: AgentState, pergunta: str) -> dict[str, Any]:
         "tentativas_extrato": tentativas,
         "status": "answered",
         "answer": pergunta,
+        "chave_mensagem": chave,
         "needs_human": False,
         "messages": [AIMessage(content=pergunta)],
     }
@@ -299,21 +312,23 @@ def read_statement(state: AgentState, runtime: Runtime[AgentContext]) -> dict[st
     try:
         anexos = runtime.context.anexos.carregar_anexos(state.get("attachments") or [])
     except AnexoInvalido:
-        return _perguntar_extrato(state, runtime.context.anexos.mensagem_anexo_invalido())
+        return _perguntar_extrato(
+            state, runtime.context.anexos.mensagem_anexo_invalido(), "anexos:anexo_invalido"
+        )
 
     try:
         dados = runtime.context.llm.ler_extrato(anexos)
         extrato = hiscon_mod.normalizar_extrato(dados)
     except Exception:
-        return _perguntar_extrato(state, MENSAGEM_EXTRATO_ILEGIVEL)
+        return _perguntar_extrato(state, MENSAGEM_EXTRATO_ILEGIVEL, "textos:extrato_ilegivel")
 
     status = hiscon_mod.validar_extrato(extrato, hoje_operacao())
     if status == hiscon_mod.STATUS_NAO_HISCON:
-        return _perguntar_extrato(state, MENSAGEM_EXTRATO_INCORRETO)
+        return _perguntar_extrato(state, MENSAGEM_EXTRATO_INCORRETO, "textos:extrato_incorreto")
     if status == hiscon_mod.STATUS_ILEGIVEL:
-        return _perguntar_extrato(state, MENSAGEM_EXTRATO_ILEGIVEL)
+        return _perguntar_extrato(state, MENSAGEM_EXTRATO_ILEGIVEL, "textos:extrato_ilegivel")
     if status == hiscon_mod.STATUS_MES_ERRADO:
-        return _perguntar_extrato(state, MENSAGEM_EXTRATO_MES_ERRADO)
+        return _perguntar_extrato(state, MENSAGEM_EXTRATO_MES_ERRADO, "textos:extrato_mes_errado")
 
     dados_extrato = extrato.model_dump()
     if status == hiscon_mod.STATUS_CONFERENCIA_FALHOU:
@@ -326,6 +341,7 @@ def read_statement(state: AgentState, runtime: Runtime[AgentContext]) -> dict[st
         return {
             "portability_result": _resultado_falha(dados_extrato, "especie_nao_atendida"),
             "answer": mensagem.MENSAGEM_ESPECIE_NAO_ATENDIDA,
+            "chave_mensagem": "inss:especie_nao_atendida",
             "needs_human": True,
             "handoff_reason": "especie_nao_atendida",
         }
@@ -348,14 +364,14 @@ def check_customer_data(state: AgentState) -> dict[str, Any]:
     idade = calculo.idade_em_anos(cliente.get("data_nascimento"), hoje)
 
     if idade is None:
-        return _pedido(PERGUNTA_DATA, "data_nascimento")
+        return _pedido(PERGUNTA_DATA, "data_nascimento", "textos:pergunta_data")
 
     uf = normalizar_uf(cliente.get("uf"))
     if uf is not None:
         cliente["uf"] = uf
 
     if idade >= IDADE_WEBPLUS and uf is None:
-        return _pedido(PERGUNTA_UF, "uf")
+        return _pedido(PERGUNTA_UF, "uf", "textos:pergunta_uf")
 
     return {
         "status": "in_progress",
@@ -365,7 +381,7 @@ def check_customer_data(state: AgentState) -> dict[str, Any]:
     }
 
 
-def _falha_coleta(state: AgentState, pergunta: str) -> dict[str, Any]:
+def _falha_coleta(state: AgentState, pergunta: str, chave: str) -> dict[str, Any]:
     tentativas = int(state.get("tentativas_coleta") or 0) + 1
     if tentativas >= 2:
         return {
@@ -377,6 +393,7 @@ def _falha_coleta(state: AgentState, pergunta: str) -> dict[str, Any]:
         "tentativas_coleta": tentativas,
         "status": "answered",
         "answer": pergunta,
+        "chave_mensagem": chave,
         "needs_human": False,
         "messages": [AIMessage(content=pergunta)],
     }
@@ -392,7 +409,7 @@ def collect_customer_data(state: AgentState) -> dict[str, Any]:
     if aguardando == "data_nascimento":
         dados = parse_data_nascimento(texto, hoje_operacao())
         if dados is None:
-            return _falha_coleta(state, PERGUNTA_DATA_INVALIDA)
+            return _falha_coleta(state, PERGUNTA_DATA_INVALIDA, "textos:pergunta_data_invalida")
         data_iso, _ = dados
         cliente["data_nascimento"] = data_iso
         return {
@@ -404,7 +421,7 @@ def collect_customer_data(state: AgentState) -> dict[str, Any]:
     if aguardando == "uf":
         uf = normalizar_uf(texto)
         if uf is None:
-            return _falha_coleta(state, PERGUNTA_UF_INVALIDA)
+            return _falha_coleta(state, PERGUNTA_UF_INVALIDA, "textos:pergunta_uf_invalida")
         cliente["uf"] = uf
         return {
             "cliente": cliente,
@@ -461,6 +478,7 @@ def calculate_portability(state: AgentState) -> dict[str, Any]:
         }
         if motivo in MENSAGENS_FALHA_CALCULO:
             atualizacao["answer"] = MENSAGENS_FALHA_CALCULO[motivo]
+            atualizacao["chave_mensagem"] = f"inss:{motivo}"
         return atualizacao
 
     elegiveis = [c for c in resultado.get("contratos", []) if c.get("elegivel")]
@@ -470,6 +488,7 @@ def calculate_portability(state: AgentState) -> dict[str, Any]:
             "needs_human": True,
             "handoff_reason": "sem_portabilidade",
             "answer": mensagem.mensagem_sem_portabilidade(resultado),
+            "chave_mensagem": "inss:sem_portabilidade",
         }
 
     return {"portability_result": resultado}
@@ -484,6 +503,7 @@ def present_offer(state: AgentState) -> dict[str, Any]:
     return {
         "status": "answered",
         "answer": resposta,
+        "chave_mensagem": "inss:oferta",
         "oferta_pendente": True,
         "needs_human": False,
         "handoff_reason": None,

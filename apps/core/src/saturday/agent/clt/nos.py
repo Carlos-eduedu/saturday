@@ -24,7 +24,7 @@ from zoneinfo import ZoneInfo
 from langgraph.runtime import Runtime
 
 from saturday.agent.clt import leitura, proposta, regras
-from saturday.agent.clt.mensagens import chaves, texto, variaveis, versao
+from saturday.agent.clt.mensagens import Fixo, chaves, texto, variaveis, versao
 from saturday.agent.clt.turno import PERGUNTAS, Turno, primeiro_nome, reais
 from saturday.agent.coleta import hoje_operacao
 from saturday.agent.context import AgentContext
@@ -218,7 +218,7 @@ def _autorizou(t: Turno) -> dict[str, Any]:
         t.contexto.fabrica,
         conversa_id=t.conversa_id,
         tipo=CONSENTIMENTO_CONSULTA,
-        texto_mostrado=texto("consentimento"),
+        texto_mostrado=str(texto("consentimento")),
         versao=versao(),
         resposta_literal=t.texto,
         wamid=t.state.get("message_id"),
@@ -362,9 +362,12 @@ def _pos_consulta(t: Turno, detalhe: DetalheConsulta) -> dict[str, Any]:
         return _simular(t, vinculos[0])
     t.clt.update(etapa="escolha_vinculo", passo="vinculo", erros=0)
     t.clt["vinculos"] = [v.id_margem for v in vinculos]
-    opcoes = "\n".join(
-        texto("opcao_vinculo", numero=i, empregador=v.nome_empregador, margem=reais(v.margem))
-        for i, v in enumerate(vinculos, start=1)
+    opcoes = Fixo(
+        "\n".join(
+            texto("opcao_vinculo", numero=i, empregador=v.nome_empregador, margem=reais(v.margem))
+            for i, v in enumerate(vinculos, start=1)
+        ),
+        "opcao_vinculo",
     )
     return t.responder(texto("escolher_vinculo"), opcoes)
 
@@ -452,7 +455,7 @@ def _guardar_oferta(
     return dados
 
 
-def _texto_oferta(t: Turno, simulacao: Simulacao) -> str:
+def _texto_oferta(t: Turno, simulacao: Simulacao) -> Fixo:
     valores: dict[str, object] = {
         "nome": primeiro_nome(t.dados.get("nome") or ""),
         "liberado": reais(simulacao.liberado),
@@ -468,7 +471,7 @@ def _texto_oferta(t: Turno, simulacao: Simulacao) -> str:
         oferta = texto("oferta_sem_seguro", **valores)
     if simulacao.limitado_ao_teto:
         aviso = texto("aviso_teto", teto=reais(t.granatech.teto))
-        return f"{aviso}\n\n{oferta}"
+        return Fixo(f"{aviso}\n\n{oferta}", f"{aviso.chave}+{oferta.chave}")
     return oferta
 
 

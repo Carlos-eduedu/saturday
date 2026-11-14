@@ -9,7 +9,7 @@ from conftest import resultado_jev
 from sqlalchemy import func, select
 
 from saturday.dados import repositorios
-from saturday.dados.modelos import Alerta, Conversa, Mensagem, UsuarioPainel
+from saturday.dados.modelos import Alerta, Conversa, Mensagem, Outbox, Turno, UsuarioPainel
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.schemas import ChatRequest
 
@@ -166,3 +166,33 @@ def test_erro_interno_vai_para_handoff_com_alerta(service_pg, fabrica, conversa,
     assert _conversa(fabrica, conversa).atendimento == "handoff"
     with abrir_sessao(fabrica) as sessao:
         assert [a.tipo for a in sessao.scalars(select(Alerta))] == ["erro_interno"]
+
+
+def test_erro_interno_grava_o_aviso_no_historico_e_no_outbox(
+    service_pg, fabrica, conversa, monkeypatch
+):
+    """Decisão 7 do plano: o aviso de erro interno aparece no painel e sai pelo outbox."""
+
+    from saturday.canais.base import OrigemCanal
+
+    def quebra(*_args, **_kwargs):
+        raise RuntimeError("grafo caiu")
+
+    monkeypatch.setattr(service_pg.graph, "stream", quebra)
+    origem = OrigemCanal(canal="whatsapp", telefone="11987654321", phone_number_id="1000001")
+    resposta = service_pg.process_message(
+        ChatRequest(conversation_id=conversa, message="oi"), origem
+    )
+
+    with abrir_sessao(fabrica) as sessao:
+        [saida] = sessao.scalars(select(Mensagem).where(Mensagem.direcao == "saida")).all()
+        [turno] = sessao.scalars(select(Turno)).all()
+        [envio] = sessao.scalars(select(Outbox)).all()
+        assert saida.conteudo == resposta.answer
+        assert saida.turno_id == turno.id and turno.erro == "RuntimeError"
+        assert saida.chave_mensagem in (
+            "handoff:erro_interno",
+            "handoff:erro_interno+textos:fora_horario",
+        )
+        assert envio.payload["mensagem_id"] == saida.id
+        assert envio.payload["handoff_reason"] == "erro_interno"

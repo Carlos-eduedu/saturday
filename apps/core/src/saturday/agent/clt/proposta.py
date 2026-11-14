@@ -20,7 +20,7 @@ from typing import Any
 from sqlalchemy import select
 
 from saturday.agent.clt import leitura
-from saturday.agent.clt.mensagens import texto, versao
+from saturday.agent.clt.mensagens import Fixo, texto, versao
 from saturday.agent.clt.turno import Turno, reais
 from saturday.bancos.granatech.cliente import ErroGranatech, ErroIncerto
 from saturday.bancos.granatech.normalizacao import (
@@ -164,9 +164,12 @@ def conta(t: Turno) -> dict[str, Any]:
             t.clt["bancos"] = [
                 {"codigo": str(b.get("codigo")), "nome": str(b.get("nome"))} for b in candidatos
             ]
-            opcoes = "\n".join(
-                texto("opcao_banco", numero=i, nome=b["nome"], codigo=b["codigo"])
-                for i, b in enumerate(t.clt["bancos"], start=1)
+            opcoes = Fixo(
+                "\n".join(
+                    texto("opcao_banco", numero=i, nome=b["nome"], codigo=b["codigo"])
+                    for i, b in enumerate(t.clt["bancos"], start=1)
+                ),
+                "opcao_banco",
             )
             return t.responder(texto("escolher_banco"), opcoes)
         nova.update(banco_codigo=str(candidatos[0].get("codigo")))
@@ -228,7 +231,7 @@ def _pedir_aceite(t: Turno) -> dict[str, Any]:
         seguro=reais(oferta.valor_seguro),
     )
     # O texto exato vai para a prova do SIM.
-    t.clt.update(etapa="aceite", passo="sim", erros=0, resumo=resumo)
+    t.clt.update(etapa="aceite", passo="sim", erros=0, resumo=str(resumo))
     return t.responder(resumo)
 
 

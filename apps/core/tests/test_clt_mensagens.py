@@ -97,3 +97,13 @@ def test_textos_obrigatorios_do_contrato() -> None:
 
 def test_versao_presente() -> None:
     assert mensagens.versao()
+
+
+def test_texto_lembra_a_chave_e_junta_na_ordem() -> None:
+    abertura = mensagens.texto("abertura")
+    assert isinstance(abertura, mensagens.Fixo) and abertura.chave == "abertura"
+    pergunta = mensagens.texto("triagem_carteira")
+    assert mensagens.chave_de(abertura, "", pergunta) == "abertura+triagem_carteira"
+    assert mensagens.chave_de("texto solto") is None
+    # Concatenar ou juntar devolve `str` puro: a subclasse não se espalha.
+    assert type(abertura + "x") is str and type("\n".join([abertura])) is str

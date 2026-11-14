@@ -16,6 +16,9 @@ class AgentState(MessagesState, total=False):
     needs_human: bool
     status: Literal["in_progress", "answered", "handoff"]
     answer: str | None
+    # Chave da mensagem fixa da resposta (`+` quando junta várias); nula quando
+    # o modelo escreveu (decisão 0018).
+    chave_mensagem: str | None
     handoff_reason: str | None
     resposta_oferta: str | None
     # Ramo CLT: evento do sistema que abriu o turno (sem mensagem do cliente),
@@ -60,6 +63,7 @@ CAMPOS_DO_TURNO = (
     "intent_confidence",
     "needs_human",
     "answer",
+    "chave_mensagem",
     "handoff_reason",
     "resposta_oferta",
     "evento_sistema",
@@ -91,6 +95,7 @@ def turno_inicial(
         "needs_human": False,
         "status": "in_progress",
         "answer": None,
+        "chave_mensagem": None,
         "handoff_reason": None,
         "resposta_oferta": None,
         "evento_sistema": None,

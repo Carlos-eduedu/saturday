@@ -592,3 +592,19 @@ def test_midia_passa_pela_api_com_sessao(client_pg, service_pg, fabrica, storage
     assert resposta.content == b"%PDF-1.4"
     assert resposta.headers["content-type"] == "application/pdf"
     assert client_pg.get(f"/admin/midia/{mensagem_id}/1").status_code == 404
+
+
+def test_historico_traz_o_turno_e_a_chave_da_fala(
+    client_pg, service_pg, fakes, fabrica, ana, conversa
+):
+    fakes.jev.resultado = resultado_jev(intent="saudacao")
+    _cliente_escreve(service_pg, conversa, "oi")
+    alvo = _conversa_id(fabrica, conversa)
+    _entrar(client_pg, "ana@exemplo.test")
+
+    mensagens = client_pg.get(f"/admin/conversas/{alvo}").json()["mensagens"]
+    entrada, saida = mensagens
+    assert entrada["turno_id"] is None and entrada["chave_mensagem"] is None
+    assert saida["chave_mensagem"] == "textos:boas_vindas"
+    turnos = client_pg.get(f"/admin/conversas/{alvo}/turnos").json()["turnos"]
+    assert saida["turno_id"] == turnos[0]["id"]

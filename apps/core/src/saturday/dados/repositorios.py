@@ -116,6 +116,8 @@ def registrar_saida(
     autor: str = "ia",
     usuario_id: uuid.UUID | None = None,
     anexos: list[dict[str, Any]] | None = None,
+    turno_id: int | None = None,
+    chave_mensagem: str | None = None,
 ) -> int:
     """Grava a resposta e devolve o id.
 
@@ -131,6 +133,8 @@ def registrar_saida(
         message_id=message_id,
         conteudo=conteudo,
         anexos=anexos,
+        turno_id=turno_id,
+        chave_mensagem=chave_mensagem,
     )
     sessao.add(linha)
     sessao.flush()
