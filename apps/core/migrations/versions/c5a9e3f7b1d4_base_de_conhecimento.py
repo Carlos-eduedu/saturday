@@ -24,6 +24,11 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    # Quem vem do `postgres:17-alpine` (musl) troca a biblioteca de ordenação de
+    # texto ao passar para a imagem Debian do pgvector: os índices de texto são
+    # refeitos uma vez. Sem nome, o REINDEX vale para o banco atual (Postgres 15+).
+    with op.get_context().autocommit_block():
+        op.execute("REINDEX DATABASE")
     op.execute("CREATE EXTENSION IF NOT EXISTS vector")
     op.create_table(
         "fontes_conhecimento",
