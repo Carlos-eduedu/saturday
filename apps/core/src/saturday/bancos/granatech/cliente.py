@@ -57,6 +57,8 @@ from saturday.settings import (
 logger = logging.getLogger(__name__)
 
 PARCEIRO = "granatech"
+# Cota e chamadas do simulador, de membro testador (decisão 0020): não somam na real.
+PARCEIRO_TESTE = "granatech_teste"
 CACHE_BANCOS_S = 24 * 3600
 CONSIGNADO = "/api-consignado/v1"
 RENOVAR_ANTES_S = 300
@@ -137,7 +139,12 @@ class ClienteGranatech:
         *,
         relogio: Callable[[], float] = time.monotonic,
         dormir: Callable[[float], None] = time.sleep,
+        teste: bool = False,
     ) -> None:
+        # `teste`: o cliente do simulador, para conversa de membro testador. As
+        # linhas que ele grava e lê levam a marca; a cota é a de PARCEIRO_TESTE.
+        self.teste = teste
+        self._parceiro = PARCEIRO_TESTE if teste else PARCEIRO
         self._http = http
         self._settings = settings
         self._fabrica = fabrica
@@ -271,7 +278,7 @@ class ClienteGranatech:
         conversa_id: Any,
     ) -> None:
         duracao_ms = (time.monotonic() - inicio) * 1000
-        registrar_chamada(PARCEIRO, duracao_ms, status=situacao if situacao else "erro")
+        registrar_chamada(self._parceiro, duracao_ms, status=situacao if situacao else "erro")
         logger.info(
             "granatech_chamada metodo=%s rota=%s status=%s ms=%.0f",
             metodo,
@@ -284,7 +291,7 @@ class ClienteGranatech:
                 sessao.add(
                     ChamadaExterna(
                         conversa_id=conversa_id,
-                        servico=PARCEIRO,
+                        servico=self._parceiro,
                         metodo=metodo,
                         rota=rota_modelo,
                         status_http=situacao,
@@ -312,7 +319,7 @@ class ClienteGranatech:
         with abrir_sessao(self._fabrica) as sessao:
             cota.reservar(
                 sessao,
-                parceiro=PARCEIRO,
+                parceiro=self._parceiro,
                 hoje=hoje,
                 teto_dia=self._settings.granatech_cota_diaria,
                 teto_mes=self._settings.granatech_cota_mensal,
@@ -347,7 +354,7 @@ class ClienteGranatech:
 
     def _devolver_cota(self, dia: date) -> None:
         with abrir_sessao(self._fabrica) as sessao:
-            cota.devolver(sessao, parceiro=PARCEIRO, dia=dia)
+            cota.devolver(sessao, parceiro=self._parceiro, dia=dia)
 
     def _limite_reaproveitamento(self) -> datetime:
         return datetime.now(UTC) - timedelta(days=self._settings.granatech_reaproveitar_dias)
@@ -358,6 +365,7 @@ class ClienteGranatech:
                 select(ConsultaGranatech)
                 .where(
                     ConsultaGranatech.cpf == cpf,
+                    ConsultaGranatech.teste.is_(self.teste),
                     ConsultaGranatech.criada_em >= self._limite_reaproveitamento(),
                     ConsultaGranatech.status.not_in(ordem.CONSULTA_SEM_REAPROVEITAMENTO),
                 )
@@ -412,11 +420,15 @@ class ClienteGranatech:
     ) -> ConsultaAberta:
         with abrir_sessao(self._fabrica) as sessao:
             linha = sessao.scalars(
-                select(ConsultaGranatech).where(ConsultaGranatech.id_externo == id_externo)
+                select(ConsultaGranatech).where(
+                    ConsultaGranatech.id_externo == id_externo,
+                    ConsultaGranatech.teste.is_(self.teste),
+                )
             ).first()
             if linha is None:
                 linha = ConsultaGranatech(
                     id_externo=id_externo,
+                    teste=self.teste,
                     cpf=cpf,
                     status=status,
                     link_termo=str(link_termo) if link_termo else None,
@@ -486,7 +498,10 @@ class ClienteGranatech:
 
         with abrir_sessao(self._fabrica) as sessao:
             linha = sessao.scalars(
-                select(ConsultaGranatech).where(ConsultaGranatech.id_externo == id_consulta)
+                select(ConsultaGranatech).where(
+                    ConsultaGranatech.id_externo == id_consulta,
+                    ConsultaGranatech.teste.is_(self.teste),
+                )
             ).one()
             detalhe = normalizar_detalhe(linha.detalhe) if linha.detalhe else None
             return linha.status, linha.link_termo, detalhe
@@ -499,7 +514,10 @@ class ClienteGranatech:
             return None
         with abrir_sessao(self._fabrica) as sessao:
             linha = sessao.scalars(
-                select(ConsultaGranatech).where(ConsultaGranatech.id_externo == id_consulta)
+                select(ConsultaGranatech).where(
+                    ConsultaGranatech.id_externo == id_consulta,
+                    ConsultaGranatech.teste.is_(self.teste),
+                )
             ).one()
             linha.detalhe = recorte
         return detalhe
@@ -561,7 +579,8 @@ class ClienteGranatech:
         with abrir_sessao(self._fabrica) as sessao:
             historico = sessao.scalars(
                 select(PropostaGranatech.historico).where(
-                    PropostaGranatech.id_externo == id_proposta
+                    PropostaGranatech.id_externo == id_proposta,
+                    PropostaGranatech.teste.is_(self.teste),
                 )
             ).first()
             return list(historico or [])
@@ -649,6 +668,7 @@ class ClienteGranatech:
             else:
                 nova = PropostaGranatech(
                     consulta_id=consulta_id,
+                    teste=self.teste,
                     conversa_id=conversa_id,
                     estado_envio="intencao",
                     valor_parcela=parcela,
@@ -730,6 +750,7 @@ class ClienteGranatech:
                 sessao.scalars(
                     select(PropostaGranatech.id_externo).where(
                         PropostaGranatech.id_externo.is_not(None),
+                        PropostaGranatech.teste.is_(self.teste),
                         PropostaGranatech.id != proposta_id,
                     )
                 ).all()
@@ -762,7 +783,10 @@ class ClienteGranatech:
     def id_local_da_consulta(self, id_consulta: str) -> int:
         with abrir_sessao(self._fabrica) as sessao:
             return sessao.scalars(
-                select(ConsultaGranatech.id).where(ConsultaGranatech.id_externo == id_consulta)
+                select(ConsultaGranatech.id).where(
+                    ConsultaGranatech.id_externo == id_consulta,
+                    ConsultaGranatech.teste.is_(self.teste),
+                )
             ).one()
 
     def enviar_dados_tomador(

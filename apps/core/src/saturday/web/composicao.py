@@ -57,6 +57,7 @@ def criar_contexto(
         llm=LLMClient(http, settings, modelos),
         anexos=AnexosClient(http, settings, storage),
         granatech=granatech,
+        granatech_teste=criar_cliente_granatech_teste(http, settings, fabrica),
         brasilapi=BrasilAPI(http, fabrica) if granatech is not None else None,
         fabrica=fabrica,
         dominio_publico=settings.dominio_publico,
@@ -148,6 +149,24 @@ def criar_cliente_granatech(
     if not settings.granatech_ativo or fabrica is None:
         return None
     return ClienteGranatech(http, settings, fabrica)
+
+
+def criar_cliente_granatech_teste(
+    http: httpx.Client,
+    settings: Settings,
+    fabrica: Any,
+) -> ClienteGranatech | None:
+    """Cliente do simulador para membro testador, ou ``None`` sem o simulador."""
+
+    if not settings.granatech_ativo or fabrica is None or not settings.granatech_simulador_url:
+        return None
+    simulador = settings.model_copy(
+        update={
+            "granatech_base_url": settings.granatech_simulador_url,
+            "granatech_chave_api": settings.granatech_simulador_chave,
+        }
+    )
+    return ClienteGranatech(http, simulador, fabrica, teste=True)
 
 
 def criar_servico(

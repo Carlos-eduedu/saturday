@@ -236,7 +236,7 @@ def _pedir_aceite(t: Turno) -> dict[str, Any]:
 
 
 def aceite(t: Turno) -> dict[str, Any]:
-    if leitura.consentiu(t.texto):
+    if leitura.consentiu(t.texto) or t.aceite_de_teste():
         return _criar_proposta(t)
     if leitura.NEGACAO.search(t.texto) or leitura.pedido_de_mudanca(t.texto):
         t.clt.update(etapa="oferta", passo=None, erros=0)
@@ -257,7 +257,7 @@ def _criar_proposta(t: Turno) -> dict[str, Any]:
         tipo=CONSENTIMENTO_PROPOSTA,
         texto_mostrado=str(t.clt["resumo"]),
         versao=versao(),
-        resposta_literal=t.texto,
+        resposta_literal=t.resposta_da_prova(),
         wamid=t.state.get("message_id"),
         cpf=t.dados["cpf"],
     )
@@ -362,7 +362,9 @@ def _link(t: Turno) -> tuple[str, str] | None:
         if not isinstance(url, str) or not url.startswith("https://"):
             return None
         with abrir_sessao(fabrica) as sessao:
-            codigo = links.criar(sessao, id_proposta=str(t.clt["proposta"]), url=url)
+            codigo = links.criar(
+                sessao, id_proposta=str(t.clt["proposta"]), url=url, teste=t.granatech.teste
+            )
         t.clt["link"] = codigo
     return links.endereco(t.contexto.dominio_publico, str(codigo)), str(codigo)
 

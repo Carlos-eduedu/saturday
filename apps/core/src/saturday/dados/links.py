@@ -9,9 +9,9 @@ from sqlalchemy.orm import Session
 from saturday.dados.modelos import LinkCurto
 
 
-def criar(sessao: Session, *, id_proposta: str, url: str) -> str:
+def criar(sessao: Session, *, id_proposta: str, url: str, teste: bool = False) -> str:
     codigo = secrets.token_urlsafe(6)
-    sessao.add(LinkCurto(codigo=codigo, id_proposta=id_proposta, url=url))
+    sessao.add(LinkCurto(codigo=codigo, id_proposta=id_proposta, url=url, teste=teste))
     sessao.flush()
     return codigo
 

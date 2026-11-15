@@ -202,7 +202,7 @@ def _consentimento(t: Turno) -> dict[str, Any]:
         return t.perguntar("consentimento", "sim")
 
     # Passo `sim`: a última mensagem do agente foi o pedido de autorização.
-    if leitura.consentiu(t.texto):
+    if leitura.consentiu(t.texto) or t.aceite_de_teste():
         return _autorizou(t)
     if leitura.NEGACAO.search(t.texto):
         return t.responder(texto("consentimento_recusado"))
@@ -220,7 +220,7 @@ def _autorizou(t: Turno) -> dict[str, Any]:
         tipo=CONSENTIMENTO_CONSULTA,
         texto_mostrado=str(texto("consentimento")),
         versao=versao(),
-        resposta_literal=t.texto,
+        resposta_literal=t.resposta_da_prova(),
         wamid=t.state.get("message_id"),
         cpf=t.dados["cpf"],
     )
@@ -230,8 +230,8 @@ def _autorizou(t: Turno) -> dict[str, Any]:
 def _consultar(t: Turno, *, recontato: int | None) -> dict[str, Any]:
     """Abre (ou reaproveita) a consulta. Só depois de uma prova gravada."""
 
-    granatech, fabrica = t.contexto.granatech, t.contexto.fabrica
-    if granatech is None or fabrica is None:
+    fabrica = t.contexto.fabrica
+    if t.contexto.granatech is None or fabrica is None:
         return t.handoff("granatech_indisponivel")
     with abrir_sessao(fabrica) as sessao:
         provado = consentimentos.existe_prova(
@@ -243,7 +243,7 @@ def _consultar(t: Turno, *, recontato: int | None) -> dict[str, Any]:
         return t.handoff("sem_consentimento")
 
     try:
-        consulta = granatech.abrir_consulta(
+        consulta = t.granatech.abrir_consulta(
             t.dados["cpf"], t.dados["nome"], t.dados["celular"], conversa_id=t.conversa_id
         )
     except CotaEsgotada:
@@ -254,7 +254,7 @@ def _consultar(t: Turno, *, recontato: int | None) -> dict[str, Any]:
     t.clt.update(etapa="consultando", passo=None, consulta=consulta.id_externo, erros=0)
     if not consulta.reaproveitada:
         try:
-            granatech.assinar_termo(
+            t.granatech.assinar_termo(
                 id_consulta=consulta.id_externo,
                 cpf=t.dados["cpf"],
                 email=t.dados["email"],

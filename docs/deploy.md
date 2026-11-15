@@ -40,6 +40,13 @@ nginx que serve o build do Vite e repassa `/admin` para a API na mesma origem.
   rede interna do stack (sem domínio); exige `EVOLUTION_POSTGRES_SENHA` e as
   `SATURDAY_EVOLUTION_*`. Os volumes `evolution_*` guardam a sessão do
   WhatsApp: perdê-los obriga a ler o QR de novo.
+- Simulador da Granatech para membro testador (opcional, só dev e homolog,
+  [decisão 0020](decisoes/0020-membro-testador.md)): `simulador-granatech` em
+  `COMPOSE_PROFILES` sobe o serviço `granatech-simulador` na rede interna do
+  stack, sem domínio. Defina `SATURDAY_GRANATECH_SIMULADOR_URL=http://granatech-simulador:8200`
+  e uma chave e um token próprios em `SATURDAY_GRANATECH_SIMULADOR_CHAVE` e
+  `SATURDAY_GRANATECH_SIMULADOR_WEBHOOK_TOKEN` (nunca os da Granatech real).
+  Em produção a API recusa subir com a URL do simulador.
 - Domínios pela aba Domains do stack (o Dokploy injeta os labels do Traefik),
   com HTTPS e certificado Let's Encrypt.
 - Com `SATURDAY_GRANATECH_PROPOSTA_ATIVA=true`, `SATURDAY_DOMINIO_PUBLICO` é

@@ -311,10 +311,18 @@ class ConsultaGranatech(Base):
     """
 
     __tablename__ = "consultas_granatech"
-    __table_args__ = (Index("ix_consultas_granatech_cpf", "cpf", "criada_em"),)
+    __table_args__ = (
+        Index("ix_consultas_granatech_cpf", "cpf", "criada_em"),
+        # O simulador e a Granatech real numeram por conta própria (decisão 0020).
+        UniqueConstraint("id_externo", "teste", name="uq_consultas_granatech_externo_teste"),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    id_externo: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    id_externo: Mapped[str] = mapped_column(String(64), nullable=False)
+    # Consulta do simulador, de membro testador: fora da cota e da aba Bancos.
+    teste: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=sa_false()
+    )
     cpf: Mapped[str] = mapped_column(String(11), nullable=False)
     conversa_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("conversas.id", ondelete="CASCADE")
@@ -341,6 +349,9 @@ class PropostaGranatech(Base):
     """
 
     __tablename__ = "propostas_granatech"
+    __table_args__ = (
+        UniqueConstraint("id_externo", "teste", name="uq_propostas_granatech_externo_teste"),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     consulta_id: Mapped[int] = mapped_column(
@@ -349,7 +360,11 @@ class PropostaGranatech(Base):
     conversa_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("conversas.id", ondelete="CASCADE")
     )
-    id_externo: Mapped[str | None] = mapped_column(String(64), unique=True)
+    id_externo: Mapped[str | None] = mapped_column(String(64))
+    # Proposta do simulador, de membro testador (decisão 0020).
+    teste: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=sa_false()
+    )
     estado_envio: Mapped[str] = mapped_column(String(16), nullable=False, default="intencao")
     valor_parcela: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     numero_parcelas: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -405,6 +420,10 @@ class LinkCurto(Base):
     codigo: Mapped[str] = mapped_column(String(16), primary_key=True)
     id_proposta: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     url: Mapped[str] = mapped_column(Text, nullable=False)
+    # Proposta do simulador (decisão 0020): o clique consulta o simulador.
+    teste: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=sa_false()
+    )
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
 
 

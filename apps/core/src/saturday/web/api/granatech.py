@@ -30,6 +30,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["granatech"])
 
 ORIGEM = "granatech"
+# Chave posta no payload do evento que veio do simulador (decisão 0020).
+MARCA_TESTE = "_teste"
 
 
 def token_recebido(request: Request) -> str:
@@ -112,12 +114,16 @@ async def receber(
     fabrica: Annotated[sessionmaker[Session] | None, Depends(get_fabrica)],
 ) -> Response:
     esperado = settings.granatech_webhook_token.get_secret_value()
-    if not esperado:
+    simulador = settings.granatech_simulador_webhook_token.get_secret_value()
+    recebido = token_recebido(request)
+    # O simulador do membro testador (decisão 0020) tem token próprio: o evento
+    # dele vai marcado e o worker o aplica só às linhas de teste.
+    teste = bool(simulador) and hmac.compare_digest(recebido.encode(), simulador.encode())
+    if not teste and not esperado:
         # Token vazio nunca vale como senha: recusa tudo até ser configurado.
         raise HTTPException(status_code=503, detail="webhook não configurado")
 
-    recebido = token_recebido(request)
-    if not hmac.compare_digest(recebido.encode(), esperado.encode()):
+    if not teste and not hmac.compare_digest(recebido.encode(), esperado.encode()):
         logger.warning(
             "granatech_token_invalido",
             extra=diagnostico(request, await request.body(), esperado),
@@ -130,6 +136,8 @@ async def receber(
         raise HTTPException(status_code=400, detail="corpo inválido") from None
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="corpo inválido")
+    if teste:
+        payload = {**payload, MARCA_TESTE: True}
 
     if fabrica is not None:
         with abrir_sessao(fabrica) as sessao:

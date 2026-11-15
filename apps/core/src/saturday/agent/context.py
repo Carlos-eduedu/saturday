@@ -29,6 +29,9 @@ class AgentContext:
     llm: LLMClient
     anexos: AnexosClient
     granatech: ClienteGranatech | None = None
+    # Cliente do simulador para conversa de membro testador (decisão 0020);
+    # só com `SATURDAY_GRANATECH_SIMULADOR_URL` (dev e homolog).
+    granatech_teste: ClienteGranatech | None = None
     brasilapi: BrasilAPI | None = None
     fabrica: sessionmaker[Session] | None = None
     # Domínio dos links curtos da biometria (`SATURDAY_DOMINIO_PUBLICO`).

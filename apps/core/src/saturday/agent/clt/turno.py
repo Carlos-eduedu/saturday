@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 from typing import Any
@@ -16,6 +16,8 @@ from saturday.agent.clt.mensagens import chave_de, texto
 from saturday.agent.context import AgentContext
 from saturday.agent.state import AgentState
 from saturday.bancos.granatech.cliente import ClienteGranatech
+from saturday.dados import repositorios
+from saturday.dados.sessao import sessao as abrir_sessao
 
 logger = logging.getLogger("saturday.agent.clt.nos")
 
@@ -44,6 +46,8 @@ PERGUNTAS = {
     "titular": "confirmar_titular",
 }
 ERROS_ATE_HANDOFF = 2
+# Marca da prova de consentimento de membro testador (decisão 0020).
+PROVA_DE_TESTE = "[teste de membro]"
 
 
 # ---------------------------------------------------------------- formatação
@@ -71,6 +75,8 @@ class Turno:
     hoje: date
     # Opt-in ou opt-out de marketing decidido neste turno (o serviço grava).
     marketing: str | None = None
+    # Lido uma vez por turno: a conversa é de membro testador (decisão 0020)?
+    _membro: bool | None = field(default=None, repr=False)
 
     @property
     def dados(self) -> dict[str, Any]:
@@ -78,9 +84,47 @@ class Turno:
         return dados
 
     @property
+    def teste(self) -> bool:
+        """Conversa de membro testador com o simulador ligado (decisão 0020).
+
+        Só então a Granatech é a simulada e o SIM vira aceite de teste. Sem o
+        simulador (produção), o membro segue com a Granatech real e o SIM.
+        """
+
+        if self.contexto.granatech_teste is None or self.contexto.fabrica is None:
+            return False
+        if self._membro is None:
+            with abrir_sessao(self.contexto.fabrica) as sessao:
+                telefone = self.state.get("telefone")
+                self._membro = repositorios.testador(sessao, telefone) is not None
+        return self._membro
+
+    def aceite_de_teste(self) -> bool:
+        """Exceção à regra 3 (decisão 0020): só com a Granatech simulada.
+
+        Na conversa de membro testador, a resposta ao pedido de autorização ou
+        ao resumo da proposta vale como aceite, menos negação, pergunta ou
+        pedido de mudança. Nada chega à Granatech real.
+        """
+
+        return (
+            self.teste
+            and not leitura.NEGACAO.search(self.texto)
+            and not leitura.eh_pergunta(self.texto)
+            and not leitura.pedido_de_mudanca(self.texto)
+        )
+
+    def resposta_da_prova(self) -> str:
+        """O que a prova do consentimento guarda; a de teste vai marcada."""
+
+        return f"{PROVA_DE_TESTE} {self.texto}" if self.teste else self.texto
+
+    @property
     def granatech(self) -> ClienteGranatech:
         if self.contexto.granatech is None:
             raise RuntimeError("ramo CLT sem cliente da Granatech")
+        if self.teste and self.contexto.granatech_teste is not None:
+            return self.contexto.granatech_teste
         return self.contexto.granatech
 
     @property

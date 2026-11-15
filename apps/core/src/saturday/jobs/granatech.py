@@ -45,10 +45,14 @@ def aplicar(
     servico: AgentService | None = None,
 ) -> None:
     tipo = str(payload.get("tipo") or "").lower()
+    # Evento do simulador (decisão 0020): só linhas de teste, com o cliente dele.
+    teste = payload.get("_teste") is True
+    if teste:
+        cliente = servico.context.granatech_teste if servico is not None else None
     if tipo == "consulta":
-        _consulta(fabrica, cliente, payload, servico)
+        _consulta(fabrica, cliente, payload, servico, teste=teste)
     elif tipo == "proposta":
-        _proposta(fabrica, payload, servico)
+        _proposta(fabrica, payload, servico, teste=teste)
     else:
         with abrir_sessao(fabrica) as sessao:
             _alertar(sessao, None, motivo="tipo_desconhecido", tipo=tipo or None)
@@ -69,6 +73,8 @@ def _consulta(
     cliente: ClienteGranatech | None,
     payload: dict[str, Any],
     servico: AgentService | None = None,
+    *,
+    teste: bool = False,
 ) -> None:
     # A especificação diz `id_solicitacao`; a api-dev manda `id_consulta`
     # (webhook recebido no dev em 2026-11-13). Vale o que vier.
@@ -78,7 +84,7 @@ def _consulta(
     with abrir_sessao(fabrica) as sessao:
         linha = sessao.scalars(
             select(ConsultaGranatech)
-            .where(ConsultaGranatech.id_externo == id_externo)
+            .where(ConsultaGranatech.id_externo == id_externo, ConsultaGranatech.teste.is_(teste))
             .with_for_update()
         ).first()
         if linha is None:
@@ -138,6 +144,8 @@ def _proposta(
     fabrica: sessionmaker[Session],
     payload: dict[str, Any],
     servico: AgentService | None = None,
+    *,
+    teste: bool = False,
 ) -> None:
     id_externo = str(payload.get("id_proposta") or "")
     novo, notificacao = ordem.ler_evento_proposta(payload)
@@ -145,7 +153,7 @@ def _proposta(
     with abrir_sessao(fabrica) as sessao:
         linha = sessao.scalars(
             select(PropostaGranatech)
-            .where(PropostaGranatech.id_externo == id_externo)
+            .where(PropostaGranatech.id_externo == id_externo, PropostaGranatech.teste.is_(teste))
             .with_for_update()
         ).first()
         if linha is None:

@@ -93,6 +93,11 @@ class Settings(BaseSettings):
     granatech_chave_api: SecretStr = SecretStr("")
     granatech_webhook_token: SecretStr = SecretStr("")
     granatech_ativo: bool = False
+    # Simulador da Granatech para conversas de membro testador (decisão 0020):
+    # só dev e homolog. Vazio desliga; a conversa de membro usa a Granatech real.
+    granatech_simulador_url: str = ""
+    granatech_simulador_chave: SecretStr = SecretStr("")
+    granatech_simulador_webhook_token: SecretStr = SecretStr("")
     granatech_proposta_ativa: bool = False
     # TODO(granatech): corpo do PATCH de dados bancários; até lá, desligado.
     granatech_dados_bancarios_ativo: bool = False
@@ -140,6 +145,13 @@ class Settings(BaseSettings):
 
     def validar_para_subir(self) -> None:
         """Interrompe a subida quando falta configuração obrigatória."""
+
+        # Antes de tudo: o simulador do membro testador nunca roda em produção
+        # (decisão 0020), mesmo com o resto da configuração incompleto.
+        if self.granatech_simulador_url and self.environment == "prod":
+            raise RuntimeError(
+                "SATURDAY_GRANATECH_SIMULADOR_URL não vale em produção (decisão 0020)."
+            )
 
         if self.environment != "pytest":
             obrigatorias = {
@@ -197,6 +209,22 @@ class Settings(BaseSettings):
             if faltando:
                 raise RuntimeError(
                     "SATURDAY_GRANATECH_ATIVO=true exige " + ", ".join(faltando) + "."
+                )
+
+        if self.granatech_simulador_url:
+            faltando = [
+                nome
+                for nome, valor in {
+                    "SATURDAY_GRANATECH_SIMULADOR_CHAVE": self.granatech_simulador_chave,
+                    "SATURDAY_GRANATECH_SIMULADOR_WEBHOOK_TOKEN": (
+                        self.granatech_simulador_webhook_token
+                    ),
+                }.items()
+                if not valor.get_secret_value()
+            ]
+            if faltando and self.environment != "pytest":
+                raise RuntimeError(
+                    "SATURDAY_GRANATECH_SIMULADOR_URL exige " + ", ".join(faltando) + "."
                 )
 
         if self.evolution_ativo and self.environment != "pytest":

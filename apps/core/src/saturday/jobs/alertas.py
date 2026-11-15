@@ -88,6 +88,7 @@ def _consultas_paradas(sessao: Session) -> tuple[int, list[str]]:
     consultas = sessao.scalars(
         select(ConsultaGranatech).where(
             ConsultaGranatech.status.not_in(finais),
+            ConsultaGranatech.teste.is_(False),
             ConsultaGranatech.atualizada_em < func.now() - CONSULTA_PARADA,
             ~avisada,
         )

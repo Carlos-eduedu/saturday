@@ -202,7 +202,13 @@ def listar_consultas(
     cpf: str | None = None,
 ) -> list[dict[str, Any]]:
     inicio, fim = _periodo(desde, ate)
-    filtro = select(ConsultaGranatech).order_by(ConsultaGranatech.criada_em.desc()).limit(LIMITE)
+    # As de membro testador, do simulador (decisão 0020), ficam fora da aba Bancos.
+    filtro = (
+        select(ConsultaGranatech)
+        .where(ConsultaGranatech.teste.is_(False))
+        .order_by(ConsultaGranatech.criada_em.desc())
+        .limit(LIMITE)
+    )
     if status:
         filtro = filtro.where(ConsultaGranatech.status == status)
     if inicio:
@@ -241,6 +247,7 @@ def listar_propostas(
     filtro = (
         select(PropostaGranatech, ConsultaGranatech.cpf)
         .join(ConsultaGranatech, ConsultaGranatech.id == PropostaGranatech.consulta_id)
+        .where(PropostaGranatech.teste.is_(False))
         .order_by(PropostaGranatech.intencao_em.desc())
         .limit(LIMITE)
     )

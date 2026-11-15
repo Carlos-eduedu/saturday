@@ -34,10 +34,13 @@ def redirecionar(
         link = links.buscar(sessao, codigo)
         if link is None:
             raise HTTPException(status_code=404, detail="link não encontrado")
-        id_proposta, guardada = link.id_proposta, link.url
+        id_proposta, guardada, teste = link.id_proposta, link.url, link.teste
 
     destino = guardada
-    granatech = get_agent_service(request).context.granatech
+    contexto = get_agent_service(request).context
+    # Proposta do simulador só se resolve no simulador: o mesmo id pode existir
+    # na Granatech real (decisão 0020).
+    granatech = contexto.granatech_teste if teste else contexto.granatech
     if granatech is not None:
         try:
             vigente = granatech.status_proposta(id_proposta).get("url_seguranca_identidade")

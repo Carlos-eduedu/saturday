@@ -54,6 +54,11 @@ COPY apps/core/migrations ./migrations
 # partir do diretório de trabalho.
 COPY conhecimento ./conhecimento
 
+# Simulador da Granatech, só para conversa de membro testador (decisão 0020):
+# um arquivo, rodado pelo serviço `granatech-simulador` do compose (profile
+# próprio, dev e homolog). Na API e no worker ele fica parado.
+COPY simuladores/granatech/app.py ./simuladores/granatech/app.py
+
 RUN chown -R saturday:saturday /app
 
 ENV PATH="/app/.venv/bin:$PATH" \
