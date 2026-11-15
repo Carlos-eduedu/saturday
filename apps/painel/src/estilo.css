@@ -201,7 +201,7 @@ time, small { font-size: 0.8rem; color: var(--suave); }
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--borda);
 }
-.marca-topo { display: flex; align-items: center; gap: 0.75rem; flex: 1; min-width: 0; }
+.marca-topo { display: flex; align-items: center; gap: 0.75rem; flex: 1; width: 100%; min-width: 0; }
 .staggered-menu-header .sm-logo { flex: 1; min-width: 0; }
 .nav-topo { display: flex; gap: 0.25rem; margin-left: 1rem; }
 .nav-topo a {
@@ -219,34 +219,27 @@ time, small { font-size: 0.8rem; color: var(--suave); }
 .nav-topo a[aria-current="page"] { background: var(--destaque-suave); color: var(--destaque); }
 .conta-topo { margin-left: auto; display: flex; align-items: center; gap: 1rem; }
 /* Desktop: tudo no topo, sem o menu; celular: só marca, selo e o botão Menu. */
-.selo-alertas, .conta-topo .cota { white-space: nowrap; }
+.conta-topo .cota { white-space: nowrap; }
 @media (min-width: 1024px) {
   .sm-toggle, .staggered-menu-panel, .sm-prelayers { display: none; }
 }
 @media (max-width: 1023px) {
   .nav-topo, .conta-topo { display: none; }
 }
-/* O e-mail é o que sai primeiro quando falta espaço; ele continua no menu. */
-@media (max-width: 1279px) {
-  .conta-topo .quem { display: none; }
-}
-/* O selo fica com 32 px de altura no topo; a área de toque estende até 44. */
-.selo-alertas {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  min-height: 32px;
-  padding: 0 0.75rem;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--handoff) 14%, transparent);
-  color: var(--handoff);
-  font-size: 0.85rem;
-  font-weight: 600;
-  text-decoration: none;
-  transition: transform 120ms ease, background-color 120ms ease;
-}
-.selo-alertas::after { content: ""; position: absolute; inset: calc((32px - var(--alvo)) / 2) 0; }
-.selo-alertas:hover { transform: translateY(-1px); background: color-mix(in srgb, var(--handoff) 22%, transparent); }
+/* Conta: o ícone do usuário com a contagem de alertas; abre alertas e sair.
+   No celular fica ao lado do Menu, então os alertas seguem à vista. */
+.menu-conta { position: relative; margin-left: auto; flex: none; }
+@media (min-width: 1024px) { .conta-topo + .menu-conta { margin-left: 0; } }
+.menu-conta__botao { position: relative; display: grid; place-items: center; width: var(--alvo); height: var(--alvo); padding: 0; border: none; border-radius: 999px; background: none; box-shadow: none; }
+.menu-conta__botao:hover:not(:disabled) { transform: none; box-shadow: none; background: var(--superficie-2); }
+.menu-conta__avatar { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 999px; background: var(--destaque-suave); color: var(--destaque); font-size: 0.85rem; font-weight: 600; letter-spacing: 0.02em; }
+.menu-conta__selo { position: absolute; top: 2px; right: 0; min-width: 18px; height: 18px; padding: 0 5px; display: grid; place-items: center; border-radius: 999px; background: var(--handoff); color: var(--superficie); font-size: 0.7rem; font-weight: 700; font-variant-numeric: tabular-nums; box-shadow: 0 0 0 2px var(--superficie); }
+.menu-conta__painel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 40; min-width: 14rem; display: flex; flex-direction: column; padding: 0.4rem; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio-l); box-shadow: var(--sombra-alta); }
+.menu-conta__quem { display: flex; flex-direction: column; gap: 0.1rem; margin: 0; padding: 0.5rem 0.6rem 0.6rem; border-bottom: 1px solid var(--borda); margin-bottom: 0.3rem; }
+.menu-conta__quem span { font-size: 0.8rem; color: var(--suave); }
+.menu-conta__item { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; min-height: var(--alvo); padding: 0 0.6rem; border: none; border-radius: var(--raio-m); background: none; box-shadow: none; color: var(--texto); font: inherit; text-decoration: none; text-align: left; }
+.menu-conta__item:hover:not(:disabled) { transform: none; box-shadow: none; background: var(--superficie-2); }
+.menu-conta__contagem { min-width: 1.5rem; padding: 0 0.4rem; border-radius: 999px; background: color-mix(in srgb, var(--handoff) 14%, transparent); color: var(--handoff); font-size: 0.8rem; font-weight: 600; text-align: center; font-variant-numeric: tabular-nums; }
 .marca {
   font-family: var(--fonte-titulo);
   font-weight: 600;

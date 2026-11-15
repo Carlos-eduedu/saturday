@@ -3,6 +3,7 @@ import { Link, Navigate, Route, Routes, useLocation } from "react-router";
 import { api, type Cota, type Eu, ErroApi, guardarCsrf, SESSAO_EXPIRADA } from "./api";
 import { ConfirmarProvider } from "./componentes/Confirmar";
 import { Falha } from "./componentes/Falha";
+import { MenuConta } from "./componentes/MenuConta";
 import { Alertas } from "./paginas/Alertas";
 import { Canais } from "./paginas/Canais";
 import { Agente } from "./paginas/Agente";
@@ -68,45 +69,20 @@ function Logado({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
   // Menu do celular aberto: a página atrás sai do Tab e do leitor de tela.
   const [menuAberto, setMenuAberto] = useState(false);
   const emConversas = pathname === "/" || pathname.startsWith("/conversas");
+  const em = (base: string) => pathname === base || pathname.startsWith(`${base}/`);
   const itens = [
     { label: "Conversas", ariaLabel: "Ir para as conversas", link: "/", ativo: emConversas },
-    {
-      label: "Alertas",
-      ariaLabel: "Ir para os alertas",
-      link: "/alertas",
-      ativo: pathname === "/alertas",
-    },
-    {
-      label: "Granatech",
-      ariaLabel: "Ir para a Granatech",
-      link: "/granatech",
-      ativo: pathname === "/granatech",
-    },
-    {
-      label: "Agente",
-      ariaLabel: "Ir para o agente",
-      link: "/agente",
-      ativo: pathname === "/agente",
-    },
+    { label: "Bancos", ariaLabel: "Ir para os bancos", link: "/bancos", ativo: em("/bancos") },
+    { label: "Agente", ariaLabel: "Ir para o agente", link: "/agente", ativo: em("/agente") },
     ...(eu.perfil === "gestor"
       ? [
+          { label: "Canais", ariaLabel: "Ir para os canais", link: "/canais", ativo: em("/canais") },
+          { label: "Membros", ariaLabel: "Ir para os membros", link: "/membros", ativo: em("/membros") },
           {
-            label: "Canais",
-            ariaLabel: "Ir para os canais",
-            link: "/canais",
-            ativo: pathname === "/canais",
-          },
-          {
-            label: "Usuários",
-            ariaLabel: "Ir para os usuários",
-            link: "/usuarios",
-            ativo: pathname === "/usuarios",
-          },
-          {
-            label: "Custos",
-            ariaLabel: "Ir para os custos",
-            link: "/custos",
-            ativo: pathname === "/custos",
+            label: "Operação",
+            ariaLabel: "Ir para a operação",
+            link: "/operacao",
+            ativo: em("/operacao"),
           },
         ]
       : []),
@@ -136,7 +112,6 @@ function Logado({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
             <Link to="/" className="marca">
               Saturday
             </Link>
-            <SeloAlertas />
             {/* Desktop: navegação e conta à vista; o menu animado fica só no celular. */}
             <nav className="nav-topo" aria-label="Principal">
               {itens.map((it) => (
@@ -147,11 +122,8 @@ function Logado({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
             </nav>
             <div className="conta-topo">
               <ContadorCota />
-              <span className="quem">{eu.nome}</span>
-              <button type="button" onClick={aoSair}>
-                Sair
-              </button>
             </div>
+            <MenuConta eu={eu} aoSair={aoSair} />
           </div>
         }
         rodape={
@@ -172,11 +144,15 @@ function Logado({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
           <Route path="/" element={<Caixa eu={eu} />} />
           <Route path="/conversas/:id" element={<Caixa eu={eu} />} />
           <Route path="/alertas" element={<Alertas />} />
-          <Route path="/granatech" element={<Granatech eu={eu} />} />
+          <Route path="/bancos" element={<Granatech eu={eu} />} />
           <Route path="/agente" element={<Agente />} />
           {eu.perfil === "gestor" && <Route path="/canais" element={<Canais />} />}
-          {eu.perfil === "gestor" && <Route path="/usuarios" element={<Usuarios eu={eu} />} />}
-          {eu.perfil === "gestor" && <Route path="/custos" element={<Custos />} />}
+          {eu.perfil === "gestor" && <Route path="/membros" element={<Usuarios eu={eu} />} />}
+          {eu.perfil === "gestor" && <Route path="/operacao" element={<Custos />} />}
+          {/* Endereços antigos, de antes da barra nova: links salvos continuam valendo. */}
+          <Route path="/granatech" element={<Navigate to="/bancos" replace />} />
+          <Route path="/usuarios" element={<Navigate to="/membros" replace />} />
+          <Route path="/custos" element={<Navigate to="/operacao" replace />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
         </ConfirmarProvider>
@@ -204,30 +180,5 @@ function ContadorCota() {
     <span className={alerta ? "cota cota-alerta" : "cota"} title="Consultas Granatech">
       Cota: {cota.dia.usadas}/{cota.dia.teto} hoje · {cota.mes.usadas}/{cota.mes.teto} no mês
     </span>
-  );
-}
-
-// Com a navegação dentro do menu, os alertas abertos ficam à vista no topo.
-function SeloAlertas() {
-  const [total, setTotal] = useState(0);
-  const carregar = useCallback(() => {
-    api
-      .alertas()
-      .then((lista) => setTotal(lista.length))
-      .catch(() => undefined);
-  }, []);
-  useEffect(carregar, [carregar]);
-  useAvisos(
-    useCallback(
-      (aviso) => (aviso.tipo === "alerta" || aviso.tipo === "reconectado") && carregar(),
-      [carregar],
-    ),
-  );
-
-  if (total === 0) return null;
-  return (
-    <Link to="/alertas" className="selo-alertas">
-      {total} {total === 1 ? "alerta" : "alertas"}
-    </Link>
   );
 }
