@@ -52,6 +52,8 @@ Editor = Annotated[UsuarioLogado, Depends(editor_do_agente)]
 GestorCsrf = Annotated[UsuarioLogado, Depends(gestor_com_csrf)]
 
 CATALOGO_URL = "https://openrouter.ai/api/v1/models"
+# Os modelos de embeddings não vêm na lista geral: têm rota própria.
+EMBEDDINGS_URL = "https://openrouter.ai/api/v1/embeddings/models"
 CATALOGO_TIMEOUT_S = 15.0
 TESTE_TIMEOUT_S = 30.0
 LATENCIA_DIAS = 7
@@ -167,6 +169,7 @@ def modelos(request: Request, usuario: Logado, fabrica: Fabrica) -> dict[str, An
                     "no": p.no,
                     "do_catalogo": p.do_catalogo,
                     "exige_entrada": p.exige_entrada,
+                    "saida": p.saida,
                     "modelo": salvos.get(nome) or ambiente[nome],
                     "origem": "versao" if salvos.get(nome) else "ambiente",
                     "variavel": f"SATURDAY_{p.atributo.upper()}",
@@ -195,18 +198,21 @@ def atualizar_catalogo(request: Request, usuario: Editor, fabrica: Fabrica) -> d
     """Lê o catálogo público da OpenRouter e guarda com a data da leitura."""
 
     http: httpx.Client = request.app.state.http
-    try:
-        resposta = http.get(CATALOGO_URL, timeout=CATALOGO_TIMEOUT_S)
-        resposta.raise_for_status()
-        dados = resposta.json().get("data")
-    except (httpx.HTTPError, ValueError, AttributeError) as exc:
-        raise HTTPException(
-            status_code=502, detail=f"OpenRouter não respondeu ({type(exc).__name__})"
-        ) from exc
-    if not isinstance(dados, list):
-        raise HTTPException(status_code=502, detail="OpenRouter devolveu um catálogo inválido")
-    lista = [m for m in (_normalizar(b) for b in dados if isinstance(b, dict)) if m]
-    lista.sort(key=lambda m: m["id"])
+    dados: list[Any] = []
+    for url in (CATALOGO_URL, EMBEDDINGS_URL):
+        try:
+            resposta = http.get(url, timeout=CATALOGO_TIMEOUT_S)
+            resposta.raise_for_status()
+            parte = resposta.json().get("data")
+        except (httpx.HTTPError, ValueError, AttributeError) as exc:
+            raise HTTPException(
+                status_code=502, detail=f"OpenRouter não respondeu ({type(exc).__name__})"
+            ) from exc
+        if not isinstance(parte, list):
+            raise HTTPException(status_code=502, detail="OpenRouter devolveu um catálogo inválido")
+        dados.extend(parte)
+    por_id = {m["id"]: m for m in (_normalizar(b) for b in dados if isinstance(b, dict)) if m}
+    lista = sorted(por_id.values(), key=lambda m: m["id"])
 
     with abrir_sessao(fabrica) as sessao:
         linha = sessao.get(CatalogoModelos, 1)
@@ -346,11 +352,17 @@ def _validar(modelos: dict[str, str], catalogo: CatalogoModelos | None) -> dict[
             raise HTTPException(
                 status_code=422, detail=f"{papel}: {valor} não está no catálogo da OpenRouter"
             )
+        if regra.saida not in info["saida"]:
+            raise HTTPException(
+                status_code=422, detail=f"{papel}: {valor} não serve para esta etapa"
+            )
         if regra.exige_entrada and regra.exige_entrada not in info["entrada"]:
             raise HTTPException(
                 status_code=422, detail=f"{papel}: {valor} não aceita {regra.exige_entrada}"
             )
-        if info["parametros"] and not JSON_ESTRUTURADO & set(info["parametros"]):
+        # Resposta em JSON só pesa para quem conversa; embeddings devolvem vetores.
+        conversa = regra.saida == "text"
+        if conversa and info["parametros"] and not JSON_ESTRUTURADO & set(info["parametros"]):
             raise HTTPException(
                 status_code=422, detail=f"{papel}: {valor} não aceita resposta em JSON"
             )

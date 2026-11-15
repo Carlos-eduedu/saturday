@@ -306,6 +306,8 @@ export interface ModelosAgente {
     no: string | null;
     do_catalogo: boolean;
     exige_entrada: string | null;
+    // "text" (conversa) ou "embeddings": separa as listas do catálogo por etapa.
+    saida: string;
     modelo: string;
     origem: "versao" | "ambiente";
     variavel: string;

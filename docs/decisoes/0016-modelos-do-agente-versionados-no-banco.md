@@ -33,7 +33,16 @@ testar antes de salvar, manter histórico de versões e controlar quem edita.
   OpenRouter: é a medida nas nossas chamadas dos últimos 7 dias (cada chamada
   passa a registrar o `modelo` na trilha do turno).
 - Jev (OpenRouter Decisions) e transcrição (provedor compatível com a OpenAI)
-  ficam fora do catálogo: id digitado, sem preço na tela.
+  ficam fora do catálogo: id digitado, sem preço na tela. A OpenRouter não
+  publica as versões do Jev (o catálogo só traz `typesafe/jev-router`), então
+  não há lista para ele.
+- Atualização de 2026-11-15: o catálogo lê também
+  `GET https://openrouter.ai/api/v1/embeddings/models`, e a etapa de embeddings
+  passa a escolher nele. Cada etapa declara a saída que precisa (`text` ou
+  `embeddings`); a lista de cada etapa e a validação ao salvar só aceitam
+  modelos dessa saída (resposta em JSON só pesa para quem conversa). O painel
+  deixou a lista geral e a comparação lado a lado: cada etapa abre só a lista
+  dos modelos que servem para ela.
 - "Testar" faz uma chamada real e paga, só para gestor, com o mesmo prompt do
   atendimento (classificação e FAQ). A auditoria guarda etapa, modelo e erro,
   nunca o texto digitado nem a resposta.

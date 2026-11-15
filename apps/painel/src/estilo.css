@@ -1137,10 +1137,10 @@ main:has(.historico) { padding-bottom: 0; }
 .estado-no__mudou { white-space: nowrap; margin-left: 0.4rem; font-size: 0.72rem; font-weight: 600; color: var(--destaque); }
 .execucoes { display: flex; flex-direction: column; gap: 0.75rem; }
 .modelos-agente, .versoes { display: flex; flex-direction: column; gap: 1rem; padding-bottom: 5rem; }
-.faixa-versao, .papel-modelo, .catalogo { display: flex; flex-direction: column; gap: 0.6rem; padding: 1.1rem 1.25rem; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio-l); }
-.faixa-versao p, .papel-modelo p, .catalogo p { margin: 0; }
+.faixa-versao, .papel-modelo { display: flex; flex-direction: column; gap: 0.6rem; padding: 1.1rem 1.25rem; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio-l); }
+.faixa-versao p, .papel-modelo p { margin: 0; }
 .faixa-versao > button { align-self: flex-start; }
-.faixa-versao code, .catalogo code { font-family: var(--fonte-mono); font-size: 0.78rem; overflow-wrap: anywhere; }
+.faixa-versao code { font-family: var(--fonte-mono); font-size: 0.78rem; overflow-wrap: anywhere; }
 .papeis-modelo { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: 1rem; }
 .papel-modelo.alterado { border-color: var(--destaque); box-shadow: 0 0 0 3px var(--destaque-suave); }
 .papel-modelo header h3 { margin: 0; font-size: 1.05rem; }
@@ -1150,18 +1150,27 @@ main:has(.historico) { padding-bottom: 0; }
 .ficha-modelo { display: grid; grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr)); gap: 0.5rem 1rem; margin: 0; }
 .ficha-modelo dt { font-size: 0.75rem; color: var(--suave); }
 .ficha-modelo dd { margin: 0.1rem 0 0; font-variant-numeric: tabular-nums; font-size: 0.9rem; }
-.catalogo h2 { margin: 0; font-size: 1.15rem; }
-.catalogo .contagem { color: var(--suave); font-weight: 400; }
-.catalogo .opcao { flex-direction: row; align-items: center; gap: 0.5rem; min-height: var(--alvo); color: var(--texto); }
-/* Tabela larga rola dentro do quadro no celular, nunca a página. */
-.tabela-rolavel { overflow-x: auto; }
-.tabela-rolavel table { width: 100%; border-collapse: collapse; font-size: 0.875rem; font-variant-numeric: tabular-nums; }
-.tabela-rolavel th, .tabela-rolavel td { padding: 0.45rem 0.5rem; border-bottom: 1px solid var(--borda); text-align: left; vertical-align: top; }
-.tabela-rolavel thead th { font-size: 0.75rem; font-weight: 500; color: var(--suave); }
-.tabela-rolavel .num { text-align: right; white-space: nowrap; }
-.tabela-catalogo td code { display: block; color: var(--suave); }
-.comparar h3 { margin: 0 0 0.5rem; font-size: 0.95rem; }
-.comparar thead th button { display: block; font-size: 0.75rem; }
+/* O modelo em uso no cartão da etapa; a lista completa abre em diálogo. */
+.modelo-escolhido { display: flex; flex-direction: column; align-items: flex-start; gap: 0.2rem; }
+.modelo-escolhido .rotulo-campo { font-size: 0.8rem; color: var(--suave); }
+.modelo-escolhido code { font-family: var(--fonte-mono); font-size: 0.78rem; color: var(--suave); overflow-wrap: anywhere; }
+.modelo-escolhido button { margin-top: 0.35rem; }
+.modelo-escolhido .contagem { color: var(--suave); font-weight: 400; }
+/* Lista por etapa: duas linhas curtas por modelo, nunca uma tabela larga. */
+.lista-modelos__filtros { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.lista-modelos__filtros label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.8rem; color: var(--suave); flex: 1 1 12rem; }
+.lista-modelos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border-top: 1px solid var(--borda); }
+.lista-modelos li { border-bottom: 1px solid var(--borda); }
+.lista-modelos li > button, .lista-modelos li > div { display: flex; flex-direction: column; align-items: flex-start; gap: 0.15rem; width: 100%; padding: 0.6rem 0.5rem; text-align: left; font: inherit; color: var(--texto); background: none; border: none; border-radius: var(--raio-m); box-shadow: none; }
+.lista-modelos li > button:hover:not(:disabled) { background: var(--superficie-2); transform: none; box-shadow: none; }
+.lista-modelos li.atual > button, .lista-modelos li.atual > div { background: var(--destaque-suave); }
+.lista-modelos__topo { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem; }
+.lista-modelos__topo strong { font-weight: 600; }
+.lista-modelos code { font-family: var(--fonte-mono); font-size: 0.75rem; color: var(--suave); overflow-wrap: anywhere; }
+.lista-modelos__dados { font-size: 0.82rem; color: var(--suave); font-variant-numeric: tabular-nums; }
+.lista-modelos .selo { font-size: 0.72rem; font-weight: 600; color: var(--ia); }
+.lista-modelos .selo.escolhido { color: var(--destaque); }
+.lista-modelos__mais { align-self: flex-start; }
 .barra-rascunho { position: sticky; bottom: max(0.75rem, env(safe-area-inset-bottom)); z-index: 6; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; padding: 0.6rem 0.75rem 0.6rem 1rem; background: var(--texto); color: var(--fundo); border-radius: var(--raio-l); box-shadow: var(--sombra-alta); }
 .barra-rascunho span { flex: 1; min-width: 10rem; font-weight: 600; }
 .barra-rascunho button:not(.principal) { background: transparent; color: inherit; border-color: color-mix(in srgb, var(--fundo) 40%, transparent); }

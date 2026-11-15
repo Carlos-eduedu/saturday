@@ -37,6 +37,9 @@ class Papel:
     do_catalogo: bool
     # Modalidade de entrada que o modelo precisa aceitar, além de texto.
     exige_entrada: str | None = None
+    # O que o modelo devolve: texto (chat) ou vetores (embeddings). Separa as
+    # listas do catálogo por finalidade.
+    saida: str = "text"
 
 
 PAPEIS: dict[str, Papel] = {
@@ -46,7 +49,11 @@ PAPEIS: dict[str, Papel] = {
     "transcricao": Papel("Transcrição de áudio", None, "transcricao_modelo", False),
     # Trocar o modelo de embeddings manda reindexar todas as fontes.
     "embeddings": Papel(
-        "Busca na base de conhecimento (embeddings)", "generate_answer", "embeddings_model", False
+        "Busca na base de conhecimento (embeddings)",
+        "generate_answer",
+        "embeddings_model",
+        True,
+        saida="embeddings",
     ),
 }
 

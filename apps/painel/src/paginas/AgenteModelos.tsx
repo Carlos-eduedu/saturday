@@ -23,13 +23,16 @@ const mensagem = (e: unknown) => (e instanceof ErroApi ? e.message : "falha ao c
 const dataHora = (iso: string) =>
   new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 const porMilhao = (v: number | null) => (v === null ? "—" : `${dolar(v)}/M`);
-const LIMITE_LINHAS = 80;
-const MAX_COMPARAR = 3;
+const LIMITE_LINHAS = 60;
 const JSON_ESTRUTURADO = ["response_format", "structured_outputs"];
 
-// O modelo serve para a etapa? Mesma regra da API (`agente_modelos._validar`).
+// O modelo serve para a etapa? Mesma regra da API (`agente_modelos._validar`):
+// a saída certa (texto ou embeddings), a entrada exigida e, para quem conversa,
+// resposta em JSON.
 function serve(m: ModeloDoCatalogo, papel: Papel): boolean {
+  if (!m.saida.includes(papel.saida)) return false;
   if (papel.exige_entrada && !m.entrada.includes(papel.exige_entrada)) return false;
+  if (papel.saida !== "text") return true;
   return m.parametros.length === 0 || m.parametros.some((p) => JSON_ESTRUTURADO.includes(p));
 }
 
@@ -74,7 +77,6 @@ export function AbaModelos() {
   const [rascunho, setRascunho] = useState<Rascunho>({});
   const [confirmar, setConfirmar] = useState(false);
   const [testando, setTestando] = useState<{ papel: Papel; modelo: string } | null>(null);
-  const [comparar, setComparar] = useState<string[]>([]);
   const [atualizando, setAtualizando] = useState(false);
   const [aviso, setAviso] = useState("");
 
@@ -162,13 +164,6 @@ export function AbaModelos() {
         ))}
       </div>
 
-      <Catalogo
-        dados={dados}
-        comparar={comparar}
-        mudarComparar={setComparar}
-        atualizar={dados.pode_editar ? atualizarCatalogo : null}
-      />
-
       {mudancas.length > 0 && (
         <div className="barra-rascunho" role="region" aria-label="Alterações não salvas">
           <span>
@@ -233,6 +228,7 @@ function CartaoPapel({
     [dados.catalogo.modelos, papel],
   );
   const id = `modelo-${papel.papel}`;
+  const [lista, setLista] = useState(false);
   const latencia = dados.latencia[valor];
   const usaCatalogo = papel.do_catalogo && opcoes.length > 0;
   const provedor =
@@ -240,9 +236,7 @@ function CartaoPapel({
       ? "OpenRouter Decisions"
       : papel.papel === "transcricao"
         ? dados.transcricao_provedor
-        : papel.papel === "embeddings"
-          ? "OpenRouter Embeddings; trocar manda reindexar todas as fontes"
-          : null;
+        : null;
 
   return (
     <section className={valor !== papel.modelo ? "papel-modelo alterado" : "papel-modelo"}>
@@ -256,28 +250,20 @@ function CartaoPapel({
             : `do ambiente (${papel.variavel})`}
         </p>
       </header>
-      {/* A lista do catálogo leva o nome pelo `ariaLabel`; o campo de texto, por aqui. */}
-      <label htmlFor={usaCatalogo ? undefined : id}>Modelo</label>
       {usaCatalogo ? (
-        <GlideSelect
-          className="largo"
-          ariaLabel={`Modelo: ${papel.rotulo}`}
-          value={valor}
-          onChange={mudar}
-          disabled={!dados.pode_editar}
-          menuWidth={360}
-          options={[
-            ...(opcoes.some((m) => m.id === valor)
-              ? []
-              : [{ value: valor, label: valor || "— nenhum —", tag: "fora do catálogo" }]),
-            ...opcoes.map((m) => ({
-              value: m.id,
-              label: m.nome,
-              tag: `${porMilhao(m.preco_entrada)} entrada`,
-            })),
-          ]}
-        />
+        <div className="modelo-escolhido">
+          <span className="rotulo-campo">Modelo</span>
+          <strong>{info?.nome ?? (valor || "— nenhum —")}</strong>
+          {valor && <code>{valor}</code>}
+          {valor && !info && <span className="erro">Fora do catálogo da OpenRouter.</span>}
+          <button type="button" onClick={() => setLista(true)}>
+            {dados.pode_editar ? "Trocar modelo" : "Ver modelos"}
+            <span className="contagem"> · {opcoes.length}</span>
+          </button>
+        </div>
       ) : (
+        <>
+          <label htmlFor={id}>Modelo</label>
         <input
           id={id}
           value={valor}
@@ -286,6 +272,22 @@ function CartaoPapel({
           maxLength={128}
           spellCheck={false}
           placeholder="id do modelo"
+          />
+        </>
+      )}
+      {lista && (
+        <ListaModelos
+          papel={papel}
+          opcoes={opcoes}
+          valor={valor}
+          vigente={papel.modelo}
+          latencia={dados.latencia}
+          podeEscolher={dados.pode_editar}
+          escolher={(v) => {
+            mudar(v);
+            setLista(false);
+          }}
+          fechar={() => setLista(false)}
         />
       )}
       {!valor && <p className="erro">Sem modelo: esta etapa fica desligada.</p>}
@@ -293,6 +295,9 @@ function CartaoPapel({
         <p className="nota">
           Sem catálogo lido: digite o id. Atualize o catálogo para ver preços e escolher na lista.
         </p>
+      )}
+      {papel.papel === "embeddings" && (
+        <p className="nota">Trocar o modelo de embeddings manda reindexar todas as fontes.</p>
       )}
       {provedor && (
         <p className="nota">
@@ -342,74 +347,57 @@ function CartaoPapel({
   );
 }
 
-function Catalogo({
-  dados,
-  comparar,
-  mudarComparar,
-  atualizar,
+// Os modelos do catálogo que servem para uma etapa, em linhas curtas: nome e
+// situação em cima; id, preço e contexto embaixo. Escolher volta ao cartão
+// como rascunho, salvo junto com as outras etapas.
+function ListaModelos({
+  papel,
+  opcoes,
+  valor,
+  vigente,
+  latencia,
+  podeEscolher,
+  escolher,
+  fechar,
 }: {
-  dados: ModelosAgente;
-  comparar: string[];
-  mudarComparar: (ids: string[]) => void;
-  atualizar: (() => void) | null;
+  papel: Papel;
+  opcoes: ModeloDoCatalogo[];
+  valor: string;
+  vigente: string;
+  latencia: ModelosAgente["latencia"];
+  podeEscolher: boolean;
+  escolher: (id: string) => void;
+  fechar: () => void;
 }) {
   const [busca, setBusca] = useState("");
-  const [soImagem, setSoImagem] = useState(false);
   const [ordem, setOrdem] = useState<"preco" | "contexto" | "nome">("preco");
-  const todos = dados.catalogo.modelos;
+  const [limite, setLimite] = useState(LIMITE_LINHAS);
+  const vetores = papel.saida !== "text";
 
   const lista = useMemo(() => {
     const termo = busca.trim().toLowerCase();
-    const filtrados = todos.filter(
-      (m) =>
-        (!termo || m.id.toLowerCase().includes(termo) || m.nome.toLowerCase().includes(termo)) &&
-        (!soImagem || m.entrada.includes("image")),
-    );
     const chave = {
       preco: (m: ModeloDoCatalogo) => m.preco_entrada ?? Infinity,
       contexto: (m: ModeloDoCatalogo) => -(m.contexto ?? 0),
       nome: () => 0,
     }[ordem];
-    return filtrados.sort((a, b) => chave(a) - chave(b) || a.nome.localeCompare(b.nome));
-  }, [todos, busca, soImagem, ordem]);
-
-  if (todos.length === 0)
-    return (
-      <section className="catalogo">
-        <h2>Modelos disponíveis</h2>
-        <Vazio
-          titulo="Nenhum modelo no catálogo."
-          texto={
-            atualizar
-              ? "Leia o catálogo da OpenRouter para ver preços, limites e capacidades."
-              : "Peça a quem pode editar o agente para atualizar o catálogo."
-          }
-        />
-      </section>
-    );
-
-  const alternar = (id: string) =>
-    mudarComparar(
-      comparar.includes(id)
-        ? comparar.filter((c) => c !== id)
-        : comparar.length < MAX_COMPARAR
-          ? [...comparar, id]
-          : comparar,
-    );
-  const escolhidos = comparar.map((id) => todos.find((m) => m.id === id)).filter((m) => !!m);
+    return opcoes
+      .filter((m) => !termo || m.id.toLowerCase().includes(termo) || m.nome.toLowerCase().includes(termo))
+      .sort((a, b) => chave(a) - chave(b) || a.nome.localeCompare(b.nome));
+  }, [opcoes, busca, ordem]);
 
   return (
-    <section className="catalogo">
-      <h2>
-        Modelos disponíveis <span className="contagem">· {todos.length}</span>
-      </h2>
-      <div className="execucoes-filtros">
+    <Dialogo titulo={`Modelos para ${papel.rotulo}`} aoFechar={fechar} largo>
+      <div className="lista-modelos__filtros">
         <label>
           Buscar
           <input
             type="search"
             value={busca}
-            onChange={(e) => setBusca(e.target.value)}
+            onChange={(e) => {
+              setBusca(e.target.value);
+              setLimite(LIMITE_LINHAS);
+            }}
             placeholder="nome ou id"
           />
         </label>
@@ -421,124 +409,64 @@ function Catalogo({
             onChange={(v) => setOrdem(v as typeof ordem)}
             menuWidth={220}
             options={[
-              { value: "preco", label: "Menor preço de entrada" },
+              { value: "preco", label: "Menor preço" },
               { value: "contexto", label: "Maior contexto" },
               { value: "nome", label: "Nome" },
             ]}
           />
         </label>
-        <label className="opcao">
-          <input type="checkbox" checked={soImagem} onChange={(e) => setSoImagem(e.target.checked)} />
-          Só os que leem imagem
-        </label>
       </div>
-
-      {escolhidos.length > 0 && (
-        <div className="comparar">
-          <h3>Comparando {escolhidos.length} de até {MAX_COMPARAR}</h3>
-          <div className="tabela-rolavel">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Item</th>
-                  {escolhidos.map((m) => (
-                    <th key={m.id} scope="col">
-                      {m.nome}
-                      <button type="button" className="link" onClick={() => alternar(m.id)}>
-                        tirar
-                      </button>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {(
-                  [
-                    ["Entrada", (m) => porMilhao(m.preco_entrada)],
-                    ["Saída", (m) => porMilhao(m.preco_saida)],
-                    ["Imagem", (m) => (m.preco_imagem ? porMilhao(m.preco_imagem) : "—")],
-                    ["Contexto", (m) => (m.contexto ? tokens(m.contexto) : "—")],
-                    ["Máx. de saída", (m) => (m.max_saida ? tokens(m.max_saida) : "—")],
-                    ["Aceita", (m) => m.entrada.join(", ")],
-                    [
-                      "Resposta em JSON",
-                      (m) => (m.parametros.some((p) => JSON_ESTRUTURADO.includes(p)) ? "sim" : "não"),
-                    ],
-                    [
-                      "Latência medida",
-                      (m) =>
-                        dados.latencia[m.id] ? duracao(dados.latencia[m.id].media_ms) : "sem dados",
-                    ],
-                  ] as [string, (m: ModeloDoCatalogo) => string][]
-                ).map(([nome, f]) => (
-                  <tr key={nome}>
-                    <th scope="row">{nome}</th>
-                    {escolhidos.map((m) => (
-                      <td key={m.id}>{f(m)}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
+      <p className="nota" role="status">
+        {busca.trim() ? `${lista.length} de ${opcoes.length}` : opcoes.length}{" "}
+        {opcoes.length === 1 ? "modelo serve" : "modelos servem"} para esta etapa
+        {papel.exige_entrada === "image" && " (todos leem imagem)"}.
+      </p>
       {lista.length === 0 ? (
-        <Vazio titulo="Nenhum modelo com esse filtro." texto="Tente outro nome ou tire o filtro." />
+        <Vazio titulo="Nenhum modelo com esse nome." texto="Tente outro nome ou parte do id." />
       ) : (
-        <div className="tabela-rolavel">
-          <table className="tabela-catalogo">
-            <thead>
-              <tr>
-                <th scope="col">
-                  <span className="sr">Comparar</span>
-                </th>
-                <th scope="col">Modelo</th>
-                <th scope="col" className="num">
-                  Entrada
-                </th>
-                <th scope="col" className="num">
-                  Saída
-                </th>
-                <th scope="col" className="num">
-                  Contexto
-                </th>
-                <th scope="col">Aceita</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lista.slice(0, LIMITE_LINHAS).map((m) => (
-                <tr key={m.id}>
-                  <td>
-                    <input
-                      type="checkbox"
-                      aria-label={`Comparar ${m.nome}`}
-                      checked={comparar.includes(m.id)}
-                      disabled={!comparar.includes(m.id) && comparar.length >= MAX_COMPARAR}
-                      onChange={() => alternar(m.id)}
-                    />
-                  </td>
-                  <td>
-                    {m.nome}
-                    <code>{m.id}</code>
-                  </td>
-                  <td className="num">{porMilhao(m.preco_entrada)}</td>
-                  <td className="num">{porMilhao(m.preco_saida)}</td>
-                  <td className="num">{m.contexto ? tokens(m.contexto) : "—"}</td>
-                  <td>{m.entrada.join(", ")}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ul className="lista-modelos">
+          {lista.slice(0, limite).map((m) => {
+            const lat = latencia[m.id];
+            const dadosLinha = [
+              vetores
+                ? `${porMilhao(m.preco_entrada)}`
+                : `${porMilhao(m.preco_entrada)} entrada · ${porMilhao(m.preco_saida)} saída`,
+              m.contexto ? `${tokens(m.contexto)} de contexto` : null,
+              lat ? `${duracao(lat.media_ms)} medidos` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ");
+            const corpo = (
+              <>
+                <span className="lista-modelos__topo">
+                  <strong>{m.nome}</strong>
+                  {m.id === vigente && <span className="selo">em uso</span>}
+                  {m.id === valor && m.id !== vigente && <span className="selo escolhido">escolhido</span>}
+                </span>
+                <code>{m.id}</code>
+                <span className="lista-modelos__dados">{dadosLinha}</span>
+              </>
+            );
+            return (
+              <li key={m.id} className={m.id === valor ? "atual" : undefined}>
+                {podeEscolher ? (
+                  <button type="button" onClick={() => escolher(m.id)} aria-pressed={m.id === valor}>
+                    {corpo}
+                  </button>
+                ) : (
+                  <div>{corpo}</div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
       )}
-      {lista.length > LIMITE_LINHAS && (
-        <p className="nota">
-          Mostrando {LIMITE_LINHAS} de {lista.length}. Refine a busca para ver os outros.
-        </p>
+      {lista.length > limite && (
+        <button type="button" className="lista-modelos__mais" onClick={() => setLimite((l) => l + LIMITE_LINHAS)}>
+          Mostrar mais {Math.min(LIMITE_LINHAS, lista.length - limite)} de {lista.length - limite}
+        </button>
       )}
-    </section>
+    </Dialogo>
   );
 }
 

@@ -38,6 +38,18 @@ CATALOGO = {
         {"id": "id com espaço", "name": "inválido"},
     ]
 }
+# A OpenRouter lista os modelos de embeddings em rota própria.
+EMBEDDINGS = {
+    "data": [
+        {
+            "id": "openai/text-embedding-3-small",
+            "name": "Text Embedding 3 Small",
+            "context_length": 8192,
+            "pricing": {"prompt": "0.00000002"},
+            "architecture": {"input_modalities": ["text"], "output_modalities": ["embeddings"]},
+        }
+    ]
+}
 
 
 def _entrar(client, fabrica, email, perfil, *, editor=False) -> dict[str, str]:
@@ -119,10 +131,16 @@ def test_sem_permissao_nao_salva_nem_atualiza_catalogo(client_pg, fabrica):
 
 
 def test_catalogo_traz_preco_por_milhao_e_valida_a_escolha(client_pg, fabrica):
-    pedidos = _http(client_pg, {"https://openrouter.ai/api/v1/models": CATALOGO})
+    pedidos = _http(
+        client_pg,
+        {
+            "https://openrouter.ai/api/v1/models": CATALOGO,
+            "https://openrouter.ai/api/v1/embeddings/models": EMBEDDINGS,
+        },
+    )
     csrf = _entrar(client_pg, fabrica, "edita@exemplo.test", "atendente", editor=True)
 
-    assert client_pg.post("/admin/agente/catalogo/atualizar", headers=csrf).json() == {"modelos": 2}
+    assert client_pg.post("/admin/agente/catalogo/atualizar", headers=csrf).json() == {"modelos": 3}
     assert "authorization" not in pedidos[0].headers
     catalogo = client_pg.get("/admin/agente/modelos").json()["catalogo"]
     assert catalogo["fonte"] == "https://openrouter.ai/api/v1/models"
@@ -138,9 +156,18 @@ def test_catalogo_traz_preco_por_milhao_e_valida_a_escolha(client_pg, fabrica):
         )
 
     assert "não aceita image" in salvar({"visao": "meta/so-texto"}).json()["detail"]
+    # Cada etapa só aceita modelos da própria finalidade.
+    embeddings = "openai/text-embedding-3-small"
+    assert "não serve para esta etapa" in salvar({"llm": embeddings}).json()["detail"]
+    assert "não serve para esta etapa" in salvar({"embeddings": "meta/so-texto"}).json()["detail"]
     assert "não está no catálogo" in salvar({"llm": "sumiu/modelo"}).json()["detail"]
     # Jev e transcrição têm provedor próprio: fora do catálogo da OpenRouter.
-    assert salvar({"jev": "typesafe/jev-2.0", "visao": "openai/gpt-4o-mini"}).status_code == 201
+    assert (
+        salvar(
+            {"jev": "typesafe/jev-2.0", "visao": "openai/gpt-4o-mini", "embeddings": embeddings}
+        ).status_code
+        == 201
+    )
 
 
 def test_restaurar_cria_versao_nova_com_os_modelos_antigos(client_pg, fabrica, settings):
