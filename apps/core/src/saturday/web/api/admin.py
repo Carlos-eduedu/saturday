@@ -209,7 +209,7 @@ def eu(request: Request, usuario: Logado) -> dict[str, Any]:
 # ------------------------------------------------------------------ perfil
 
 # A foto vem crua no corpo, como os anexos; só imagem comum e pequena.
-FOTO_MAX = 2 * 1024 * 1024
+FOTO_MAX = 10 * 1024 * 1024
 FOTO_TIPOS = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
 FOTO_MIME = {extensao: mime for mime, extensao in FOTO_TIPOS.items()}
 
@@ -283,7 +283,7 @@ async def trocar_foto(
     if not dados:
         raise HTTPException(status_code=422, detail="arquivo vazio")
     if len(dados) > FOTO_MAX:
-        raise HTTPException(status_code=413, detail="foto acima de 2 MB")
+        raise HTTPException(status_code=413, detail="foto acima de 10 MB")
     if not _e_imagem(dados, extensao):
         raise HTTPException(status_code=415, detail="o arquivo não é uma imagem válida")
 

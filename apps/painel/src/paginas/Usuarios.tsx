@@ -52,7 +52,7 @@ function formatarTelefone(digitos: string | null): string {
   return `(${digitos.slice(0, 2)}) ${corpo.slice(0, meio)}-${corpo.slice(meio)}`;
 }
 
-const FOTO_MAX = 2 * 1024 * 1024;
+const FOTO_MAX = 10 * 1024 * 1024;
 const FOTO_TIPOS = ["image/jpeg", "image/png", "image/webp"];
 
 // O próprio perfil: nome de exibição, telefone e foto. E-mail e perfil ficam à
@@ -88,7 +88,7 @@ function Voce({ eu, atualizarEu }: { eu: Eu; atualizarEu: (eu: Eu) => void }) {
     evento.target.value = "";
     if (!foto) return;
     if (!FOTO_TIPOS.includes(foto.type)) return setErro("A foto precisa ser JPG, PNG ou WebP.");
-    if (foto.size > FOTO_MAX) return setErro("A foto passa de 2 MB. Escolha uma menor.");
+    if (foto.size > FOTO_MAX) return setErro("A foto passa de 10 MB. Escolha uma menor.");
     executar(() => enviarFoto(foto), "Foto trocada.");
   }
 
@@ -111,7 +111,7 @@ function Voce({ eu, atualizarEu }: { eu: Eu; atualizarEu: (eu: Eu) => void }) {
               Remover
             </button>
           )}
-          <span className="nota">JPG, PNG ou WebP, até 2 MB.</span>
+          <span className="nota">JPG, PNG ou WebP, até 10 MB.</span>
         </div>
         <input
           ref={arquivo}
