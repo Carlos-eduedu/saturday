@@ -1029,8 +1029,8 @@ function DetalheProposta({
 
       {p.oferta && (
         <details className="oferta-completa">
-          <summary>Simulação completa, como veio da Granatech</summary>
-          <pre className="nota">{JSON.stringify(p.oferta, null, 2)}</pre>
+          <summary>Simulação completa</summary>
+          <SimulacaoCompleta o={p.oferta} />
         </details>
       )}
 
@@ -1105,6 +1105,47 @@ function DetalheProposta({
 // Liberado, taxa, seguro e CET vêm das condições que o cliente aceitou,
 // guardadas na proposta. Nas propostas antigas, vêm da oferta do checkpoint só
 // enquanto a conversa aponta para elas; sem nenhuma das duas, só as parcelas.
+// `porcento` é ao mês; a Granatech também manda as taxas anuais.
+const aoAno = (valor: string | null | undefined) =>
+  valor
+    ? `${Number(valor).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}% a.a.`
+    : "—";
+
+// O resto da simulação que o cliente aceitou, em texto de gente: o JSON cru
+// mostrava IDs internos (produto, margem, empregador) e números sem unidade.
+function SimulacaoCompleta({ o }: { o: Record<string, unknown> }) {
+  const v = (chave: string) => o[chave] as string | null | undefined;
+  const vencimento = v("primeiro_vencimento");
+  return (
+    <dl className="ficha-granatech">
+      <dt>IOF</dt>
+      <dd className="dado">{reais(v("valor_iof"))}</dd>
+      <dt>Total financiado</dt>
+      <dd className="dado">{reais(v("valor_total_financiado"))}</dd>
+      <dt>Total a pagar</dt>
+      <dd className="dado">{reais(v("valor_total_divida"))}</dd>
+      <dt>Taxa e CET ao ano</dt>
+      <dd className="dado">
+        {aoAno(v("taxa_anual"))} · CET {aoAno(v("cet_anual"))}
+      </dd>
+      <dt>1º vencimento</dt>
+      <dd className="dado">{vencimento ? vencimento.split("-").reverse().join("/") : "—"}</dd>
+      {o.limitado_ao_teto === true && (
+        <>
+          <dt>Teto</dt>
+          <dd>Valor reduzido ao teto de liberação</dd>
+        </>
+      )}
+      {o.pediu_sem_seguro === true && (
+        <>
+          <dt>Pedido</dt>
+          <dd>O cliente pediu sem seguro</dd>
+        </>
+      )}
+    </dl>
+  );
+}
+
 function Condicoes({ p }: { p: PropostaGranatechDetalhe }) {
   const o = p.oferta as Record<string, string | number | boolean | null> | null;
   return (
