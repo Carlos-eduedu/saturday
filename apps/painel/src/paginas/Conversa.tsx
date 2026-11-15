@@ -568,8 +568,14 @@ type Recurso<T> = { dado: T | null; erro: string; carregar: () => void };
 // Coluna da direita: a Ficha do cliente ou a trilha da IA, turno a turno.
 function Lateral({ id, ficha, trilha }: { id: string; ficha: Recurso<Ficha>; trilha: Recurso<Trilha> }) {
   const [aba, setAba] = useState<"ficha" | "ia">("ficha");
+  // Trocar de aba volta ao topo: a rolagem da outra aba não vale para esta.
+  const coluna = useRef<HTMLElement>(null);
+  const trocarAba = (nova: "ficha" | "ia") => {
+    setAba(nova);
+    coluna.current?.scrollTo({ top: 0 });
+  };
   return (
-    <aside className="lateral">
+    <aside ref={coluna} className="lateral">
       <Abas
         rotulo="Painel lateral"
         opcoes={[
@@ -577,7 +583,7 @@ function Lateral({ id, ficha, trilha }: { id: string; ficha: Recurso<Ficha>; tri
           ["ia", "IA"],
         ]}
         valor={aba}
-        mudar={setAba}
+        mudar={trocarAba}
         painel="lateral-painel"
       />
       <div role="tabpanel" id="lateral-painel" aria-labelledby={idAba("lateral-painel", aba)}>

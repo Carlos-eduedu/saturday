@@ -982,8 +982,11 @@ main:has(.historico) { padding-bottom: 0; }
 /* Gruda na mesma linha do cabeçalho da conversa: em repouso as duas nascem em
    90 (topo do `main`), ao rolar as duas param em 60 (a barra). O `padding-top`
    igual ao do cabeçalho põe as abas Ficha/IA na linha do telefone. */
-.lateral { position: sticky; top: var(--topo); display: flex; flex-direction: column; gap: 0.75rem; padding-top: 0.75rem; max-height: calc(100dvh - var(--topo) - var(--respiro)); overflow-y: auto; }
+.lateral { position: sticky; top: var(--topo); display: flex; flex-direction: column; gap: 0.75rem; max-height: calc(100dvh - var(--topo) - var(--respiro)); overflow-y: auto; }
 .lateral > [role="tabpanel"] { display: flex; flex-direction: column; gap: 0.75rem; }
+/* A coluna rola sozinha: as abas ficam presas no topo para não sumirem com a
+   trilha da IA ou a ficha roladas. */
+.lateral > [role="tablist"] { position: sticky; top: 0; z-index: 1; flex: none; padding-top: 0.75rem; background: var(--fundo); }
 /* Abas de página (componente Abas): sublinhadas, como as filas da Inbox. Um
    estilo só para aba no painel; rolam de lado se faltar espaço, nunca cortam. */
 .abas-laterais { display: flex; gap: 0.75rem; border-bottom: 1px solid var(--borda); overflow-x: auto; scrollbar-width: none; }
