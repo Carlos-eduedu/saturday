@@ -120,3 +120,32 @@ def test_reiniciar_de_cliente_comum_e_texto_qualquer(service_pg, fabrica, conver
     )
     assert resposta.answer != MENSAGEM_REINICIADA
     assert service_pg.estado_atual(service_pg.config(conversa)).get("intent")
+
+
+def test_recontato_de_membro_testador_vence_na_hora(service_pg, fabrica, conversa):
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import select
+
+    from saturday.dados import recontatos
+    from saturday.dados.modelos import Conversa
+
+    service_pg.process_message(ChatRequest(conversation_id=conversa, message="oi"), ORIGEM)
+    amanha = datetime.now(UTC) + timedelta(days=1)
+    with abrir(fabrica) as s:
+        conversa_id = s.scalar(select(Conversa.id).where(Conversa.conversation_id == conversa))
+        cliente = recontatos.agendar(
+            s, conversa_id=conversa_id, motivo=recontatos.COTA_ESGOTADA, quando=amanha
+        )
+        assert cliente.quando == amanha
+
+    _membro(fabrica, testa=True)
+    with abrir(fabrica) as s:
+        membro = recontatos.agendar(
+            s, conversa_id=conversa_id, motivo=recontatos.TEMPO_CASA, quando=amanha
+        )
+        assert membro.quando <= datetime.now(UTC)
+        vencidos = recontatos.vencidos(
+            s, motivo=recontatos.TEMPO_CASA, agora=datetime.now(UTC), limite=5
+        )
+        assert [r.id for r in vencidos] == [membro.id]

@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from saturday.dados.modelos import Recontato
+from saturday.dados import repositorios
+from saturday.dados.modelos import Conversa, Recontato
 
 COTA_ESGOTADA = "cota_esgotada"
 TEMPO_CASA = "tempo_casa"
@@ -22,6 +23,11 @@ def agendar(
     quando: datetime,
     tentativas: int = 0,
 ) -> Recontato:
+    # Membro testador não espera horas ou dias: vence já, no próximo ciclo do
+    # worker (decisão 0020).
+    conversa = sessao.get(Conversa, conversa_id)
+    if conversa is not None and repositorios.testador(sessao, conversa.telefone):
+        quando = min(quando, datetime.now(UTC))
     recontato = Recontato(
         conversa_id=conversa_id, motivo=motivo, quando=quando, tentativas=tentativas
     )
