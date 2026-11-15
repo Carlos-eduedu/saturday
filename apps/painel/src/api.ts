@@ -476,11 +476,10 @@ export type Homologacao = {
 };
 
 export class ErroApi extends Error {
-  constructor(
-    readonly status: number,
-    mensagem: string,
-  ) {
+  readonly status: number;
+  constructor(status: number, mensagem: string) {
     super(mensagem);
+    this.status = status;
   }
 }
 
@@ -521,6 +520,7 @@ const PADRAO: Record<number, string> = {
   404: "Não encontrado: pode ter sido apagado ou o link está errado.",
   409: "Alguém mudou isso antes de você. Recarregue e confira.",
   413: "Arquivo grande demais.",
+  422: "O servidor recusou o pedido: algum dado veio em formato errado.",
   429: "Muitas tentativas seguidas. Espere um pouco e tente de novo.",
 };
 
@@ -528,6 +528,25 @@ function textoPadrao(status: number): string {
   if (PADRAO[status]) return PADRAO[status];
   if (status >= 500) return "O servidor falhou ao responder. Tente de novo em instantes.";
   return `Não deu certo (erro ${status}).`;
+}
+
+// Textos que o FastAPI/Starlette põem sozinhos, em inglês (rota que não existe etc.).
+const PADROES_DO_STARLETTE = new Set(["Not Found", "Method Not Allowed", "Not authenticated", "Forbidden"]);
+
+// Texto do erro para a tela. A validação do pydantic responde uma lista; só os
+// nossos validadores (`value_error`) falam português, as mensagens prontas do
+// pydantic vêm em inglês e dão lugar ao texto padrão do status.
+export function detalheDoErro(status: number, corpo: unknown): string {
+  const detail = (corpo as { detail?: unknown } | null)?.detail;
+  if (typeof detail === "string" && detail && !PADROES_DO_STARLETTE.has(detail)) return detail;
+  if (Array.isArray(detail)) {
+    const nossos = detail
+      .filter((e: { type?: string }) => e?.type === "value_error")
+      .map((e: { msg?: string }) => (e.msg ?? "").replace(/^Value error, /, ""))
+      .filter(Boolean);
+    if (nossos.length > 0) return nossos.join("; ");
+  }
+  return textoPadrao(status);
 }
 
 async function chamar<T>(metodo: string, caminho: string, corpo?: unknown): Promise<T> {
@@ -549,20 +568,13 @@ async function responder<T>(resposta: Response): Promise<T> {
     // O login responde 401 a senha errada: ali não é sessão vencida.
     if (resposta.status === 401 && csrf && !resposta.url.endsWith("/admin/login"))
       window.dispatchEvent(new Event(SESSAO_EXPIRADA));
-    let detalhe = textoPadrao(resposta.status);
+    let corpo: unknown = null;
     try {
-      const json = (await resposta.json()) as { detail?: unknown };
-      if (typeof json.detail === "string") detalhe = json.detail;
-      // Validação do pydantic: lista de erros por campo.
-      else if (Array.isArray(json.detail))
-        detalhe = json.detail
-          .map((e: { msg?: string }) => (e.msg ?? "").replace(/^Value error, /, ""))
-          .filter(Boolean)
-          .join("; ");
+      corpo = await resposta.json();
     } catch {
       // corpo sem JSON: fica o texto padrão do status
     }
-    throw new ErroApi(resposta.status, detalhe);
+    throw new ErroApi(resposta.status, detalheDoErro(resposta.status, corpo));
   }
   if (resposta.status === 204) return undefined as T;
   return (await resposta.json()) as T;

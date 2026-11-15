@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
-    "teste": "node --experimental-strip-types --disable-warning=ExperimentalWarning testes/movimento.teste.ts && node --experimental-strip-types --disable-warning=ExperimentalWarning testes/conferencia.teste.ts"
+    "teste": "node --experimental-strip-types --disable-warning=ExperimentalWarning testes/movimento.teste.ts && node --experimental-strip-types --disable-warning=ExperimentalWarning testes/conferencia.teste.ts && node --experimental-strip-types --disable-warning=ExperimentalWarning testes/erros.teste.ts"
   },
   "dependencies": {
     "@fontsource-variable/red-hat-display": "^5.3.0",
