@@ -57,7 +57,11 @@ export function Canais() {
   const carregar = useCallback(() => {
     api
       .canais()
-      .then(setCanais)
+      .then((novos) => {
+        setCanais(novos);
+        // Instância apagada (aqui ou por outra pessoa) leva junto os detalhes abertos.
+        setDetalhesDe((d) => (d && novos.evolution.instancias.some((i) => i.nome === d) ? d : null));
+      })
       .catch((e: unknown) => setErro(mensagemDeFalha(e)));
   }, []);
   useEffect(carregar, [carregar]);
