@@ -685,7 +685,7 @@ main:has(.historico) { padding-bottom: 0; }
 /* O erro de uma ação fica no cabeçalho fixo: à vista em qualquer ponto do histórico. */
 .historico header .erro { flex-basis: 100%; margin: 0; }
 .identidade { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
-.historico h1 { font-size: 1.45rem; margin: 0; font-family: var(--fonte-mono); font-weight: 500; letter-spacing: 0; }
+.historico h1 { font-size: 1.45rem; margin: 0; font-family: var(--fonte-mono); font-weight: 500; letter-spacing: 0; white-space: nowrap; }
 .identidade p { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; font-size: 0.85rem; color: var(--suave); }
 /* Por que a conversa caiu no humano: a única coisa do cabeçalho que os selos
    ao lado não dizem. */
@@ -947,7 +947,9 @@ main:has(.historico) { padding-bottom: 0; }
   .historico .voltar { margin-left: -0.6rem; padding: 0 0.6rem; }
   .voltar-texto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   .historico h1 { font-size: 1.15rem; }
-  .identidade { flex: 1; }
+  /* O telefone inteiro é o piso: sem espaço, as ações descem de linha em vez
+     de passar por cima dele. */
+  .identidade { flex: 1; min-width: min-content; }
   .identidade p { gap: 0.25rem 0.6rem; font-size: 0.8rem; }
   .mensagens { margin: 1rem 0; }
 }
@@ -1515,7 +1517,10 @@ small.dado { font-size: 0.8rem; }
   .identidade { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 0.15rem 0.5rem; }
   .identidade p { display: contents; }
   .identidade .contexto { display: none; }
-  .historico > header.tem-envio .acao-primaria { display: none; }
+  /* Devolver fica no Mais; Assumir só sai daqui quando o envio, que o repete,
+     está à mostra (nas abas Ficha e IA não está). */
+  .historico > header.tem-envio .acao-primaria,
+  .historico > header .acao-devolver { display: none; }
   .acoes { margin-left: auto; width: auto; flex-wrap: nowrap; align-self: flex-start; }
   .mais-painel { left: auto; right: 0; }
   .mais-contexto { display: block; margin: 0; color: var(--suave); font-size: 0.85rem; }

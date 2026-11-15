@@ -240,7 +240,9 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
   return (
     <div className={fichaEmAba ? "conversa em-abas" : "conversa"}>
       <section className="historico">
-        <header className={temEnvio ? "tem-envio" : undefined}>
+        {/* Só esconde Assumir/Devolver do cabeçalho (celular) quando o envio, que
+            os repete, está à mostra: nas abas Ficha e IA ele não aparece. */}
+        <header className={temEnvio && (!fichaEmAba || aba === "mensagens") ? "tem-envio" : undefined}>
           <Link className="voltar" to="/">
             <HugeiconsIcon icon={ArrowLeft01Icon} size={18} strokeWidth={2} />
             <span className="voltar-texto">Conversas</span>
@@ -498,7 +500,7 @@ function Acoes({
       {podeDevolver && (
         <button
           type="button"
-          className="acao-primaria"
+          className="acao-primaria acao-devolver"
           disabled={ocupado}
           onClick={() => mudar("devolver")}
           title="Devolver para a IA (tecla D)"
