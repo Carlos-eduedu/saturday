@@ -216,6 +216,14 @@ export interface Turno {
   erro: string | null;
 }
 
+// Estado técnico depois de um nó da execução, lido dos checkpoints. Texto do
+// cliente e dados pessoais nunca vêm: `ocultos` traz só o nome do que mudou.
+export interface PassoDoNo {
+  no: string;
+  campos: { campo: string; valor: string | number | boolean | null; mudou: boolean }[];
+  ocultos: string[];
+}
+
 export interface Execucao extends Turno {
   conversa_id: string;
   telefone: string | null;
@@ -666,6 +674,9 @@ export const api = {
   turnos: (id: string) => chamar<Trilha>("GET", `/conversas/${id}/turnos`),
   custos: () => chamar<Custos>("GET", "/custos"),
   grafo: () => chamar<Grafo>("GET", "/agente/grafo"),
+  // `passos` nulo: os checkpoints do turno já foram podados pela retenção.
+  passos: (turno: number) =>
+    chamar<{ passos: PassoDoNo[] | null }>("GET", `/agente/execucoes/${turno}/passos`),
   modelosAgente: () => chamar<ModelosAgente>("GET", "/agente/modelos"),
   atualizarCatalogo: () => chamar<{ modelos: number }>("POST", "/agente/catalogo/atualizar"),
   testarModelo: (papel: PapelModelo, modelo: string, texto: string) =>

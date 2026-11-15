@@ -82,3 +82,41 @@ def test_agente_exige_login(client_pg):
     client_pg.cookies.clear()
     assert client_pg.get("/admin/agente/grafo").status_code == 401
     assert client_pg.get("/admin/agente/execucoes").status_code == 401
+
+
+def test_passos_mostram_o_estado_tecnico_de_cada_no_sem_dado_pessoal(
+    client_pg, service_pg, fabrica, conversa
+):
+    service_pg.process_message(ChatRequest(conversation_id=conversa, message="oi"), WHATSAPP)
+    service_pg.process_message(
+        ChatRequest(conversation_id=conversa, message="meu cpf é 123.456.789-09, como funciona?"),
+        WHATSAPP,
+    )
+    _entrar(client_pg, fabrica, "ana-passos@exemplo.test", "atendente")
+    primeiro, segundo = sorted(_turnos(fabrica, conversa), key=lambda t: t.id)
+
+    resposta = client_pg.get(f"/admin/agente/execucoes/{segundo.id}/passos")
+    assert resposta.status_code == 200
+    passos = resposta.json()["passos"]
+    assert [p["no"] for p in passos] == segundo.caminho
+    classificou = next(p for p in passos if p["no"] == "classify_intent")
+    intencao = next(c for c in classificou["campos"] if c["campo"] == "intent")
+    assert intencao["mudou"] is True and intencao["valor"] == segundo.classificacao["intencao"]
+    # Texto do cliente e da IA: só o nome do campo, nunca o valor.
+    assert "answer" in passos[-1]["ocultos"]
+    assert "123.456.789-09" not in resposta.text and "como funciona" not in resposta.text
+
+    # O primeiro turno tem o próprio trecho do histórico.
+    assert client_pg.get(f"/admin/agente/execucoes/{primeiro.id}/passos").json()["passos"]
+    assert client_pg.get("/admin/agente/execucoes/999999999/passos").status_code == 404
+
+
+def test_passos_somem_quando_os_checkpoints_foram_podados(client_pg, service_pg, fabrica, conversa):
+    service_pg.process_message(ChatRequest(conversation_id=conversa, message="oi"), WHATSAPP)
+    service_pg.process_message(ChatRequest(conversation_id=conversa, message="e aí"), WHATSAPP)
+    _entrar(client_pg, fabrica, "ana-poda@exemplo.test", "atendente")
+    primeiro, _ = sorted(_turnos(fabrica, conversa), key=lambda t: t.id)
+
+    service_pg._podar_checkpoints(service_pg.config(conversa))
+
+    assert client_pg.get(f"/admin/agente/execucoes/{primeiro.id}/passos").json()["passos"] is None

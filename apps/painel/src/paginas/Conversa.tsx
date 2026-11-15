@@ -21,6 +21,7 @@ import { pedidoDeTomada, textoDoAviso, useAvisoDesfazer } from "../componentes/D
 import { Abas, idAba } from "../componentes/Abas";
 import { Compositor } from "../componentes/Compositor";
 import { Falha } from "../componentes/Falha";
+import { ModalGrafo } from "../componentes/Grafo";
 import { ItemTurno } from "../componentes/ItemTurno";
 import { Vazio } from "../componentes/Vazio";
 import {
@@ -591,6 +592,8 @@ function Lateral({ id, ficha, trilha }: { id: string; ficha: Recurso<Ficha>; tri
 }
 
 function TrilhaIa({ trilha, erro, carregar }: { trilha: Trilha | null; erro: string; carregar: () => void }) {
+  // Caminho do turno aberto em "Ver grafo".
+  const [grafoAberto, setGrafoAberto] = useState<Turno | null>(null);
   // Falhar ao recarregar mantém a última trilha à vista.
   if (!trilha)
     return erro ? (
@@ -620,9 +623,18 @@ function TrilhaIa({ trilha, erro, carregar }: { trilha: Trilha | null; erro: str
       )}
       <ol>
         {trilha.turnos.map((t) => (
-          <ItemTurno key={t.id} t={t} />
+          <ItemTurno
+            key={t.id}
+            t={t}
+            topo={
+              <button type="button" className="link" onClick={() => setGrafoAberto(t)}>
+                Ver grafo
+              </button>
+            }
+          />
         ))}
       </ol>
+      {grafoAberto && <ModalGrafo turno={grafoAberto} aoFechar={() => setGrafoAberto(null)} />}
     </div>
   );
 }

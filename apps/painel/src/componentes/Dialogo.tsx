@@ -9,6 +9,7 @@ export function Dialogo({
   aoFechar,
   rodape,
   largo = false,
+  classe,
   children,
 }: {
   titulo: ReactNode;
@@ -16,6 +17,8 @@ export function Dialogo({
   rodape?: ReactNode;
   // Conteúdo extenso (rodada da homologação): 46rem em vez de 36rem.
   largo?: boolean;
+  // Variação própria de quem usa (o grafo ocupa quase a tela toda).
+  classe?: string;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -28,9 +31,11 @@ export function Dialogo({
   return (
     <dialog
       ref={ref}
-      className={largo ? "dialogo dialogo--largo" : "dialogo"}
+      className={["dialogo", largo && "dialogo--largo", classe].filter(Boolean).join(" ")}
       aria-labelledby={idTitulo}
-      onClose={aoFechar}
+      // O detalhe do nó abre dentro do modal do grafo: o `close` dele chega
+      // aqui pela árvore do React e não pode fechar este.
+      onClose={(e) => e.target === ref.current && aoFechar()}
       onClick={(e) => e.target === ref.current && fechar()}
     >
       <div className="dialogo__corpo">
