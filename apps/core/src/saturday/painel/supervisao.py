@@ -16,6 +16,7 @@ from sqlalchemy import and_, func, or_, select, true
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.orm import Session
 
+from saturday.dados import repositorios
 from saturday.dados.modelos import Alerta, Conversa, Mensagem
 
 # Cliente sem resposta por mais que isto pede atenção.
@@ -80,6 +81,7 @@ def supervisao(
     ultima = _ultimas(sessao, ids, None)
     ultima_saida = _ultimas(sessao, ids, "saida")
     motivos = _motivos_de_handoff(sessao, ids)
+    membros = repositorios.testadores(sessao)
 
     resultado: dict[uuid.UUID, dict[str, Any]] = {}
     for conversa in conversas:
@@ -107,6 +109,8 @@ def supervisao(
                 else None
             ),
             "etapa": conversa.etapa,
+            # Conversa de membro testador (decisão 0020): o nome dele, ou None.
+            "membro": membros.get(conversa.telefone) if conversa.telefone else None,
             "motivo_handoff": motivo,
             "aguardando_desde": aguardando,
             "envio_falhou": falhou,

@@ -248,6 +248,10 @@ class UsuarioPainel(Base):
     # fica no storage privado; aqui só a chave.
     telefone: Mapped[str | None] = mapped_column(String(20))
     foto_chave: Mapped[str | None] = mapped_column(String(200))
+    # Membro testador: conversa vinda deste telefone testa fluxos (decisão 0020).
+    pode_testar_fluxos: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=sa_false()
+    )
 
 
 class Auditoria(Base):

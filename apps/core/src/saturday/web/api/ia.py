@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Date, cast, func, select
 from sqlalchemy.orm import Session, sessionmaker
 
+from saturday.dados import repositorios
 from saturday.dados.modelos import Conversa, Turno
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.privacidade import MASCARAS
@@ -100,8 +101,16 @@ def custos(
     fim = datetime.combine(fim_dia + timedelta(days=1), datetime.min.time(), fuso).astimezone(UTC)
 
     dia = cast(func.timezone(TZ_OPERACAO, Turno.criado_em), Date)
-    periodo = (Turno.criado_em >= inicio, Turno.criado_em < fim)
     with abrir_sessao(fabrica) as sessao:
+        # Conversas de membro testador ficam fora dos custos (decisão 0020).
+        de_membro = select(Conversa.id).where(
+            Conversa.telefone.in_(list(repositorios.testadores(sessao)))
+        )
+        periodo = (
+            Turno.criado_em >= inicio,
+            Turno.criado_em < fim,
+            Turno.conversa_id.not_in(de_membro),
+        )
         por_dia = sessao.execute(
             select(dia, func.sum(Turno.custo_usd), func.sum(Turno.tokens), func.count())
             .where(*periodo)

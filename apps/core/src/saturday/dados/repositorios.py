@@ -10,7 +10,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from saturday.dados.modelos import Alerta, Conversa, Mensagem
+from saturday.dados.modelos import Alerta, Conversa, Mensagem, UsuarioPainel
 
 # Canal do `LISTEN` da API (`web/eventos.py`). O aviso leva só tipo e IDs:
 # nada de dado pessoal passa por ele.
@@ -260,3 +260,29 @@ def reabrir_alertas(sessao: Session, ids: list[int]) -> list[int]:
     for alerta_id in reabertos:
         notificar(sessao, "alerta", alerta=alerta_id)
     return reabertos
+
+
+# ------------------------------------------------------------------ membros testadores
+
+
+def testadores(sessao: Session) -> dict[str, str]:
+    """Telefone → nome de quem testa fluxos pelo WhatsApp (decisão 0020).
+
+    Membro ativo, com a permissão "testar fluxos" e telefone no perfil. Os dois
+    telefones estão no mesmo formato (DDD + número), o da conversa e o do perfil.
+    """
+
+    linhas = sessao.execute(
+        select(UsuarioPainel.telefone, UsuarioPainel.nome).where(
+            UsuarioPainel.ativo.is_(True),
+            UsuarioPainel.pode_testar_fluxos.is_(True),
+            UsuarioPainel.telefone.is_not(None),
+        )
+    ).all()
+    return {telefone: nome for telefone, nome in linhas if telefone}
+
+
+def testador(sessao: Session, telefone: str | None) -> str | None:
+    """Nome do membro testador dono deste telefone, ou None."""
+
+    return testadores(sessao).get(telefone) if telefone else None

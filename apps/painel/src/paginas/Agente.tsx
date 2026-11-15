@@ -192,7 +192,12 @@ function ListaExecucoes({ nos }: { nos: NoDoGrafo[] }) {
             <ItemTurno
               key={e.id}
               t={e}
-              topo={<Link to={`/conversas/${e.conversa_id}`}>{e.telefone ?? e.canal}</Link>}
+              topo={
+                <>
+                  <Link to={`/conversas/${e.conversa_id}`}>{e.telefone ?? e.canal}</Link>
+                  {e.membro && <span className="selo-membro">Membro · {e.membro.split(" ")[0]}</span>}
+                </>
+              }
               verGrafo={() => setGrafoAberto(e)}
             />
           ))}

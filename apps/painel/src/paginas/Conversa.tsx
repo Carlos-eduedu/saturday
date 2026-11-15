@@ -255,6 +255,11 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
                 {ROTULO_ATENDIMENTO[conversa.atendimento]}
                 {conversa.atendente_id && (minha ? " (você)" : ` · ${dono}`)}
               </span>
+              {conversa.membro && (
+                <span className="selo-membro" title="Conversa de teste: telefone de um membro com a permissão testar fluxos">
+                  Membro · {conversa.membro}
+                </span>
+              )}
               <span className="contexto">
                 {conversa.canal === "evolution" ? "Evolution" : "WhatsApp oficial"}
               </span>

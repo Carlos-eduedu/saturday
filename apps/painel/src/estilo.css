@@ -1614,3 +1614,11 @@ small.dado { font-size: 0.8rem; }
 .resumo-canais__numero { font-size: 1.15rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .resumo-canais .sem-canal .resumo-canais__numero, .resumo-canais .sem-canal .nota { color: var(--erro); }
 .canais > .resumo-canais { padding: 0; background: none; border: none; box-shadow: none; }
+
+/* Membro testador (decisão 0020): a conversa é de teste, não de cliente. */
+.selo-membro { display: inline-flex; align-items: center; padding: 0 0.5rem; min-height: 1.4rem; border-radius: 999px; background: color-mix(in srgb, var(--ia) 12%, transparent); color: var(--ia); font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+.voce__teste { color: var(--ia); }
+/* Permissões na edição do membro: caixa de tamanho normal, uma por linha. */
+.form-usuario .opcao { grid-column: 1 / -1; display: flex; flex-direction: row; align-items: center; gap: 0.6rem; min-height: var(--alvo); color: var(--texto); font-weight: 400; }
+.form-usuario .opcao input { flex: none; width: 1.1rem; height: 1.1rem; min-height: 0; margin: 0; accent-color: var(--destaque); }
+.form-usuario .opcao small { color: var(--suave); }

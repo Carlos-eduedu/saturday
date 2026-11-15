@@ -162,6 +162,13 @@ function Voce({ eu, atualizarEu }: { eu: Eu; atualizarEu: (eu: Eu) => void }) {
           </div>
         </dl>
         <p className="nota">E-mail e perfil só o gestor troca.</p>
+        {eu.pode_testar_fluxos && (
+          <p className="nota voce__teste">
+            {eu.telefone
+              ? "Você testa fluxos: as conversas deste telefone no WhatsApp são de teste."
+              : "Você testa fluxos: ponha o telefone acima para as suas conversas virarem teste."}
+          </p>
+        )}
         <button type="submit" disabled={!mudou || ocupado}>
           Salvar
         </button>
@@ -443,13 +450,15 @@ function EdicaoUsuario({
   const [email, setEmail] = useState(usuario.email);
   const [perfil, setPerfil] = useState<Perfil>(usuario.perfil);
   const [editaAgente, setEditaAgente] = useState(usuario.pode_editar_agente);
+  const [testaFluxos, setTestaFluxos] = useState(usuario.pode_testar_fluxos);
   const [senha, setSenha] = useState("");
   const secao = useRef<HTMLElement>(null);
   const mudou =
     nome !== usuario.nome ||
     email !== usuario.email ||
     perfil !== usuario.perfil ||
-    editaAgente !== usuario.pode_editar_agente;
+    editaAgente !== usuario.pode_editar_agente ||
+    testaFluxos !== usuario.pode_testar_fluxos;
 
   // Abre abaixo da lista: leva o gestor até o painel.
   useEffect(() => {
@@ -461,7 +470,13 @@ function EdicaoUsuario({
     evento.preventDefault();
     agir(
       () =>
-        api.editarUsuario(usuario.id, { nome, email, perfil, pode_editar_agente: editaAgente }),
+        api.editarUsuario(usuario.id, {
+          nome,
+          email,
+          perfil,
+          pode_editar_agente: editaAgente,
+          pode_testar_fluxos: testaFluxos,
+        }),
       "Alterações salvas.",
     );
   }
@@ -507,6 +522,15 @@ function EdicaoUsuario({
             onChange={(e) => setEditaAgente(e.target.checked)}
           />
           Pode editar o agente (modelos, base de conhecimento, voltar versão)
+        </label>
+        <label className="opcao">
+          <input
+            type="checkbox"
+            checked={testaFluxos}
+            onChange={(e) => setTestaFluxos(e.target.checked)}
+          />
+          Testa fluxos pelo WhatsApp: conversas do telefone do perfil viram teste
+          {!usuario.telefone && <small> (a pessoa ainda não pôs telefone no perfil)</small>}
         </label>
         <button type="submit" disabled={!mudou}>
           Salvar

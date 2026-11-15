@@ -75,6 +75,7 @@ class UsuarioLogado:
     # Perfil (seção "Você"): telefone e a chave da foto no storage.
     telefone: str | None = None
     foto_chave: str | None = None
+    pode_testar_fluxos: bool = False
 
     @property
     def gestor(self) -> bool:
@@ -100,6 +101,7 @@ def usuario_logado(
             usuario.pode_editar_agente,
             usuario.telefone,
             usuario.foto_chave,
+            usuario.pode_testar_fluxos,
         )
 
 

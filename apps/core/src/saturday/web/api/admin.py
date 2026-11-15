@@ -149,6 +149,7 @@ def _eu(request: Request, usuario: UsuarioLogado) -> dict[str, Any]:
         # O próprio telefone volta inteiro: é a pessoa vendo o que ela digitou.
         "telefone": usuario.telefone,
         "foto": url_foto(usuario.id, usuario.foto_chave),
+        "pode_testar_fluxos": usuario.pode_testar_fluxos,
         "csrf": sessoes.token_csrf(segredo, usuario.token),
     }
 

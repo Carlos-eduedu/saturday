@@ -49,6 +49,7 @@ class Edicao(BaseModel):
     email: str | None = None
     perfil: str | None = None
     pode_editar_agente: bool | None = None
+    pode_testar_fluxos: bool | None = None
 
 
 class NovaSenha(BaseModel):
@@ -74,6 +75,7 @@ def _linha(usuario: UsuarioPainel, assumidas: int) -> dict[str, Any]:
         "email": usuario.email,
         "perfil": usuario.perfil,
         "pode_editar_agente": usuario.pode_editar_agente,
+        "pode_testar_fluxos": usuario.pode_testar_fluxos,
         # Na lista da equipe o telefone vai mascarado, como os outros dados pessoais.
         "telefone": MASCARAS["telefone"](usuario.telefone) if usuario.telefone else None,
         "foto": url_foto(usuario.id, usuario.foto_chave),
@@ -123,6 +125,7 @@ def editar(usuario_id: uuid.UUID, dados: Edicao, usuario: GestorCsrf, fabrica: F
             email=dados.email,
             perfil=dados.perfil,
             pode_editar_agente=dados.pode_editar_agente,
+            pode_testar_fluxos=dados.pode_testar_fluxos,
         ),
     )
     return Response(status_code=204)

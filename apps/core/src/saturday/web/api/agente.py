@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.agent.graph import NOS, build_graph
 from saturday.agent.service import AgentService
+from saturday.dados import repositorios
 from saturday.dados.modelos import Conversa, Turno
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.privacidade import MASCARAS
@@ -163,6 +164,7 @@ def execucoes(
 
     with abrir_sessao(fabrica) as sessao:
         linhas = sessao.execute(consulta).all()
+        membros = repositorios.testadores(sessao)
 
     return {
         "execucoes": [
@@ -171,6 +173,7 @@ def execucoes(
                 "conversa_id": str(turno.conversa_id),
                 "telefone": MASCARAS["telefone"](telefone) if telefone else None,
                 "canal": canal,
+                "membro": membros.get(telefone) if telefone else None,
             }
             for turno, telefone, canal in linhas[:LIMITE_EXECUCOES]
         ],

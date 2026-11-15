@@ -13,6 +13,8 @@ export interface Eu {
   // Perfil da seção "Você": telefone (só dígitos) e o endereço da foto.
   telefone: string | null;
   foto: string | null;
+  // Conversas do telefone do perfil são de teste (decisão 0020).
+  pode_testar_fluxos: boolean;
   csrf: string;
 }
 
@@ -37,6 +39,8 @@ export interface Resumo {
   janela_aberta: boolean;
   ultima_mensagem: { autor: string; texto: string; em: string } | null;
   etapa: string | null;
+  // Nome do membro testador dono do telefone (decisão 0020), ou null.
+  membro: string | null;
   motivo_handoff: string | null;
   aguardando_desde: string | null;
   envio_falhou: boolean;
@@ -140,6 +144,7 @@ export interface UsuarioGestao {
   email: string;
   perfil: Perfil;
   pode_editar_agente: boolean;
+  pode_testar_fluxos: boolean;
   // Telefone mascarado e o endereço da foto, quando a pessoa pôs.
   telefone: string | null;
   foto: string | null;
@@ -243,6 +248,7 @@ export interface Execucao extends Turno {
   conversa_id: string;
   telefone: string | null;
   canal: string;
+  membro: string | null;
 }
 
 export interface Execucoes {
@@ -692,7 +698,13 @@ export const api = {
   criarUsuario: (dados: NovoUsuario) => chamar<{ id: string }>("POST", "/gestao/usuarios", dados),
   editarUsuario: (
     id: string,
-    dados: { nome: string; email: string; perfil: Perfil; pode_editar_agente: boolean },
+    dados: {
+      nome: string;
+      email: string;
+      perfil: Perfil;
+      pode_editar_agente: boolean;
+      pode_testar_fluxos: boolean;
+    },
   ) =>
     chamar<void>("PATCH", `/gestao/usuarios/${id}`, dados),
   redefinirSenha: (id: string, senha: string) =>

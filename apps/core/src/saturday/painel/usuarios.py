@@ -133,9 +133,12 @@ def editar(
     email: str | None = None,
     perfil: str | None = None,
     pode_editar_agente: bool | None = None,
+    pode_testar_fluxos: bool | None = None,
 ) -> None:
     usuario = _buscar(sessao, usuario_id)
     mudancas: dict[str, Any] = {}
+    if pode_testar_fluxos is not None and pode_testar_fluxos != usuario.pode_testar_fluxos:
+        mudancas["pode_testar_fluxos"] = pode_testar_fluxos
     if pode_editar_agente is not None and pode_editar_agente != usuario.pode_editar_agente:
         mudancas["pode_editar_agente"] = pode_editar_agente
     if nome is not None and _validar_nome(nome) != usuario.nome:
