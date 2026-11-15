@@ -130,34 +130,19 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
   }
 
   // A leitura começa pela última mensagem e a acompanha enquanto a pessoa está
-  // no fim. `fim` vem depois do envio: rolar até a última mensagem a deixaria
-  // atrás do envio fixo.
-  const fim = useRef<HTMLDivElement | null>(null);
-  // A lista rola por conta própria; sem ela (abas Ficha/IA) quem rola é a página.
+  // no fim. Quem rola é a lista, não a página: cabeçalho e envio ficam parados.
   const lista = useRef<HTMLOListElement | null>(null);
   const noFim = useRef(true);
-  useEffect(() => {
-    const medir = () => {
-      const caixa = fim.current?.getBoundingClientRect();
-      const janela = lista.current?.getBoundingClientRect();
-      if (!caixa) return;
-      noFim.current = janela
-        ? caixa.bottom <= janela.bottom + 80
-        : caixa.bottom <= window.innerHeight + 80;
-    };
-    const alvo = lista.current;
-    window.addEventListener("scroll", medir, { passive: true });
-    alvo?.addEventListener("scroll", medir, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", medir);
-      alvo?.removeEventListener("scroll", medir);
-    };
-  }, []);
+  function medir() {
+    const el = lista.current;
+    if (el) noFim.current = el.scrollHeight - el.scrollTop - el.clientHeight <= 80;
+  }
   const ultima = conversa?.mensagens[conversa.mensagens.length - 1]?.id;
   useEffect(() => {
-    if (ultima !== undefined && noFim.current) fim.current?.scrollIntoView({ block: "end" });
-    // Assumir libera o campo de escrever: o fim pode mudar de lugar.
-  }, [ultima, conversa?.atendimento]);
+    const el = lista.current;
+    if (el && noFim.current) el.scrollTop = el.scrollHeight;
+    // Assumir muda a altura do envio; voltar à aba Mensagens remonta a lista.
+  }, [ultima, conversa?.atendimento, aba]);
 
   // Mensagem nova na conversa aberta vira um aviso educado ao leitor de tela.
   // A primeira carga não anuncia nada, nem o que a própria pessoa enviou.
@@ -328,11 +313,12 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
         {(!fichaEmAba || aba === "mensagens") && (
           // Sem abas, as mensagens são só a coluna principal, não um painel de aba.
           <div
+            className="painel-mensagens"
             role={fichaEmAba ? "tabpanel" : undefined}
             id={fichaEmAba ? "conversa-painel" : undefined}
             aria-labelledby={fichaEmAba ? idAba("conversa-painel", aba) : undefined}
           >
-            <ol className="mensagens" ref={lista}>
+            <ol className="mensagens" ref={lista} onScroll={medir}>
               {conversa.mensagens.map((m) => (
                 <li key={m.id} className={`msg msg-${m.direcao} msg-${m.autor}`}>
                   <span className="autor">{AUTOR[m.autor]}</span>
@@ -384,7 +370,6 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
                 }}
               />
             )}
-            <div ref={fim} />
           </div>
         )}
       </section>

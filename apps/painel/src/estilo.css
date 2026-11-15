@@ -643,6 +643,14 @@ main {
 .historico:has(.mensagens) {
   height: calc(100vh - var(--topo) - var(--respiro));
 }
+/* Cabeçalho e abas mantêm a altura; quem cede espaço é o painel das mensagens. */
+.historico > * { flex-shrink: 0; }
+.historico > .painel-mensagens {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
 .historico:has(.mensagens) .mensagens {
   flex: 1 1 auto;
   min-height: 0;
