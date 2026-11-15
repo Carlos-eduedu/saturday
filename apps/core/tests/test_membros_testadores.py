@@ -74,3 +74,49 @@ def test_membro_desativado_deixa_de_ser_testador(client_pg, service_pg, fabrica,
 
     client_pg.post(f"/admin/gestao/usuarios/{membro}/desativar", headers=csrf)
     assert client_pg.get("/admin/conversas").json()[0]["membro"] is None
+
+
+def test_reiniciar_zera_a_jornada_so_do_membro_testador(service_pg, fabrica, conversa):
+    from sqlalchemy import select
+
+    from saturday.agent.textos import MENSAGEM_REINICIADA
+    from saturday.dados.modelos import Conversa, Mensagem
+
+    _membro(fabrica, testa=True)
+    service_pg.process_message(ChatRequest(conversation_id=conversa, message="oi"), ORIGEM)
+    config = service_pg.config(conversa)
+    assert service_pg.estado_atual(config).get("intent")
+
+    resposta = service_pg.process_message(
+        ChatRequest(conversation_id=conversa, message=" /Reiniciar ", message_id="wamid.1"), ORIGEM
+    )
+    assert resposta.answer == MENSAGEM_REINICIADA
+    estado = service_pg.estado_atual(config)
+    assert not estado.get("intent") and estado.get("message_ids_recentes") == ["wamid.1"]
+    with abrir(fabrica) as s:
+        conversa_db = s.scalar(select(Conversa).where(Conversa.conversation_id == conversa))
+        assert conversa_db.etapa is None
+        saidas = s.scalars(
+            select(Mensagem.chave_mensagem).where(
+                Mensagem.conversa_id == conversa_db.id, Mensagem.direcao == "saida"
+            )
+        ).all()
+        assert "reiniciar" in saidas
+
+    # Webhook repetido devolve a mesma resposta sem reiniciar de novo.
+    repetida = service_pg.process_message(
+        ChatRequest(conversation_id=conversa, message="/reiniciar", message_id="wamid.1"), ORIGEM
+    )
+    assert repetida.status == "duplicate"
+
+
+def test_reiniciar_de_cliente_comum_e_texto_qualquer(service_pg, fabrica, conversa):
+    from saturday.agent.textos import MENSAGEM_REINICIADA
+
+    _membro(fabrica, testa=False)
+    service_pg.process_message(ChatRequest(conversation_id=conversa, message="oi"), ORIGEM)
+    resposta = service_pg.process_message(
+        ChatRequest(conversation_id=conversa, message="/reiniciar"), ORIGEM
+    )
+    assert resposta.answer != MENSAGEM_REINICIADA
+    assert service_pg.estado_atual(service_pg.config(conversa)).get("intent")

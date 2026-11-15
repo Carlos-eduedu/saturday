@@ -58,6 +58,10 @@ MENSAGEM_FORA_HORARIO = (
 
 MENSAGEM_RECUSA = "Tudo bem! Se mudar de ideia, é só me chamar. Obrigado pelo contato."
 
+# Só para membro testador (decisão 0020): a jornada volta do zero.
+COMANDO_REINICIAR = "/reiniciar"
+MENSAGEM_REINICIADA = "Conversa reiniciada para teste. Pode começar de novo."
+
 MENSAGEM_BOAS_VINDAS = (
     "Oi! Sou o assistente virtual da MEX. Para eu te ajudar, me conta: você "
     "trabalha de carteira assinada (CLT), é aposentado ou pensionista do INSS, ou "

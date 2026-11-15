@@ -15,7 +15,12 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.agent.context import AgentContext
 from saturday.agent.state import turno_inicial
-from saturday.agent.textos import chave_handoff, mensagem_handoff
+from saturday.agent.textos import (
+    COMANDO_REINICIAR,
+    MENSAGEM_REINICIADA,
+    chave_handoff,
+    mensagem_handoff,
+)
 from saturday.canais.base import CANAIS_WHATSAPP, OrigemCanal
 from saturday.dados import repositorios
 from saturday.dados.modelos import Conversa, Turno
@@ -402,6 +407,13 @@ class AgentService:
 
         self._registrar_entrada(sessao, conversa, payload, historico)
 
+        if (
+            sessao is not None
+            and conversa is not None
+            and self._pediu_reinicio(sessao, conversa, payload)
+        ):
+            return self._reiniciar(payload, config, estado, sessao, conversa)
+
         if sessao is not None and conversa is not None:
             silencio, estado = self._silencio_pelo_banco(sessao, conversa, config, estado)
         else:
@@ -418,6 +430,41 @@ class AgentService:
             ids_recentes,
             respostas,
         )
+
+    @staticmethod
+    def _pediu_reinicio(sessao: Session, conversa: Conversa, payload: ChatRequest) -> bool:
+        """`/reiniciar` de membro testador (decisão 0020); de cliente é texto comum."""
+
+        if (payload.message or "").strip().lower() != COMANDO_REINICIAR:
+            return False
+        return repositorios.testador(sessao, conversa.telefone) is not None
+
+    def _reiniciar(
+        self,
+        payload: ChatRequest,
+        config: dict[str, Any],
+        estado: dict[str, Any],
+        sessao: Session,
+        conversa: Conversa,
+    ) -> AgentReply:
+        """Zera a jornada: estado do grafo, etapa e arquivos do estado.
+
+        A conversa, as mensagens e as provas de consentimento ficam no banco.
+        """
+
+        self._apagar_anexos(estado.get("attachments") or [])
+        thread_id = config["configurable"]["thread_id"]
+        if hasattr(self.checkpointer, "delete_thread"):
+            self.checkpointer.delete_thread(thread_id)
+        conversa.etapa = None
+        # O `message_id` entra no estado novo: um webhook repetido não reinicia de novo.
+        self._registrar_resposta(config, [], {}, payload.message_id, MENSAGEM_REINICIADA)
+        resposta = self.evento(
+            payload.conversation_id, {}, status="answered", answer=MENSAGEM_REINICIADA
+        )
+        self._gravar_saida(sessao, conversa, resposta, {"chave_mensagem": "reiniciar"})
+        logger.info("conversa_reiniciada conversation_id=%s", payload.conversation_id)
+        return resposta
 
     def _conversa(
         self,
