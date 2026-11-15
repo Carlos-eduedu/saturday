@@ -28,7 +28,7 @@ import { useMidia } from "../midia";
 import { type Aviso, useAvisos } from "../tempoReal";
 
 // Cores do SwipeRow pelas variáveis do painel: seguem o tema claro e o escuro.
-const CORES_SWIPE = {
+export const CORES_SWIPE = {
   "--sr-row": "var(--superficie)",
   "--sr-text": "var(--texto)",
   "--sr-drawer": "var(--superficie-2)",
@@ -40,7 +40,7 @@ type Acao = "assumir" | "devolver";
 
 // Uma forma de agir por tela: a partir de 600 px, o botão da linha; abaixo,
 // arrastar (o mesmo corte do CSS que esconde o botão).
-const COM_BOTAO = "(min-width: 600px)";
+export const COM_BOTAO = "(min-width: 600px)";
 const RECARREGAM = new Set<Aviso["tipo"]>(["mensagem", "conversa", "alerta", "turno", "reconectado"]);
 
 // A ação que arrastar faz numa linha; nenhuma quando quem vê não pode agir.

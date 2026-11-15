@@ -1029,6 +1029,19 @@ main:has(.historico) { padding-bottom: 0; }
 .turno-linha-caminho { display: flex; align-items: baseline; gap: 0.75rem; }
 .turno-linha-caminho .turno-caminho { flex: 1; min-width: 0; }
 .turno-linha-caminho > button { flex: none; font-size: 0.85rem; }
+/* No celular o turno arrasta para ver o grafo (SwipeRow, como assumir no
+   inbox): o cartão passa a ser o recorte do componente. */
+.turno.turno-gesto { padding: 0; border: none; background: none; }
+.turno-gesto .swipe-row__clip { border: 1px solid var(--borda); }
+.turno.falhou.turno-gesto .swipe-row__clip { border-color: var(--erro); }
+.turno-gesto .swipe-row[data-phase="idle"],
+.turno-gesto .swipe-row[data-phase="idle"] .swipe-row__clip { height: auto; min-height: var(--sr-h); }
+.turno-gesto .swipe-row__surface { padding: 0; min-height: var(--sr-h); }
+.turno-corpo { flex: 1; min-width: 0; padding: 0.75rem 0.9rem; }
+.turno-gesto .turno-topo { padding-right: var(--alvo); }
+.turno-gesto .swipe-row__action--commit { font-weight: 600; }
+.turno-gesto .swipe-row__toggle { display: grid; width: var(--alvo); height: var(--alvo); border-radius: var(--raio-m); overflow: visible; clip-path: none; color: var(--suave); }
+.turno-gesto .swipe-row__toggle:hover:not(:disabled) { transform: none; box-shadow: none; background: var(--superficie-2); color: var(--texto); }
 .turno-classificacao { color: var(--suave); }
 .turno-chamadas { list-style: none; margin: 0.4rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.2rem; }
 .turno-chamadas li { display: flex; flex-wrap: wrap; gap: 0.5rem; font-size: 0.8rem; color: var(--suave); font-variant-numeric: tabular-nums; }
