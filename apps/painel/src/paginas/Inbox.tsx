@@ -328,7 +328,9 @@ export function Inbox({
   const navegar = useNavigate();
   const abrirPelaSuperficie = (e: MouseEvent, id: string) => {
     if ((e.target as Element).closest("a, button") || arrastou(e)) return;
-    navegar(`/conversas/${id}`);
+    // Sem o link no caminho do clique, Ctrl/⌘/Shift não abririam outra aba sozinhos.
+    if (e.ctrlKey || e.metaKey || e.shiftKey) window.open(`/conversas/${id}`, "_blank", "noopener");
+    else navegar(`/conversas/${id}`);
   };
 
   // Quem é o dono atual, para a confirmação de tomar a conversa de outra pessoa.
