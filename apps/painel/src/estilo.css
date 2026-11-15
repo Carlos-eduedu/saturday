@@ -380,6 +380,8 @@ main {
    fechada"): cabe em 0,8rem, o menor tamanho legível da escala. */
 .linha-canal { display: flex; flex-wrap: wrap; gap: 0 0.5rem; font-size: 0.8rem; color: var(--suave); }
 .linha-canal .janela { font-size: 0.8rem; }
+/* O rótulo quebra inteiro para a linha de baixo, nunca no meio. */
+.linha-canal > * { white-space: nowrap; }
 .fala { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
 .fala .motivo { font-size: 0.8rem; color: var(--handoff); font-weight: 500; }
 /* A coluna de meta pode encolher: sem `min-width: 0` o selo com nome de quem
@@ -441,6 +443,10 @@ main {
 /* O SwipeRow esconde o que passa da altura para poder recolher; fora disso, a
    sombra do cartão precisa aparecer. */
 .inbox .swipe-row:not([data-phase="collapsing"]) { overflow: visible; }
+/* Parada, a linha cresce com o conteúdo (motivo do handoff, rótulo que quebra);
+   a altura fixa do SwipeRow fica só como piso e para a animação de recolher. */
+.inbox .swipe-row[data-phase="idle"],
+.inbox .swipe-row[data-phase="idle"] .swipe-row__clip { height: auto; min-height: var(--sr-h); }
 .inbox .swipe-row__surface { padding: 0; }
 .inbox .swipe-row a {
   width: 100%;
@@ -507,13 +513,15 @@ main {
     color: var(--suave);
   }
   .inbox .swipe-row__toggle:hover:not(:disabled) { transform: none; box-shadow: none; background: var(--superficie-2); color: var(--texto); }
-  .inbox .swipe-row .linha-identidade { padding-right: var(--alvo); }
+  /* Só reserva o canto quando o botão existe: com o Assumir na linha não há
+     ações de arrastar, e o espaço vazio quebrava "janela fechada" em duas. */
+  .inbox .swipe-row:has(.swipe-row__toggle) .linha-identidade { padding-right: var(--alvo); }
   /* Abas com contagem não cabem numa linha: quebram em vez de cortar no meio
      da palavra sob o esmaecido. */
   .filtros [role="tablist"] { flex-wrap: wrap; gap: 0 0.9rem; overflow: visible; mask-image: none; animation: none; }
   .inbox li a { grid-template-columns: minmax(0, 1fr); align-content: center; }
   .inbox .linha-conteudo { grid-template-columns: minmax(0, 1fr); row-gap: 0.2rem; }
-  .linha-identidade { flex-direction: row; gap: 0.6rem; align-items: baseline; padding-right: 0; border-right: 0; }
+  .linha-identidade { flex-direction: row; flex-wrap: wrap; row-gap: 0; gap: 0.6rem; align-items: baseline; padding-right: 0; border-right: 0; }
   .linha-meta { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; }
   /* Como no máximo cabem dois rótulos curtos, é pílula, não faixa inteira. */
   .linha-meta .atencao { order: -1; align-self: flex-start; }
