@@ -274,7 +274,9 @@ def test_foto_do_perfil_vai_para_o_storage_e_so_logado_ve(
 
     assert subir(b"GIF89a", "image/gif").status_code == 415
     assert subir(b"nao e png", "image/png").status_code == 415
-    assert subir(b"\x89PNG\r\n\x1a\n" + b"\x00" * (10 * 1024 * 1024), "image/png").status_code == 413
+    assert (
+        subir(b"\x89PNG\r\n\x1a\n" + b"\x00" * (10 * 1024 * 1024), "image/png").status_code == 413
+    )
 
     primeira = subir(PNG, "image/png").json()["foto"]
     assert primeira.startswith(f"/admin/usuarios/{ana}/foto?v=")
