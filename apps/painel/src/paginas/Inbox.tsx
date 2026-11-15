@@ -134,7 +134,7 @@ export const ROTULO_ATENDIMENTO = { ia: "IA", handoff: "Handoff", assumida: "Ass
 
 /** O único motivo que ganha rótulo na linha: falha de envio é invisível sem
  *  ele. "Sem resposta" e "falando de valores" já aparecem no tempo, na etapa e
- *  no fundo tingido — e a lista põe quem espera no topo. */
+ *  no filtro "pedem atenção" — e a lista põe quem espera no topo. */
 const ATENCAO_PROPRIAS = new Set(["envio_falhou"]);
 
 // `compacta`: a lista estreita ao lado da conversa aberta (`aberta`). Nela, só
@@ -583,7 +583,7 @@ export function Inbox({
                         </time>
                       </span>
                       {c.nao_lida && <span className="sr">não lida</span>}
-                      {/* O fundo tingido também em texto: nunca só cor. */}
+                      {/* O motivo da atenção em texto para leitor de tela; não há marca visual na linha. */}
                       {c.atencao.some((a) => !ATENCAO_PROPRIAS.has(a)) && (
                         <span className="sr">
                           Pede atenção:{" "}
