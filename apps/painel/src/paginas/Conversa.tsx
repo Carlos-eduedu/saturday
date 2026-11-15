@@ -844,7 +844,7 @@ function Acompanhamento({ ficha }: { ficha: Ficha }) {
             </p>
           )}
           <p className="nota">
-            <Link to="/bancos">Ver na Granatech</Link>
+            <Link to="/bancos/granatech">Ver na Granatech</Link>
           </p>
         </>
       )}

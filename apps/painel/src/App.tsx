@@ -8,7 +8,7 @@ import { Alertas } from "./paginas/Alertas";
 import { Canais } from "./paginas/Canais";
 import { Agente } from "./paginas/Agente";
 import { Operacao } from "./paginas/Custos";
-import { Granatech } from "./paginas/Granatech";
+import { Bancos } from "./paginas/Bancos";
 import StaggeredMenu from "./componentes/StaggeredMenu";
 import { Caixa } from "./paginas/Caixa";
 import { Login } from "./paginas/Login";
@@ -155,13 +155,14 @@ function Logado({
           <Route path="/" element={<Caixa eu={eu} />} />
           <Route path="/conversas/:id" element={<Caixa eu={eu} />} />
           <Route path="/alertas" element={<Alertas />} />
-          <Route path="/bancos" element={<Granatech eu={eu} />} />
+          <Route path="/bancos" element={<Bancos eu={eu} />} />
+          <Route path="/bancos/:banco" element={<Bancos eu={eu} />} />
           <Route path="/agente" element={<Agente />} />
           {eu.perfil === "gestor" && <Route path="/canais" element={<Canais />} />}
           <Route path="/membros" element={<Membros eu={eu} atualizarEu={atualizarEu} />} />
           {eu.perfil === "gestor" && <Route path="/operacao" element={<Operacao />} />}
           {/* Endereços antigos, de antes da barra nova: links salvos continuam valendo. */}
-          <Route path="/granatech" element={<Navigate to="/bancos" replace />} />
+          <Route path="/granatech" element={<Navigate to="/bancos/granatech" replace />} />
           <Route path="/usuarios" element={<Navigate to="/membros" replace />} />
           <Route path="/custos" element={<Navigate to="/operacao" replace />} />
           <Route path="*" element={<Navigate to="/" />} />

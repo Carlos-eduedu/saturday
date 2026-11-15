@@ -115,7 +115,8 @@ export function Granatech({ eu }: { eu: Eu }) {
 
   return (
     <div className="canais granatech">
-      <h1 className="titulo-tela">Granatech</h1>
+      {/* Seção de Bancos: o título da tela é "Bancos". */}
+      <h2 className="sr">Granatech</h2>
       {erro && (
         <p className="erro" role="alert">
           {erro}

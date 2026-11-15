@@ -1599,3 +1599,12 @@ small.dado { font-size: 0.8rem; }
 .cabeca-secao h2 { margin: 0; }
 .pessoa { display: inline-flex; align-items: center; gap: 0.6rem; }
 .voce .form-usuario > .voce__fixos { grid-column: 1 / -1; }
+
+/* Bancos: um link por banco ligado, como abas; a seção do banco vem embaixo. */
+.bancos { display: flex; flex-direction: column; gap: 1.25rem; }
+.bancos-nav { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.bancos-nav a { display: flex; flex-direction: column; gap: 0.1rem; min-width: 12rem; padding: 0.6rem 0.9rem; border: 1px solid var(--borda); border-radius: var(--raio-m); background: var(--superficie); color: var(--texto); text-decoration: none; }
+.bancos-nav a span { font-size: 0.8rem; color: var(--suave); }
+.bancos-nav a:hover { border-color: var(--suave); }
+.bancos-nav a[aria-current="page"] { border-color: var(--destaque); box-shadow: 0 0 0 3px var(--destaque-suave); }
+.bancos-nav a[aria-current="page"] strong { color: var(--destaque); }
