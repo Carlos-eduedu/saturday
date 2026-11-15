@@ -5,7 +5,17 @@ import { CHAMADAS, dolar, ETAPAS, MOTIVOS_HANDOFF, NOS, rotulo, tokens } from ".
 
 // Um turno da IA: caminho no grafo, classificação, chamadas e custo. Usado na
 // aba IA da conversa e nas execuções da aba Agente (que passa o cabeçalho).
-export function ItemTurno({ t, topo }: { t: Turno; topo?: ReactNode }) {
+// `verGrafo` põe o botão no fim da linha do caminho, fora do cabeçalho, que
+// na coluna estreita da conversa não tem espaço.
+export function ItemTurno({
+  t,
+  topo,
+  verGrafo,
+}: {
+  t: Turno;
+  topo?: ReactNode;
+  verGrafo?: () => void;
+}) {
   return (
     <li className={t.erro ? "turno falhou" : "turno"}>
       <div className="turno-topo">
@@ -15,7 +25,14 @@ export function ItemTurno({ t, topo }: { t: Turno; topo?: ReactNode }) {
         {t.duracao_ms !== null && <span className="turno-duracao">{duracao(t.duracao_ms)}</span>}
         {t.custo_usd !== null && <span className="turno-custo">{dolar(t.custo_usd)}</span>}
       </div>
-      <p className="turno-caminho">{t.caminho.map((n) => rotulo(NOS, n)).join(" → ")}</p>
+      <div className="turno-linha-caminho">
+        <p className="turno-caminho">{t.caminho.map((n) => rotulo(NOS, n)).join(" → ")}</p>
+        {verGrafo && (
+          <button type="button" className="link" onClick={verGrafo}>
+            Ver grafo
+          </button>
+        )}
+      </div>
       {t.erro && <p className="erro">Erro: {t.erro}</p>}
       {t.classificacao && (
         <p className="turno-classificacao">

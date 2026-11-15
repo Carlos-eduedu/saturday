@@ -623,15 +623,7 @@ function TrilhaIa({ trilha, erro, carregar }: { trilha: Trilha | null; erro: str
       )}
       <ol>
         {trilha.turnos.map((t) => (
-          <ItemTurno
-            key={t.id}
-            t={t}
-            topo={
-              <button type="button" className="link" onClick={() => setGrafoAberto(t)}>
-                Ver grafo
-              </button>
-            }
-          />
+          <ItemTurno key={t.id} t={t} verGrafo={() => setGrafoAberto(t)} />
         ))}
       </ol>
       {grafoAberto && <ModalGrafo turno={grafoAberto} aoFechar={() => setGrafoAberto(null)} />}
