@@ -244,6 +244,10 @@ class UsuarioPainel(Base):
     pode_editar_agente: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=sa_false()
     )
+    # Perfil da própria pessoa (seção "Você" de Membros): contato e foto. A foto
+    # fica no storage privado; aqui só a chave.
+    telefone: Mapped[str | None] = mapped_column(String(20))
+    foto_chave: Mapped[str | None] = mapped_column(String(200))
 
 
 class Auditoria(Base):

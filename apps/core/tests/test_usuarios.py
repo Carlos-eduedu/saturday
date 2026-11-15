@@ -222,3 +222,81 @@ def test_ultimo_gestor_nao_e_desativado_por_outro(
             assert exc.status == 409
         else:
             raise AssertionError("desativou o último gestor")
+
+
+# ------------------------------------------------------------------ "Você"
+
+PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
+JPG = b"\xff\xd8\xff\xe0" + b"\x00" * 32
+
+
+def test_cada_um_edita_o_proprio_perfil_e_o_telefone_fica_fora_da_auditoria(
+    client_pg: TestClient, fabrica: sessionmaker[Session]
+) -> None:
+    _usuario(fabrica, "ana@exemplo.test")
+    csrf = _entrar(client_pg, "ana@exemplo.test")
+
+    resposta = client_pg.patch(
+        "/admin/eu",
+        json={"nome": "  Ana   Souza ", "telefone": "+55 (11) 98765-4321"},
+        headers=csrf,
+    )
+    assert resposta.status_code == 200, resposta.text
+    assert resposta.json()["nome"] == "Ana Souza"
+    assert resposta.json()["telefone"] == "11987654321"
+    assert client_pg.get("/admin/eu").json()["telefone"] == "11987654321"
+    detalhes = _auditoria(fabrica, "perfil_editar")
+    assert detalhes == [{"campos": ["nome", "telefone"]}]
+    assert "98765" not in str(detalhes)
+
+    invalido = client_pg.patch("/admin/eu", json={"nome": "Ana", "telefone": "123"}, headers=csrf)
+    assert invalido.status_code == 422
+    # Perfil e e-mail não se trocam por aqui: são do gestor.
+    assert (
+        client_pg.patch(
+            "/admin/eu", json={"nome": "Ana", "perfil": "gestor"}, headers=csrf
+        ).status_code
+        == 422
+    )
+    assert client_pg.patch("/admin/eu", json={"nome": "Ana"}).status_code == 403
+
+
+def test_foto_do_perfil_vai_para_o_storage_e_so_logado_ve(
+    client_pg: TestClient, fabrica: sessionmaker[Session], storage: Any
+) -> None:
+    ana = _usuario(fabrica, "ana@exemplo.test")
+    csrf = _entrar(client_pg, "ana@exemplo.test")
+
+    def subir(dados: bytes, tipo: str) -> Any:
+        return client_pg.put(
+            "/admin/eu/foto", content=dados, headers={**csrf, "Content-Type": tipo}
+        )
+
+    assert subir(b"GIF89a", "image/gif").status_code == 415
+    assert subir(b"nao e png", "image/png").status_code == 415
+    assert subir(b"\x89PNG\r\n\x1a\n" + b"\x00" * (2 * 1024 * 1024), "image/png").status_code == 413
+
+    primeira = subir(PNG, "image/png").json()["foto"]
+    assert primeira.startswith(f"/admin/usuarios/{ana}/foto?v=")
+    assert client_pg.get(primeira).content == PNG
+    segunda = subir(JPG, "image/jpeg").json()["foto"]
+    assert segunda != primeira
+    resposta = client_pg.get(segunda)
+    assert resposta.content == JPG and resposta.headers["content-type"] == "image/jpeg"
+    # A anterior sai do storage: só a atual fica.
+    assert len([k for k in storage._objetos if k.startswith("painel/usuarios/")]) == 1
+
+    # A equipe vê a foto e o telefone mascarado na lista.
+    _gestor(client_pg, fabrica)
+    linha = next(u for u in client_pg.get(ROTA).json() if u["id"] == str(ana))
+    assert linha["foto"] == segunda
+
+    client_pg.cookies.clear()
+    assert client_pg.get(segunda).status_code == 401
+
+    _entrar(client_pg, "ana@exemplo.test")
+    csrf = {"X-CSRF-Token": client_pg.get("/admin/eu").json()["csrf"]}
+    assert client_pg.delete("/admin/eu/foto", headers=csrf).json()["foto"] is None
+    assert not [k for k in storage._objetos if k.startswith("painel/usuarios/")]
+    assert client_pg.get(segunda).status_code == 404
+    assert _auditoria(fabrica, "perfil_foto_remover")

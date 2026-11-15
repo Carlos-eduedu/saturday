@@ -232,7 +232,8 @@ time, small { font-size: 0.8rem; color: var(--suave); }
 @media (min-width: 1024px) { .conta-topo + .menu-conta { margin-left: 0; } }
 .menu-conta__botao { position: relative; display: grid; place-items: center; width: var(--alvo); height: var(--alvo); padding: 0; border: none; border-radius: 999px; background: none; box-shadow: none; }
 .menu-conta__botao:hover:not(:disabled) { transform: none; box-shadow: none; background: var(--superficie-2); }
-.menu-conta__avatar { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 999px; background: var(--destaque-suave); color: var(--destaque); font-size: 0.85rem; font-weight: 600; letter-spacing: 0.02em; }
+/* Pessoa da equipe: foto redonda, ou as iniciais sobre o cobalto suave. */
+.avatar { display: inline-grid; place-items: center; flex: none; border-radius: 999px; background: var(--destaque-suave); color: var(--destaque); font-weight: 600; letter-spacing: 0.02em; object-fit: cover; }
 .menu-conta__selo { position: absolute; top: 2px; right: 0; min-width: 18px; height: 18px; padding: 0 5px; display: grid; place-items: center; border-radius: 999px; background: var(--handoff); color: var(--superficie); font-size: 0.7rem; font-weight: 700; font-variant-numeric: tabular-nums; box-shadow: 0 0 0 2px var(--superficie); }
 .menu-conta__painel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 40; min-width: 14rem; display: flex; flex-direction: column; padding: 0.4rem; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio-l); box-shadow: var(--sombra-alta); }
 .menu-conta__quem { display: flex; flex-direction: column; gap: 0.1rem; margin: 0; padding: 0.5rem 0.6rem 0.6rem; border-bottom: 1px solid var(--borda); margin-bottom: 0.3rem; }
@@ -1062,7 +1063,22 @@ main:has(.historico) { padding-bottom: 0; }
   .resumo-custos > div + div { border-left: none; border-top: 1px solid var(--borda); }
 }
 .custos td.num { font-family: var(--fonte-mono); font-size: 0.85rem; }
-.custos section { padding: 1.25rem; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio-l); }
+/* Operação: cada parte com título e faixa-resumo; só os blocos de detalhe
+   (por dia, conversas mais caras) ficam em cartão. */
+.operacao > section { display: flex; flex-direction: column; gap: 1rem; }
+.operacao > section > h2 { margin: 0; }
+.operacao > section > section { padding: 1.25rem; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio-l); }
+.operacao section section h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.cota-medidor { display: flex; flex-direction: column; gap: 0.35rem; flex: 1 1 12rem; padding: 0.85rem 1.25rem; }
+.cota-medidor__rotulo { font-size: 0.85rem; color: var(--suave); }
+.cota-medidor__valor { font-size: 1.15rem; color: var(--texto); font-variant-numeric: tabular-nums; }
+.cota-medidor__valor span { font-size: 0.8rem; color: var(--suave); }
+.cota-medidor__barra { display: block; height: 6px; border-radius: 999px; background: var(--superficie-2); overflow: hidden; }
+.cota-medidor__barra > span { display: block; height: 100%; border-radius: inherit; background: var(--ia); }
+.cota-medidor.nivel-atencao .cota-medidor__barra > span { background: var(--handoff); }
+.cota-medidor.nivel-esgotada .cota-medidor__barra > span { background: var(--erro); }
+.cota-medidor.nivel-atencao .cota-medidor__valor, .cota-operacao tr.nivel-atencao td:last-child { color: var(--handoff); font-weight: 600; }
+.cota-medidor.nivel-esgotada .cota-medidor__valor, .cota-operacao tr.nivel-esgotada td:last-child { color: var(--erro); font-weight: 600; }
 .custos table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .custos th { text-align: left; font-size: 0.8rem; font-weight: 500; color: var(--suave); padding: 0.5rem; border-bottom: 1px solid var(--borda); }
 .custos td { padding: 0.5rem; border-bottom: 1px solid var(--borda); }
@@ -1569,3 +1585,17 @@ small.dado { font-size: 0.8rem; }
 @media (max-width: 599px) {
   .compositor .devolver-rodape { margin-left: auto; }
 }
+
+/* Membros: a seção "Você" e a cabeça da equipe com o botão de adicionar. */
+.voce { display: flex; flex-direction: column; gap: 1rem; }
+.voce h2 { margin: 0; }
+.voce__foto { display: flex; align-items: center; gap: 1rem; }
+.voce__foto-acoes { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; }
+.voce__foto-acoes .nota { flex-basis: 100%; margin: 0; }
+.voce__fixos { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 0.5rem 1rem; margin: 0; }
+.voce__fixos dt { font-size: 0.8rem; color: var(--suave); }
+.voce__fixos dd { margin: 0.15rem 0 0; overflow-wrap: anywhere; }
+.cabeca-secao { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.cabeca-secao h2 { margin: 0; }
+.pessoa { display: inline-flex; align-items: center; gap: 0.6rem; }
+.voce .form-usuario > .voce__fixos { grid-column: 1 / -1; }

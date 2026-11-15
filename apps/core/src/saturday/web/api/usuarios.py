@@ -21,6 +21,8 @@ from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.painel import usuarios as regras
 from saturday.painel.acoes import AcaoRecusada
 from saturday.painel.sessoes import agora
+from saturday.privacidade import MASCARAS
+from saturday.web.api.admin import url_foto
 from saturday.web.dependencies import (
     UsuarioLogado,
     exigir_fabrica,
@@ -72,6 +74,9 @@ def _linha(usuario: UsuarioPainel, assumidas: int) -> dict[str, Any]:
         "email": usuario.email,
         "perfil": usuario.perfil,
         "pode_editar_agente": usuario.pode_editar_agente,
+        # Na lista da equipe o telefone vai mascarado, como os outros dados pessoais.
+        "telefone": MASCARAS["telefone"](usuario.telefone) if usuario.telefone else None,
+        "foto": url_foto(usuario.id, usuario.foto_chave),
         "situacao": situacao,
         "bloqueado_ate": ate.isoformat() if ate else None,
         "criado_em": usuario.criado_em.isoformat(),

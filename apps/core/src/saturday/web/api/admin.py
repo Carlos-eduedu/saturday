@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator
+from dataclasses import replace
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Annotated, Any, Literal
@@ -24,6 +25,7 @@ from starlette.concurrency import run_in_threadpool
 from saturday.agent.clt import leitura
 from saturday.agent.service import AgentService
 from saturday.canais.whatsapp.janela import janela_aberta
+from saturday.canais.whatsapp.telefone import normalizar_telefone
 from saturday.dados import repositorios
 from saturday.dados.modelos import (
     Alerta,
@@ -127,6 +129,15 @@ class EdicaoFicha(BaseModel):
         return leitura.email(valor) if valor else valor
 
 
+def url_foto(usuario_id: uuid.UUID, chave: str | None) -> str | None:
+    """Endereço da foto; o nome do arquivo muda a cada troca e serve de versão."""
+
+    if not chave:
+        return None
+    versao = chave.rsplit("/", 1)[-1].split(".", 1)[0]
+    return f"/admin/usuarios/{usuario_id}/foto?v={versao}"
+
+
 def _eu(request: Request, usuario: UsuarioLogado) -> dict[str, Any]:
     segredo = get_settings(request).sessao_segredo.get_secret_value()
     return {
@@ -135,6 +146,9 @@ def _eu(request: Request, usuario: UsuarioLogado) -> dict[str, Any]:
         "nome": usuario.nome,
         "perfil": usuario.perfil,
         "pode_editar_agente": usuario.pode_editar_agente,
+        # O próprio telefone volta inteiro: é a pessoa vendo o que ela digitou.
+        "telefone": usuario.telefone,
+        "foto": url_foto(usuario.id, usuario.foto_chave),
         "csrf": sessoes.token_csrf(segredo, usuario.token),
     }
 
@@ -190,6 +204,149 @@ def logout(usuario: ComCsrf, fabrica: Fabrica) -> Response:
 @router.get("/eu")
 def eu(request: Request, usuario: Logado) -> dict[str, Any]:
     return _eu(request, usuario)
+
+
+# ------------------------------------------------------------------ perfil
+
+# A foto vem crua no corpo, como os anexos; só imagem comum e pequena.
+FOTO_MAX = 2 * 1024 * 1024
+FOTO_TIPOS = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
+FOTO_MIME = {extensao: mime for mime, extensao in FOTO_TIPOS.items()}
+
+
+def _e_imagem(dados: bytes, extensao: str) -> bool:
+    """Confere a assinatura do arquivo: o Content-Type vem do navegador."""
+
+    if extensao == "jpg":
+        return dados.startswith(b"\xff\xd8\xff")
+    if extensao == "png":
+        return dados.startswith(b"\x89PNG\r\n\x1a\n")
+    return dados[:4] == b"RIFF" and dados[8:12] == b"WEBP"
+
+
+class Perfil(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    nome: str = Field(min_length=2, max_length=80)
+    telefone: str | None = Field(default=None, max_length=30)
+
+    @field_validator("nome")
+    @classmethod
+    def _nome(cls, valor: str) -> str:
+        valor = " ".join(valor.split())
+        if len(valor) < 2:
+            raise ValueError("nome curto demais")
+        return valor
+
+    @field_validator("telefone")
+    @classmethod
+    def _telefone(cls, valor: str | None) -> str | None:
+        digitos = "".join(c for c in valor or "" if c.isdigit())
+        if not digitos:
+            return None
+        numero = normalizar_telefone(digitos)
+        if len(numero) not in (10, 11):
+            raise ValueError("telefone inválido: use DDD e número")
+        return numero
+
+
+@router.patch("/eu")
+def atualizar_perfil(
+    dados: Perfil, request: Request, usuario: ComCsrf, fabrica: Fabrica
+) -> dict[str, Any]:
+    """Cada pessoa edita o próprio nome de exibição e telefone. E-mail e perfil
+    continuam com o gestor: o e-mail é o login."""
+
+    with abrir_sessao(fabrica) as sessao:
+        linha = sessao.get(UsuarioPainel, usuario.id)
+        if linha is None:
+            raise HTTPException(status_code=404, detail="usuário não encontrado")
+        mudou = [c for c in ("nome", "telefone") if getattr(linha, c) != getattr(dados, c)]
+        linha.nome = dados.nome
+        linha.telefone = dados.telefone
+        if mudou:
+            # Só os nomes dos campos: o telefone é dado pessoal.
+            auditar(sessao, usuario.id, "perfil_editar", str(usuario.id), {"campos": mudou})
+    return _eu(request, replace(usuario, nome=dados.nome, telefone=dados.telefone))
+
+
+@router.put("/eu/foto")
+async def trocar_foto(
+    request: Request, usuario: ComCsrf, fabrica: Fabrica, service: Servico
+) -> dict[str, Any]:
+    if service.storage is None:
+        raise HTTPException(status_code=503, detail="storage indisponível")
+    extensao = FOTO_TIPOS.get(mime_base(request.headers.get("content-type", "")))
+    if extensao is None:
+        raise HTTPException(status_code=415, detail="a foto precisa ser JPG, PNG ou WebP")
+    dados = await request.body()
+    if not dados:
+        raise HTTPException(status_code=422, detail="arquivo vazio")
+    if len(dados) > FOTO_MAX:
+        raise HTTPException(status_code=413, detail="foto acima de 2 MB")
+    if not _e_imagem(dados, extensao):
+        raise HTTPException(status_code=415, detail="o arquivo não é uma imagem válida")
+
+    chave = await run_in_threadpool(
+        service.storage.salvar,
+        dados,
+        mime_type=FOTO_MIME[extensao],
+        chave=f"painel/usuarios/{usuario.id}/{uuid.uuid4().hex}.{extensao}",
+    )
+    antiga = await run_in_threadpool(_gravar_foto, fabrica, usuario.id, chave)
+    if antiga:
+        await run_in_threadpool(service.storage.apagar, antiga)
+    return _eu(request, replace(usuario, foto_chave=chave))
+
+
+@router.delete("/eu/foto")
+async def remover_foto(
+    request: Request, usuario: ComCsrf, fabrica: Fabrica, service: Servico
+) -> dict[str, Any]:
+    antiga = await run_in_threadpool(_gravar_foto, fabrica, usuario.id, None)
+    if antiga and service.storage is not None:
+        await run_in_threadpool(service.storage.apagar, antiga)
+    return _eu(request, replace(usuario, foto_chave=None))
+
+
+def _gravar_foto(
+    fabrica: sessionmaker[Session], usuario_id: uuid.UUID, chave: str | None
+) -> str | None:
+    """Troca a chave da foto e devolve a anterior, para apagar do storage."""
+
+    with abrir_sessao(fabrica) as sessao:
+        linha = sessao.get(UsuarioPainel, usuario_id)
+        if linha is None:
+            raise HTTPException(status_code=404, detail="usuário não encontrado")
+        antiga = linha.foto_chave
+        linha.foto_chave = chave
+        acao = "perfil_foto" if chave else "perfil_foto_remover"
+        auditar(sessao, usuario_id, acao, str(usuario_id))
+        return antiga
+
+
+@router.get("/usuarios/{usuario_id}/foto")
+async def foto(
+    usuario_id: uuid.UUID, _usuario: Logado, fabrica: Fabrica, service: Servico
+) -> Response:
+    """A foto de quem está na equipe, só para quem entrou no painel."""
+
+    def chave_da_foto() -> str | None:
+        with abrir_sessao(fabrica) as sessao:
+            linha = sessao.get(UsuarioPainel, usuario_id)
+            return linha.foto_chave if linha else None
+
+    chave = await run_in_threadpool(chave_da_foto)
+    if not chave or service.storage is None:
+        raise HTTPException(status_code=404, detail="sem foto")
+    dados = await run_in_threadpool(service.storage.ler, chave)
+    extensao = chave.rsplit(".", 1)[-1]
+    # O endereço muda a cada troca (`?v=`): pode ficar no cache do navegador.
+    return Response(
+        dados,
+        media_type=FOTO_MIME.get(extensao, "application/octet-stream"),
+        headers={"Cache-Control": "private, max-age=31536000, immutable"},
+    )
 
 
 @router.get("/usuarios")
@@ -647,6 +804,28 @@ def cota(request: Request, _usuario: Logado, fabrica: Fabrica) -> dict[str, Any]
     return {
         "mes": {"usadas": int(mes or 0), "teto": settings.granatech_cota_mensal},
         "dia": {"usadas": int(dia or 0), "teto": settings.granatech_cota_diaria},
+    }
+
+
+@router.get("/cota/dias")
+def cota_por_dia(request: Request, _usuario: Logado, fabrica: Fabrica) -> dict[str, Any]:
+    """Consultas gastas em cada dia do mês corrente, para a aba Operação."""
+
+    settings = get_settings(request)
+    hoje = datetime.now(ZoneInfo(TZ_OPERACAO)).date()
+    inicio = date(hoje.year, hoje.month, 1)
+    with abrir_sessao(fabrica) as sessao:
+        linhas = sessao.execute(
+            select(Cota.dia, Cota.usadas)
+            .where(Cota.parceiro == "granatech", Cota.dia >= inicio, Cota.dia <= hoje)
+            .order_by(Cota.dia.desc())
+        ).all()
+    return {
+        "de": inicio.isoformat(),
+        "ate": hoje.isoformat(),
+        "teto_diario": settings.granatech_cota_diaria,
+        "teto_mensal": settings.granatech_cota_mensal,
+        "dias": [{"dia": dia.isoformat(), "usadas": usadas} for dia, usadas in linhas if usadas],
     }
 
 

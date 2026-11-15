@@ -7,12 +7,12 @@ import { MenuConta } from "./componentes/MenuConta";
 import { Alertas } from "./paginas/Alertas";
 import { Canais } from "./paginas/Canais";
 import { Agente } from "./paginas/Agente";
-import { Custos } from "./paginas/Custos";
+import { Operacao } from "./paginas/Custos";
 import { Granatech } from "./paginas/Granatech";
 import StaggeredMenu from "./componentes/StaggeredMenu";
 import { Caixa } from "./paginas/Caixa";
 import { Login } from "./paginas/Login";
-import { Usuarios } from "./paginas/Usuarios";
+import { Membros } from "./paginas/Usuarios";
 import { iniciarTempoReal, useAvisos } from "./tempoReal";
 
 export function App() {
@@ -60,10 +60,18 @@ export function App() {
   if (carregando) return <p className="centro">Carregando…</p>;
   if (falha) return <Falha titulo="Não deu para abrir o painel." texto={falha} aoTentar={conferir} />;
   if (!eu) return <Login aoEntrar={entrar} />;
-  return <Logado eu={eu} aoSair={sair} />;
+  return <Logado eu={eu} aoSair={sair} atualizarEu={entrar} />;
 }
 
-function Logado({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
+function Logado({
+  eu,
+  aoSair,
+  atualizarEu,
+}: {
+  eu: Eu;
+  aoSair: () => void;
+  atualizarEu: (eu: Eu) => void;
+}) {
   useEffect(() => iniciarTempoReal(), []);
   const { pathname } = useLocation();
   // Menu do celular aberto: a página atrás sai do Tab e do leitor de tela.
@@ -75,9 +83,12 @@ function Logado({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
     { label: "Bancos", ariaLabel: "Ir para os bancos", link: "/bancos", ativo: em("/bancos") },
     { label: "Agente", ariaLabel: "Ir para o agente", link: "/agente", ativo: em("/agente") },
     ...(eu.perfil === "gestor"
+      ? [{ label: "Canais", ariaLabel: "Ir para os canais", link: "/canais", ativo: em("/canais") }]
+      : []),
+    // Todos: o atendente vê só a seção "Você"; o gestor, também a equipe.
+    { label: "Membros", ariaLabel: "Ir para os membros", link: "/membros", ativo: em("/membros") },
+    ...(eu.perfil === "gestor"
       ? [
-          { label: "Canais", ariaLabel: "Ir para os canais", link: "/canais", ativo: em("/canais") },
-          { label: "Membros", ariaLabel: "Ir para os membros", link: "/membros", ativo: em("/membros") },
           {
             label: "Operação",
             ariaLabel: "Ir para a operação",
@@ -147,8 +158,8 @@ function Logado({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
           <Route path="/bancos" element={<Granatech eu={eu} />} />
           <Route path="/agente" element={<Agente />} />
           {eu.perfil === "gestor" && <Route path="/canais" element={<Canais />} />}
-          {eu.perfil === "gestor" && <Route path="/membros" element={<Usuarios eu={eu} />} />}
-          {eu.perfil === "gestor" && <Route path="/operacao" element={<Custos />} />}
+          <Route path="/membros" element={<Membros eu={eu} atualizarEu={atualizarEu} />} />
+          {eu.perfil === "gestor" && <Route path="/operacao" element={<Operacao />} />}
           {/* Endereços antigos, de antes da barra nova: links salvos continuam valendo. */}
           <Route path="/granatech" element={<Navigate to="/bancos" replace />} />
           <Route path="/usuarios" element={<Navigate to="/membros" replace />} />

@@ -1,12 +1,118 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
-import { api, type Custos as DadosCustos, ErroApi } from "../api";
+import { api, type CotaPorDia, type Custos as DadosCustos, ErroApi } from "../api";
 import { Falha } from "../componentes/Falha";
 import { Vazio } from "../componentes/Vazio";
 import { dolar, tokens } from "../rotulos";
+import { useAvisos } from "../tempoReal";
 
-// Tela Custos, só para gestor: gasto com IA (OpenRouter) em US$, por dia do mês.
-export function Custos() {
+const mensagem = (e: unknown) => (e instanceof ErroApi ? e.message : "falha ao carregar");
+const diaCurto = (iso: string) =>
+  new Date(`${iso}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+
+// Aba Operação, só para gestor: o uso da cota da Granatech e os relatórios de
+// custos operacionais (IA em US$).
+export function Operacao() {
+  return (
+    <div className="custos operacao">
+      <h1 className="titulo-tela">Operação</h1>
+      <CotaGranatech />
+      <Custos />
+    </div>
+  );
+}
+
+// Uso da cota no mês e em cada dia, contra os tetos (diário e mensal).
+function CotaGranatech() {
+  const [cota, setCota] = useState<CotaPorDia | null>(null);
+  const [erro, setErro] = useState("");
+  const carregar = useCallback(() => {
+    api
+      .cotaPorDia()
+      .then((c) => {
+        setCota(c);
+        setErro("");
+      })
+      .catch((e: unknown) => setErro(mensagem(e)));
+  }, []);
+  useEffect(carregar, [carregar]);
+  useAvisos(useCallback((aviso) => aviso.tipo === "reconectado" && carregar(), [carregar]));
+
+  if (erro)
+    return <Falha titulo="Não deu para carregar a cota da Granatech." texto={erro} aoTentar={carregar} />;
+  if (!cota) return <p className="centro">Carregando…</p>;
+
+  const noMes = cota.dias.reduce((soma, d) => soma + d.usadas, 0);
+  const hoje = cota.dias.find((d) => d.dia === cota.ate)?.usadas ?? 0;
+  const porcento = (usadas: number, teto: number) => (teto ? Math.min(100, (usadas / teto) * 100) : 0);
+  // O painel avisa a partir de 80% do mês (alerta de cota).
+  const nivel = (usadas: number, teto: number) =>
+    usadas >= teto ? "nivel-esgotada" : usadas >= teto * 0.8 ? "nivel-atencao" : "";
+
+  return (
+    <section className="cota-operacao">
+      <h2>
+        Cota da Granatech <span className="contagem">· de {diaCurto(cota.de)} a {diaCurto(cota.ate)}</span>
+      </h2>
+      <div className="resumo-custos cota-medidores">
+        {(
+          [
+            ["No mês", noMes, cota.teto_mensal],
+            ["Hoje", hoje, cota.teto_diario],
+          ] as const
+        ).map(([rotulo, usadas, teto]) => (
+          <div key={rotulo} className={`cota-medidor ${nivel(usadas, teto)}`}>
+            <span className="cota-medidor__rotulo">{rotulo}</span>
+            <span className="cota-medidor__valor">
+              {usadas} <span>de {teto} consultas</span>
+            </span>
+            <span
+              className="cota-medidor__barra"
+              role="meter"
+              aria-label={`Cota ${rotulo.toLowerCase()}`}
+              aria-valuemin={0}
+              aria-valuemax={teto}
+              aria-valuenow={usadas}
+            >
+              <span style={{ width: `${porcento(usadas, teto)}%` }} />
+            </span>
+          </div>
+        ))}
+      </div>
+      <section>
+      <h3>Por dia</h3>
+      {cota.dias.length === 0 ? (
+        <Vazio
+          titulo="Nenhuma consulta neste mês."
+          texto="Cada consulta à Granatech gasta cota; os dias com consulta aparecem aqui."
+        />
+      ) : (
+        <table>
+          <thead>
+            <tr>
+              <th>Dia</th>
+              <th className="num">Consultas</th>
+              <th className="num">Do teto diário</th>
+            </tr>
+          </thead>
+          <tbody>
+            {cota.dias.map((d) => (
+              <tr key={d.dia} className={nivel(d.usadas, cota.teto_diario) || undefined}>
+                <td>{diaCurto(d.dia)}</td>
+                <td className="num">{d.usadas}</td>
+                <td className="num">{Math.round(porcento(d.usadas, cota.teto_diario))}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      </section>
+    </section>
+  );
+}
+
+// Relatórios de custos operacionais: gasto com IA (OpenRouter) em US$, por dia do mês.
+function Custos() {
   const [custos, setCustos] = useState<DadosCustos | null>(null);
   const [erro, setErro] = useState("");
 
@@ -15,24 +121,23 @@ export function Custos() {
     api
       .custos()
       .then(setCustos)
-      .catch((e: unknown) => setErro(e instanceof ErroApi ? e.message : "falha ao carregar"));
+      .catch((e: unknown) => setErro(mensagem(e)));
   }, []);
   useEffect(carregar, [carregar]);
 
   if (erro) return <Falha titulo="Não deu para carregar os custos." texto={erro} aoTentar={carregar} />;
   if (!custos) return <p className="centro">Carregando…</p>;
 
-  const dia = (iso: string) =>
-    new Date(`${iso}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  const dia = diaCurto;
 
   return (
-    <div className="custos">
-      <h1 className="titulo-tela">
-        Custos{" "}
+    <section className="relatorio-custos">
+      <h2>
+        Custos operacionais{" "}
         <span className="contagem">
           · IA em US$, de {dia(custos.de)} a {dia(custos.ate)}
         </span>
-      </h1>
+      </h2>
       {/* Uma faixa só, sem cartões: três números para conferir, não um painel de vitrine. */}
       <dl className="resumo-custos">
         <div>
@@ -58,7 +163,7 @@ export function Custos() {
       </dl>
 
       <section>
-        <h2>Por dia</h2>
+        <h3>Por dia</h3>
         {custos.dias.length === 0 ? (
           <Vazio
             titulo="Nenhum turno da IA neste período."
@@ -90,7 +195,7 @@ export function Custos() {
 
       {custos.conversas_mais_caras.length > 0 && (
         <section>
-          <h2>Conversas mais caras</h2>
+          <h3>Conversas mais caras</h3>
           <ol className="caras">
             {custos.conversas_mais_caras.map((c) => (
               <li key={c.id}>
@@ -101,6 +206,6 @@ export function Custos() {
           </ol>
         </section>
       )}
-    </div>
+    </section>
   );
 }

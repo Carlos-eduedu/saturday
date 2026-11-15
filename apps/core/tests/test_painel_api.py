@@ -581,6 +581,30 @@ def test_cota_zerada_mostra_os_tetos(client_pg, ana):
     }
 
 
+def test_cota_por_dia_traz_so_o_mes_corrente(client_pg, fabrica, ana):
+    from datetime import date, datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    from saturday.dados.modelos import Cota
+    from saturday.settings import TZ_OPERACAO
+
+    hoje = datetime.now(ZoneInfo(TZ_OPERACAO)).date()
+    inicio = date(hoje.year, hoje.month, 1)
+    with abrir(fabrica) as s:
+        s.add_all(
+            [
+                Cota(parceiro="granatech", dia=hoje, usadas=3),
+                Cota(parceiro="granatech", dia=inicio - timedelta(days=1), usadas=9),
+                Cota(parceiro="outro", dia=hoje, usadas=5),
+            ]
+        )
+    _entrar(client_pg, "ana@exemplo.test")
+    resposta = client_pg.get("/admin/cota/dias").json()
+    assert resposta["de"] == inicio.isoformat() and resposta["ate"] == hoje.isoformat()
+    assert resposta["teto_diario"] == 20 and resposta["teto_mensal"] == 500
+    assert resposta["dias"] == [{"dia": hoje.isoformat(), "usadas": 3}]
+
+
 def test_midia_passa_pela_api_com_sessao(client_pg, service_pg, fabrica, storage, ana, conversa):
     chave = storage.salvar(b"%PDF-1.4", mime_type="application/pdf")
     _cliente_escreve(service_pg, conversa, "oi")

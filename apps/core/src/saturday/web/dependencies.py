@@ -72,6 +72,9 @@ class UsuarioLogado:
     token: str
     # Troca modelos e a base de conhecimento na aba Agente; independe do perfil.
     pode_editar_agente: bool = False
+    # Perfil (seção "Você"): telefone e a chave da foto no storage.
+    telefone: str | None = None
+    foto_chave: str | None = None
 
     @property
     def gestor(self) -> bool:
@@ -95,6 +98,8 @@ def usuario_logado(
             usuario.perfil,
             token,
             usuario.pode_editar_agente,
+            usuario.telefone,
+            usuario.foto_chave,
         )
 
 

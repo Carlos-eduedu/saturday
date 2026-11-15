@@ -1,13 +1,23 @@
-import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { type ChangeEvent, type FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { Avatar } from "../componentes/Avatar";
 import { useConfirmar } from "../componentes/Confirmar";
+import { Dialogo } from "../componentes/Dialogo";
 import { Vazio } from "../componentes/Vazio";
-import { api, type Eu, type Perfil, mensagemDeFalha, type UsuarioGestao } from "../api";
+import {
+  api,
+  enviarFoto,
+  type Eu,
+  type Perfil,
+  mensagemDeFalha,
+  type UsuarioGestao,
+} from "../api";
 import { Falha } from "../componentes/Falha";
 
-// Aba Usuários (decisão 0012), só para gestor: cadastrar, editar, redefinir
-// senha, desbloquear, desativar e reativar. Nunca apagar: a auditoria continua
-// dizendo quem fez o quê. As travas (não desativar a si mesmo, nunca ficar sem
-// gestor) são da API; a tela só esconde o que já sabe que vai ser recusado.
+// Aba Membros: a seção "Você" (o próprio perfil) para todos e, para o gestor,
+// a equipe (decisão 0012): cadastrar, editar, redefinir senha, desbloquear,
+// desativar e reativar. Nunca apagar: a auditoria continua dizendo quem fez o
+// quê. As travas (não desativar a si mesmo, nunca ficar sem gestor) são da API;
+// a tela só esconde o que já sabe que vai ser recusado.
 
 const SENHA_MINIMA = 12;
 
@@ -24,13 +34,159 @@ function situacao(u: UsuarioGestao): string {
   return u.situacao.charAt(0).toUpperCase() + u.situacao.slice(1);
 }
 
-export function Usuarios({ eu }: { eu: Eu }) {
+export function Membros({ eu, atualizarEu }: { eu: Eu; atualizarEu: (eu: Eu) => void }) {
+  return (
+    <div className="canais usuarios">
+      <h1 className="titulo-tela">Membros</h1>
+      <Voce eu={eu} atualizarEu={atualizarEu} />
+      {eu.perfil === "gestor" && <Equipe eu={eu} />}
+    </div>
+  );
+}
+
+// O telefone volta só com dígitos: na tela, com DDD e hífen.
+function formatarTelefone(digitos: string | null): string {
+  if (!digitos) return "";
+  const corpo = digitos.slice(2);
+  const meio = corpo.length - 4;
+  return `(${digitos.slice(0, 2)}) ${corpo.slice(0, meio)}-${corpo.slice(meio)}`;
+}
+
+const FOTO_MAX = 2 * 1024 * 1024;
+const FOTO_TIPOS = ["image/jpeg", "image/png", "image/webp"];
+
+// O próprio perfil: nome de exibição, telefone e foto. E-mail e perfil ficam à
+// vista, mas só o gestor troca: o e-mail é o login.
+function Voce({ eu, atualizarEu }: { eu: Eu; atualizarEu: (eu: Eu) => void }) {
+  const [nome, setNome] = useState(eu.nome);
+  const [telefone, setTelefone] = useState(formatarTelefone(eu.telefone));
+  const [erro, setErro] = useState("");
+  const [aviso, setAviso] = useState("");
+  const [ocupado, setOcupado] = useState(false);
+  const arquivo = useRef<HTMLInputElement>(null);
+  const mudou = nome.trim() !== eu.nome || telefone.replace(/\D/g, "") !== (eu.telefone ?? "");
+
+  async function executar(acao: () => Promise<Eu>, feito: string) {
+    setErro("");
+    setAviso("");
+    setOcupado(true);
+    try {
+      const novo = await acao();
+      atualizarEu(novo);
+      setNome(novo.nome);
+      setTelefone(formatarTelefone(novo.telefone));
+      setAviso(feito);
+    } catch (e) {
+      setErro(mensagemDeFalha(e));
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  function escolherFoto(evento: ChangeEvent<HTMLInputElement>) {
+    const foto = evento.target.files?.[0];
+    evento.target.value = "";
+    if (!foto) return;
+    if (!FOTO_TIPOS.includes(foto.type)) return setErro("A foto precisa ser JPG, PNG ou WebP.");
+    if (foto.size > FOTO_MAX) return setErro("A foto passa de 2 MB. Escolha uma menor.");
+    executar(() => enviarFoto(foto), "Foto trocada.");
+  }
+
+  return (
+    <section className="voce" aria-labelledby="voce-titulo">
+      <h2 id="voce-titulo">Você</h2>
+      <div className="voce__foto">
+        <Avatar nome={eu.nome} foto={eu.foto} tamanho={72} />
+        <div className="voce__foto-acoes">
+          <button type="button" onClick={() => arquivo.current?.click()} disabled={ocupado}>
+            {eu.foto ? "Trocar foto" : "Pôr foto"}
+          </button>
+          {eu.foto && (
+            <button
+              type="button"
+              className="link"
+              onClick={() => executar(api.removerFoto, "Foto removida.")}
+              disabled={ocupado}
+            >
+              Remover
+            </button>
+          )}
+          <span className="nota">JPG, PNG ou WebP, até 2 MB.</span>
+        </div>
+        <input
+          ref={arquivo}
+          type="file"
+          accept={FOTO_TIPOS.join(",")}
+          onChange={escolherFoto}
+          hidden
+        />
+      </div>
+      <form
+        className="form-usuario"
+        onSubmit={(e: FormEvent) => {
+          e.preventDefault();
+          executar(() => api.atualizarPerfil(nome.trim(), telefone), "Perfil salvo.");
+        }}
+      >
+        <label>
+          Nome de exibição
+          <input
+            value={nome}
+            onChange={(e) => setNome(e.target.value)}
+            minLength={2}
+            maxLength={80}
+            autoComplete="name"
+            required
+          />
+        </label>
+        <label>
+          Telefone de contato
+          <input
+            type="tel"
+            inputMode="tel"
+            value={telefone}
+            onChange={(e) => setTelefone(e.target.value)}
+            placeholder="DDD e número"
+            maxLength={30}
+            autoComplete="tel-national"
+          />
+        </label>
+        <dl className="voce__fixos">
+          <div>
+            <dt>E-mail (login)</dt>
+            <dd>{eu.email}</dd>
+          </div>
+          <div>
+            <dt>Perfil</dt>
+            <dd>{ROTULO_PERFIL[eu.perfil]}</dd>
+          </div>
+        </dl>
+        <p className="nota">E-mail e perfil só o gestor troca.</p>
+        <button type="submit" disabled={!mudou || ocupado}>
+          Salvar
+        </button>
+      </form>
+      {erro && (
+        <p className="erro" role="alert">
+          {erro}
+        </p>
+      )}
+      {aviso && (
+        <p className="confere" role="status">
+          {aviso}
+        </p>
+      )}
+    </section>
+  );
+}
+
+function Equipe({ eu }: { eu: Eu }) {
   const confirmar = useConfirmar();
   const [usuarios, setUsuarios] = useState<UsuarioGestao[] | null>(null);
   const [erro, setErro] = useState("");
   const [aviso, setAviso] = useState("");
   const [editando, setEditando] = useState<string | null>(null);
-  // Quem espera a confirmação de desativar.
+  const [adicionando, setAdicionando] = useState(false);
 
   const carregar = useCallback(() => {
     api
@@ -64,8 +220,7 @@ export function Usuarios({ eu }: { eu: Eu }) {
   const selecionado = usuarios.find((u) => u.id === editando) ?? null;
 
   return (
-    <div className="canais usuarios">
-      <h1 className="titulo-tela">Usuários</h1>
+    <>
       {erro && (
         <p className="erro" role="alert">
           {erro}
@@ -74,9 +229,14 @@ export function Usuarios({ eu }: { eu: Eu }) {
       {aviso && <p className="confere">{aviso}</p>}
 
       <section>
-        <h2>Equipe</h2>
+        <div className="cabeca-secao">
+          <h2>Equipe</h2>
+          <button type="button" className="principal" onClick={() => setAdicionando(true)}>
+            Adicionar usuário
+          </button>
+        </div>
         {usuarios.length === 0 ? (
-          <Vazio titulo="Nenhum usuário." texto="Cadastre o primeiro abaixo." />
+          <Vazio titulo="Nenhum usuário." texto="Adicione a primeira pessoa da equipe." />
         ) : (
           <table>
             <thead>
@@ -93,8 +253,11 @@ export function Usuarios({ eu }: { eu: Eu }) {
               {usuarios.map((u) => (
                 <tr key={u.id} className={u.situacao === "desativado" ? "desativado" : undefined}>
                   <td>
-                    {u.nome}
-                    {u.id === eu.id && <span className="nota"> (você)</span>}
+                    <span className="pessoa">
+                      <Avatar nome={u.nome} foto={u.foto} tamanho={28} />
+                      {u.nome}
+                      {u.id === eu.id && <span className="nota"> (você)</span>}
+                    </span>
                   </td>
                   <td data-rotulo="E-mail">{u.email}</td>
                   <td data-rotulo="Perfil">{ROTULO_PERFIL[u.perfil]}</td>
@@ -150,8 +313,18 @@ export function Usuarios({ eu }: { eu: Eu }) {
             </tbody>
           </table>
         )}
-        <NovoUsuario agir={agir} />
       </section>
+
+      {adicionando && (
+        <NovoUsuario
+          criado={(texto) => {
+            setErro("");
+            setAviso(texto);
+            carregar();
+          }}
+          fechar={() => setAdicionando(false)}
+        />
+      )}
 
       {selecionado && (
         <EdicaoUsuario
@@ -162,35 +335,56 @@ export function Usuarios({ eu }: { eu: Eu }) {
           fechar={() => setEditando(null)}
         />
       )}
-    </div>
+    </>
   );
 }
 
 type Agir = (acao: () => Promise<unknown>, feito: string) => Promise<boolean>;
 
-function NovoUsuario({ agir }: { agir: Agir }) {
+// Adicionar abre num diálogo: preencher, conferir e confirmar.
+function NovoUsuario({ criado, fechar }: { criado: (aviso: string) => void; fechar: () => void }) {
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [perfil, setPerfil] = useState<Perfil>("atendente");
   const [senha, setSenha] = useState("");
+  // A falha fica no diálogo, onde a pessoa está olhando.
+  const [erro, setErro] = useState("");
+  const [enviando, setEnviando] = useState(false);
 
   async function criar(evento: FormEvent) {
     evento.preventDefault();
-    const ok = await agir(
-      () => api.criarUsuario({ nome, email, perfil, senha }),
-      `${nome.trim()} cadastrado. Passe a senha para a pessoa por um canal seguro.`,
-    );
-    if (ok) {
-      setNome("");
-      setEmail("");
-      setPerfil("atendente");
-      setSenha("");
+    setErro("");
+    setEnviando(true);
+    try {
+      await api.criarUsuario({ nome, email, perfil, senha });
+      criado(`${nome.trim()} adicionado. Passe a senha para a pessoa por um canal seguro.`);
+      fechar();
+    } catch (e) {
+      setErro(mensagemDeFalha(e));
+    } finally {
+      setEnviando(false);
     }
   }
 
   return (
-    <form onSubmit={criar} className="form-usuario">
-      <h3>Cadastrar</h3>
+    <Dialogo
+      titulo="Adicionar usuário"
+      aoFechar={fechar}
+      rodape={
+        <>
+          <button type="button" onClick={fechar}>
+            Cancelar
+          </button>
+          <button type="submit" form="novo-usuario" className="principal" disabled={enviando}>
+            {enviando ? "Adicionando…" : "Adicionar"}
+          </button>
+        </>
+      }
+    >
+    <form id="novo-usuario" onSubmit={criar} className="form-usuario">
+      <p className="nota">
+        A pessoa entra com este e-mail e a senha inicial. Passe a senha por um canal seguro.
+      </p>
       <label>
         Nome
         <input value={nome} onChange={(e) => setNome(e.target.value)} maxLength={80} required />
@@ -224,8 +418,13 @@ function NovoUsuario({ agir }: { agir: Agir }) {
           required
         />
       </label>
-      <button type="submit">Cadastrar</button>
+      {erro && (
+        <p className="erro" role="alert">
+          {erro}
+        </p>
+      )}
     </form>
+    </Dialogo>
   );
 }
 

@@ -10,6 +10,9 @@ export interface Eu {
   nome: string;
   perfil: Perfil;
   pode_editar_agente: boolean;
+  // Perfil da seção "Você": telefone (só dígitos) e o endereço da foto.
+  telefone: string | null;
+  foto: string | null;
   csrf: string;
 }
 
@@ -114,6 +117,15 @@ export interface Cota {
   dia: { usadas: number; teto: number };
 }
 
+// Consultas da Granatech gastas por dia no mês corrente (aba Operação).
+export interface CotaPorDia {
+  de: string;
+  ate: string;
+  teto_diario: number;
+  teto_mensal: number;
+  dias: { dia: string; usadas: number }[];
+}
+
 export interface Usuario {
   id: string;
   nome: string;
@@ -128,6 +140,9 @@ export interface UsuarioGestao {
   email: string;
   perfil: Perfil;
   pode_editar_agente: boolean;
+  // Telefone mascarado e o endereço da foto, quando a pessoa pôs.
+  telefone: string | null;
+  foto: string | null;
   situacao: "ativo" | "bloqueado" | "desativado";
   bloqueado_ate: string | null;
   criado_em: string;
@@ -602,6 +617,16 @@ export function enviarAnexo(id: string, arquivo: Blob, nome: string, legenda: st
   }).then((r) => responder<{ mensagem_id: number }>(r));
 }
 
+// Foto do perfil: arquivo cru no corpo, como o anexo. Devolve o "eu" atualizado.
+export function enviarFoto(arquivo: File) {
+  return buscar("/admin/eu/foto", {
+    method: "PUT",
+    headers: { "X-CSRF-Token": csrf, "Content-Type": arquivo.type || "application/octet-stream" },
+    body: arquivo,
+    credentials: "same-origin",
+  }).then((r) => responder<Eu>(r));
+}
+
 // Fonte da base de conhecimento: arquivo cru no corpo, como o anexo.
 export function enviarFonte(arquivo: File, titulo: string) {
   const params = new URLSearchParams({ titulo, nome: arquivo.name });
@@ -660,6 +685,9 @@ export const api = {
   resolverAlerta: (id: number) => chamar<void>("POST", `/alertas/${id}/resolver`),
   cota: () => chamar<Cota>("GET", "/cota"),
   canais: () => chamar<Canais>("GET", "/canais"),
+  atualizarPerfil: (nome: string, telefone: string) =>
+    chamar<Eu>("PATCH", "/eu", { nome, telefone: telefone || null }),
+  removerFoto: () => chamar<Eu>("DELETE", "/eu/foto"),
   gestaoUsuarios: () => chamar<UsuarioGestao[]>("GET", "/gestao/usuarios"),
   criarUsuario: (dados: NovoUsuario) => chamar<{ id: string }>("POST", "/gestao/usuarios", dados),
   editarUsuario: (
@@ -675,6 +703,7 @@ export const api = {
   reativarUsuario: (id: string) => chamar<void>("POST", `/gestao/usuarios/${id}/reativar`),
   turnos: (id: string) => chamar<Trilha>("GET", `/conversas/${id}/turnos`),
   custos: () => chamar<Custos>("GET", "/custos"),
+  cotaPorDia: () => chamar<CotaPorDia>("GET", "/cota/dias"),
   grafo: () => chamar<Grafo>("GET", "/agente/grafo"),
   // `passos` nulo: os checkpoints do turno já foram podados pela retenção.
   passos: (turno: number) =>
