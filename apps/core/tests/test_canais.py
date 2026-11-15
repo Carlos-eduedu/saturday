@@ -485,3 +485,37 @@ def test_rotulos_da_meta_lidos_da_variavel() -> None:
     for invalido in ("100000000000001", "=Vendas", "100000000000001="):
         with pytest.raises(ValidationError, match="id=Rótulo"):
             Settings(environment="pytest", whatsapp_rotulos=invalido)
+
+
+def test_nao_tira_o_unico_canal_ativo(
+    api: TestClient,
+    fabrica: sessionmaker[Session],
+    settings: Settings,
+    simulador: tuple[str, ModuleType],
+) -> None:
+    # Sem número da Meta: a Evolution conectada é o único canal ativo.
+    api.app.state.settings = settings.model_copy(update={"whatsapp_numeros": []})
+    cabecalhos = _entrar(api, fabrica, "gestor")
+    _, modulo = simulador
+    modulo.INSTANCIAS["mex-vendas"] = {"estado": "open", "telefone": TELEFONE, "webhook": None}
+    modulo.INSTANCIAS["mex-parada"] = {"estado": "close", "telefone": "", "webhook": None}
+
+    for pedido in (
+        lambda: api.delete("/admin/canais/evolution/mex-vendas", headers=cabecalhos),
+        lambda: api.post("/admin/canais/evolution/mex-vendas/desconectar", headers=cabecalhos),
+    ):
+        resposta = pedido()
+        assert resposta.status_code == 409
+        assert "único canal ativo" in resposta.json()["detail"]
+    assert "mex-vendas" in modulo.INSTANCIAS
+
+    # Tirar uma instância desconectada não muda os canais ativos.
+    assert api.delete("/admin/canais/evolution/mex-parada", headers=cabecalhos).status_code == 204
+
+    # Com outra instância conectada, a primeira pode sair.
+    modulo.INSTANCIAS["mex-suporte"] = {
+        "estado": "open",
+        "telefone": "11912345678",
+        "webhook": None,
+    }
+    assert api.delete("/admin/canais/evolution/mex-vendas", headers=cabecalhos).status_code == 204

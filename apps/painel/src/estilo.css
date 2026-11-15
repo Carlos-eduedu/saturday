@@ -1608,3 +1608,9 @@ small.dado { font-size: 0.8rem; }
 .bancos-nav a:hover { border-color: var(--suave); }
 .bancos-nav a[aria-current="page"] { border-color: var(--destaque); box-shadow: 0 0 0 3px var(--destaque-suave); }
 .bancos-nav a[aria-current="page"] strong { color: var(--destaque); }
+
+/* Canais: o resumo dos canais ativos, na mesma faixa dos resumos da Operação. */
+.resumo-canais .resumo-custos dd { margin: 0.15rem 0 0; }
+.resumo-canais__numero { font-size: 1.15rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.resumo-canais .sem-canal .resumo-canais__numero, .resumo-canais .sem-canal .nota { color: var(--erro); }
+.canais > .resumo-canais { padding: 0; background: none; border: none; box-shadow: none; }

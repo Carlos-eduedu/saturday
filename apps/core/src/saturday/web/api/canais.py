@@ -320,8 +320,32 @@ def configurar(
     return Response(status_code=204)
 
 
+def exigir_outro_canal(settings: Settings, cliente: EvolutionClient, nome: str) -> None:
+    """Pelo menos um canal ativo, de qualquer tipo: tirar o último é recusado.
+
+    Ativo é número da Meta configurado ou instância da Evolution conectada.
+    Tirar uma instância que não está conectada não muda nada e passa.
+    """
+
+    if settings.whatsapp_numeros:
+        return
+    try:
+        estados = cliente.listar()
+    except ErroWhatsApp as exc:
+        raise _falha(exc) from exc
+    conectadas = {e.nome for e in estados if e.estado == "open"}
+    if nome in conectadas and not conectadas - {nome}:
+        raise HTTPException(
+            status_code=409,
+            detail="este é o único canal ativo: conecte outro canal antes de tirar este",
+        )
+
+
 @router.post("/evolution/{nome}/desconectar", status_code=204)
-def desconectar(nome: str, usuario: GestorCsrf, fabrica: Fabrica, cliente: Evolution) -> Response:
+def desconectar(
+    nome: str, request: Request, usuario: GestorCsrf, fabrica: Fabrica, cliente: Evolution
+) -> Response:
+    exigir_outro_canal(get_settings(request), cliente, nome)
     try:
         cliente.desconectar(nome)
     except ErroWhatsApp as exc:
@@ -332,7 +356,10 @@ def desconectar(nome: str, usuario: GestorCsrf, fabrica: Fabrica, cliente: Evolu
 
 
 @router.delete("/evolution/{nome}", status_code=204)
-def apagar(nome: str, usuario: GestorCsrf, fabrica: Fabrica, cliente: Evolution) -> Response:
+def apagar(
+    nome: str, request: Request, usuario: GestorCsrf, fabrica: Fabrica, cliente: Evolution
+) -> Response:
+    exigir_outro_canal(get_settings(request), cliente, nome)
     try:
         cliente.apagar(nome)
     except ErroWhatsApp as exc:

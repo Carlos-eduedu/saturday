@@ -13,7 +13,9 @@ import {
 } from "../api";
 import { Falha } from "../componentes/Falha";
 
-// Tela Canais (decisão 0010), só para gestor: números da Meta para consulta e
+// Tela Canais (decisão 0010), só para gestor: um resumo dos canais ativos no
+// topo (o agente precisa de pelo menos um; a API recusa tirar o último), números
+// da Meta para consulta e
 // instâncias da Evolution geridas aqui. O QR se renova sozinho até conectar.
 // Detalhes mostram o webhook e as configurações gravados na Evolution, lado a
 // lado com o que o Saturday aplica; o token nunca chega ao navegador. O gestor
@@ -43,6 +45,47 @@ const ROTULO_CONFIGURACAO: Record<string, string> = {
   readStatus: "Ler status (stories)",
   syncFullHistory: "Sincronizar histórico completo",
 };
+
+// Quantos canais atendem agora, por tipo. Ativo: número da Meta configurado ou
+// instância da Evolution conectada.
+function ResumoCanais({ canais }: { canais: DadosCanais }) {
+  const instancias = canais.evolution.ativo ? canais.evolution.instancias : [];
+  const conectadas = instancias.filter((i) => i.estado === "open").length;
+  const ativos = canais.meta.length + conectadas;
+  return (
+    <section className="resumo-canais" aria-label="Resumo dos canais">
+      <dl className="resumo-custos">
+        <div className={ativos === 0 ? "sem-canal" : undefined}>
+          <dt>Canais ativos</dt>
+          <dd className="resumo-canais__numero">{ativos}</dd>
+          <dd className="nota">
+            {ativos === 0
+              ? "Nenhum: o agente não recebe nem responde ninguém."
+              : ativos === 1
+                ? "O único canal ativo não pode ser desconectado nem apagado."
+                : "O agente atende por todos eles."}
+          </dd>
+        </div>
+        <div>
+          <dt>Evolution (WhatsApp Web)</dt>
+          <dd className="resumo-canais__numero">
+            {canais.evolution.ativo ? `${conectadas} de ${instancias.length}` : "—"}
+          </dd>
+          <dd className="nota">
+            {canais.evolution.ativo ? "instâncias conectadas" : "desligado neste ambiente"}
+          </dd>
+        </div>
+        <div>
+          <dt>WhatsApp oficial (Meta)</dt>
+          <dd className="resumo-canais__numero">{canais.meta.length}</dd>
+          <dd className="nota">
+            {canais.meta.length === 1 ? "número configurado" : "números configurados"}
+          </dd>
+        </div>
+      </dl>
+    </section>
+  );
+}
 
 function simNao(valor: boolean | null): string {
   return valor === null ? "—" : valor ? "sim" : "não";
@@ -86,6 +129,7 @@ export function Canais() {
   return (
     <div className="canais">
       <h1 className="titulo-tela">Canais</h1>
+      <ResumoCanais canais={canais} />
       {erro && (
         <p className="erro" role="alert">
           {erro}
