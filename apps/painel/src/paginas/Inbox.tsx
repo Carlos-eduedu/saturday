@@ -614,7 +614,7 @@ export function Inbox({
                       actionColor={acao === "assumir" ? "var(--destaque)" : "var(--ia)"}
                       // Duas linhas de conteúdo; no celular e na lista compacta, identidade,
                       // fala e meta ficam em linhas próprias.
-                      height={compacta ? 112 : comBotao ? 76 : 136}
+                      height={compacta ? 112 : comBotao ? 76 : 96}
                       radius={14}
                       label={`Conversa ${c.telefone ?? c.canal}`}
                       toggleLabel={`Ações de ${c.telefone ?? c.canal}`}
