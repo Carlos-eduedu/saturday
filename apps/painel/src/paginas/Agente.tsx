@@ -445,9 +445,12 @@ function ListaExecucoes({
   function maisAntigas() {
     if (!lista?.length) return;
     setCarregandoMais(true);
+    const pedida = chave;
     api
       .execucoes({ situacao, no: filtroNo || undefined, antes_de: lista[lista.length - 1].id })
       .then((r) => {
+        // Filtro trocado no meio do pedido: a página é da lista anterior.
+        if (chaveAtual.current !== pedida) return;
         setLista((atual) => [...(atual ?? []), ...r.execucoes]);
         setTemMais(r.tem_mais);
       })
