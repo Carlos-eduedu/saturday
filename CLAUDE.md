@@ -26,9 +26,11 @@ for mexer no painel): `.venv` próprio e o banco `saturday_test_<nome>`.
 
 Para ver telas rodando, `infra/painel_local.sh` sobe a API (banco
 `saturday_painel_dev`, segredos fictícios) e o Vite em `:5173`;
-`infra/painel_local.sh seed` cria antes uma conversa CLT com humano, ficha
-preenchida e consulta parada (`infra/painel_seed.py`), mais um alerta e um
-turno (`infra/painel_seed.sql`). A revisão de um diff
+`infra/painel_local.sh seed` cria antes o gestor `gestor@exemplo.test` (a senha
+sai no fim do seed, ou vem de `PAINEL_LOCAL_SENHA`), conversas nas três
+situações, uma com imagem, PDF e arquivo sem prévia num S3 local, e a conversa
+CLT com humano, ficha preenchida e consulta parada (`infra/painel_seed.py`),
+mais um alerta e um turno (`infra/painel_seed.sql`). A revisão de um diff
 do painel segue o `CODING_STANDARDS.md`.
 
 ## Arquitetura (o que exige ler vários arquivos)
