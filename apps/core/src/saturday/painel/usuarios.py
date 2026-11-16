@@ -15,9 +15,9 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from saturday.dados import repositorios
+from saturday.dados import atendimento
 from saturday.dados.modelos import Conversa, UsuarioPainel
-from saturday.dados.trava import travar_conversa
+from saturday.dados.trava import travar_e_reler
 from saturday.painel.acoes import AcaoRecusada
 from saturday.painel.auditoria import auditar
 from saturday.painel.sessoes import (
@@ -218,20 +218,14 @@ def desativar(sessao: Session, autor_id: uuid.UUID, usuario_id: uuid.UUID) -> in
     )
     devolvidas = 0
     for conversation_id in ids:
-        travar_conversa(sessao, conversation_id)
-        conversa = sessao.scalars(
-            select(Conversa)
-            .where(Conversa.conversation_id == conversation_id)
-            .execution_options(populate_existing=True)
-        ).one()
+        conversa = travar_e_reler(sessao, conversation_id)
         if conversa.atendimento != "assumida" or conversa.atendente_id != usuario.id:
             continue
-        repositorios.mudar_atendimento(sessao, conversa, "handoff")
-        repositorios.abrir_alerta(
+        atendimento.entrar_em_handoff(
             sessao,
+            conversa,
             "atendente_desativado",
-            conversa_id=conversa.id,
-            detalhe={"usuario_id": str(usuario.id), "nome": usuario.nome},
+            {"usuario_id": str(usuario.id), "nome": usuario.nome},
         )
         devolvidas += 1
 

@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from saturday.canais.base import CANAIS_WHATSAPP, Envio
 from saturday.canais.whatsapp.janela import janela_aberta
 from saturday.canais.whatsapp.modelos import MODELOS
-from saturday.dados import repositorios
+from saturday.dados import atendimento, repositorios
 from saturday.dados.modelos import (
     Auditoria,
     ConsultaGranatech,
@@ -29,10 +29,9 @@ from saturday.dados.modelos import (
 )
 from saturday.dados.outbox import enfileirar
 from saturday.dados.sessao import sessao as abrir_sessao
-from saturday.dados.trava import travar_conversa
+from saturday.dados.trava import travar_e_reler
 from saturday.painel import midia
 from saturday.painel.auditoria import auditar
-from saturday.painel.supervisao import TIPOS_DE_HANDOFF
 from saturday.storage.base import Storage
 
 logger = logging.getLogger(__name__)
@@ -68,23 +67,13 @@ def conversa_travada(
         )
         if conversation_id is None:
             raise AcaoRecusada(404, "conversa não encontrada")
-        travar_conversa(sessao, conversation_id)
-        conversa = sessao.scalars(
-            select(Conversa)
-            .where(Conversa.id == conversa_id)
-            .execution_options(populate_existing=True)
-        ).one()
-        yield sessao, conversa
+        yield sessao, travar_e_reler(sessao, conversation_id)
 
 
 # Ações que mudam o atendimento; a última delas é a única que se desfaz.
 ACOES_DE_ATENDIMENTO = ("assumir", "devolver", "transferir", "desfazer")
 # Folga sobre os 5 s em que o painel mostra "Desfazer".
 PRAZO_DESFAZER = timedelta(seconds=15)
-# Alertas que cada ação dá por tratados (docs/decisoes/0018). Transferir não
-# resolve nada, e `evento_com_humano` nunca se resolve sozinho.
-ALERTAS_DE_ASSUMIR = TIPOS_DE_HANDOFF
-ALERTAS_DE_DEVOLVER = (*TIPOS_DE_HANDOFF, "sem_resposta")
 
 
 def _estado(conversa: Conversa) -> dict[str, Any]:
@@ -108,8 +97,7 @@ def assumir(sessao: Session, conversa: Conversa, usuario_id: uuid.UUID, gestor: 
             return
         _exigir_dono(conversa, usuario_id, gestor)
     antes = _estado(conversa)
-    repositorios.mudar_atendimento(sessao, conversa, "assumida", atendente_id=usuario_id)
-    alertas = repositorios.resolver_alertas(sessao, conversa.id, ALERTAS_DE_ASSUMIR, usuario_id)
+    alertas = atendimento.assumir(sessao, conversa, usuario_id)
     auditar(sessao, usuario_id, "assumir", str(conversa.id), {**antes, "alertas": alertas})
 
 
@@ -119,8 +107,7 @@ def devolver(sessao: Session, conversa: Conversa, usuario_id: uuid.UUID, gestor:
     if conversa.atendimento == "assumida":
         _exigir_dono(conversa, usuario_id, gestor)
     antes = _estado(conversa)
-    repositorios.mudar_atendimento(sessao, conversa, "ia")
-    alertas = repositorios.resolver_alertas(sessao, conversa.id, ALERTAS_DE_DEVOLVER, usuario_id)
+    alertas = atendimento.devolver(sessao, conversa, usuario_id)
     auditar(sessao, usuario_id, "devolver", str(conversa.id), {**antes, "alertas": alertas})
 
 
@@ -157,7 +144,7 @@ def desfazer(sessao: Session, conversa: Conversa, usuario_id: uuid.UUID) -> None
         if destino is None or not destino.ativo:
             raise AcaoRecusada(409, "não dá mais para desfazer: quem estava com ela saiu")
     destino_atendimento = str(antes.get("antes"))
-    repositorios.mudar_atendimento(sessao, conversa, destino_atendimento, atendente_id=dono)
+    atendimento.restaurar(sessao, conversa, destino_atendimento, dono)
     if "alertas" in antes:
         reabertos = repositorios.reabrir_alertas(sessao, [int(i) for i in antes["alertas"]])
     elif destino_atendimento == "handoff":
@@ -189,7 +176,7 @@ def transferir(
     if destino is None or not destino.ativo:
         raise AcaoRecusada(404, "atendente de destino não encontrado")
     anterior = conversa.atendente_id
-    repositorios.mudar_atendimento(sessao, conversa, "assumida", atendente_id=destino_id)
+    atendimento.transferir(sessao, conversa, destino_id)
     auditar(
         sessao,
         usuario_id,

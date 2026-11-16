@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from saturday.dados import repositorios
+from saturday.dados import atendimento, repositorios
 from saturday.dados.modelos import Alerta, Auditoria, Conversa, SessaoPainel, UsuarioPainel
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.painel import sessoes
@@ -146,7 +146,7 @@ def test_desativar_devolve_conversas_derruba_sessao_e_barra_login(
     with abrir_sessao(fabrica) as sessao:
         for numero in ("1", "2"):
             conversa = repositorios.obter_ou_criar_conversa(sessao, f"chat:{numero}")
-            repositorios.mudar_atendimento(sessao, conversa, "assumida", atendente_id=ana)
+            atendimento.assumir(sessao, conversa, ana)
         usuario = sessao.get(UsuarioPainel, ana)
         assert usuario is not None
         token = sessoes.abrir_sessao(sessao, usuario)
@@ -164,6 +164,14 @@ def test_desativar_devolve_conversas_derruba_sessao_e_barra_login(
         assert alertas == ["atendente_desativado", "atendente_desativado"]
         assert sessoes.usuario_da_sessao(sessao, token) is None
     assert _auditoria(fabrica, "usuario_desativar") == [{"conversas": 2}]
+
+    # Quem assume a conversa trata o alerta (docs/decisoes/0021).
+    with abrir_sessao(fabrica) as sessao:
+        conversa = repositorios.buscar_conversa(sessao, "chat:1")
+        assert conversa is not None
+        assert len(atendimento.assumir(sessao, conversa, gestor_id)) == 1
+        abertos = sessao.scalars(select(Alerta.conversa_id).where(Alerta.resolvido_em.is_(None)))
+        assert conversa.id not in abertos.all()
 
     # Some da lista de transferir; o login recusa como senha errada.
     destinos = client_pg.get("/admin/usuarios").json()

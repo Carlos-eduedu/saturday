@@ -9,7 +9,7 @@ import pytest
 from conftest import resultado_jev
 from sqlalchemy import func, select
 
-from saturday.dados import repositorios
+from saturday.dados import atendimento, repositorios
 from saturday.dados.modelos import (
     Alerta,
     Auditoria,
@@ -44,7 +44,7 @@ def _atendente(fabrica, email="ana@exemplo.test"):
 def _assumir(fabrica, conversation_id, usuario_id):
     with abrir_sessao(fabrica) as sessao:
         conversa = repositorios.buscar_conversa(sessao, conversation_id)
-        repositorios.mudar_atendimento(sessao, conversa, "assumida", atendente_id=usuario_id)
+        atendimento.assumir(sessao, conversa, usuario_id)
 
 
 def _saidas(fabrica, conversation_id):

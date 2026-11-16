@@ -9,7 +9,7 @@ from datetime import timedelta
 import psycopg
 from sqlalchemy import func, select, update
 
-from saturday.dados import repositorios
+from saturday.dados import atendimento, repositorios
 from saturday.dados.modelos import Alerta, Conversa, Mensagem, Outbox
 from saturday.dados.outbox import enfileirar, marcar_desistencia
 from saturday.dados.sessao import sessao as abrir
@@ -100,7 +100,7 @@ def _conversa_assumida(fabrica, conversation_id, minutos_atras):
         usuario = sessoes.criar_usuario(s, f"{conversation_id}@exemplo.test", "x" * 12, "atendente")
         conversa = repositorios.obter_ou_criar_conversa(s, conversation_id, canal="whatsapp")
         repositorios.registrar_entrada(s, conversa, message_id=None, conteudo="oi?")
-        repositorios.mudar_atendimento(s, conversa, "assumida", atendente_id=usuario.id)
+        atendimento.assumir(s, conversa, usuario.id)
         s.execute(
             update(Conversa)
             .where(Conversa.id == conversa.id)

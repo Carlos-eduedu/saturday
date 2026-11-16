@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from saturday.agent.context import AgentContext
 from saturday.agent.textos import chave_handoff, mensagem_handoff
 from saturday.canais.base import CANAIS_WHATSAPP, Envio
-from saturday.dados import repositorios
+from saturday.dados import atendimento, repositorios
 from saturday.dados.modelos import Conversa, Turno
 from saturday.dados.outbox import enfileirar
 from saturday.dados.sessao import sessao as abrir_sessao
@@ -231,13 +231,8 @@ class RegistroPostgres:
         motivo: str | None,
         detalhe: dict[str, Any] | None = None,
     ) -> None:
-        repositorios.mudar_atendimento(self.sessao, self.conversa, "handoff")
-        repositorios.abrir_alerta(
-            self.sessao,
-            tipo_alerta,
-            conversa_id=self.conversa.id,
-            detalhe={"motivo": motivo, **(detalhe or {})},
-            unico=True,
+        atendimento.entrar_em_handoff(
+            self.sessao, self.conversa, tipo_alerta, {"motivo": motivo, **(detalhe or {})}
         )
 
     def alertar_evento_com_humano(self, detalhe: dict[str, Any]) -> None:

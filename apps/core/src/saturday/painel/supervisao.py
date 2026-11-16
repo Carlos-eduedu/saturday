@@ -17,6 +17,7 @@ from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.orm import Session
 
 from saturday.dados import repositorios
+from saturday.dados.atendimento import TIPOS_DE_HANDOFF
 from saturday.dados.modelos import Alerta, Conversa, Mensagem
 
 # Cliente sem resposta por mais que isto pede atenção.
@@ -24,7 +25,6 @@ ESPERA_ATENCAO = timedelta(minutes=5)
 # Etapas em que a IA fala de dinheiro com o cliente.
 ETAPAS_DE_DINHEIRO = frozenset({"oferta", "aceite", "proposta"})
 PREVIA_MAXIMA = 140
-TIPOS_DE_HANDOFF = ("handoff", "erro_interno")
 
 
 def _previa(mensagem: Mensagem) -> str:

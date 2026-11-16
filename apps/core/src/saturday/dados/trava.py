@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import hashlib
 
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
+
+from saturday.dados.modelos import Conversa
 
 _MASCARA_64 = (1 << 64) - 1
 
@@ -40,3 +42,18 @@ def travar_conversa(sessao: Session, conversation_id: str) -> None:
         text("SELECT pg_advisory_xact_lock(:chave)"),
         {"chave": chave_trava(conversation_id)},
     )
+
+
+def travar_e_reler(sessao: Session, conversation_id: str) -> Conversa:
+    """Trava a conversa e a relê já sob a trava.
+
+    `populate_existing` descarta a cópia que a sessão já tinha: quem decide com
+    ela decide com o estado de antes de o outro processo terminar.
+    """
+
+    travar_conversa(sessao, conversation_id)
+    return sessao.scalars(
+        select(Conversa)
+        .where(Conversa.conversation_id == conversation_id)
+        .execution_options(populate_existing=True)
+    ).one()

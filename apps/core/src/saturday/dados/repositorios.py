@@ -176,22 +176,6 @@ def atualizar_status(sessao: Session, *, wamid: str, status: str) -> bool:
     return True
 
 
-def mudar_atendimento(
-    sessao: Session,
-    conversa: Conversa,
-    atendimento: str,
-    *,
-    atendente_id: uuid.UUID | None = None,
-) -> None:
-    """Muda quem responde a conversa: `ia`, `handoff` ou `assumida`."""
-
-    conversa.atendimento = atendimento
-    conversa.atendente_id = atendente_id if atendimento == "assumida" else None
-    conversa.atendimento_em = func.now()
-    sessao.flush()
-    notificar(sessao, "conversa", conversa=conversa.id)
-
-
 def abrir_alerta(
     sessao: Session,
     tipo: str,

@@ -24,6 +24,7 @@ export const MOTIVOS_HANDOFF: Record<string, string> = {
   aceite_clt: "Cliente aceitou a oferta",
   aceitou_portabilidade: "Cliente aceitou a portabilidade",
   acima_do_teto: "Valor acima do teto",
+  atendente_desativado: "Atendente desativado",
   brasilapi_indisponivel: "BrasilAPI fora do ar",
   consulta_com_erro: "Consulta com erro",
   cota_esgotada: "Cota esgotada",

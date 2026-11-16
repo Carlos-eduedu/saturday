@@ -12,7 +12,7 @@ Não roda o grafo nem chama parceiro nenhum. Pode rodar de novo. Use por
 """
 
 from saturday.agent.graph import build_graph
-from saturday.dados import repositorios
+from saturday.dados import atendimento, repositorios
 from saturday.dados.modelos import ConsultaGranatech
 from saturday.dados.sessao import criar_engine, criar_factory
 from saturday.dados.sessao import sessao as abrir
@@ -44,8 +44,7 @@ with abrir(fabrica) as sessao:
         repositorios.registrar_saida(
             sessao, conversa, conteudo="Vou chamar alguém da equipe."
         )
-    repositorios.mudar_atendimento(sessao, conversa, "handoff")
-    repositorios.abrir_alerta(sessao, "handoff", conversa_id=conversa.id, unico=True)
+    atendimento.entrar_em_handoff(sessao, conversa, "handoff")
     if sessao.scalar(
         select(ConsultaGranatech.id).where(ConsultaGranatech.id_externo == "seed-1")
     ):

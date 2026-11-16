@@ -22,7 +22,7 @@ from saturday.agent.textos import (
 from saturday.agent.turno import RegistroDoTurno, RegistroMemoria, RegistroPostgres, Turnos
 from saturday.agent.turno import etapa_do_estado as etapa_do_estado
 from saturday.canais.base import OrigemCanal
-from saturday.dados import repositorios
+from saturday.dados import atendimento, repositorios
 from saturday.dados.modelos import Conversa
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.dados.trava import travar_conversa
@@ -271,8 +271,7 @@ class AgentService:
         Os alertas se resolvem sem usuário e não há auditoria.
         """
 
-        repositorios.mudar_atendimento(sessao, conversa, "ia")
-        repositorios.resolver_alertas(sessao, conversa.id, acoes.ALERTAS_DE_DEVOLVER, None)
+        atendimento.devolver(sessao, conversa, None)
         return self._liberar_handoff(config)
 
     def editar_ficha(self, conversation_id: str, campos: dict[str, Any]) -> None:
