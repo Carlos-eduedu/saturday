@@ -75,3 +75,6 @@ jobs:
 
       - name: Tipos e build
         run: npm run build
+
+      - name: Testes
+        run: npm run teste

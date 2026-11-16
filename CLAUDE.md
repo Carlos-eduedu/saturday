@@ -23,6 +23,17 @@ docker exec saturday-postgres-1 createdb -U saturday saturday_test_<nome>
 - O compose local publica portas fixas: só uma worktree sobe o compose por vez.
 - Ao terminar, o ramo da worktree entra na `main` com fast-forward
   (`git rebase main` antes, se a `main` andou) e a `main` vai para o push.
+- Ao remover a worktree, apague o banco dela:
+  `docker exec saturday-postgres-1 dropdb -U saturday saturday_test_<nome>`.
+- Na sessão presa à worktree, cada chamada leva um `git` simples: comando com
+  `cd`, `&&` ou função de shell junto do `git` é recusado.
+
+## Painel no navegador
+
+Para ver telas rodando, `infra/painel_local.sh` sobe a API (banco
+`saturday_painel_dev`, segredos fictícios) e o Vite em `:5173`;
+`infra/painel_seed.sql` acrescenta um alerta e um turno. A revisão de um diff
+do painel segue o `CODING_STANDARDS.md`.
 
 ## Arquitetura (o que exige ler vários arquivos)
 
