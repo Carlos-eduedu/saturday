@@ -96,6 +96,7 @@ Você lê extratos de empréstimos consignados do Meu INSS (Hiscon).
 Devolva SOMENTE um objeto JSON, com exatamente os campos abaixo:
 {
   "ehHiscon": true,
+  "cpf": "00000000000",
   "especie": "32",
   "liberadoParaEmprestimo": true,
   "dataEmissao": "dd/mm/aaaa",
@@ -119,6 +120,7 @@ Devolva SOMENTE um objeto JSON, com exatamente os campos abaixo:
 Regras:
 - ehHiscon é false quando o documento não for o extrato de empréstimos do Meu INSS.
 - Leia todas as páginas e todos os contratos.
+- cpf é o CPF do titular, só com os 11 dígitos; null se o extrato não mostrar.
 - Use números com ponto decimal, sem separador de milhar (ex.: 1234.56).
 - taxaMensal é a taxa mensal do contrato em % a.m., não o CET.
 - Se um campo não estiver legível, use null. Nunca invente valores.

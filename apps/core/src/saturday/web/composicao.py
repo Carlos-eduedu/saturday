@@ -61,6 +61,7 @@ def criar_contexto(
         granatech_teste=criar_cliente_granatech_teste(http, settings, fabrica),
         brasilapi=BrasilAPI(http, fabrica) if granatech is not None else None,
         fabrica=fabrica,
+        c6_ativo=settings.c6_ativo,
         dominio_publico=settings.dominio_publico,
         conhecimento=Conhecimento(http, settings, fabrica, modelos),
     )

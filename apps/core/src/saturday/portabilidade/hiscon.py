@@ -166,6 +166,8 @@ class Extrato(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     ehHiscon: bool = False
+    # Só dígitos quando o extrato traz; o nó confere os dígitos verificadores.
+    cpf: str | None = None
     especie: str | None = None
     liberadoParaEmprestimo: bool = False
     dataEmissao: str | None = None
@@ -179,6 +181,15 @@ class Extrato(BaseModel):
     @classmethod
     def _bool(cls, valor: Any) -> bool:
         return _booleano(valor)
+
+    @field_validator("cpf", mode="before")
+    @classmethod
+    def _cpf(cls, valor: Any) -> str | None:
+        # O modelo de visão pode devolver número ou texto com pontuação.
+        if isinstance(valor, bool) or not isinstance(valor, int | str):
+            return None
+        digitos = "".join(c for c in str(valor) if c.isdigit())
+        return digitos.zfill(11) if 0 < len(digitos) <= 11 else None
 
     @field_validator("especie", mode="before")
     @classmethod

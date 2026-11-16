@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -9,10 +10,13 @@ from zoneinfo import ZoneInfo
 from langchain_core.messages import AIMessage
 from langgraph.runtime import Runtime
 
+from saturday.agent.clt import leitura
 from saturday.agent.coleta import hoje_operacao, normalizar_uf, parse_data_nascimento
 from saturday.agent.context import AgentContext
 from saturday.agent.state import AgentState
 from saturday.agent.textos import (
+    CONSENTIMENTO_C6,
+    CONSENTIMENTO_C6_REPETIR,
     MENSAGEM_BOAS_VINDAS,
     MENSAGEM_EXTRATO_ILEGIVEL,
     MENSAGEM_EXTRATO_INCORRETO,
@@ -21,19 +25,25 @@ from saturday.agent.textos import (
     MENSAGEM_RECUSA,
     MENSAGEM_SEM_TEXTO,
     MENSAGENS_FALHA_CALCULO,
+    PERGUNTA_CPF,
+    PERGUNTA_CPF_INVALIDO,
     PERGUNTA_DATA,
     PERGUNTA_DATA_INVALIDA,
     PERGUNTA_UF,
     PERGUNTA_UF_INVALIDA,
+    VERSAO_CONSENTIMENTO_C6,
     chave_handoff,
     mensagem_handoff,
 )
+from saturday.dados import consentimentos
 from saturday.portabilidade import calculo, mensagem
 from saturday.portabilidade import hiscon as hiscon_mod
 from saturday.portabilidade.regras import IDADE_WEBPLUS, PRAZO_C6
 from saturday.portabilidade.util import parse_data
 from saturday.services.anexos import AnexoInvalido
 from saturday.settings import HISTORY_MAX_MESSAGES, JEV_INTENT_THRESHOLD, TZ_OPERACAO
+
+CONSENTIMENTO_SIMULACAO_C6 = "simulacao_c6"
 
 
 def _historico(state: AgentState) -> list[dict[str, str]]:
@@ -89,6 +99,7 @@ def _pedido(pergunta: str, aguardando: str, chave: str) -> dict[str, Any]:
         "answer": pergunta,
         "chave_mensagem": chave,
         "aguardando": aguardando,
+        "tentativas_coleta": 0,
         "needs_human": False,
         "messages": [AIMessage(content=pergunta)],
     }
@@ -356,8 +367,8 @@ def read_statement(state: AgentState, runtime: Runtime[AgentContext]) -> dict[st
     }
 
 
-def check_customer_data(state: AgentState) -> dict[str, Any]:
-    """Confere se faltam dados do cliente (nascimento, UF) para calcular."""
+def check_customer_data(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
+    """Confere se faltam dados do cliente (nascimento, UF) e o SIM da simulação no C6."""
 
     cliente: dict[str, Any] = dict(state.get("cliente") or {})
     hoje = hoje_operacao()
@@ -372,6 +383,15 @@ def check_customer_data(state: AgentState) -> dict[str, Any]:
 
     if idade >= IDADE_WEBPLUS and uf is None:
         return _pedido(PERGUNTA_UF, "uf", "textos:pergunta_uf")
+
+    # Com o C6 ligado, o cliente decide uma vez por conversa se autoriza a simulação.
+    if runtime.context.c6_ativo and "c6_autorizado" not in cliente:
+        cpf = cliente.get("cpf") or leitura.cpf(str((state.get("hiscon") or {}).get("cpf") or ""))
+        if cpf is None:
+            return {**_pedido(PERGUNTA_CPF, "cpf", "textos:pergunta_cpf"), "cliente": cliente}
+        cliente["cpf"] = cpf
+        pedido = _pedido(CONSENTIMENTO_C6, "consentimento_c6", "textos:consentimento_c6")
+        return {**pedido, "cliente": cliente}
 
     return {
         "status": "in_progress",
@@ -399,8 +419,19 @@ def _falha_coleta(state: AgentState, pergunta: str, chave: str) -> dict[str, Any
     }
 
 
-def collect_customer_data(state: AgentState) -> dict[str, Any]:
-    """Recebe o dado pedido (nascimento, UF) e valida em código."""
+def _sem_c6(
+    state: AgentState, cliente: dict[str, Any], pergunta: str, chave: str
+) -> dict[str, Any]:
+    """Repete a pergunta uma vez; na segunda, segue só com a portabilidade."""
+
+    if int(state.get("tentativas_coleta") or 0) >= 1:
+        cliente["c6_autorizado"] = False
+        return {"cliente": cliente, "tentativas_coleta": 0, "aguardando": None}
+    return _falha_coleta(state, pergunta, chave)
+
+
+def collect_customer_data(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
+    """Recebe o dado pedido (nascimento, UF, CPF, SIM do C6) e valida em código."""
 
     aguardando = state.get("aguardando")
     cliente: dict[str, Any] = dict(state.get("cliente") or {})
@@ -428,6 +459,41 @@ def collect_customer_data(state: AgentState) -> dict[str, Any]:
             "tentativas_coleta": 0,
             "aguardando": None,
         }
+
+    if aguardando == "cpf":
+        cpf = leitura.cpf(texto)
+        if cpf is None:
+            return _sem_c6(state, cliente, PERGUNTA_CPF_INVALIDO, "textos:pergunta_cpf_invalido")
+        cliente["cpf"] = cpf
+        return {"cliente": cliente, "tentativas_coleta": 0, "aguardando": None}
+
+    if aguardando == "consentimento_c6":
+        # Regra 3: o SIM só vale como resposta ao pedido. Se outra fala entrou
+        # no meio (extrato recusado, mensagem vazia), o pedido é refeito.
+        mostrado = _ultima_mensagem_agente(state)
+        if mostrado not in (CONSENTIMENTO_C6, CONSENTIMENTO_C6_REPETIR):
+            return _pedido(CONSENTIMENTO_C6, "consentimento_c6", "textos:consentimento_c6")
+        if leitura.consentiu(texto):
+            # Regra 3: a prova é gravada antes de qualquer simulação.
+            ref = state.get("conversa_ref")
+            consentimentos.gravar_prova(
+                runtime.context.fabrica,
+                conversa_id=uuid.UUID(ref) if ref else None,
+                tipo=CONSENTIMENTO_SIMULACAO_C6,
+                texto_mostrado=mostrado,
+                versao=VERSAO_CONSENTIMENTO_C6,
+                resposta_literal=texto,
+                wamid=state.get("message_id"),
+                cpf=cliente["cpf"],
+            )
+            cliente["c6_autorizado"] = True
+        elif leitura.NEGACAO.search(texto):
+            cliente["c6_autorizado"] = False
+        else:
+            return _sem_c6(
+                state, cliente, CONSENTIMENTO_C6_REPETIR, "textos:consentimento_c6_repetir"
+            )
+        return {"cliente": cliente, "tentativas_coleta": 0, "aguardando": None}
 
     return {}
 

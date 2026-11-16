@@ -94,4 +94,11 @@ def texto_valido_para(aguardando: str | None, texto: str, hoje: date) -> bool:
         return parse_data_nascimento(texto, hoje) is not None
     if aguardando == "uf":
         return normalizar_uf(texto) is not None
+    # Importado aqui: `clt.leitura` importa este módulo.
+    from saturday.agent.clt import leitura  # noqa: PLC0415
+
+    if aguardando == "cpf":
+        return leitura.cpf(texto) is not None
+    if aguardando == "consentimento_c6":
+        return leitura.consentiu(texto) or bool(leitura.NEGACAO.search(texto))
     return False

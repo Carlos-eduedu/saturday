@@ -83,6 +83,20 @@ PERGUNTA_DATA_INVALIDA = (
 PERGUNTA_UF = "Como você tem 60 anos ou mais, preciso também da sua UF (estado). Qual é a sua UF?"
 PERGUNTA_UF_INVALIDA = "Não consegui identificar a UF. Me envie a sigla do estado, por exemplo: MS."
 
+# Consentimento da simulação no C6 (decisão 0026). Mudou o texto, mude a versão:
+# a prova guarda os dois.
+VERSAO_CONSENTIMENTO_C6 = "2026-11-16"
+CONSENTIMENTO_C6 = (
+    "Para ver quanto você pode receber em contrato novo ou refinanciamento, preciso "
+    "fazer uma simulação no banco C6 com o seu CPF, o número do seu benefício, a sua "
+    "data de nascimento e a sua renda. Você autoriza? Responda *SIM* para eu simular."
+)
+CONSENTIMENTO_C6_REPETIR = (
+    "Não entendi. Você autoriza a simulação no banco C6? Responda *SIM* ou *NÃO*."
+)
+PERGUNTA_CPF = "Para simular no banco C6, preciso do seu CPF. Pode me enviar só os números?"
+PERGUNTA_CPF_INVALIDO = "Não consegui validar esse CPF. Me envie os 11 números, por favor."
+
 MENSAGEM_EXTRATO_INCORRETO = (
     "O arquivo recebido não é o extrato de empréstimos do Meu INSS. No app ou "
     'site Meu INSS, escolha a opção "Extrato de Empréstimos" e envie o PDF ou '

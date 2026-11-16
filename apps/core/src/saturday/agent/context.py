@@ -34,6 +34,8 @@ class AgentContext:
     # só com `SATURDAY_GRANATECH_SIMULADOR_URL` (dev e homolog).
     granatech_teste: ClienteGranatech | None = None
     brasilapi: BrasilAPI | None = None
+    # `SATURDAY_C6_ATIVO`: o ramo INSS pede o SIM para simular no C6 (decisão 0026).
+    c6_ativo: bool = False
     # Domínio dos links curtos da biometria (`SATURDAY_DOMINIO_PUBLICO`).
     dominio_publico: str = ""
     # Base de conhecimento (RAG) do nó de respostas; sem ela, só a FAQ fixa.

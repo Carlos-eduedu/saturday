@@ -42,7 +42,7 @@ class AgentState(MessagesState, total=False):
     cliente: dict[str, Any]
     hiscon: dict[str, Any] | None
     hiscon_recebido_em: str | None
-    aguardando: Literal["data_nascimento", "uf"] | None
+    aguardando: Literal["data_nascimento", "uf", "cpf", "consentimento_c6"] | None
     tentativas_coleta: int
     tentativas_extrato: int
     # Respostas seguidas sem FAQ fora de jornada: a 2ª vai para a equipe.

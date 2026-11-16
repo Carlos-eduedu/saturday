@@ -48,8 +48,9 @@ uma entrega fora das fases.
   segundo banco (docs/decisoes/0004). Detalhes e pendências em `docs/granatech.md`.
 - **C6, contrato novo e refinanciamento INSS (decisão 0026), em andamento:**
   feito o cliente em `bancos/c6/` (token, simulação, inclusão, consulta e link
-  de formalização) e o simulador em `simuladores/c6/`. Nada no agente o usa
-  ainda. Faltam consentimento, simulação e oferta, digitação, acompanhamento e
+  de formalização), o simulador em `simuladores/c6/` e o SIM do cliente antes
+  da simulação, com prova gravada (atrás de `SATURDAY_C6_ATIVO`). Nada simula
+  ainda. Faltam simulação e oferta, digitação, acompanhamento e
   painel. Detalhes e pendências em `docs/c6.md`.
 - **Fase 5 concluída:** ramo CLT em `agent/clt/` até a oferta, com triagem antes
   da identificação (docs/decisoes/0007), BrasilAPI com cache em `empresas_cnpj`

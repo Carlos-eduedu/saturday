@@ -116,7 +116,7 @@ MotivoPortabilidade = Literal[
 ]
 
 ConversationStatus = Literal["in_progress", "answered", "handoff"]
-AguardandoColeta = Literal["data_nascimento", "uf"]
+AguardandoColeta = Literal["data_nascimento", "uf", "cpf", "consentimento_c6"]
 
 
 class Attachment(BaseModel):
