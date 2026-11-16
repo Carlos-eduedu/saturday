@@ -44,7 +44,8 @@ def after_classify(state: AgentState) -> str:
         if state.get("resposta_oferta") == "aceita":
             return "handoff"
         if state.get("resposta_oferta") == "recusa":
-            return "decline_offer"
+            ofertado = (state.get("c6_novo") or {}).get("situacao") == "ofertado"
+            return "decline_c6" if ofertado else "decline_offer"
     return "generate_answer"
 
 
@@ -63,6 +64,14 @@ def after_read(state: AgentState) -> str:
 
 
 def after_check(state: AgentState) -> str:
+    if state.get("status") == "answered":
+        return END
+    if (state.get("cliente") or {}).get("c6_autorizado") is True and not state.get("c6_novo"):
+        return "simulate_c6"
+    return "calculate_portability"
+
+
+def after_simulate(state: AgentState) -> str:
     if state.get("status") == "answered":
         return END
     return "calculate_portability"

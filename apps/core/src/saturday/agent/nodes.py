@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -11,7 +13,13 @@ from langchain_core.messages import AIMessage
 from langgraph.runtime import Runtime
 
 from saturday.agent.clt import leitura
-from saturday.agent.coleta import hoje_operacao, normalizar_uf, parse_data_nascimento
+from saturday.agent.clt.turno import reais
+from saturday.agent.coleta import (
+    hoje_operacao,
+    ler_renda,
+    normalizar_uf,
+    parse_data_nascimento,
+)
 from saturday.agent.context import AgentContext
 from saturday.agent.state import AgentState
 from saturday.agent.textos import (
@@ -25,23 +33,31 @@ from saturday.agent.textos import (
     MENSAGEM_RECUSA,
     MENSAGEM_SEM_TEXTO,
     MENSAGENS_FALHA_CALCULO,
+    OFERTA_CONTRATO_NOVO,
     PERGUNTA_CPF,
     PERGUNTA_CPF_INVALIDO,
     PERGUNTA_DATA,
     PERGUNTA_DATA_INVALIDA,
+    PERGUNTA_RENDA,
+    PERGUNTA_RENDA_INVALIDA,
     PERGUNTA_UF,
     PERGUNTA_UF_INVALIDA,
     VERSAO_CONSENTIMENTO_C6,
     chave_handoff,
     mensagem_handoff,
 )
+from saturday.bancos.c6 import regras as regras_c6
+from saturday.bancos.c6.cliente import ErroC6, PedidoSimulacao
 from saturday.dados import consentimentos
+from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.portabilidade import calculo, mensagem
 from saturday.portabilidade import hiscon as hiscon_mod
 from saturday.portabilidade.regras import IDADE_WEBPLUS, PRAZO_C6
 from saturday.portabilidade.util import parse_data
 from saturday.services.anexos import AnexoInvalido
 from saturday.settings import HISTORY_MAX_MESSAGES, JEV_INTENT_THRESHOLD, TZ_OPERACAO
+
+logger = logging.getLogger(__name__)
 
 CONSENTIMENTO_SIMULACAO_C6 = "simulacao_c6"
 
@@ -203,7 +219,9 @@ def classify_intent(state: AgentState, runtime: Runtime[AgentContext]) -> dict[s
     if pediu_humano:
         atualizacao.update({"needs_human": True, "handoff_reason": "pediu_humano"})
     elif resposta_oferta == "aceita":
-        atualizacao.update({"needs_human": True, "handoff_reason": "aceitou_portabilidade"})
+        ofertado = (state.get("c6_novo") or {}).get("situacao") == "ofertado"
+        motivo = "aceitou_contrato_novo" if ofertado else "aceitou_portabilidade"
+        atualizacao.update({"needs_human": True, "handoff_reason": motivo})
     return atualizacao
 
 
@@ -362,6 +380,7 @@ def read_statement(state: AgentState, runtime: Runtime[AgentContext]) -> dict[st
         "hiscon_recebido_em": datetime.now(ZoneInfo(TZ_OPERACAO)).isoformat(),
         "tentativas_extrato": 0,
         "portability_result": None,
+        "c6_novo": None,
         "oferta_pendente": False,
         "resposta_oferta": None,
     }
@@ -384,14 +403,30 @@ def check_customer_data(state: AgentState, runtime: Runtime[AgentContext]) -> di
     if idade >= IDADE_WEBPLUS and uf is None:
         return _pedido(PERGUNTA_UF, "uf", "textos:pergunta_uf")
 
-    # Com o C6 ligado, o cliente decide uma vez por conversa se autoriza a simulação.
+    extrato = state.get("hiscon") or {}
+    cpf_extrato = leitura.cpf(str(extrato.get("cpf") or ""))
+    if runtime.context.c6_ativo and cpf_extrato and cliente.get("cpf") not in (None, cpf_extrato):
+        # Extrato de outro titular: a autorização e a renda do anterior não valem.
+        cliente.pop("c6_autorizado", None)
+        cliente.pop("renda", None)
+        cliente["cpf"] = cpf_extrato
+
+    # Com o C6 ligado, o titular decide uma vez por conversa se autoriza a simulação.
     if runtime.context.c6_ativo and "c6_autorizado" not in cliente:
-        cpf = cliente.get("cpf") or leitura.cpf(str((state.get("hiscon") or {}).get("cpf") or ""))
+        cpf = cliente.get("cpf") or cpf_extrato
         if cpf is None:
             return {**_pedido(PERGUNTA_CPF, "cpf", "textos:pergunta_cpf"), "cliente": cliente}
         cliente["cpf"] = cpf
         pedido = _pedido(CONSENTIMENTO_C6, "consentimento_c6", "textos:consentimento_c6")
         return {**pedido, "cliente": cliente}
+
+    # A simulação pede a renda: vem do extrato; se a leitura não achou, o cliente diz.
+    simula = runtime.context.c6 is not None and cliente.get("c6_autorizado") is True
+    if simula and not state.get("c6_novo") and _pedido_c6(cliente, extrato) is not None:
+        if extrato.get("baseCalculo"):
+            cliente["renda"] = float(extrato["baseCalculo"])
+        if not cliente.get("renda"):
+            return {**_pedido(PERGUNTA_RENDA, "renda", "textos:pergunta_renda"), "cliente": cliente}
 
     return {
         "status": "in_progress",
@@ -460,6 +495,20 @@ def collect_customer_data(state: AgentState, runtime: Runtime[AgentContext]) -> 
             "aguardando": None,
         }
 
+    if aguardando == "renda":
+        renda = ler_renda(texto)
+        if renda is None:
+            if int(state.get("tentativas_coleta") or 0) >= 1:
+                # Sem renda não há simulação: segue só com a portabilidade.
+                return {
+                    "c6_novo": {"situacao": "sem_oferta"},
+                    "tentativas_coleta": 0,
+                    "aguardando": None,
+                }
+            return _falha_coleta(state, PERGUNTA_RENDA_INVALIDA, "textos:pergunta_renda_invalida")
+        cliente["renda"] = renda
+        return {"cliente": cliente, "tentativas_coleta": 0, "aguardando": None}
+
     if aguardando == "cpf":
         cpf = leitura.cpf(texto)
         if cpf is None:
@@ -496,6 +545,112 @@ def collect_customer_data(state: AgentState, runtime: Runtime[AgentContext]) -> 
         return {"cliente": cliente, "tentativas_coleta": 0, "aguardando": None}
 
     return {}
+
+
+def _pedido_c6(
+    cliente: dict[str, Any], extrato: dict[str, Any]
+) -> tuple[int, Decimal | None, Decimal, date] | None:
+    """Prazo, teto, parcela e nascimento do pedido; ``None`` quando não dá para simular."""
+
+    nascimento = parse_data(cliente.get("data_nascimento"))
+    idade = calculo.idade_em_anos(cliente.get("data_nascimento"), hoje_operacao())
+    margem = extrato.get("margemDisponivel")
+    if nascimento is None or idade is None or not margem or not extrato.get("numeroBeneficio"):
+        return None
+    if (extrato.get("margemExtrapolada") or 0) > 0:
+        return None
+    faixa = regras_c6.prazo_e_teto(idade)
+    parcela = regras_c6.parcela_do_contrato_novo(Decimal(str(margem)))
+    if faixa is None or parcela is None:
+        return None
+    return faixa[0], faixa[1], parcela, nascimento
+
+
+def _contrato_novo(state: AgentState, contexto: AgentContext) -> dict[str, Any] | None:
+    """Condição de contrato novo escolhida em código, ou ``None`` sem oferta."""
+
+    cliente = state.get("cliente") or {}
+    extrato = state.get("hiscon") or {}
+    cpf = cliente.get("cpf")
+    renda = cliente.get("renda")
+    limites = _pedido_c6(cliente, extrato)
+    if contexto.c6 is None or limites is None or not (cpf and renda):
+        return None
+    if leitura.cpf(str(extrato.get("cpf") or "")) not in (None, cpf):
+        # O SIM é do titular do CPF: não simula com o benefício de outra pessoa.
+        return None
+    prazo, teto, parcela, nascimento = limites
+
+    ref = state.get("conversa_ref")
+    conversa_id = uuid.UUID(ref) if ref else None
+    with abrir_sessao(contexto.fabrica) as sessao:
+        provado = consentimentos.existe_prova(
+            sessao, conversa_id=conversa_id, tipo=CONSENTIMENTO_SIMULACAO_C6, cpf=cpf
+        )
+    if not provado:
+        # Regra 3: nenhuma simulação sem o SIM gravado para este CPF.
+        logger.error("c6_simulacao_sem_consentimento")
+        return None
+
+    pedido = PedidoSimulacao(
+        operacao="NOVA",
+        cpf=cpf,
+        beneficio=extrato["numeroBeneficio"],
+        nascimento=nascimento,
+        renda=Decimal(str(renda)),
+        parcelas=prazo,
+        valor_parcela=parcela,
+    )
+    try:
+        condicoes = contexto.c6.simular(pedido, conversa_id=conversa_id)
+    except ErroC6 as erro:
+        logger.warning("c6_simulacao_falhou status=%s", erro.status)
+        return None
+    escolhida = regras_c6.escolher(condicoes, prazo=prazo, parcela=parcela, teto=teto)
+    if escolhida is None:
+        return None
+    return {
+        "valor": str(escolhida.valor_cliente),
+        "parcela": str(escolhida.parcela),
+        "parcelas": escolhida.parcelas,
+        "taxa": str(escolhida.taxa_mensal),
+        "convenio": escolhida.convenio,
+        "produto": escolhida.produto,
+    }
+
+
+def simulate_c6(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
+    """Simula o contrato novo no C6 e, havendo condição, monta a oferta fixa."""
+
+    oferta = _contrato_novo(state, runtime.context)
+    if oferta is None:
+        return {"c6_novo": {"situacao": "sem_oferta"}}
+    resposta = OFERTA_CONTRATO_NOVO.format(
+        valor=reais(Decimal(oferta["valor"])),
+        parcela=reais(Decimal(oferta["parcela"])),
+        parcelas=oferta["parcelas"],
+        taxa=reais(Decimal(oferta["taxa"])),
+    )
+    return {
+        "c6_novo": {"situacao": "ofertado", **oferta},
+        "status": "answered",
+        "answer": resposta,
+        "chave_mensagem": "textos:oferta_contrato_novo",
+        "oferta_pendente": True,
+        "needs_human": False,
+        "handoff_reason": None,
+        "messages": [AIMessage(content=resposta)],
+    }
+
+
+def decline_c6(state: AgentState) -> dict[str, Any]:
+    """Cliente recusou o contrato novo: a conversa segue para a portabilidade."""
+
+    return {
+        "c6_novo": {**(state.get("c6_novo") or {}), "situacao": "recusado"},
+        "oferta_pendente": False,
+        "resposta_oferta": None,
+    }
 
 
 def _dados_cliente(cliente: Any) -> calculo.DadosCliente | None:

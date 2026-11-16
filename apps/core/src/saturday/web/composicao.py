@@ -22,6 +22,7 @@ from saturday.agent.context import AgentContext
 from saturday.agent.graph import build_graph
 from saturday.agent.service import AgentService
 from saturday.agente_config import Modelos
+from saturday.bancos.c6.cliente import ClienteC6
 from saturday.bancos.granatech.cliente import ClienteGranatech
 from saturday.canais.evolution.cliente import EvolutionClient
 from saturday.canais.evolution.saida import SaidaEvolution
@@ -62,6 +63,7 @@ def criar_contexto(
         brasilapi=BrasilAPI(http, fabrica) if granatech is not None else None,
         fabrica=fabrica,
         c6_ativo=settings.c6_ativo,
+        c6=ClienteC6(http, settings, fabrica) if settings.c6_ativo else None,
         dominio_publico=settings.dominio_publico,
         conhecimento=Conhecimento(http, settings, fabrica, modelos),
     )

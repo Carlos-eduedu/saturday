@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from datetime import date, datetime
 from typing import Any
@@ -168,6 +169,9 @@ class Extrato(BaseModel):
     ehHiscon: bool = False
     # Só dígitos quando o extrato traz; o nó confere os dígitos verificadores.
     cpf: str | None = None
+    numeroBeneficio: str | None = None
+    # Base de cálculo da margem: a renda que o C6 pede na simulação.
+    baseCalculo: float | None = None
     especie: str | None = None
     liberadoParaEmprestimo: bool = False
     dataEmissao: str | None = None
@@ -190,6 +194,20 @@ class Extrato(BaseModel):
             return None
         digitos = "".join(c for c in str(valor) if c.isdigit())
         return digitos.zfill(11) if 0 < len(digitos) <= 11 else None
+
+    @field_validator("numeroBeneficio", mode="before")
+    @classmethod
+    def _beneficio(cls, valor: Any) -> str | None:
+        if isinstance(valor, bool) or not isinstance(valor, int | str):
+            return None
+        digitos = "".join(c for c in str(valor) if c.isdigit())
+        return digitos.zfill(10) if 0 < len(digitos) <= 10 else None
+
+    @field_validator("baseCalculo", mode="before")
+    @classmethod
+    def _base(cls, valor: Any) -> float | None:
+        numero = numero_brasileiro(valor)
+        return numero if numero is not None and math.isfinite(numero) and numero > 0 else None
 
     @field_validator("especie", mode="before")
     @classmethod

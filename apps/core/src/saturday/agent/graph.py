@@ -14,12 +14,14 @@ from saturday.agent.nodes import (
     check_customer_data,
     classify_intent,
     collect_customer_data,
+    decline_c6,
     decline_offer,
     generate_answer,
     handoff,
     pedir_texto,
     present_offer,
     read_statement,
+    simulate_c6,
 )
 from saturday.agent.routing import (
     after_calculate,
@@ -29,6 +31,7 @@ from saturday.agent.routing import (
     after_collect,
     after_generate,
     after_read,
+    after_simulate,
     route_start,
 )
 from saturday.agent.state import AgentState
@@ -45,6 +48,8 @@ NOS: dict[str, Any] = {
     "read_statement": read_statement,
     "check_customer_data": check_customer_data,
     "collect_customer_data": collect_customer_data,
+    "simulate_c6": simulate_c6,
+    "decline_c6": decline_c6,
     "calculate_portability": calculate_portability,
     "present_offer": present_offer,
     "clt": clt,
@@ -76,6 +81,7 @@ def build_graph(checkpointer: Any = None) -> Any:
         {
             "handoff": "handoff",
             "decline_offer": "decline_offer",
+            "decline_c6": "decline_c6",
             "collect_customer_data": "collect_customer_data",
             "generate_answer": "generate_answer",
             "clt": "clt",
@@ -113,9 +119,19 @@ def build_graph(checkpointer: Any = None) -> Any:
         after_check,
         {
             "calculate_portability": "calculate_portability",
+            "simulate_c6": "simulate_c6",
             END: END,
         },
     )
+    builder.add_conditional_edges(
+        "simulate_c6",
+        after_simulate,
+        {
+            "calculate_portability": "calculate_portability",
+            END: END,
+        },
+    )
+    builder.add_edge("decline_c6", "calculate_portability")
     builder.add_conditional_edges(
         "collect_customer_data",
         after_collect,

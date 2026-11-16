@@ -98,13 +98,12 @@ def c6(
 def test_simula_contrato_novo_e_registra_so_a_rota(
     c6: ClienteC6, fabrica: sessionmaker[Session]
 ) -> None:
-    simulacao = c6.simular(NOVO)
+    (simulacao,) = c6.simular(NOVO)
 
     assert simulacao.parcelas == 96
-    assert simulacao.principal == Decimal("6900.0")
     assert simulacao.taxa_mensal == Decimal("1.8")
-    assert simulacao.valor_cliente == simulacao.principal - simulacao.iof
-    assert simulacao.convenio and simulacao.produto
+    assert simulacao.valor_cliente == Decimal(str(simulacao.bruto["net_amount"]))
+    assert simulacao.convenio and simulacao.produto and not simulacao.observacao
     with fabrica() as sessao:
         chamadas = sessao.scalars(select(ChamadaExterna).order_by(ChamadaExterna.id)).all()
     assert [(c.servico, c.metodo, c.rota, c.status_http) for c in chamadas] == [
@@ -116,12 +115,27 @@ def test_simula_contrato_novo_e_registra_so_a_rota(
 def test_refinanciamento_desconta_o_saldo_dos_contratos(
     c6: ClienteC6, simulador_c6: ModuleType
 ) -> None:
-    simulacao = c6.simular(REFIN)
+    (simulacao,) = c6.simular(REFIN)
 
     assert simulacao.parcela == Decimal("150.9")
-    liquido = simulacao.principal - simulacao.iof
+    liquido = Decimal(str(simulacao.bruto["net_amount"]))
     assert simulacao.valor_cliente == liquido - Decimal(str(simulador_c6.CONFIG["saldo_refin"]))
     assert simulacao.bruto["refinancing"][0]["proposal_operation_number"] == "900123456789"
+
+
+def test_lista_de_condicoes_vira_uma_simulacao_por_faixa(
+    c6: ClienteC6, simulador_c6: ModuleType
+) -> None:
+    simulador_c6.CONFIG["formato"] = "lista"
+
+    condicoes = c6.simular(REFIN)
+
+    assert sorted(c.taxa_mensal for c in condicoes) == [
+        Decimal("1.75"),
+        Decimal("1.8"),
+        Decimal("1.85"),
+    ]
+    assert {c.parcela for c in condicoes} == {Decimal("150.9")}
 
 
 def test_corpo_da_simulacao_segue_o_manual() -> None:
@@ -179,7 +193,7 @@ def test_401_renova_o_token_e_repete_uma_vez(c6: ClienteC6, simulador_c6: Module
     c6.simular(NOVO)
     simulador_c6.TOKENS.clear()
 
-    assert c6.simular(NOVO).parcelas == 96
+    assert c6.simular(NOVO)[0].parcelas == 96
     assert len(simulador_c6.LOGINS) == 2
 
 

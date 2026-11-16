@@ -67,6 +67,7 @@ HandoffReason = Literal[
     "especie_nao_atendida",
     "sem_portabilidade",
     "aceitou_portabilidade",
+    "aceitou_contrato_novo",
     "dados_cliente_nao_informados",
     "erro_interno",
     # Ramo CLT (Fase 5).
@@ -116,7 +117,7 @@ MotivoPortabilidade = Literal[
 ]
 
 ConversationStatus = Literal["in_progress", "answered", "handoff"]
-AguardandoColeta = Literal["data_nascimento", "uf", "cpf", "consentimento_c6"]
+AguardandoColeta = Literal["data_nascimento", "uf", "cpf", "consentimento_c6", "renda"]
 
 
 class Attachment(BaseModel):

@@ -97,6 +97,8 @@ Devolva SOMENTE um objeto JSON, com exatamente os campos abaixo:
 {
   "ehHiscon": true,
   "cpf": "00000000000",
+  "numeroBeneficio": "0000000000",
+  "baseCalculo": 0.00,
   "especie": "32",
   "liberadoParaEmprestimo": true,
   "dataEmissao": "dd/mm/aaaa",
@@ -120,6 +122,8 @@ Devolva SOMENTE um objeto JSON, com exatamente os campos abaixo:
 Regras:
 - ehHiscon é false quando o documento não for o extrato de empréstimos do Meu INSS.
 - Leia todas as páginas e todos os contratos.
+- numeroBeneficio é o número do benefício (NB), só com os dígitos; null se o extrato não mostrar.
+- baseCalculo é a base de cálculo da margem consignável; null se o extrato não mostrar.
 - cpf é o CPF do titular, só com os 11 dígitos; null se o extrato não mostrar.
 - Use números com ponto decimal, sem separador de milhar (ex.: 1234.56).
 - taxaMensal é a taxa mensal do contrato em % a.m., não o CET.

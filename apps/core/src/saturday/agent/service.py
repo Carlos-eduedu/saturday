@@ -215,6 +215,7 @@ class AgentService:
         atualizacao: dict[str, Any] = {
             "hiscon": None,
             "portability_result": None,
+            "c6_novo": None,
             "oferta_pendente": False,
             "hiscon_recebido_em": None,
             "attachments": [],

@@ -14,13 +14,14 @@ Cada chamada deixa em ``chamadas_externas`` só a rota, sem a query string.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any, Literal
 
 import httpx
@@ -83,15 +84,16 @@ class PedidoSimulacao:
 
 @dataclass(frozen=True)
 class Simulacao:
+    """Uma condição de crédito devolvida pela simulação."""
+
     convenio: str
     produto: str
     parcelas: int
-    valor_solicitado: Decimal
-    principal: Decimal
     parcela: Decimal
-    iof: Decimal
     valor_cliente: Decimal
     taxa_mensal: Decimal
+    observacao: str  # preenchida quando o convênio recusa a condição
+    com_despesa: bool  # alguma despesa (seguro) cobrada na condição
     bruto: dict[str, Any]  # a inclusão devolve ao banco os valores da simulação
 
 
@@ -105,15 +107,47 @@ def _decimal(dados: dict[str, Any], chave: str) -> Decimal:
     valor = dados.get(chave)
     if isinstance(valor, bool) or not isinstance(valor, int | float | str):
         raise ErroC6(f"simulação sem {chave}")
-    return Decimal(str(valor))
+    try:
+        numero = Decimal(str(valor))
+    except InvalidOperation as exc:
+        raise ErroC6(f"simulação com {chave} ilegível") from exc
+    if not numero.is_finite():
+        raise ErroC6(f"simulação com {chave} ilegível")
+    return numero
 
 
-def _codigo(dados: dict[str, Any], chave: str) -> str:
+def _bloco(dados: dict[str, Any], chave: str) -> dict[str, Any]:
     bloco = dados.get(chave)
-    codigo = bloco.get("code") if isinstance(bloco, dict) else None
-    if not isinstance(codigo, str) or not codigo:
-        raise ErroC6(f"simulação sem {chave}.code")
-    return codigo
+    return bloco if isinstance(bloco, dict) else {}
+
+
+def _condicao(dados: Any, pedido: PedidoSimulacao) -> Simulacao:
+    if not isinstance(dados, dict):
+        raise ErroC6("simulação em formato inesperado")
+    parcelas = dados.get("installment_quantity", pedido.parcelas)
+    if isinstance(parcelas, bool) or not isinstance(parcelas, int):
+        raise ErroC6("simulação sem installment_quantity")
+    convenio = _bloco(dados, "covenant")
+    if "installment_amount" in dados:
+        parcela = _decimal(dados, "installment_amount")
+    elif pedido.valor_parcela is not None:
+        parcela = pedido.valor_parcela
+    else:
+        raise ErroC6("simulação sem installment_amount")
+    return Simulacao(
+        convenio=str(convenio.get("code") or ""),
+        produto=str(_bloco(dados, "product").get("code") or ""),
+        parcelas=parcelas,
+        parcela=parcela,
+        valor_cliente=_decimal(dados, "client_amount"),
+        taxa_mensal=_decimal(dados, "monthly_customer_rate"),
+        observacao=str(convenio.get("observation") or "").strip(),
+        com_despesa=any(
+            isinstance(d, dict) and str(d.get("exempt", "")).lower() != "sim"
+            for d in dados.get("expenses") or []
+        ),
+        bruto=dados,
+    )
 
 
 def corpo_da_simulacao(pedido: PedidoSimulacao, promotora: str) -> dict[str, Any]:
@@ -290,7 +324,14 @@ class ClienteC6:
 
     # ------------------------------------------------------------------ operações
 
-    def simular(self, pedido: PedidoSimulacao, *, conversa_id: Any = None) -> Simulacao:
+    def simular(self, pedido: PedidoSimulacao, *, conversa_id: Any = None) -> list[Simulacao]:
+        """Condições de crédito da simulação.
+
+        O manual mostra uma condição por resposta; a operação da MEX recebe
+        `credit_conditions`, uma lista. Os dois formatos são aceitos.
+        TODO(c6): qual formato vale com a credencial do Saturday?
+        """
+
         dados = self._chamar(
             "POST",
             ROTA_SIMULACAO,
@@ -298,23 +339,15 @@ class ClienteC6:
             json=corpo_da_simulacao(pedido, self._settings.c6_codigo_promotora),
             conversa_id=conversa_id,
         )
-        if not isinstance(dados, dict):
-            raise ErroC6("simulação em formato inesperado")
-        parcelas = dados.get("installment_quantity")
-        if isinstance(parcelas, bool) or not isinstance(parcelas, int):
-            raise ErroC6("simulação sem installment_quantity")
-        return Simulacao(
-            convenio=_codigo(dados, "covenant"),
-            produto=_codigo(dados, "product"),
-            parcelas=parcelas,
-            valor_solicitado=_decimal(dados, "requested_amount"),
-            principal=_decimal(dados, "principal_amount"),
-            parcela=_decimal(dados, "installment_amount"),
-            iof=_decimal(dados, "iof_amount"),
-            valor_cliente=_decimal(dados, "client_amount"),
-            taxa_mensal=_decimal(dados, "monthly_customer_rate"),
-            bruto=dados,
-        )
+        lista = dados.get("credit_conditions") if isinstance(dados, dict) else None
+        if isinstance(lista, list):
+            condicoes = []
+            for item in lista:
+                # Condição recusada pelo convênio pode vir sem valores: não derruba as outras.
+                with contextlib.suppress(ErroC6):
+                    condicoes.append(_condicao(item, pedido))
+            return condicoes
+        return [_condicao(dados, pedido)]
 
     def incluir(self, corpo: dict[str, Any], *, conversa_id: Any = None) -> str:
         """Inclui a proposta e devolve o número. Sem retry (regra 4).

@@ -42,13 +42,15 @@ class AgentState(MessagesState, total=False):
     cliente: dict[str, Any]
     hiscon: dict[str, Any] | None
     hiscon_recebido_em: str | None
-    aguardando: Literal["data_nascimento", "uf", "cpf", "consentimento_c6"] | None
+    aguardando: Literal["data_nascimento", "uf", "cpf", "consentimento_c6", "renda"] | None
     tentativas_coleta: int
     tentativas_extrato: int
     # Respostas seguidas sem FAQ fora de jornada: a 2ª vai para a equipe.
     tentativas_resposta: int
     portability_result: dict[str, Any] | None
     oferta_pendente: bool
+    # Contrato novo no C6: `situacao` (ofertado, recusado, sem_oferta) e a condição ofertada.
+    c6_novo: dict[str, Any] | None
     # Jornada CLT: etapa, passo, dados informados e oferta (ver agent/clt).
     clt: dict[str, Any]
     handoff_em: str | None

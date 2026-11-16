@@ -42,6 +42,9 @@ MENSAGENS_HANDOFF = {
     "aceitou_portabilidade": (
         "Combinado! Um atendente da MEX vai seguir com a digitação da proposta."
     ),
+    "aceitou_contrato_novo": (
+        "Combinado! Um atendente da MEX vai seguir com a digitação da proposta."
+    ),
     "dados_cliente_nao_informados": (
         "Não consegui confirmar os seus dados. Vou te transferir para um atendente da MEX."
     ),
@@ -93,6 +96,15 @@ CONSENTIMENTO_C6 = (
 )
 CONSENTIMENTO_C6_REPETIR = (
     "Não entendi. Você autoriza a simulação no banco C6? Responda *SIM* ou *NÃO*."
+)
+PERGUNTA_RENDA = "Para simular no banco C6, qual é o valor do seu benefício por mês?"
+PERGUNTA_RENDA_INVALIDA = "Não entendi o valor. Me envie só o número, por exemplo: 1518,00."
+OFERTA_CONTRATO_NOVO = (
+    "Simulei no banco C6 e você tem um contrato novo disponível:\n"
+    "• Valor na sua conta: R$ {valor}\n"
+    "• Parcela: R$ {parcela} em {parcelas} vezes\n"
+    "• Taxa: {taxa}% ao mês\n"
+    "Quer seguir com esse contrato?"
 )
 PERGUNTA_CPF = "Para simular no banco C6, preciso do seu CPF. Pode me enviar só os números?"
 PERGUNTA_CPF_INVALIDO = "Não consegui validar esse CPF. Me envie os 11 números, por favor."

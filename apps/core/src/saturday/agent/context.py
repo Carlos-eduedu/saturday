@@ -12,6 +12,7 @@ from saturday.services.llm import LLMClient
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session, sessionmaker
 
+    from saturday.bancos.c6.cliente import ClienteC6
     from saturday.bancos.granatech.cliente import ClienteGranatech
     from saturday.conhecimento import Conhecimento
     from saturday.fontes.brasilapi import BrasilAPI
@@ -36,6 +37,7 @@ class AgentContext:
     brasilapi: BrasilAPI | None = None
     # `SATURDAY_C6_ATIVO`: o ramo INSS pede o SIM para simular no C6 (decisão 0026).
     c6_ativo: bool = False
+    c6: ClienteC6 | None = None
     # Domínio dos links curtos da biometria (`SATURDAY_DOMINIO_PUBLICO`).
     dominio_publico: str = ""
     # Base de conhecimento (RAG) do nó de respostas; sem ela, só a FAQ fixa.

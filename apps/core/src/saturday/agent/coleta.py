@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 
 from saturday.portabilidade import calculo
 from saturday.portabilidade.regras import IDADE_COLETA_MAX, IDADE_COLETA_MIN
+from saturday.portabilidade.util import numero_brasileiro
 from saturday.settings import TZ_OPERACAO
 
 UFS_POR_NOME = {
@@ -89,6 +90,20 @@ def parse_data_nascimento(texto: str, hoje: date) -> tuple[str, int] | None:
     return nascimento.isoformat(), idade
 
 
+# Faixa plausível de benefício mensal: fora dela é erro de digitação.
+RENDA_MIN, RENDA_MAX = 100.0, 100_000.0
+
+
+def ler_renda(texto: str) -> float | None:
+    limpo = texto.lower().replace("r$", "").replace("reais", "").strip()
+    if re.fullmatch(r"\d{1,3}(\.\d{3})+", limpo):
+        limpo = limpo.replace(".", "")  # "1.518" é mil e quinhentos, não 1,518
+    valor = numero_brasileiro(limpo)
+    if valor is None or not RENDA_MIN <= valor <= RENDA_MAX:
+        return None
+    return valor
+
+
 def texto_valido_para(aguardando: str | None, texto: str, hoje: date) -> bool:
     if aguardando == "data_nascimento":
         return parse_data_nascimento(texto, hoje) is not None
@@ -97,6 +112,8 @@ def texto_valido_para(aguardando: str | None, texto: str, hoje: date) -> bool:
     # Importado aqui: `clt.leitura` importa este módulo.
     from saturday.agent.clt import leitura  # noqa: PLC0415
 
+    if aguardando == "renda":
+        return ler_renda(texto) is not None
     if aguardando == "cpf":
         return leitura.cpf(texto) is not None
     if aguardando == "consentimento_c6":

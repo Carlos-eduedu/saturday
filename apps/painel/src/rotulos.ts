@@ -22,6 +22,7 @@ export const ETAPAS: Record<string, string> = {
 
 export const MOTIVOS_HANDOFF: Record<string, string> = {
   aceite_clt: "Cliente aceitou a oferta",
+  aceitou_contrato_novo: "Cliente aceitou o contrato novo",
   aceitou_portabilidade: "Cliente aceitou a portabilidade",
   acima_do_teto: "Valor acima do teto",
   atendente_desativado: "Atendente desativado",

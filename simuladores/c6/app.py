@@ -36,8 +36,12 @@ ACCEPT_LINK = "application/vnd.c6bank_url_consult_v1+json"
 CONFIG: dict[str, Any] = {
     "expira_s": 1199,  # o exemplo do manual
     "taxa_mensal": 1.8,
+    # "unico": uma condição, como no manual. "lista": `credit_conditions`.
+    "formato": "unico",
     "saldo_refin": 1500.0,  # saldo devedor de cada contrato refinanciado
 }
+
+TAXAS_DA_LISTA = [1.75, 1.8, 1.85]
 
 TOKENS: dict[str, float] = {}
 PROPOSTAS: dict[str, dict[str, Any]] = {}
@@ -134,10 +138,23 @@ async def simular(request: Request) -> Response:
     if faltando:
         return _erro(400, "campos obrigatórios: " + ", ".join(faltando))
 
+    taxas = TAXAS_DA_LISTA if CONFIG["formato"] == "lista" else [float(CONFIG["taxa_mensal"])]
+    saldo = float(CONFIG["saldo_refin"]) * len(contratos) if refin else 0.0
+    condicoes = [_condicao(corpo, taxa, refin, saldo, contratos) for taxa in taxas]
+    if CONFIG["formato"] == "lista":
+        # TODO(c6): a lista de condições não está no manual; é o que a operação
+        # da MEX recebe hoje (12 convênios em 3 faixas de taxa).
+        return JSONResponse({"credit_conditions": condicoes})
+    return JSONResponse(condicoes[0])
+
+
+def _condicao(
+    corpo: dict[str, Any], taxa_mensal: float, refin: bool, saldo: float, contratos: list[str]
+) -> dict[str, Any]:
     parcelas = int(corpo["installment_quantity"])
-    taxa = float(CONFIG["taxa_mensal"]) / 100
+    taxa = taxa_mensal / 100
     fator = _price(taxa, parcelas)
-    if por_parcela:
+    if corpo.get("simulation_type") == "POR_VALOR_PARCELA":
         parcela = float(corpo["installment_amount"])
         principal = round(parcela / fator, 2)
     else:
@@ -145,37 +162,34 @@ async def simular(request: Request) -> Response:
         parcela = round(principal * fator, 2)
     iof = round(principal * 0.03, 2)
     liquido = round(principal - iof, 2)
-    saldo = float(CONFIG["saldo_refin"]) * len(contratos) if refin else 0.0
-    return JSONResponse(
-        {
-            "covenant": {
-                "code": "001033" if refin else "210177",
-                "description": "INSS Refin - Web" if refin else "INSS ML Normal - Web",
-            },
-            "product": {
-                "code": "000035" if refin else "000030",
-                "description": "INSS REFIN DWEB" if refin else "INSS ML DWEB",
-            },
-            "installment_quantity": parcelas,
-            "requested_amount": liquido,
-            "principal_amount": principal,
-            "installment_amount": parcela,
-            "gross_amount": round(parcela * parcelas, 2),
-            "iof_amount": iof,
-            "net_amount": liquido,
-            "client_amount": round(liquido - saldo, 2),
-            "first_due_date": "2027-01-07",
-            "last_due_date": "2034-12-07",
-            "monthly_effective_total_cost_rate": round(taxa * 100 + 0.2, 2),
-            "annual_effective_total_cost_rate": 27.48,
-            "monthly_customer_rate": float(CONFIG["taxa_mensal"]),
-            "annual_customer_rate": 23.8721,
-            "expenses": [],
-            "refinancing": [
-                {"proposal_operation_number": numero, "installments": []} for numero in contratos
-            ],
-        }
-    )
+    return {
+        "covenant": {
+            "code": ("0010" if refin else "2101") + f"{round(taxa_mensal * 100) % 100:02d}",
+            "description": "INSS Refin - Web" if refin else "INSS ML Normal - Web",
+        },
+        "product": {
+            "code": "000035" if refin else "000030",
+            "description": "INSS REFIN DWEB" if refin else "INSS ML DWEB",
+        },
+        "installment_quantity": parcelas,
+        "requested_amount": liquido,
+        "principal_amount": principal,
+        "installment_amount": parcela,
+        "gross_amount": round(parcela * parcelas, 2),
+        "iof_amount": iof,
+        "net_amount": liquido,
+        "client_amount": round(liquido - saldo, 2),
+        "first_due_date": "2027-01-07",
+        "last_due_date": "2034-12-07",
+        "monthly_effective_total_cost_rate": round(taxa_mensal + 0.2, 2),
+        "annual_effective_total_cost_rate": 27.48,
+        "monthly_customer_rate": taxa_mensal,
+        "annual_customer_rate": 23.8721,
+        "expenses": [],
+        "refinancing": [
+            {"proposal_operation_number": numero, "installments": []} for numero in contratos
+        ],
+    }
 
 
 @app.post("/marketplace/proposal")
