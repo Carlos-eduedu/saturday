@@ -19,9 +19,11 @@ for mexer no painel): `.venv` próprio e o banco `saturday_test_<nome>`.
 - Ao terminar, da raiz do checkout principal: `infra/worktree_entregar.sh <nome>`
   faz o fast-forward na `main` (`git rebase main` antes, na worktree, se a
   `main` andou), o push, remove a worktree, o ramo e o banco dela e espera o CI.
-- Na sessão presa à worktree, cada chamada leva um `git` simples. Comando
-  composto com subshell em segundo plano e o `eval` do `agent-browser` são
-  recusados: escreva o arquivo com Write/Edit e rode o script.
+- Checagens na worktree: `infra/worktree_testar.sh` (ruff, mypy e a suíte com o
+  banco dela); com argumentos, só o pytest (`infra/worktree_testar.sh -k janela`).
+- Na sessão presa à worktree, cada chamada leva um comando simples. Heredoc,
+  grupo com chaves, subshell e o `eval` do `agent-browser` são recusados:
+  escreva o arquivo com Write/Edit e rode o script.
 
 ## Painel no navegador
 

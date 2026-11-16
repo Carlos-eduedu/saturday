@@ -2,6 +2,9 @@
 
 - **Data:** 2026-11-15
 - **Status:** aceita
+- **Estendida por:** a [0024](0024-comandos-do-membro-testador.md), com os demais
+  comandos de chat. Até ela, o simulador só mandava evento pelo `/admin/evento`;
+  o resultado automático da consulta de teste vem da 0024.
 
 ## Contexto
 
