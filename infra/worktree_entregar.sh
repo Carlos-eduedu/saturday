@@ -4,17 +4,32 @@
 #   infra/worktree_entregar.sh <nome>
 #
 # Rode da raiz do checkout principal, na main, com tudo da worktree já em
-# commit. Só fast-forward: se a main andou, faça `git rebase main` na worktree
-# antes. O push dispara o CI e o deploy do dev; o script espera o CI.
+# commit. Só fast-forward: se a main andou, o script faz o rebase na worktree e
+# roda o infra/worktree_testar.sh antes. O push dispara o CI e o deploy do dev;
+# o script espera o CI.
 set -euo pipefail
 
 nome="${1:?uso: infra/worktree_entregar.sh <nome>}"
 caminho=".claude/worktrees/${nome}"
 
 [ "$(git branch --show-current)" = "main" ] || { echo "rode na main" >&2; exit 1; }
-[ -z "$(git -C "$caminho" status --porcelain)" ] || { echo "a worktree tem mudança sem commit" >&2; exit 1; }
+sem_commit() {
+  [ -z "$(git -C "$caminho" status --porcelain)" ] || { echo "a worktree tem mudança sem commit" >&2; exit 1; }
+}
+sem_commit
 
 git fetch -q origin
+# Outra sessão entregou no meio: a main local alcança a remota, o ramo vai para
+# cima dela e as checagens rodam de novo antes do push.
+git merge -q --ff-only origin/main
+if ! git merge-base --is-ancestor main "worktree-${nome}"; then
+  git -C "$caminho" rebase -q main || {
+    echo "conflito no rebase: resolva na worktree e rode de novo" >&2
+    exit 1
+  }
+  (cd "$caminho" && infra/worktree_testar.sh)
+  sem_commit
+fi
 # Antes de mexer em qualquer coisa: a main local e a remota têm de estar no ramo.
 for base in main origin/main; do
   git merge-base --is-ancestor "$base" "worktree-${nome}" || {

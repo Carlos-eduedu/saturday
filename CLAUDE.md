@@ -17,8 +17,14 @@ for mexer no painel): `.venv` próprio e o banco `saturday_test_<nome>`.
   `saturday_test` de outra sessão rodando ao mesmo tempo.
 - O compose local publica portas fixas: só uma worktree sobe o compose por vez.
 - Ao terminar, da raiz do checkout principal: `infra/worktree_entregar.sh <nome>`
-  faz o fast-forward na `main` (`git rebase main` antes, na worktree, se a
-  `main` andou), o push, remove a worktree, o ramo e o banco dela e espera o CI.
+  faz o fast-forward na `main` (se ela andou, o rebase na worktree e as
+  checagens de novo), o push, remove a worktree, o ramo e o banco dela e espera
+  o CI.
+- Antes de entregar um diff que muda comportamento em `apps/core`, um agente
+  separado revisa o diff (`/code-review`); para o painel, a revisão segue o
+  `CODING_STANDARDS.md`.
+- Conversa de membro testador ponta a ponta, sem telefone: `infra/fumaca_membro.sh`
+  sobe a API, o worker e os simuladores e manda os comandos pelo simulador da Meta.
 - Checagens na worktree: `infra/worktree_testar.sh` (ruff, mypy e a suíte com o
   banco dela); com argumentos, só o pytest (`infra/worktree_testar.sh -k janela`).
 - Na sessão presa à worktree, cada chamada leva um comando simples. Heredoc,
