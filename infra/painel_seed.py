@@ -26,7 +26,7 @@ import zlib
 
 from saturday.agent.graph import build_graph
 from saturday.dados import atendimento, repositorios
-from saturday.dados.modelos import ConsultaGranatech, Mensagem, UsuarioPainel
+from saturday.dados.modelos import ConsultaGranatech, Conversa, Mensagem, UsuarioPainel
 from saturday.dados.sessao import criar_engine, criar_factory
 from saturday.dados.sessao import sessao as abrir
 from saturday.painel.auditoria import auditar
@@ -276,4 +276,12 @@ with abrir(fabrica) as sessao:
 
 if pool is not None:
     pool.close()
+# Os caminhos que os prints costumam pedir, para não consultar o banco atrás de id.
+with abrir(fabrica) as sessao:
+    for pessoa in sessao.scalars(select(UsuarioPainel).order_by(UsuarioPainel.email)):
+        assumida = sessao.scalar(
+            select(Conversa.id).where(Conversa.atendente_id == pessoa.id).limit(1)
+        )
+        conversa_dela = f"  /conversas/{assumida}" if assumida else ""
+        print(f"{pessoa.email}  /membros/{pessoa.id}{conversa_dela}")
 print(f"seed pronto: entre com {GESTOR} e a senha {senha}")
