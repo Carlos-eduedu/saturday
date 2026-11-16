@@ -89,6 +89,8 @@ docker compose --profile postgres --profile minio up --build
   `pgvector/pgvector:pg17`; um container antigo em `postgres:17-alpine` falha em
   `CREATE EXTENSION`.
 - Há `.env` e `.env.backup` reais na raiz: use o `.env.example` como referência.
+- Hook de pre-commit versionado em `.githooks/` (formatação e lint do que vai no
+  commit). Ligue uma vez por clone: `git config core.hooksPath .githooks`.
 - `compose.yaml` tem a forma de deploy (Dokploy: sem portas, volumes nomeados,
   limites de recurso); `compose.override.yaml` é carregado sozinho e publica as
   portas no ambiente local.
@@ -97,7 +99,7 @@ docker compose --profile postgres --profile minio up --build
 
 ## Forma de trabalho
 
-- Antes de codar cada fase, envie o plano pelo Plannotator e espere a aprovação.
+- Antes de codar uma mudança de comportamento ou uma refatoração de mais de um arquivo, envie o plano pelo Plannotator e espere a aprovação.
 - Uma fase só está pronta quando os testes passam, os critérios de aceite foram
   demonstrados e a documentação foi atualizada (`README.md`, `docs/` e
   `docs/estado.md`).

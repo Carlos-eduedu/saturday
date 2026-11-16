@@ -1,0 +1,13 @@
+#!/bin/sh
+# Formatação e lint dos arquivos Python que vão no commit. Tipos e testes ficam
+# no CI. Ligue uma vez por clone: git config core.hooksPath .githooks
+set -e
+
+cd "$(git rev-parse --show-toplevel)"
+arquivos=$(git diff --cached --name-only --diff-filter=ACM -- '*.py')
+[ -z "$arquivos" ] && exit 0
+
+# shellcheck disable=SC2086 -- um caminho por palavra; não há espaço em nome de .py
+uv run ruff format --check $arquivos
+# shellcheck disable=SC2086
+uv run ruff check $arquivos

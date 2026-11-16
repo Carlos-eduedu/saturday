@@ -11,6 +11,7 @@
 - [`../AGENTS.md`](../AGENTS.md) — regras inegociáveis, ponteiros da especificação e comandos.
 - [`granatech.md`](granatech.md) — cliente, cota, webhook e simulador da Granatech.
 - [`clt.md`](clt.md) — ramo CLT: etapas, proposta, pós-venda, turnos de sistema e recontato.
+- [`evolution.md`](evolution.md) — canal Evolution: instâncias, webhook e simulador.
 - [`deploy.md`](deploy.md) — ambientes, ambiente do zero, backup e restauração no Dokploy.
 - [`granatech-homologacao/`](granatech-homologacao/README.md) — material da homologação com a Granatech.
 
@@ -19,22 +20,7 @@
 Registro do **porquê** das escolhas que não são óbvias pelo código. Cada arquivo é
 imutável: quando uma decisão muda, entra um registro novo que a substitui.
 
-- [`decisoes/0001-outbox-dono-do-reagendamento.md`](decisoes/0001-outbox-dono-do-reagendamento.md)
-  — o canal só classifica; quem espera e desiste é o outbox.
-- [`decisoes/0002-workspace-uv-unico.md`](decisoes/0002-workspace-uv-unico.md)
-  — um `uv.lock` e um `.venv` na raiz do monorepo.
-- [`decisoes/0003-estado-de-atendimento-na-tabela-conversas.md`](decisoes/0003-estado-de-atendimento-na-tabela-conversas.md)
-  — quem responde a conversa mora em `conversas`, não no checkpoint.
-- [`decisoes/0004-sem-interface-banco-com-um-banco-so.md`](decisoes/0004-sem-interface-banco-com-um-banco-so.md)
-  — o `Protocol` de banco espera o segundo banco.
-- [`decisoes/0005-dokploy-leitura-livre-alteracao-confirmada.md`](decisoes/0005-dokploy-leitura-livre-alteracao-confirmada.md)
-  — no Dokploy de produção, ler é livre e alterar exige confirmação.
-- [`decisoes/0006-brasilapi-sem-interface-fonte-cadastral.md`](decisoes/0006-brasilapi-sem-interface-fonte-cadastral.md)
-  — a `FonteCadastral` espera a segunda fonte.
-- [`decisoes/0007-triagem-antes-da-identificacao.md`](decisoes/0007-triagem-antes-da-identificacao.md)
-  — no CLT, as perguntas de sim/não vêm antes de pedir CPF.
-- [`decisoes/0008-dados-da-proposta-antes-do-sim.md`](decisoes/0008-dados-da-proposta-antes-do-sim.md)
-  — o SIM do aceite cobre os valores e a conta.
+Ficam em [`decisoes/`](decisoes/); o nome de cada arquivo diz o tema.
 
 ## Estado por fase
 
