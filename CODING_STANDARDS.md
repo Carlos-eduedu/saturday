@@ -9,3 +9,9 @@ julgamentos que nenhum linter confere; o que é mecânico vira checagem no CI.
   navegação ou o que uma tela mostra, e com isso contradiz o `DESIGN.md`,
   atualiza o `DESIGN.md` no mesmo commit. Decisão consciente de divergir fica
   escrita lá, com o motivo.
+
+## Testes do core (`apps/core/tests`)
+
+- **Login do painel só pelo `conftest`.** Teste que entra no painel usa `entrar`
+  ou `entrar_como` e a `SENHA_DO_PAINEL`; um `_entrar` ou `_login` próprio no
+  arquivo de teste é duplicação.

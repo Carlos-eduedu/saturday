@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import timedelta
 
+from conftest import SENHA_DO_PAINEL, entrar
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
@@ -13,21 +14,13 @@ from saturday.dados.modelos import Auditoria, Conversa, Mensagem, UsuarioPainel
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.painel import membros, sessoes
 
-SENHA = "senha-comprida-de-teste-1"  # noqa: S105 - senha de teste
 SO_DO_GESTOR = {"situacao", "bloqueado_ate", "tentativas_falhas", "observacao"}
 DE_QUEM_PODE = {"email", "telefone", "ultimo_acesso_em", "criado_em", "pode_editar_agente"}
 
 
 def _usuario(fabrica: sessionmaker[Session], email: str, perfil: str = "atendente") -> uuid.UUID:
     with abrir_sessao(fabrica) as sessao:
-        return sessoes.criar_usuario(sessao, email, SENHA, perfil).id
-
-
-def _entrar(client: TestClient, email: str) -> dict[str, str]:
-    client.cookies.clear()
-    resposta = client.post("/admin/login", json={"email": email, "senha": SENHA})
-    assert resposta.status_code == 200, resposta.text
-    return {"X-CSRF-Token": resposta.json()["csrf"]}
+        return sessoes.criar_usuario(sessao, email, SENHA_DO_PAINEL, perfil).id
 
 
 def test_estado_do_membro() -> None:
@@ -60,7 +53,7 @@ def test_colega_ve_so_o_que_serve_para_transferir(
 ) -> None:
     bia = _usuario(fabrica, "bia@exemplo.test")
     _usuario(fabrica, "ana@exemplo.test")
-    _entrar(client_pg, "ana@exemplo.test")
+    entrar(client_pg, "ana@exemplo.test")
 
     lista = {m["nome"]: m for m in client_pg.get("/admin/membros").json()}
     assert set(lista) == {"ana", "bia"}
@@ -78,7 +71,7 @@ def test_a_propria_pessoa_ve_contato_acesso_e_atividade(
     client_pg: TestClient, fabrica: sessionmaker[Session]
 ) -> None:
     ana = _usuario(fabrica, "ana@exemplo.test")
-    _entrar(client_pg, "ana@exemplo.test")
+    entrar(client_pg, "ana@exemplo.test")
 
     eu = client_pg.get(f"/admin/membros/{ana}").json()
     assert eu["nivel"] == "proprio" and eu["voce"] is True
@@ -95,7 +88,7 @@ def test_gestor_ve_tudo_inclusive_desativados(
     bia = _usuario(fabrica, "bia@exemplo.test")
     _usuario(fabrica, "ana@exemplo.test")
     _usuario(fabrica, "gestora@exemplo.test", "gestor")
-    csrf = _entrar(client_pg, "gestora@exemplo.test")
+    csrf = entrar(client_pg, "gestora@exemplo.test")
     edicao = client_pg.patch(
         f"/admin/gestao/usuarios/{bia}",
         json={"cargo": "  Atendente   CLT ", "observacao": "em treinamento"},
@@ -118,7 +111,7 @@ def test_gestor_ve_tudo_inclusive_desativados(
     assert mudancas == {"cargo": "Atendente CLT", "observacao": "alterada"}
 
     # Para o atendente, o desativado não existe.
-    _entrar(client_pg, "ana@exemplo.test")
+    entrar(client_pg, "ana@exemplo.test")
     assert client_pg.get(f"/admin/membros/{bia}").status_code == 404
     assert {m["nome"] for m in client_pg.get("/admin/membros").json()} == {"ana", "gestora"}
 
@@ -128,7 +121,7 @@ def test_funcao_longa_demais_e_recusada(
 ) -> None:
     bia = _usuario(fabrica, "bia@exemplo.test")
     _usuario(fabrica, "gestora@exemplo.test", "gestor")
-    csrf = _entrar(client_pg, "gestora@exemplo.test")
+    csrf = entrar(client_pg, "gestora@exemplo.test")
     resposta = client_pg.patch(
         f"/admin/gestao/usuarios/{bia}", json={"cargo": "x" * 61}, headers=csrf
     )
@@ -168,7 +161,7 @@ def test_atividade_conta_sete_dias_e_as_acoes_nao_levam_detalhe(
                     criada_em=quando,
                 )
             )
-    _entrar(client_pg, "ana@exemplo.test")
+    entrar(client_pg, "ana@exemplo.test")
 
     eu = client_pg.get(f"/admin/membros/{ana}").json()
     assert eu["atividade"] == {"mensagens": 1, "assumidas": 1, "devolvidas": 1, "transferidas": 0}
@@ -184,7 +177,7 @@ def test_ausente_aparece_para_quem_transfere(
 ) -> None:
     _usuario(fabrica, "bia@exemplo.test")
     _usuario(fabrica, "ana@exemplo.test")
-    csrf = _entrar(client_pg, "bia@exemplo.test")
+    csrf = entrar(client_pg, "bia@exemplo.test")
     sem_csrf = client_pg.patch("/admin/eu/disponibilidade", json={"disponivel": False})
     assert sem_csrf.status_code == 403
     resposta = client_pg.patch(
@@ -193,6 +186,6 @@ def test_ausente_aparece_para_quem_transfere(
     assert resposta.status_code == 200 and resposta.json()["disponivel"] is False
     assert client_pg.get("/admin/eu").json()["disponivel"] is False
 
-    _entrar(client_pg, "ana@exemplo.test")
+    entrar(client_pg, "ana@exemplo.test")
     destinos = {u["nome"]: u["estado"] for u in client_pg.get("/admin/usuarios").json()}
     assert destinos == {"ana": "disponivel", "bia": "ausente"}
