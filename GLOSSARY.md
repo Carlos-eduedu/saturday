@@ -53,6 +53,17 @@ _Evitar_: liberar, release
 **Transferir**:
 Trocar o dono de uma conversa assumida por outro atendente.
 
+**Membro**:
+Pessoa da equipe com acesso ao painel: atendente ou gestor.
+
+**Função**:
+O que o membro faz na equipe (ex.: "Atendente CLT"), em texto livre do gestor.
+Não muda o que a pessoa pode fazer: isso é do perfil.
+
+**Estado do membro**:
+Disponível (usou o painel há menos de 5 min), ausente (a própria pessoa marcou)
+ou fora do painel. Informa quem transfere; não bloqueia.
+
 **Autor**:
 Quem escreveu uma mensagem de saída: a IA, um atendente ou o sistema (modelo).
 

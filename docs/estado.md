@@ -31,6 +31,9 @@ uma entrega fora das fases.
   reconciliar, reenviar link, cancelar, corrigir conta e atualizar detalhe;
   abrir consulta, simular e criar proposta ficam só na conversa
   (docs/decisoes/0013).
+  Aba Membros para todos: lista da equipe e página do membro
+  (`/membros/:id`) com estado, carga, atividade de 7 dias, últimas ações e a
+  gestão do gestor; o servidor decide o que cada um vê (docs/decisoes/0023).
 - **Fase 4 concluída:** cliente Granatech em `bancos/granatech/` (token em cache,
   retry só em GET, normalização em `Decimal`, teto, proposta única com
   reconciliação pela listagem), cota com trava e alerta a 80%, reaproveitamento

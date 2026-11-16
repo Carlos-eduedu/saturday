@@ -165,7 +165,10 @@ nunca pelo `conversation_id`, que no WhatsApp carrega o telefone.
 | `POST` | `/admin/login` | `{email, senha}`. 5 falhas bloqueiam por 15 min; a resposta de erro é sempre a mesma. |
 | `POST` | `/admin/logout` | Apaga a sessão. |
 | `GET` | `/admin/eu` | Usuário, perfil e token CSRF. |
-| `GET` | `/admin/usuarios` | Destinos de transferência. |
+| `GET` | `/admin/usuarios` | Destinos de transferência, com o `estado` de cada pessoa (`disponivel`, `ausente` ou `fora`). |
+| `GET` | `/admin/membros` | A equipe, para todos (decisão 0023). Os campos dependem de quem pede (`nivel`: `colega`, `proprio` ou `gestor`); desativados só para o gestor. |
+| `GET` | `/admin/membros/{id}` | Um membro. Para a própria pessoa e para o gestor traz também `atividade` (7 dias) e `acoes` (as 10 últimas, sem o detalhe da auditoria). |
+| `PATCH` | `/admin/eu/disponibilidade` | `{disponivel}`: a própria pessoa marca disponível ou ausente. Informa quem transfere; não bloqueia. |
 | `GET` | `/admin/conversas?fila=ia\|handoff\|assumida\|minhas&busca=` | Inbox, com `nao_lida` e o que o canal permite agora: `envia`, `janela` (`aberta`, `fechada` ou `null` no canal sem janela) e `modelos` (as 200 mais recentes). |
 | `GET` | `/admin/conversas/contagens` | Quantas conversas há em cada fila (`todas`, `ia`, `handoff`, `assumida`, `minhas`) e quantas pedem atenção (`atencao`), em toda a base. |
 | `GET` | `/admin/conversas/{id}` | Histórico com autor e status de entrega; marca como vista. |

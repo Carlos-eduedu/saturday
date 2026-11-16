@@ -29,7 +29,9 @@ Para ver telas rodando, `infra/painel_local.sh` sobe a API (banco
 `saturday_painel_dev`, segredos fictícios) e o Vite em `:5173`;
 `infra/painel_local.sh seed` cria antes o gestor `gestor@exemplo.test` (a senha
 sai no fim do seed, ou vem de `PAINEL_LOCAL_SENHA`), conversas nas três
-situações, uma com imagem, PDF e arquivo sem prévia num S3 local, e a conversa
+situações, uma com imagem, PDF e arquivo sem prévia num S3 local, três
+atendentes (`bia@`, `caio@` e `dora@exemplo.test`, com a mesma senha; para os
+prints como outra pessoa, `PAINEL_LOCAL_EMAIL`), e a conversa
 CLT com humano, ficha preenchida e consulta parada (`infra/painel_seed.py`),
 mais um alerta e um turno (`infra/painel_seed.sql`).
 `infra/painel_prints.sh <pasta> <caminho>...` grava cada tela em desktop claro,

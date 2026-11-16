@@ -204,6 +204,9 @@ Cantos suaves em três passos: 6px para foco e detalhes, 10px para botões e cam
 - **Desktop:** links no topo, 44px de altura; hover com Superfície Recuada; página atual com Cobalto de Ação Suave e texto cobalto.
 - **Celular:** botão "Menu" abre um painel lateral (StaggeredMenu) calmo: itens em caixa de frase, Red Hat Text 500 a ~1.15rem, linhas de 48px, sem numeração; a página atual em Cobalto de Ação Suave com texto cobalto; entrada com fade curto; a conta no pé.
 
+### Membro (lista e página)
+A equipe é uma lista dentro de um único cartão, uma linha por pessoa separada por fio de 1px: avatar de 40px, nome com função e perfil abaixo, estado, e à direita as conversas assumidas (mono). A linha inteira é o link para a página do membro. O estado é um ponto de 0,55rem com o texto ao lado, nunca só a cor: verde-IA cheio (disponível), âmbar cheio (ausente), contorno grafite (fora do painel). No celular a carga desce para baixo do nome. A página do membro abre com avatar de 72px, nome, função e estado, e segue em cartões: Atividade (números em mono de 1,15rem, sem destaque de cor), Últimas ações, Contato e acesso, Seu perfil (só na própria) e Gestão (só o gestor). A disponibilidade é um par de botões com `aria-pressed`, o escolhido em superfície branca.
+
 ### Abas
 Um estilo só de aba de página (Agente, Granatech, Ficha e IA da conversa): texto em grafite sobre um fio de 1px em Borda; a aba atual em cobalto com sublinhado de 2px. Sem trilho, fundo ou sombra. Setas, Home e End trocam de aba; o conteúdo fica num `tabpanel` ligado à aba. Rolam de lado se faltar espaço, nunca cortam.
 

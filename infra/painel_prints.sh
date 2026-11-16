@@ -12,6 +12,9 @@ set -euo pipefail
 [ $# -ge 2 ] || { echo "uso: $0 <pasta> <caminho>..." >&2; exit 2; }
 : "${PAINEL_LOCAL_SENHA:?defina PAINEL_LOCAL_SENHA com a senha do gestor do seed}"
 BASE="${PAINEL_LOCAL_URL:-http://localhost:5173}"
+# Outra pessoa do seed (ex.: bia@exemplo.test): feche antes o navegador
+# (`agent-browser close`), que guarda a sessão de quem entrou por último.
+EMAIL="${PAINEL_LOCAL_EMAIL:-gestor@exemplo.test}"
 pasta="$1"
 shift
 mkdir -p "$pasta"
@@ -19,7 +22,7 @@ mkdir -p "$pasta"
 agent-browser open "$BASE/login" >/dev/null
 agent-browser wait 800 >/dev/null
 # Sessão já aberta de uma rodada anterior pula o formulário.
-if agent-browser fill 'input[type="email"]' gestor@exemplo.test >/dev/null 2>&1; then
+if agent-browser fill 'input[type="email"]' "$EMAIL" >/dev/null 2>&1; then
   agent-browser fill 'input[type="password"]' "$PAINEL_LOCAL_SENHA" >/dev/null
   agent-browser press Enter >/dev/null
   agent-browser wait 1200 >/dev/null

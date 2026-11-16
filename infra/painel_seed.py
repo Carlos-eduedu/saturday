@@ -29,7 +29,8 @@ from saturday.dados import atendimento, repositorios
 from saturday.dados.modelos import ConsultaGranatech, Mensagem, UsuarioPainel
 from saturday.dados.sessao import criar_engine, criar_factory
 from saturday.dados.sessao import sessao as abrir
-from saturday.painel.sessoes import criar_usuario, gerar_hash
+from saturday.painel.auditoria import auditar
+from saturday.painel.sessoes import agora, criar_usuario, gerar_hash
 from saturday.settings import get_settings
 from saturday.storage.base import criar_storage
 from saturday.web.composicao import criar_checkpointer
@@ -171,6 +172,29 @@ with abrir(fabrica) as sessao:
     else:
         gestor.senha_hash = gerar_hash(senha)
 
+    # A equipe, para a aba Membros ter quem mostrar: uma atendente com carga e
+    # atividade, um ausente e uma desativada. A senha é a mesma do gestor.
+    equipe = {}
+    for email, nome, cargo in [
+        ("bia@exemplo.test", "Bia Souza", "Atendente CLT"),
+        ("caio@exemplo.test", "Caio Lima", "Atendente INSS"),
+        ("dora@exemplo.test", "Dora Reis", None),
+    ]:
+        pessoa = sessao.scalar(
+            select(UsuarioPainel).where(UsuarioPainel.email == email)
+        )
+        if pessoa is None:
+            pessoa = criar_usuario(sessao, email, senha, "atendente", nome)
+        else:
+            pessoa.senha_hash = gerar_hash(senha)
+        pessoa.cargo = cargo
+        equipe[email] = pessoa
+    gestor.cargo = "Gestão do atendimento"
+    bia = equipe["bia@exemplo.test"]
+    bia.ultimo_acesso_em = agora()
+    equipe["caio@exemplo.test"].disponivel = False
+    equipe["dora@exemplo.test"].ativo = False
+
     for n in range(14):
         situacao = ("ia", "handoff", "assumida")[n % 3]
         conversa = repositorios.obter_ou_criar_conversa(
@@ -191,7 +215,18 @@ with abrir(fabrica) as sessao:
         if situacao == "handoff":
             atendimento.entrar_em_handoff(sessao, conversa, "handoff")
         elif situacao == "assumida":
-            atendimento.assumir(sessao, conversa, gestor.id)
+            # Metade com a Bia, com o rastro que o painel deixaria.
+            dono = bia if n % 2 else gestor
+            atendimento.assumir(sessao, conversa, dono.id)
+            auditar(sessao, dono.id, "assumir", str(conversa.id))
+            repositorios.registrar_saida(
+                sessao,
+                conversa,
+                conteudo="Oi, aqui é da equipe. Já vejo isso.",
+                autor="atendente",
+                usuario_id=dono.id,
+            )
+            auditar(sessao, dono.id, "enviar_mensagem", str(conversa.id))
 
     conversa = repositorios.obter_ou_criar_conversa(
         sessao,
