@@ -24,6 +24,7 @@ from saturday.agent.service import AgentService
 from saturday.agente_config import Modelos
 from saturday.bancos.c6.cliente import ClienteC6
 from saturday.bancos.granatech.cliente import ClienteGranatech
+from saturday.bancos.icred.cliente import ClienteIcred
 from saturday.canais.evolution.cliente import EvolutionClient
 from saturday.canais.evolution.saida import SaidaEvolution
 from saturday.canais.whatsapp.cliente import WhatsAppClient
@@ -61,6 +62,7 @@ def criar_contexto(
         granatech=granatech,
         granatech_teste=criar_cliente_granatech_teste(http, settings, fabrica),
         brasilapi=BrasilAPI(http, fabrica) if granatech is not None else None,
+        icred=criar_cliente_icred(http, settings, fabrica),
         fabrica=fabrica,
         c6_ativo=settings.c6_ativo,
         c6=ClienteC6(http, settings, fabrica) if settings.c6_ativo else None,
@@ -153,6 +155,18 @@ def criar_cliente_granatech(
     if not settings.granatech_ativo:
         return None
     return ClienteGranatech(http, settings, fabrica)
+
+
+def criar_cliente_icred(
+    http: httpx.Client,
+    settings: Settings,
+    fabrica: sessionmaker[Session],
+) -> ClienteIcred | None:
+    """Cliente do motor do iCred, ou ``None`` com ``SATURDAY_ICRED_ATIVO`` desligado."""
+
+    if not settings.icred_ativo:
+        return None
+    return ClienteIcred(http, settings, fabrica)
 
 
 def criar_cliente_granatech_teste(

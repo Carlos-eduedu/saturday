@@ -346,6 +346,36 @@ class ConsultaGranatech(Base):
     )
 
 
+class ConsultaIcred(Base):
+    """Consulta aberta no motor do iCred (decisão 0027).
+
+    A linha nasce como ``intencao`` antes do POST, com a ``chave`` que vai no
+    ``Idempotency-Key``. ``estado`` segue o do motor (``na_fila``,
+    ``processando``, ``concluida``, ``cancelada``), mais ``falhou`` (o POST não
+    passou) e ``desistida`` (o prazo de espera venceu). ``contratos`` é o
+    pacote já normalizado, sem comissão.
+    """
+
+    __tablename__ = "consultas_icred"
+    __table_args__ = (Index("ix_consultas_icred_conversa", "conversa_id", "criada_em"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    chave: Mapped[str] = mapped_column(String(36), nullable=False, unique=True)
+    id_externo: Mapped[str | None] = mapped_column(String(64), unique=True)
+    cpf: Mapped[str] = mapped_column(String(11), nullable=False)
+    conversa_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("conversas.id", ondelete="CASCADE")
+    )
+    estado: Mapped[str] = mapped_column(String(16), nullable=False)
+    situacao: Mapped[str | None] = mapped_column(String(32))
+    contratos: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
+    valido_ate: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
+    atualizada_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=AGORA, onupdate=AGORA
+    )
+
+
 class PropostaGranatech(Base):
     """Proposta na Granatech, gravada como intenção antes do POST.
 

@@ -18,6 +18,7 @@ from saturday.conhecimento import Conhecimento
 from saturday.dados.sessao import criar_engine, criar_factory
 from saturday.health import registrar_batimento
 from saturday.jobs import alertas, recontatos
+from saturday.jobs import icred as eventos_icred
 from saturday.jobs.eventos import processar
 from saturday.jobs.homologacao import Rodadas
 from saturday.jobs.outbox import Entregador, EntregadorPorCanal, EntregadorWebhook, drenar
@@ -96,6 +97,8 @@ def rodar(settings: Settings, parar: threading.Event) -> None:
                 indexou = conhecimento.indexar_pendente(storage)
                 if time.monotonic() >= proxima_verificacao:
                     alertas.verificar(fabrica, servico)
+                    if servico.context.icred is not None:
+                        eventos_icred.verificar_prazo(fabrica, servico.context.icred, servico)
                     recontatos.disparar(fabrica, servico)
                     proxima_verificacao = time.monotonic() + alertas.INTERVALO_S
             except Exception:

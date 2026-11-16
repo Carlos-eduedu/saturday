@@ -8,6 +8,7 @@ from langgraph.graph import END, START, StateGraph
 
 from saturday.agent.clt.nos import clt
 from saturday.agent.context import AgentContext
+from saturday.agent.icred.nos import icred, porta
 from saturday.agent.nodes import (
     boas_vindas,
     calculate_portability,
@@ -24,12 +25,13 @@ from saturday.agent.nodes import (
     simulate_c6,
 )
 from saturday.agent.routing import (
-    after_calculate,
     after_check,
     after_classify,
     after_clt,
     after_collect,
     after_generate,
+    after_icred,
+    after_porta,
     after_read,
     after_simulate,
     route_start,
@@ -53,6 +55,8 @@ NOS: dict[str, Any] = {
     "calculate_portability": calculate_portability,
     "present_offer": present_offer,
     "clt": clt,
+    "icred_porta": porta,
+    "icred": icred,
 }
 
 
@@ -73,6 +77,7 @@ def build_graph(checkpointer: Any = None) -> Any:
             "collect_customer_data": "collect_customer_data",
             "classify_intent": "classify_intent",
             "clt": "clt",
+            "icred": "icred",
         },
     )
     builder.add_conditional_edges(
@@ -141,12 +146,24 @@ def build_graph(checkpointer: Any = None) -> Any:
             END: END,
         },
     )
+    builder.add_edge("calculate_portability", "icred_porta")
     builder.add_conditional_edges(
-        "calculate_portability",
-        after_calculate,
+        "icred_porta",
+        after_porta,
         {
+            END: END,
             "present_offer": "present_offer",
             "handoff": "handoff",
+        },
+    )
+    builder.add_conditional_edges(
+        "icred",
+        after_icred,
+        {
+            END: END,
+            "handoff": "handoff",
+            "classify_intent": "classify_intent",
+            "calculate_portability": "calculate_portability",
         },
     )
     builder.add_edge("pedir_texto", END)

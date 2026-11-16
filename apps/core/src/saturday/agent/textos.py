@@ -52,6 +52,20 @@ MENSAGENS_HANDOFF = {
         "Tive um problema para continuar o seu atendimento. Vou te transferir "
         "para um atendente da MEX."
     ),
+    # iCred (decisão 0027).
+    "icred_aceite": "Combinado! Um atendente da MEX vai finalizar a sua proposta no iCred.",
+    "icred_bloqueio": (
+        "Consultei o iCred e preciso que um atendente da MEX confira o seu cadastro "
+        "por lá. Vou te transferir."
+    ),
+    "icred_taxa_alta": (
+        "Consultei o iCred e um atendente da MEX vai conferir as condições com você. "
+        "Vou te transferir."
+    ),
+    "icred_conferir": (
+        "Consultei o iCred e um atendente da MEX vai conferir as condições com você. "
+        "Vou te transferir."
+    ),
 }
 
 MENSAGEM_FORA_HORARIO = (

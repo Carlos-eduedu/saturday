@@ -28,6 +28,9 @@ class AgentState(MessagesState, total=False):
     message_id: str | None
     telefone: str | None
     clt_faq: bool
+    # Para onde o nó do iCred manda o turno: de volta ao classificador ou ao
+    # cálculo da portabilidade (o caminho de antes do iCred).
+    icred_rota: str | None
     # Saída do turno além do texto: modelo para a janela fechada (com o código do
     # link curto), modelo enviado sempre (marketing) e detalhe do alerta de handoff.
     modelo_aviso: str | None
@@ -53,6 +56,8 @@ class AgentState(MessagesState, total=False):
     c6_novo: dict[str, Any] | None
     # Jornada CLT: etapa, passo, dados informados e oferta (ver agent/clt).
     clt: dict[str, Any]
+    # Consulta e oferta do iCred no ramo INSS: etapa, consulta e pacote (ver agent/icred).
+    icred: dict[str, Any]
     handoff_em: str | None
     # Sem reducer de propósito: a lista é substituída a cada gravação.
     message_ids_recentes: list[str]
@@ -73,6 +78,7 @@ CAMPOS_DO_TURNO = (
     "message_id",
     "telefone",
     "clt_faq",
+    "icred_rota",
     "modelo_aviso",
     "link_aviso",
     "modelo_envio",

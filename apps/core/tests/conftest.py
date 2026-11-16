@@ -470,6 +470,40 @@ def settings_granatech(**extras: Any) -> Settings:
     return Settings(**base)
 
 
+# ------------------------------------------------------------------ simulador do iCred
+
+
+@pytest.fixture
+def simulador_icred() -> Iterator[ModuleType]:
+    modulo = _carregar_simulador("icred")
+    modulo.limpar()
+    original = dict(modulo.CONFIG)
+    # Sem cenário: a consulta fica na fila até o teste concluí-la.
+    modulo.CONFIG.update(cenario="", atraso_s=0)
+    yield modulo
+    modulo.CONFIG.clear()
+    modulo.CONFIG.update(original)
+    modulo.limpar()
+
+
+@pytest.fixture
+def http_icred(simulador_icred: ModuleType) -> Iterator[TestClient]:
+    with TestClient(simulador_icred.app, base_url="http://icred") as cliente:
+        yield cliente
+
+
+def settings_icred(**extras: Any) -> Settings:
+    base: dict[str, Any] = {
+        "environment": "pytest",
+        "icred_ativo": True,
+        "icred_base_url": "http://icred",
+        "icred_chave_api": SecretStr("chave-do-simulador-icred"),
+        "icred_webhook_segredo": SecretStr("segredo-do-simulador-icred"),
+    }
+    base.update(extras)
+    return Settings(**base)
+
+
 # ------------------------------------------------------------------ login do painel
 
 SENHA_DO_PAINEL = "senha-bem-comprida-1"  # noqa: S105 - senha de teste

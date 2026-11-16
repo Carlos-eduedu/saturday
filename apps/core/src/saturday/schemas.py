@@ -93,6 +93,11 @@ HandoffReason = Literal[
     "falha_pagamento",
     "falha_pagamento_repetida",
     "status_desconhecido",
+    # iCred no ramo INSS (decisão 0027).
+    "icred_aceite",
+    "icred_bloqueio",
+    "icred_taxa_alta",
+    "icred_conferir",
 ]
 
 MotivoContrato = Literal[

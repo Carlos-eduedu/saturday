@@ -114,6 +114,15 @@ class Settings(BaseSettings):
     c6_senha: SecretStr = SecretStr("")
     c6_codigo_promotora: str = ""
 
+    # iCred, pelo motor de consultas (decisão 0027). `ativo` liga a consulta no
+    # ramo INSS; sem ele o ramo segue como antes.
+    icred_ativo: bool = False
+    icred_base_url: str = ""
+    icred_chave_api: SecretStr = SecretStr("")
+    icred_webhook_segredo: SecretStr = SecretStr("")
+    # Minutos sem resposta até a conversa seguir sem o iCred e abrir alerta.
+    icred_espera_min: int = 5
+
     # Domínio dos links curtos (`https://{dominio}/l/{codigo}`), obrigatório com a
     # proposta ligada.
     dominio_publico: str = ""
@@ -231,6 +240,19 @@ class Settings(BaseSettings):
             if faltando:
                 raise RuntimeError("SATURDAY_C6_ATIVO=true exige " + ", ".join(faltando) + ".")
 
+        if self.icred_ativo and self.environment != "pytest":
+            faltando = [
+                nome
+                for nome, valor in {
+                    "SATURDAY_ICRED_BASE_URL": self.icred_base_url,
+                    "SATURDAY_ICRED_CHAVE_API": self.icred_chave_api.get_secret_value(),
+                    "SATURDAY_ICRED_WEBHOOK_SEGREDO": self.icred_webhook_segredo.get_secret_value(),
+                }.items()
+                if not valor
+            ]
+            if faltando:
+                raise RuntimeError("SATURDAY_ICRED_ATIVO=true exige " + ", ".join(faltando) + ".")
+
         if self.granatech_simulador_url:
             faltando = [
                 nome
@@ -313,6 +335,7 @@ HISTORY_MAX_MESSAGES = 10
 WEBHOOK_TIMEOUT_S = 10
 GRANATECH_TIMEOUT_S = 15
 GRANATECH_ESPERA_RETRY_S = 1.5
+ICRED_TIMEOUT_S = 15
 ANEXO_MAX_MB = 10
 ANEXO_TIMEOUT_S = 15
 MIME_ACEITOS = frozenset(

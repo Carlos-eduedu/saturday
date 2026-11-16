@@ -6,6 +6,7 @@ from langgraph.graph import END
 
 from saturday.agent.clt.nos import ATIVAS
 from saturday.agent.coleta import hoje_operacao, texto_valido_para
+from saturday.agent.icred.nos import ESPERANDO_CLIENTE
 from saturday.agent.state import AgentState
 
 
@@ -15,8 +16,9 @@ def _etapa_clt(state: AgentState) -> str | None:
 
 
 def route_start(state: AgentState) -> str:
-    if state.get("evento_sistema"):
-        return "clt"
+    evento = state.get("evento_sistema")
+    if evento:
+        return "icred" if evento.startswith("icred:") else "clt"
     if state.get("attachments") and _etapa_clt(state) in ATIVAS:
         # No CLT não há extrato para ler: a etapa responde com a pergunta atual.
         return "clt"
@@ -25,6 +27,8 @@ def route_start(state: AgentState) -> str:
     texto = state.get("user_message", "")
     if not texto.strip():
         return "pedir_texto"
+    if (state.get("icred") or {}).get("etapa") in ESPERANDO_CLIENTE:
+        return "icred"
     aguardando = state.get("aguardando")
     if aguardando and texto_valido_para(aguardando, texto, hoje_operacao()):
         return "collect_customer_data"
@@ -92,6 +96,19 @@ def after_calculate(state: AgentState) -> str:
     if any(c.get("elegivel") for c in resultado.get("contratos", [])):
         return "present_offer"
     return "handoff"
+
+
+def after_porta(state: AgentState) -> str:
+    # A porta do iCred pediu o SIM da consulta: o resultado do cálculo espera.
+    if state.get("status") == "answered":
+        return END
+    return after_calculate(state)
+
+
+def after_icred(state: AgentState) -> str:
+    if state.get("handoff_reason"):
+        return "handoff"
+    return state.get("icred_rota") or END
 
 
 def after_clt(state: AgentState) -> str:

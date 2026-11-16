@@ -25,6 +25,7 @@ from saturday.dados.modelos import EventoRecebido
 from saturday.dados.outbox import enfileirar
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.jobs import granatech as eventos_granatech
+from saturday.jobs import icred as eventos_icred
 from saturday.jobs import instancias as eventos_instancias
 from saturday.settings import Settings
 
@@ -32,6 +33,7 @@ logger = logging.getLogger(__name__)
 
 ORIGEM_GRANATECH = "granatech"
 ORIGEM_EVOLUTION = "evolution"
+ORIGEM_ICRED = "icred"
 
 
 def processar(
@@ -55,6 +57,8 @@ def processar(
         try:
             if linha.origem == ORIGEM_GRANATECH:
                 eventos_granatech.aplicar(fabrica, granatech, linha.payload or {}, servico)
+            elif linha.origem == ORIGEM_ICRED:
+                eventos_icred.aplicar(fabrica, linha.payload or {}, servico)
             elif (
                 linha.origem == ORIGEM_EVOLUTION and (linha.payload or {}).get("tipo") == "conexao"
             ):
@@ -73,7 +77,7 @@ def processar(
                 erro=f"{type(exc).__name__}: {exc}",
                 settings=settings,
             )
-            if desistiu and linha.origem == ORIGEM_GRANATECH:
+            if desistiu and linha.origem in (ORIGEM_GRANATECH, ORIGEM_ICRED):
                 _avisar_desistencia(fabrica, servico, linha)
         else:
             _registrar_resultado(fabrica, linha.id, erro="", settings=settings)
@@ -111,8 +115,9 @@ def _avisar_desistencia(
 ) -> None:
     """Sem isto o cliente fica esperando um evento que ninguém mais vai tentar."""
 
+    modulo = eventos_icred if linha.origem == ORIGEM_ICRED else eventos_granatech
     try:
-        eventos_granatech.desistir(fabrica, linha.payload or {}, servico)
+        modulo.desistir(fabrica, linha.payload or {}, servico)
     except Exception:  # noqa: BLE001 - o aviso não derruba o laço
         logger.exception("aviso_de_desistencia_falhou id=%s", linha.id)
 
