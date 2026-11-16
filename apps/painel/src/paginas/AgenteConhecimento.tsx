@@ -1,7 +1,6 @@
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { type FormEvent, useState } from "react";
 import {
   api,
-  type BaseConhecimento,
   enviarFonte,
   ErroApi,
   type FonteConhecimento,
@@ -9,7 +8,7 @@ import {
 import { Dialogo } from "../componentes/Dialogo";
 import { Falha } from "../componentes/Falha";
 import { Vazio } from "../componentes/Vazio";
-import { useAvisos } from "../tempoReal";
+import { useRecurso } from "../useRecurso";
 
 const mensagem = (e: unknown) => (e instanceof ErroApi ? e.message : "falha ao carregar");
 const dataHora = (iso: string) =>
@@ -34,28 +33,16 @@ const TIPO: Record<FonteConhecimento["tipo"], string> = {
 
 // Aba Agente → Conhecimento: fontes que o nó de respostas consulta junto da FAQ.
 export function AbaConhecimento() {
-  const [base, setBase] = useState<BaseConhecimento | null>(null);
-  const [erro, setErro] = useState("");
+  const {
+    dado: base,
+    falha,
+    carregar,
+  } = useRecurso("conhecimento", api.conhecimento, { recarrega: (a) => a.tipo === "agente" });
+  const erro = falha === null ? "" : mensagem(falha);
   const [aviso, setAviso] = useState("");
   const [editando, setEditando] = useState<FonteConhecimento | null>(null);
   const [removendo, setRemovendo] = useState<FonteConhecimento | null>(null);
 
-  const carregar = useCallback(() => {
-    api
-      .conhecimento()
-      .then((b) => {
-        setBase(b);
-        setErro("");
-      })
-      .catch((e: unknown) => setErro(mensagem(e)));
-  }, []);
-  useEffect(carregar, [carregar]);
-  useAvisos(
-    useCallback(
-      (a) => (a.tipo === "agente" || a.tipo === "reconectado") && carregar(),
-      [carregar],
-    ),
-  );
 
   function agir(acao: () => Promise<unknown>, feito: string) {
     setAviso("");

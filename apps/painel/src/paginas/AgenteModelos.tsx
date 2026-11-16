@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   api,
   ErroApi,
@@ -14,7 +14,7 @@ import GlideSelect from "../componentes/GlideSelect";
 import { duracao } from "../componentes/ItemTurno";
 import { Vazio } from "../componentes/Vazio";
 import { dolar, NOS, rotulo, tokens } from "../rotulos";
-import { useAvisos } from "../tempoReal";
+import { useRecurso } from "../useRecurso";
 
 type Rascunho = Partial<Record<PapelModelo, string>>;
 type Papel = ModelosAgente["papeis"][number];
@@ -37,25 +37,10 @@ function serve(m: ModeloDoCatalogo, papel: Papel): boolean {
 }
 
 function useModelos() {
-  const [dados, setDados] = useState<ModelosAgente | null>(null);
-  const [erro, setErro] = useState("");
-  const carregar = useCallback(() => {
-    api
-      .modelosAgente()
-      .then((d) => {
-        setDados(d);
-        setErro("");
-      })
-      .catch((e: unknown) => setErro(mensagem(e)));
-  }, []);
-  useEffect(carregar, [carregar]);
-  useAvisos(
-    useCallback(
-      (aviso) => (aviso.tipo === "agente" || aviso.tipo === "reconectado") && carregar(),
-      [carregar],
-    ),
-  );
-  return { dados, erro, carregar };
+  const { dado, falha, carregar } = useRecurso("modelos", api.modelosAgente, {
+    recarrega: (aviso) => aviso.tipo === "agente",
+  });
+  return { dados: dado, erro: falha === null ? "" : mensagem(falha), carregar };
 }
 
 // Aviso antes de aplicar: a troca vale no próximo turno; os que rodam terminam como estão.
@@ -615,21 +600,14 @@ function TestarModelo({ papel, modelo, fechar }: { papel: Papel; modelo: string;
 
 export function AbaVersoes() {
   const { dados } = useModelos();
-  const [versoes, setVersoes] = useState<VersaoAgente[] | null>(null);
-  const [erro, setErro] = useState("");
+  const {
+    dado: versoes,
+    falha,
+    carregar,
+  } = useRecurso("versoes", api.versoesAgente, { recarrega: (aviso) => aviso.tipo === "agente" });
+  const erro = falha === null ? "" : mensagem(falha);
   const [restaurar, setRestaurar] = useState<VersaoAgente | null>(null);
 
-  const carregar = useCallback(() => {
-    api
-      .versoesAgente()
-      .then((v) => {
-        setVersoes(v);
-        setErro("");
-      })
-      .catch((e: unknown) => setErro(mensagem(e)));
-  }, []);
-  useEffect(carregar, [carregar]);
-  useAvisos(useCallback((aviso) => aviso.tipo === "agente" && carregar(), [carregar]));
 
   if (!versoes)
     return erro ? (

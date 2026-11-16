@@ -19,7 +19,6 @@ import {
   type Eu,
   type EventoGranatech,
   type FiltroGranatech,
-  type Homologacao as DadosHomologacao,
   type PropostaGranatech,
   type PropostaGranatechDetalhe,
   type Rodada,
@@ -39,6 +38,7 @@ import {
   porcento,
 } from "../rotulos";
 import { type Aviso, useAvisos } from "../tempoReal";
+import { useRecurso } from "../useRecurso";
 
 // Aba Granatech (decisão 0013). Todos veem consultas e propostas; só o gestor
 // age. Abrir consulta, simular e criar proposta não existem aqui: dependem do
@@ -72,35 +72,34 @@ export function Granatech({ eu }: { eu: Eu }) {
   const gestor = eu.perfil === "gestor";
   const [aba, setAba] = useState<Aba>("propostas");
   const [filtro, setFiltro] = useState<FiltroGranatech>({});
-  const [consultas, setConsultas] = useState<ConsultaGranatech[] | null>(null);
-  const [propostas, setPropostas] = useState<PropostaGranatech[] | null>(null);
   const [selecao, setSelecao] = useState<Selecao>(null);
   const [versao, setVersao] = useState(0);
-  const [erro, setErro] = useState("");
   const [aviso, setAviso] = useState("");
 
-  const carregar = useCallback(() => {
-    setErro("");
-    const pedido = aba === "consultas" ? api.consultasGranatech(filtro) : api.propostasGranatech(filtro);
-    pedido
-      .then((linhas) =>
-        aba === "consultas"
-          ? setConsultas(linhas as ConsultaGranatech[])
-          : setPropostas(linhas as PropostaGranatech[]),
-      )
-      .catch((e: unknown) => setErro(mensagemDe(e)));
-  }, [aba, filtro]);
-  useEffect(carregar, [carregar]);
+  // A lista vem marcada com a aba dela: a de uma não aparece na outra. Trocar
+  // só o filtro mantém a lista anterior à vista até a nova chegar.
+  const { dado, falha, carregar } = useRecurso(
+    `${aba}|${JSON.stringify(filtro)}`,
+    (): Promise<
+      | { aba: "consultas"; linhas: ConsultaGranatech[] }
+      | { aba: "propostas"; linhas: PropostaGranatech[] }
+    > =>
+      aba === "consultas"
+        ? api.consultasGranatech(filtro).then((linhas) => ({ aba, linhas }))
+        : api.propostasGranatech(filtro).then((linhas) => ({ aba, linhas })),
+    { recarrega: (a) => a.tipo === "granatech", manter: true },
+  );
+  const consultas = dado?.aba === "consultas" ? dado.linhas : null;
+  const propostas = dado?.aba === "propostas" ? dado.linhas : null;
+  // Falha de uma ação; a de carga vem do recurso.
+  const [erroDaAcao, setErro] = useState("");
+  const erro = erroDaAcao || (falha === null ? "" : mensagemDe(falha));
 
+  // Os detalhes abertos recarregam com os mesmos avisos da lista.
   useAvisos(
-    useCallback(
-      (a: Aviso) => {
-        if (a.tipo !== "granatech" && a.tipo !== "reconectado") return;
-        carregar();
-        setVersao((v) => v + 1);
-      },
-      [carregar],
-    ),
+    useCallback((a: Aviso) => {
+      if (a.tipo === "granatech" || a.tipo === "reconectado") setVersao((v) => v + 1);
+    }, []),
   );
 
   // Uma ação por vez: reenviar o link duas vezes manda duas mensagens ao cliente.
@@ -205,34 +204,24 @@ const SITUACAO: Record<SituacaoRodada, string> = {
 
 function Homologacao() {
   const confirmar = useConfirmar();
-  const [dados, setDados] = useState<DadosHomologacao | null>(null);
-  const [indisponivel, setIndisponivel] = useState(false);
+  const {
+    dado: dados,
+    falha,
+    carregar,
+  } = useRecurso("homologacao", api.homologacao, { recarrega: (a) => a.tipo === "homologacao" });
+  // 404: este ambiente não tem homologação; a seção some.
+  const indisponivel = falha instanceof ErroApi && falha.status === 404;
   const [aberta, setAberta] = useState<number | null>(null);
   const [versao, setVersao] = useState(0);
-  const [erro, setErro] = useState("");
+  // Falha de uma ação; a de carga vem do recurso.
+  const [erroDaAcao, setErro] = useState("");
+  const erro = erroDaAcao || (falha === null ? "" : mensagemDe(falha));
 
-  const carregar = useCallback(() => {
-    api
-      .homologacao()
-      .then((d) => {
-        setDados(d);
-      })
-      .catch((e: unknown) => {
-        if (e instanceof ErroApi && e.status === 404) setIndisponivel(true);
-        else setErro(mensagemDe(e));
-      });
-  }, []);
-  useEffect(carregar, [carregar]);
-
+  // A rodada aberta recarrega com os mesmos avisos da lista.
   useAvisos(
-    useCallback(
-      (a: Aviso) => {
-        if (a.tipo !== "homologacao" && a.tipo !== "reconectado") return;
-        carregar();
-        setVersao((v) => v + 1);
-      },
-      [carregar],
-    ),
+    useCallback((a: Aviso) => {
+      if (a.tipo === "homologacao" || a.tipo === "reconectado") setVersao((v) => v + 1);
+    }, []),
   );
 
   if (indisponivel) return null;

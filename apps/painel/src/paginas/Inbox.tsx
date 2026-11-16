@@ -25,7 +25,8 @@ import { Falha } from "../componentes/Falha";
 import { Vazio } from "../componentes/Vazio";
 import { ATENCAO, AUTORES, ETAPAS, MOTIVOS_HANDOFF, relativo, rotulo } from "../rotulos";
 import { useMidia } from "../midia";
-import { type Aviso, useAvisos } from "../tempoReal";
+import type { Aviso } from "../tempoReal";
+import { useRecurso } from "../useRecurso";
 
 // Cores do SwipeRow pelas variáveis do painel: seguem o tema claro e o escuro.
 export const CORES_SWIPE = {
@@ -157,14 +158,27 @@ export function Inbox({
   const Titulo = compacta ? "h2" : "h1";
   const [fila, setFila] = useState("");
   const [busca, setBusca] = useState("");
+  // Digitar na busca dispara um pedido por tecla e os avisos chegam em rajada:
+  // o recurso só aceita a resposta do último pedido. Só o que muda a linha ou
+  // as contagens recarrega: aviso do Agente, da Granatech ou da homologação
+  // chegava em rajada e refazia dois pedidos à toa.
+  const chave = `${fila}|${busca}`;
+  const carga = useRecurso(chave, () => Promise.all([api.conversas(fila, busca), api.contagens()]), {
+    recarrega: (aviso) => RECARREGAM.has(aviso.tipo),
+    manter: true,
+  });
+  const { carregar } = carga;
   // null = ainda não carregou: não mostra "nenhuma conversa" antes de saber.
-  const [conversas, setConversas] = useState<Resumo[] | null>(null);
+  const conversas = carga.dado?.[0] ?? null;
   // Contagens das abas e do título da aba do navegador, em toda a base.
-  const [contagens, setContagens] = useState<Contagens | null>(null);
+  const contagens = carga.dado?.[1] ?? null;
   // De que fila e busca é a lista à mostra: trocar de fila mantém a anterior,
   // esmaecida, até a nova chegar (em vez de piscar "Carregando…").
-  const [carregada, setCarregada] = useState("");
-  const [erro, setErro] = useState("");
+  const carregada = carga.chaveDoDado ?? "";
+  // Falha de uma ação (assumir, devolver); a de carga vem do recurso.
+  const [erroDaAcao, setErro] = useState("");
+  const erro =
+    erroDaAcao || (carga.falha === null ? "" : mensagemDeFalha(carga.falha, "carregar as conversas"));
   const [soAtencao, setSoAtencao] = useState(false);
 
   // Leitor de tela: avisa quem escreveu, agrupado em 1,5 s, e não a cada aviso.
@@ -198,31 +212,10 @@ export function Inbox({
     }, 1500);
   }, []);
 
-  // Digitar na busca dispara um pedido por tecla e os avisos chegam em rajada:
-  // só a resposta do último pedido vale, senão uma lista velha cobre a nova.
-  const ultimoPedido = useRef(0);
-  const carregar = useCallback(() => {
-    const pedido = ++ultimoPedido.current;
-    Promise.all([api.conversas(fila, busca), api.contagens()])
-      .then(([lista, contadas]) => {
-        if (pedido !== ultimoPedido.current) return;
-        setConversas(lista);
-        setContagens(contadas);
-        setCarregada(`${fila}|${busca}`);
-        // Só a lista à mostra anuncia mensagem nova.
-        anunciar(lista, `${fila}|${busca}`);
-        setErro("");
-      })
-      .catch((e: unknown) => {
-        if (pedido !== ultimoPedido.current) return;
-        setErro(mensagemDeFalha(e, "carregar as conversas"));
-      });
-  }, [fila, busca, anunciar]);
-
-  useEffect(carregar, [carregar]);
-  // Só o que muda a linha ou as contagens recarrega: aviso do Agente, da
-  // Granatech ou da homologação chegava em rajada e refazia dois pedidos à toa.
-  useAvisos(useCallback((aviso) => RECARREGAM.has(aviso.tipo) && carregar(), [carregar]));
+  // Cada lista que chega anuncia as mensagens novas em relação à anterior.
+  useEffect(() => {
+    if (carga.dado && carga.chaveDoDado !== null) anunciar(carga.dado[0], carga.chaveDoDado);
+  }, [carga.dado, carga.chaveDoDado, anunciar]);
 
   // A espera relativa ("há 3 min") anda sozinha, sem recarregar a lista.
   const [agora, setAgora] = useState(() => Date.now());
@@ -365,6 +358,7 @@ export function Inbox({
       return;
     }
     setAgindo(c.id);
+    setErro("");
     try {
       await (acao === "assumir" ? api.assumir(c.id) : api.devolver(c.id));
       avisar({ id: c.id, texto: textoDoAviso(acao, c.telefone ?? c.canal), depois: carregar });

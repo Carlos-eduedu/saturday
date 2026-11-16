@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
-import { api, type CotaPorDia, type Custos as DadosCustos, ErroApi } from "../api";
+import { api, type Custos as DadosCustos, ErroApi } from "../api";
 import { Falha } from "../componentes/Falha";
 import { Vazio } from "../componentes/Vazio";
 import { dolar, tokens } from "../rotulos";
-import { useAvisos } from "../tempoReal";
+import { useRecurso } from "../useRecurso";
 
 const mensagem = (e: unknown) => (e instanceof ErroApi ? e.message : "falha ao carregar");
 const diaCurto = (iso: string) =>
@@ -24,19 +24,8 @@ export function Operacao() {
 
 // Uso da cota no mês e em cada dia, contra os tetos (diário e mensal).
 function CotaGranatech() {
-  const [cota, setCota] = useState<CotaPorDia | null>(null);
-  const [erro, setErro] = useState("");
-  const carregar = useCallback(() => {
-    api
-      .cotaPorDia()
-      .then((c) => {
-        setCota(c);
-        setErro("");
-      })
-      .catch((e: unknown) => setErro(mensagem(e)));
-  }, []);
-  useEffect(carregar, [carregar]);
-  useAvisos(useCallback((aviso) => aviso.tipo === "reconectado" && carregar(), [carregar]));
+  const { dado: cota, falha, carregar } = useRecurso("cota-por-dia", api.cotaPorDia);
+  const erro = falha === null ? "" : mensagem(falha);
 
   if (erro)
     return <Falha titulo="Não deu para carregar a cota da Granatech." texto={erro} aoTentar={carregar} />;
