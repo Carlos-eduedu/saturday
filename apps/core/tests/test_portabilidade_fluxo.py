@@ -274,7 +274,7 @@ def test_data_invalida_duas_vezes_vai_para_handoff(client, fakes: Fakes):
     assert body["handoff_reason"] == "dados_cliente_nao_informados"
 
 
-def test_webhook_contem_portability_result(client, fakes: Fakes):
+def test_webhook_contem_portability_result(client, fakes: Fakes, enviados_ao_outbox):
     fakes.webhook.configurado = True
     fakes.llm.extrato = dados_extrato()
 
@@ -290,8 +290,7 @@ def test_webhook_contem_portability_result(client, fakes: Fakes):
     )
 
     assert r.status_code == 202
-    assert len(fakes.webhook.enviados) == 1
-    payload = fakes.webhook.enviados[0]
+    [payload] = enviados_ao_outbox()
     assert payload["portability_result"]["ok"] is True
     assert payload["portability_result"]["contratos"]
 

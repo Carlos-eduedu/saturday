@@ -94,7 +94,7 @@ def test_erro_inesperado_vira_handoff_erro_interno(client, service, fakes: Fakes
     assert "problema para continuar" in body["answer"].lower()
 
 
-def test_erro_inesperado_no_webhook_envia_evento(client, service, fakes: Fakes):
+def test_erro_inesperado_no_webhook_envia_evento(client, service, fakes: Fakes, enviados_ao_outbox):
     fakes.webhook.configurado = True
     service.graph = GrafoQuebrado()
 
@@ -104,8 +104,7 @@ def test_erro_inesperado_no_webhook_envia_evento(client, service, fakes: Fakes):
     )
 
     assert r.status_code == 202
-    assert len(fakes.webhook.enviados) == 1
-    payload = fakes.webhook.enviados[0]
+    [payload] = enviados_ao_outbox()
     assert payload["status"] == "handoff"
     assert payload["handoff_reason"] == "erro_interno"
     assert "problema para continuar" in payload["answer"].lower()

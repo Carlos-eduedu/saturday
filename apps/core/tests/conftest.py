@@ -6,7 +6,7 @@ import importlib.util
 import os
 import sys
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import ModuleType
@@ -20,7 +20,7 @@ from langgraph.checkpoint.postgres import PostgresSaver
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 from pydantic import SecretStr
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import NullPool
 
@@ -28,6 +28,7 @@ from saturday.agent.context import AgentContext
 from saturday.agent.graph import build_graph
 from saturday.agent.service import AgentService
 from saturday.dados.base import Base
+from saturday.dados.modelos import Outbox
 from saturday.dados.sessao import criar_factory
 from saturday.services.anexos import Anexo
 from saturday.services.jev import JevResult
@@ -183,20 +184,30 @@ def fakes() -> Fakes:
 
 
 @pytest.fixture
-def service(settings: Settings, fakes: Fakes) -> AgentService:
-    # Os fakes duplicam a interface dos clientes sem herdar deles de propósito:
-    # herdar traria a implementação real (rede) junto com a assinatura.
-    context = AgentContext(jev=fakes.jev, llm=fakes.llm, anexos=fakes.anexos)  # type: ignore[arg-type]
-    checkpointer = InMemorySaver()
-    graph = build_graph(checkpointer)
-    agent_service = AgentService(
-        graph=graph,
-        context=context,
-        webhook=fakes.webhook,  # type: ignore[arg-type]
-        settings=settings,
-        checkpointer=checkpointer,
-    )
-    return agent_service
+def service(
+    settings: Settings,
+    fakes: Fakes,
+    fabrica: sessionmaker[Session],
+) -> AgentService:
+    """Serviço com o Postgres de teste e o checkpoint em memória (decisão 0022).
+
+    Sem storage: o anexo segue como veio, sem ser arquivado. O `service_pg`
+    troca o checkpoint pelo `PostgresSaver` e liga o storage, para os testes
+    de trava, de poda e de retenção.
+    """
+
+    return _servico_com_banco(settings, fakes, InMemorySaver(), fabrica, None)
+
+
+@pytest.fixture
+def enviados_ao_outbox(fabrica: sessionmaker[Session]) -> Callable[[], list[dict[str, Any]]]:
+    """O que os turnos deixaram para o worker entregar, na ordem."""
+
+    def ler() -> list[dict[str, Any]]:
+        with fabrica() as sessao:
+            return [envio.payload for envio in sessao.scalars(select(Outbox).order_by(Outbox.id))]
+
+    return ler
 
 
 @pytest.fixture
@@ -220,8 +231,8 @@ def _montar_app(
 
 
 @pytest.fixture
-def app(settings: Settings, service: AgentService) -> Any:
-    return _montar_app(settings, service)
+def app(settings: Settings, service: AgentService, fabrica: sessionmaker[Session]) -> Any:
+    return _montar_app(settings, service, fabrica)
 
 
 # ------------------------------------------------------------------ Postgres
@@ -305,7 +316,7 @@ def _servico_com_banco(
     fakes: Fakes,
     checkpointer: Any,
     fabrica: sessionmaker[Session],
-    storage: MemoriaStorage,
+    storage: MemoriaStorage | None,
 ) -> AgentService:
     contexto = AgentContext(jev=fakes.jev, llm=fakes.llm, anexos=fakes.anexos)  # type: ignore[arg-type]
     return AgentService(

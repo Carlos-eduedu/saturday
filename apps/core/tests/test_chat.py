@@ -136,7 +136,7 @@ def test_5_apos_handoff_proxima_mensagem_nao_roda_grafo(client, fakes: Fakes):
     assert len(fakes.jev.chamadas) == 1
 
 
-def test_6_webhook_recebe_payload(client, fakes: Fakes):
+def test_6_webhook_recebe_payload(client, fakes: Fakes, enviados_ao_outbox):
     fakes.webhook.configurado = True
     fakes.jev.resultado = resultado_jev()
     fakes.llm.resposta = resposta_llm("Resposta ao cliente")
@@ -149,8 +149,8 @@ def test_6_webhook_recebe_payload(client, fakes: Fakes):
 
     assert r.status_code == 202
     assert r.json() == {"conversation_id": conversa, "status": "accepted"}
-    assert len(fakes.webhook.enviados) == 1
-    payload = fakes.webhook.enviados[0]
+    # Com webhook configurado a entrega é do worker: a resposta fica no outbox.
+    [payload] = enviados_ao_outbox()
     assert payload["event"] == "agent.reply"
     assert payload["conversation_id"] == conversa
     assert payload["answer"] == "Resposta ao cliente"

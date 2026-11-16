@@ -42,24 +42,22 @@ def test_release_inexistente_retorna_404(client):
 
 
 def test_liberacao_automatica_apos_prazo(service, fakes, monkeypatch):
-    agora_fixo = datetime(2026, 10, 8, 12, 0, tzinfo=TZ)
-    monkeypatch.setattr("saturday.agent.service.agora", lambda: agora_fixo)
     service.settings.handoff_auto_release_horas = 1
     conversa = "release-auto"
-    service.graph.update_state(
-        service.config(conversa),
-        {
-            "status": "handoff",
-            "handoff_reason": "pediu_humano",
-            "handoff_em": (agora_fixo - timedelta(hours=2)).isoformat(),
-        },
-    )
+    fakes.jev.resultado = resultado_jev("humano", 0.95)
+    pedido = ChatRequest(conversation_id=conversa, message="quero atendente")
+    assert service.process_message(pedido).status == "handoff"
+
+    # O prazo conta de `conversas.atendimento_em`, gravado pelo banco agora.
+    duas_horas_depois = datetime.now(TZ) + timedelta(hours=2)
+    monkeypatch.setattr("saturday.agent.service.agora", lambda: duas_horas_depois)
+    fakes.jev.resultado = resultado_jev()
 
     resposta = service.process_message(ChatRequest(conversation_id=conversa, message="oi de novo"))
 
     assert resposta.status == "answered"
     assert resposta.handoff_reason is None
-    assert len(fakes.jev.chamadas) == 1
+    assert len(fakes.jev.chamadas) == 2
     estado = service.graph.get_state(service.config(conversa)).values
     assert estado["status"] == "answered"
     assert estado["handoff_em"] is None
