@@ -36,7 +36,11 @@ export interface Resumo {
   telefone: string | null;
   ultima_entrada_em: string | null;
   nao_lida: boolean;
-  janela_aberta: boolean;
+  // O que o canal permite agora, pronto do servidor (`painel/canal.py`):
+  // a tela não compara `canal` para decidir envio.
+  envia: boolean;
+  janela: "aberta" | "fechada" | null;
+  modelos: string[];
   ultima_mensagem: { autor: string; texto: string; em: string } | null;
   etapa: string | null;
   // Nome do membro testador dono do telefone (decisão 0020), ou null.
@@ -65,7 +69,6 @@ export interface Mensagem {
 
 export interface Detalhe extends Resumo {
   mensagens: Mensagem[];
-  modelos: string[];
 }
 
 export interface Ficha {

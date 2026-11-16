@@ -24,7 +24,6 @@ from starlette.concurrency import run_in_threadpool
 
 from saturday.agent.clt import leitura
 from saturday.agent.service import AgentService, ficha_do_estado
-from saturday.canais.whatsapp.janela import janela_aberta
 from saturday.canais.whatsapp.telefone import normalizar_telefone
 from saturday.dados import repositorios
 from saturday.dados.modelos import (
@@ -39,6 +38,7 @@ from saturday.dados.modelos import (
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.painel import acoes, exportacao, sessoes, supervisao
 from saturday.painel.auditoria import auditar
+from saturday.painel.canal import permitido
 from saturday.painel.midia import mime_base
 from saturday.privacidade import MASCARAS
 from saturday.settings import TZ_OPERACAO
@@ -368,6 +368,7 @@ def usuarios(_usuario: Logado, fabrica: Fabrica) -> list[dict[str, Any]]:
 
 def _resumo(conversa: Conversa, agora: datetime) -> dict[str, Any]:
     entrada = conversa.ultima_entrada_em
+    canal = permitido(conversa.canal, entrada, agora)
     return {
         "id": str(conversa.id),
         "canal": conversa.canal,
@@ -377,7 +378,9 @@ def _resumo(conversa: Conversa, agora: datetime) -> dict[str, Any]:
         "ultima_entrada_em": entrada,
         "nao_lida": entrada is not None
         and (conversa.vista_em is None or entrada > conversa.vista_em),
-        "janela_aberta": conversa.canal == "whatsapp" and janela_aberta(entrada, agora),
+        "envia": canal.envia,
+        "janela": canal.janela,
+        "modelos": list(canal.modelos),
     }
 
 
@@ -463,9 +466,7 @@ def ver_conversa(conversa_id: uuid.UUID, _usuario: Logado, fabrica: Fabrica) -> 
             for m in mensagens
         ]
         conversa.vista_em = func.now()
-    # Modelo é da Meta; a Evolution só manda texto (decisão 0009).
-    modelos = list(acoes.MODELOS_DO_PAINEL) if conversa.canal == "whatsapp" else []
-    return {**resumo, "mensagens": historico, "modelos": modelos}
+    return {**resumo, "mensagens": historico}
 
 
 @router.get("/conversas/{conversa_id}/exportar")

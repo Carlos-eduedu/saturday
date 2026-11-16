@@ -6,8 +6,7 @@
 interface DaConversa {
   atendimento: string;
   atendente_id: string | null;
-  canal: string;
-  janela_aberta: boolean;
+  janela: "aberta" | "fechada" | null;
 }
 
 export interface Permissoes {
@@ -21,7 +20,8 @@ export interface Permissoes {
   podeDevolver: boolean;
   // Ficha e transferência: o dono ou o gestor.
   podeMexer: boolean;
-  // Evolution não tem janela nem modelo: sempre aberta (decisão 0009).
+  // Texto e anexo agora: só a janela fechada da Meta barra; canal sem
+  // janela (`null`) escreve sempre (decisão 0009).
   janelaAberta: boolean;
 }
 
@@ -36,6 +36,6 @@ export function permissoesDa(conversa: DaConversa, eu: { id: string; perfil: str
     tomaDeOutro: podeAssumir && assumida,
     podeDevolver: conversa.atendimento !== "ia" && (conversa.atendimento === "handoff" || minha || gestor),
     podeMexer: minha || gestor,
-    janelaAberta: conversa.janela_aberta || conversa.canal !== "whatsapp",
+    janelaAberta: conversa.janela !== "fechada",
   };
 }

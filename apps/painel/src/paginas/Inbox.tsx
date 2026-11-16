@@ -551,7 +551,7 @@ export function Inbox({
                           {c.membro && <span className="selo-membro">Membro · {c.membro.split(" ")[0]}</span>}
                           {/* O canal e a janela só aparecem quando fogem do normal:
                               WhatsApp com janela aberta não precisa de rótulo. */}
-                          {(c.canal === "evolution" || !c.janela_aberta) && (
+                          {(c.canal === "evolution" || c.janela === "fechada") && (
                             <span className="linha-canal">
                               {c.canal === "evolution" ? (
                                 <span>Evolution</span>

@@ -9,8 +9,7 @@ const gestor = { id: "gil", perfil: "gestor" };
 const conversa = (atendimento: string, atendente_id: string | null = null) => ({
   atendimento,
   atendente_id,
-  canal: "whatsapp",
-  janela_aberta: true,
+  janela: "aberta" as "aberta" | "fechada" | null,
 });
 
 // Colunas: minha, podeAssumir, tomaDeOutro, podeDevolver, podeMexer.
@@ -29,11 +28,11 @@ for (const [caso, c, eu, esperado] of TABELA) {
   assert.deepEqual([p.minha, p.podeAssumir, p.tomaDeOutro, p.podeDevolver, p.podeMexer], esperado, caso);
 }
 
-// Janela: só o WhatsApp oficial fecha; Evolution escreve sempre.
-const janela = (canal: string, janela_aberta: boolean) =>
-  permissoesDa({ ...conversa("ia"), canal, janela_aberta }, ana).janelaAberta;
-assert.equal(janela("whatsapp", true), true);
-assert.equal(janela("whatsapp", false), false);
-assert.equal(janela("evolution", false), true);
+// Janela: só a fechada barra o texto; canal sem janela (`null`) escreve sempre.
+const janela = (estado: "aberta" | "fechada" | null) =>
+  permissoesDa({ ...conversa("ia"), janela: estado }, ana).janelaAberta;
+assert.equal(janela("aberta"), true);
+assert.equal(janela("fechada"), false);
+assert.equal(janela(null), true);
 
 console.log("permissoes: ok");

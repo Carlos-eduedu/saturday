@@ -113,10 +113,8 @@ export function Compositor({
     el.style.height = `${Math.min(el.scrollHeight, ALTURA_MAXIMA)}px`;
   }, [texto]);
 
-  // Evolution não tem janela nem modelo: sempre texto (decisão 0009).
-  const meta = conversa.canal === "whatsapp";
   const { janelaAberta, podeMexer: podeFicha } = permissoesDa(conversa, eu);
-  const temModelo = meta && conversa.modelos.length > 0;
+  const temModelo = conversa.modelos.length > 0;
   const podeAnexar = minha && janelaAberta && !enviando && !gravador.gravando;
   const audio = anexo?.arquivo.type.startsWith("audio/") ?? false;
 

@@ -188,7 +188,7 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
   }
   const { minha, podeAssumir, tomaDeOutro, podeDevolver, podeMexer } = permissoesDa(conversa, eu);
   const dono = usuarios.find((u) => u.id === conversa.atendente_id)?.nome ?? "outra pessoa";
-  const temEnvio = conversa.canal === "whatsapp" || conversa.canal === "evolution";
+  const temEnvio = conversa.envia;
 
   // Assumir e devolver valem na hora; o aviso deixa desfazer por 5 s.
   async function mudar(acao: "assumir" | "devolver") {
@@ -241,7 +241,7 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
               </span>
               {conversa.etapa && <span className="contexto">{rotulo(ETAPAS, conversa.etapa)}</span>}
               {/* Janela aberta é o normal: só a fechada muda o que dá para enviar. */}
-              {conversa.canal === "whatsapp" && !conversa.janela_aberta && (
+              {conversa.janela === "fechada" && (
                 <span className="janela fechada">janela fechada</span>
               )}
               {conversa.aguardando_desde && (

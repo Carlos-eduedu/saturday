@@ -20,7 +20,6 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from saturday.canais.whatsapp.janela import janela_aberta
 from saturday.dados.modelos import (
     Consentimento,
     ConsultaGranatech,
@@ -29,6 +28,7 @@ from saturday.dados.modelos import (
     PropostaGranatech,
     Turno,
 )
+from saturday.painel.canal import permitido
 from saturday.privacidade import MASCARAS
 from saturday.settings import TZ_OPERACAO
 
@@ -190,9 +190,9 @@ def _cabecalho(retrato: Retrato) -> str:
         _campo("Aberta em", _quando(conversa.criada_em)),
         _campo("Cliente escreveu pela última vez em", _quando(conversa.ultima_entrada_em)),
     ]
-    if conversa.canal == "whatsapp":
-        aberta = janela_aberta(conversa.ultima_entrada_em, retrato.exportado_em)
-        linhas.append(_campo("Janela de 24 h", "aberta" if aberta else "fechada"))
+    janela = permitido(conversa.canal, conversa.ultima_entrada_em, retrato.exportado_em).janela
+    if janela is not None:
+        linhas.append(_campo("Janela de 24 h", janela))
     atencao = retrato.supervisao.get("atencao") or []
     linhas += [
         _campo("Mensagens", len(retrato.mensagens)),

@@ -23,6 +23,7 @@ from saturday.dados.modelos import (
 )
 from saturday.dados.sessao import sessao as abrir
 from saturday.painel import acoes, sessoes
+from saturday.painel.canal import MODELOS_DO_PAINEL
 from saturday.schemas import ChatRequest
 from saturday.web.api.admin import abre_no_navegador
 
@@ -271,6 +272,16 @@ def test_desfazer_vence_com_o_prazo(client_pg, service_pg, fabrica, ana, convers
     assert _atendimento(client_pg, alvo) == ("assumida", ana)
 
 
+def test_conversa_do_chat_nao_tem_janela_nem_envio(client_pg, service_pg, ana, conversa):
+    """Janela é da Meta: no canal `chat` o painel não mostra o selo nem envia."""
+
+    service_pg.process_message(ChatRequest(conversation_id=conversa, message="oi"))
+    _entrar(client_pg, "ana@exemplo.test")
+
+    [item] = client_pg.get("/admin/conversas").json()
+    assert (item["envia"], item["janela"], item["modelos"]) == (False, None, [])
+
+
 def test_inbox_filtra_por_fila_e_marca_lida(client_pg, service_pg, fabrica, ana, conversa):
     _cliente_escreve(service_pg, conversa, "oi")
     alvo = _conversa_id(fabrica, conversa)
@@ -279,7 +290,8 @@ def test_inbox_filtra_por_fila_e_marca_lida(client_pg, service_pg, fabrica, ana,
     [item] = client_pg.get("/admin/conversas", params={"fila": "ia"}).json()
     assert item["id"] == alvo
     assert item["nao_lida"] is True
-    assert item["janela_aberta"] is True
+    assert (item["envia"], item["janela"]) == (True, "aberta")
+    assert item["modelos"] == list(MODELOS_DO_PAINEL)
     assert item["telefone"] == "(11) *****-4321"
     assert client_pg.get("/admin/conversas", params={"fila": "minhas"}).json() == []
 

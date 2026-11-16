@@ -16,9 +16,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from saturday.canais.base import CANAIS_WHATSAPP, Envio
-from saturday.canais.whatsapp.janela import janela_aberta
-from saturday.canais.whatsapp.modelos import MODELOS
+from saturday.canais.base import Envio
 from saturday.dados import atendimento, repositorios
 from saturday.dados.modelos import (
     Auditoria,
@@ -32,18 +30,10 @@ from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.dados.trava import travar_e_reler
 from saturday.painel import midia
 from saturday.painel.auditoria import auditar
+from saturday.painel.canal import Permitido, permitido
 from saturday.storage.base import Storage
 
 logger = logging.getLogger(__name__)
-
-# Modelos que o atendente pode mandar: utilidade e sem botão de link.
-# TODO: variáveis de modelo quando os textos forem cadastrados na Meta; os
-# links `/l/{codigo}` só existem na Fase 6.
-MODELOS_DO_PAINEL = tuple(
-    nome
-    for nome, modelo in MODELOS.items()
-    if modelo.categoria == "utilidade" and not modelo.tem_link
-)
 
 
 class AcaoRecusada(Exception):
@@ -215,17 +205,18 @@ def editar_ficha(
     repositorios.notificar(sessao, "conversa", conversa=conversa.id)
 
 
-def _conferir_envio(conversa: Conversa, usuario_id: uuid.UUID) -> None:
-    """Só quem assumiu responde, e o painel só envia pelo WhatsApp."""
+def _conferir_envio(conversa: Conversa, usuario_id: uuid.UUID) -> Permitido:
+    """Só quem assumiu responde, e o painel só envia pelo WhatsApp.
+
+    Devolve o que o canal da conversa permite agora (`painel/canal.py`).
+    """
 
     if conversa.atendimento != "assumida" or conversa.atendente_id != usuario_id:
         raise AcaoRecusada(409, "assuma a conversa antes de responder")
-    if (
-        conversa.canal not in CANAIS_WHATSAPP
-        or not conversa.telefone
-        or not conversa.phone_number_id
-    ):
+    canal = permitido(conversa.canal, conversa.ultima_entrada_em, datetime.now(UTC))
+    if not canal.envia or not conversa.telefone or not conversa.phone_number_id:
         raise AcaoRecusada(409, "o painel só envia pelo WhatsApp")
+    return canal
 
 
 def _enfileirar(
@@ -259,18 +250,12 @@ def enviar(
 ) -> int:
     """Grava a mensagem do atendente e o envio no outbox, na mesma transação."""
 
-    _conferir_envio(conversa, usuario_id)
+    canal = _conferir_envio(conversa, usuario_id)
     if (texto is None) == (modelo is None):
         raise AcaoRecusada(422, "envie texto ou modelo")
-    # Janela e modelos são da Meta; a Evolution só manda texto (decisão 0009).
-    meta = conversa.canal == "whatsapp"
-    if modelo is not None and (not meta or modelo not in MODELOS_DO_PAINEL):
+    if modelo is not None and modelo not in canal.modelos:
         raise AcaoRecusada(422, "modelo indisponível no painel")
-    if (
-        meta
-        and texto is not None
-        and not janela_aberta(conversa.ultima_entrada_em, datetime.now(UTC))
-    ):
+    if texto is not None and not canal.texto_livre:
         raise AcaoRecusada(409, "janela de 24 h fechada: envie um modelo")
 
     mensagem_id = repositorios.registrar_saida(
@@ -308,14 +293,12 @@ def enviar_anexo(
     janela aberta (fora dela a Meta recusa qualquer coisa que não seja modelo).
     """
 
-    _conferir_envio(conversa, usuario_id)
+    canal = _conferir_envio(conversa, usuario_id)
     try:
         tipo = midia.conferir(dados, mime_type)
     except midia.MidiaRecusada as exc:
         raise AcaoRecusada(exc.status, exc.detalhe) from exc
-    if conversa.canal == "whatsapp" and not janela_aberta(
-        conversa.ultima_entrada_em, datetime.now(UTC)
-    ):
+    if not canal.texto_livre:
         raise AcaoRecusada(409, "janela de 24 h fechada: envie um modelo")
 
     extensao = midia.EXTENSAO[mime_type]
