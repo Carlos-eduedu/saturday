@@ -33,6 +33,7 @@ import {
   enviarAnexo,
   type RespostaRapida,
 } from "../api";
+import { permissoesDa } from "../permissoes";
 import { MODELOS, rotulo } from "../rotulos";
 import { type Banco, CamposConta, CONTA_VAZIA } from "./CamposConta";
 import { Dialogo } from "./Dialogo";
@@ -114,9 +115,8 @@ export function Compositor({
 
   // Evolution não tem janela nem modelo: sempre texto (decisão 0009).
   const meta = conversa.canal === "whatsapp";
-  const janelaAberta = conversa.janela_aberta || !meta;
+  const { janelaAberta, podeMexer: podeFicha } = permissoesDa(conversa, eu);
   const temModelo = meta && conversa.modelos.length > 0;
-  const podeFicha = minha || eu.perfil === "gestor";
   const podeAnexar = minha && janelaAberta && !enviando && !gravador.gravando;
   const audio = anexo?.arquivo.type.startsWith("audio/") ?? false;
 

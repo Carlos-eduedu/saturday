@@ -37,6 +37,7 @@ import {
   TIPOS_DE_PROVA,
   tokens,
 } from "../rotulos";
+import { permissoesDa } from "../permissoes";
 import { useRecurso } from "../useRecurso";
 import { centavosCitados, foraDaOferta, origemDaMensagem, reaisDeCentavos } from "./conferencia";
 import { formatarHora, ROTULO_ATENDIMENTO, textoDaEspera } from "./Inbox";
@@ -184,21 +185,13 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
       <EsqueletoConversa fichaEmAba={fichaEmAba} />
     );
   }
-  const minha = conversa.atendimento === "assumida" && conversa.atendente_id === eu.id;
+  const { minha, podeAssumir, tomaDeOutro, podeDevolver, podeMexer } = permissoesDa(conversa, eu);
   const dono = usuarios.find((u) => u.id === conversa.atendente_id)?.nome ?? "outra pessoa";
-  const podeAssumir = !minha && (conversa.atendimento !== "assumida" || eu.perfil === "gestor");
-  const podeDevolver =
-    conversa.atendimento !== "ia" &&
-    (conversa.atendimento === "handoff" || minha || eu.perfil === "gestor");
   const temEnvio = conversa.canal === "whatsapp" || conversa.canal === "evolution";
 
   // Assumir e devolver valem na hora; o aviso deixa desfazer por 5 s.
   async function mudar(acao: "assumir" | "devolver") {
-    if (
-      acao === "assumir" &&
-      conversa?.atendimento === "assumida" &&
-      !(await confirmar(pedidoDeTomada(dono)))
-    )
+    if (acao === "assumir" && tomaDeOutro && !(await confirmar(pedidoDeTomada(dono))))
       return;
     setFocarEnvio(acao === "assumir");
     void agirUmaVez(async () => {
@@ -263,7 +256,7 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
             usuarios={usuarios}
             podeAssumir={podeAssumir}
             podeDevolver={podeDevolver}
-            podeMexer={minha || eu.perfil === "gestor"}
+            podeMexer={podeMexer}
             agir={agirUmaVez}
             ocupado={ocupado}
             mudar={mudar}

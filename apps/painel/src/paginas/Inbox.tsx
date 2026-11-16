@@ -26,6 +26,7 @@ import { Vazio } from "../componentes/Vazio";
 import { ATENCAO, AUTORES, ETAPAS, MOTIVOS_HANDOFF, relativo, rotulo } from "../rotulos";
 import { useMidia } from "../midia";
 import type { Aviso } from "../tempoReal";
+import { permissoesDa } from "../permissoes";
 import { useRecurso } from "../useRecurso";
 
 // Cores do SwipeRow pelas variáveis do painel: seguem o tema claro e o escuro.
@@ -46,9 +47,9 @@ const RECARREGAM = new Set<Aviso["tipo"]>(["mensagem", "conversa", "alerta", "tu
 
 // A ação que arrastar faz numa linha; nenhuma quando quem vê não pode agir.
 function acaoDa(c: Resumo, eu: Eu): Acao | null {
-  if (c.atendimento !== "assumida") return "assumir";
-  if (c.atendente_id === eu.id) return "devolver";
-  return eu.perfil === "gestor" ? "assumir" : null;
+  const { minha, podeAssumir } = permissoesDa(c, eu);
+  if (minha) return "devolver";
+  return podeAssumir ? "assumir" : null;
 }
 
 const ACOES: Record<Acao, SwipeAction> = {
@@ -351,7 +352,7 @@ export function Inbox({
 
   async function agir(c: Resumo, acao: Acao) {
     if (agindo) return;
-    const deOutro = acao === "assumir" && c.atendimento === "assumida" && c.atendente_id !== eu.id;
+    const deOutro = acao === "assumir" && permissoesDa(c, eu).tomaDeOutro;
     if (deOutro && !(await confirmar(pedidoDeTomada(nomeDe(c.atendente_id))))) {
       // Desistir remonta o SwipeRow que dobrou com o gesto.
       setVersao((v) => v + 1);
