@@ -35,6 +35,8 @@ import {
   reais,
   rotulo,
   SITUACAO_DA_PROPOSTA,
+  SITUACAO_ICRED,
+  TIPO_ICRED,
   TIPOS_DE_PROVA,
   tokens,
 } from "../rotulos";
@@ -752,10 +754,42 @@ function FichaCliente({
 // O que a IA disse em valores, ao lado da fala: oferta vigente, proposta no
 // banco e as provas do SIM. Só aparece quando a jornada chegou a algum deles.
 function Acompanhamento({ ficha }: { ficha: Ficha }) {
-  const { oferta, proposta, consentimentos } = ficha;
-  if (!oferta && !proposta && consentimentos.length === 0) return null;
+  const { oferta, proposta, consentimentos, icred } = ficha;
+  if (!oferta && !proposta && !icred && consentimentos.length === 0) return null;
   return (
     <div className="ficha">
+      {icred && (
+        <>
+          <h2>Consulta no iCred</h2>
+          <dl>
+            <div>
+              <dt>Situação</dt>
+              <dd className="texto">
+                {icred.situacao ? rotulo(SITUACAO_ICRED, icred.situacao) : "Aguardando o resultado"}
+              </dd>
+            </div>
+            {icred.contratos.map((c, i) => (
+              <div key={i}>
+                <dt>{rotulo(TIPO_ICRED, c.tipo)}</dt>
+                <dd>
+                  {reais(c.liberado)} na conta · {c.prazo} × {reais(c.parcela)} · {porcento(c.taxa)}
+                </dd>
+              </div>
+            ))}
+            {icred.contratos.length > 1 && (
+              <div>
+                <dt>Total na conta</dt>
+                <dd>{reais(icred.contratos.reduce((soma, c) => soma + Number(c.liberado), 0))}</dd>
+              </div>
+            )}
+          </dl>
+          {icred.valido_ate && new Date(icred.valido_ate).getTime() < Date.now() && (
+            <p className="faixa-atencao">
+              <strong>Consulta vencida.</strong> Consulte de novo no iCred antes de gravar a proposta.
+            </p>
+          )}
+        </>
+      )}
       {oferta && (
         <>
           <h2>Oferta vigente</h2>

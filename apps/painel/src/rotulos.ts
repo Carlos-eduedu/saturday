@@ -140,6 +140,26 @@ export function reais(valor: string | number | null | undefined): string {
 export const TIPOS_DE_PROVA: Record<string, string> = {
   consulta: "Autorizou a consulta",
   proposta: "Aceitou a proposta",
+  icred_consulta: "Autorizou a consulta no iCred",
+  icred_aceite: "Aceitou a proposta do iCred",
+};
+
+// Situação da consulta e tipo de contrato no iCred; código novo aparece cru.
+export const SITUACAO_ICRED: Record<string, string> = {
+  COM_OFERTA: "Com oferta",
+  SEM_COMISSAO: "Sem oferta",
+  INELEGIVEL: "Não elegível",
+  ERRO: "Erro na consulta",
+  JA_GRAVADO: "Proposta já gravada",
+  PROPOSTA_EXISTENTE: "Já tem proposta no iCred",
+  TELEFONE_VINCULADO: "Telefone ligado a outro CPF",
+};
+
+export const TIPO_ICRED: Record<string, string> = {
+  port: "Portabilidade",
+  port_refin: "Portabilidade com refinanciamento",
+  refin: "Refinanciamento",
+  novo: "Contrato novo",
 };
 
 // US$ com 4 casas para valores pequenos (um turno custa frações de centavo).

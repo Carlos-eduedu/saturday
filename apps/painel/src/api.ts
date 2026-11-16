@@ -92,6 +92,21 @@ export interface Ficha {
     seguro_aplicado: boolean;
     limitado_ao_teto: boolean;
   } | null;
+  // A última consulta ao iCred (decisão 0027); o pacote vem sem comissão.
+  icred: {
+    estado: string;
+    situacao: string | null;
+    contratos: {
+      tipo: string;
+      banco: string | null;
+      taxa: string;
+      prazo: number;
+      parcela: string;
+      liberado: string;
+    }[];
+    valido_ate: string | null;
+    atualizada_em: string;
+  } | null;
   proposta: {
     id: number;
     status: string | null;
