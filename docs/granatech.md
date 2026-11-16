@@ -156,6 +156,12 @@ Admin:
 O `SUCCESS` disparado pelo admin deixa o detalhe da consulta pronto na hora. Sem
 ele, o detalhe fica pronto `atraso_detalhe_s` depois do termo (8 s por padrão).
 
+Fora da API real: `cenario` na query de `GET /consulta-saldo`, mandado só pelo
+cliente de teste do Saturday (decisão 0024). Com `sucesso`, `sem_margem` ou
+`erro`, o simulador envia sozinho o webhook `SUCCESS`, `NO_MARGIN` ou
+`UNEXPECTED_ERROR`, `atraso_detalhe_s` depois do termo. Com `termo_pendente`, o
+termo responde 400 e nenhum evento sai.
+
 Nos testes do core, o simulador roda em processo pelo `TestClient`
 (`tests/conftest.py`, fixtures `simulador_granatech` e `http_granatech`).
 

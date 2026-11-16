@@ -304,16 +304,25 @@ class ClienteGranatech:
     # ------------------------------------------------------------------ consulta
 
     def abrir_consulta(
-        self, cpf: str, nome: str, telefone: str, *, conversa_id: Any = None
+        self,
+        cpf: str,
+        nome: str,
+        telefone: str,
+        *,
+        conversa_id: Any = None,
+        cenario: str | None = None,
     ) -> ConsultaAberta:
         """Reaproveita uma consulta recente do CPF ou abre outra, gastando cota.
 
         Levanta ``CotaEsgotada`` sem chamar a Granatech quando não há cota.
+        ``cenario`` só vale no cliente do simulador (decisão 0024): é o resultado
+        que o membro testador escolheu, e pede uma consulta nova.
         """
 
-        reaproveitada = self._consulta_local(cpf) or self._consulta_remota(cpf, conversa_id)
-        if reaproveitada is not None:
-            return reaproveitada
+        if not (self.teste and cenario):
+            reaproveitada = self._consulta_local(cpf) or self._consulta_remota(cpf, conversa_id)
+            if reaproveitada is not None:
+                return reaproveitada
 
         hoje = datetime.now(ZoneInfo(TZ_OPERACAO)).date()
         with abrir_sessao(self._fabrica) as sessao:
@@ -330,7 +339,10 @@ class ClienteGranatech:
                 "GET",
                 f"{CONSIGNADO}/consulta-saldo",
                 f"{CONSIGNADO}/consulta-saldo",
-                params={"cpf": cpf, "nome": nome, "telefone": telefone},
+                # Com cenário, o simulador manda o resultado sozinho. A Granatech
+                # real nunca recebe o campo (regra 12).
+                params={"cpf": cpf, "nome": nome, "telefone": telefone}
+                | ({"cenario": cenario or "sucesso"} if self.teste else {}),
                 conversa_id=conversa_id,
             )
         except ErroGranatech as erro:

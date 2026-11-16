@@ -16,6 +16,7 @@ Rodar local:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 import time
 import uuid
@@ -24,7 +25,7 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import httpx
-from fastapi import FastAPI, Request
+from fastapi import BackgroundTasks, FastAPI, Request
 from fastapi.responses import JSONResponse, Response
 
 app = FastAPI(title="Simulador da Granatech", version="0.1.0")
@@ -85,6 +86,11 @@ EMPREGADORES = [
     ("EMPREGADOR MOCK LTDA", "98765432000110"),
 ]
 PRODUTOS = [("AA17", 17), ("AA25", 25), ("AAA36", 36), ("AAA48", 48)]
+
+# Fora da API real: `cenario` na abertura da consulta (membro testador do
+# Saturday, decisão 0024). O simulador manda este status sozinho depois do termo.
+STATUS_DO_CENARIO = {"sucesso": "SUCCESS", "sem_margem": "NO_MARGIN", "erro": "UNEXPECTED_ERROR"}
+TERMO_PENDENTE = "termo_pendente"
 
 
 # ------------------------------------------------------------------ suporte
@@ -263,6 +269,7 @@ async def abrir_consulta(request: Request) -> Any:
         "status": "AWAITING_CLIENT_AUTHORIZATION",
         "criada_em": date.today().isoformat(),
         "pronta_em": None,
+        "cenario": request.query_params.get("cenario"),
     }
     if falha is not None:
         return falha
@@ -274,7 +281,7 @@ async def abrir_consulta(request: Request) -> Any:
 
 
 @app.post(PREFIXO + "/termo-consentimento", status_code=201)
-async def termo(request: Request) -> Any:
+async def termo(request: Request, tarefas: BackgroundTasks) -> Any:
     falha, _ = await _entrada(request)
     if falha is not None:
         return falha
@@ -285,9 +292,27 @@ async def termo(request: Request) -> Any:
     consulta = CONSULTAS.get(str(corpo["id_consulta"]))
     if consulta is None:
         return _erro(404, "consulta não encontrada")
+    if consulta.get("cenario") == TERMO_PENDENTE:
+        return _erro(400, "termo recusado pelo cenário de teste")
     consulta["pronta_em"] = time.time() + float(CONFIG["atraso_detalhe_s"])
     consulta["status"] = "PROCESSING"
+    if consulta.get("cenario") in STATUS_DO_CENARIO:
+        tarefas.add_task(_resultado_do_cenario, str(corpo["id_consulta"]))
     return {"success": True, "message": "Termo de consentimento criado com sucesso"}
+
+
+async def _resultado_do_cenario(id_consulta: str) -> None:
+    """Consulta aberta com cenário: o resultado sai sozinho, passado o atraso."""
+
+    await asyncio.sleep(float(CONFIG["atraso_detalhe_s"]))
+    consulta = CONSULTAS.get(id_consulta)
+    if consulta is None:
+        return
+    status = STATUS_DO_CENARIO[consulta["cenario"]]
+    consulta["status"] = status
+    # Saturday fora do ar: o evento se perde, como um webhook que não chegou.
+    with contextlib.suppress(httpx.HTTPError):
+        entregar(montar_evento({"id": id_consulta, "status": status}))
 
 
 # ------------------------------------------------------------------ simulação
