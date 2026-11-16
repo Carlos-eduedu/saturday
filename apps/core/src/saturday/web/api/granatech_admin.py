@@ -392,11 +392,9 @@ def reconciliar(
 
     conversa_id = cast(uuid.UUID, linha.conversa_id)  # conferido em `acoes_da_proposta`
     try:
-        with acoes.conversa_travada(fabrica, conversa_id) as (sessao, conversa):
-            acoes.devolver(sessao, conversa, usuario.id, gestor=True)
+        service.devolver(conversa_id, usuario.id, gestor=True)
     except acoes.AcaoRecusada as exc:
         raise HTTPException(status_code=exc.status, detail=exc.detalhe) from exc
-    service.limpar_handoff(conversation_id)
     # Do aceite em diante: `criar_proposta` devolve a que achamos, sem novo POST.
     service.continuar(conversation_id, "painel:reconciliar")
     _avisar(fabrica, proposta=proposta_id)

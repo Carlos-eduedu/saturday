@@ -18,7 +18,10 @@ uma entrega fora das fases.
   bloqueio, sessão no banco e CSRF; estado de atendimento (`ia`, `handoff`,
   `assumida`) em `conversas` (docs/decisoes/0003); assumir, devolver, transferir
   e responder; ficha mascarada com revelar auditado; alertas (o de handoff se
-  resolve ao assumir ou devolver e volta com o desfazer, docs/decisoes/0018);
+  resolve ao assumir ou devolver e volta com o desfazer, docs/decisoes/0018;
+  a liberação por prazo e o `/release` também o resolvem, sem usuário);
+  devolver é uma operação só (`AgentService.devolver`): banco, alertas,
+  auditoria e checkpoint sob a trava, com o checkpoint zerado antes do commit;
   cada fala da IA guarda o turno e a chave da mensagem fixa (0018);
   contador de cota;
   tempo real por `pg_notify` + SSE. Depois, fora das fases: aba Usuários (só

@@ -223,9 +223,12 @@ def resolver_alertas(
     sessao: Session,
     conversa_id: uuid.UUID,
     tipos: tuple[str, ...],
-    usuario_id: uuid.UUID,
+    usuario_id: uuid.UUID | None,
 ) -> list[int]:
-    """Resolve os alertas abertos desses tipos na conversa, em nome de quem agiu."""
+    """Resolve os alertas abertos desses tipos na conversa, em nome de quem agiu.
+
+    Sem usuário quando a conversa voltou à IA sozinha (prazo do handoff).
+    """
 
     ids = list(
         sessao.scalars(

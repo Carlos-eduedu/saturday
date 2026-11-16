@@ -53,7 +53,8 @@ os dois processos o recebam. `web/lifespan.py` cuida só de abrir e fechar.
    transcrição de áudio) em um `ChatRequest` e chama `AgentService`.
 4. `agent/service.py` é o orquestrador: abre a sessão, pega
    `pg_advisory_xact_lock` da conversa (`dados/trava.py`) e trata `message_id`
-   repetido, silêncio com humano, retenção e poda de checkpoints. Quem roda o
+   repetido, silêncio com humano, devolução à IA (`devolver`), retenção e poda
+   de checkpoints. Quem roda o
    grafo e fecha o turno é `agent/turno.py` (`Turnos.de_cliente` e
    `Turnos.de_sistema`): trilha, handoff e a resposta em `mensagens` e no
    `outbox` **na mesma transação**. O que vai para o banco passa pelo

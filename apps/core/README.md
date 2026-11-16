@@ -71,7 +71,7 @@ Todas usam o prefixo `SATURDAY_`. O `.env` é lido automaticamente.
 | `SATURDAY_OUTBOX_MAX_TENTATIVAS` | `8` | Tentativas de entrega antes de desistir. |
 | `SATURDAY_OUTBOX_BACKOFF_BASE_S` | `2.0` | Espera inicial do backoff (dobra a cada falha). |
 | `SATURDAY_RETENCAO_EXTRATO_DIAS` | `30` | Dias de retenção do extrato; ao expirar, o extrato é apagado no próximo turno. |
-| `SATURDAY_HANDOFF_AUTO_RELEASE_HORAS` | `0` | Horas para liberar automaticamente um handoff sem dono; `0` desliga. Conversa assumida nunca é liberada sozinha. |
+| `SATURDAY_HANDOFF_AUTO_RELEASE_HORAS` | `0` | Horas para liberar automaticamente um handoff sem dono; `0` desliga. Conversa assumida nunca é liberada sozinha. A liberação resolve os alertas `handoff`, `erro_interno` e `sem_resposta` da conversa, sem usuário. |
 | `SATURDAY_SESSAO_SEGREDO` | vazio | Assina o CSRF do painel. Obrigatória fora de `pytest`. |
 | `SATURDAY_GRANATECH_BASE_URL` | api-dev | Base da API da Granatech; em dev, o simulador (`http://granatech:8200`). |
 | `SATURDAY_GRANATECH_CHAVE_API` | vazio | Chave do login. Obrigatória com `GRANATECH_ATIVO=true`. |
@@ -148,7 +148,8 @@ O `GET` devolve `{conversation_id, status, handoff_reason, handoff_em, oferta_pe
 O `DELETE` devolve `204`. O `release` devolve `{conversation_id, status: "in_progress"}`.
 
 O `release` também grava `atendimento = ia` em `conversas`, que desde a Fase 3 é
-quem decide se a IA responde (docs/decisoes/0003). O `status` do `GET` continua
+quem decide se a IA responde (docs/decisoes/0003), e resolve os alertas `handoff`,
+`erro_interno` e `sem_resposta` da conversa, sem usuário. O `status` do `GET` continua
 sendo o do grafo: uma conversa assumida no painel aparece ali como estava no
 último turno da IA.
 

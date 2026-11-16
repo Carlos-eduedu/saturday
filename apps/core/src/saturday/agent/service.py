@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import datetime, timedelta
@@ -25,6 +26,7 @@ from saturday.dados import repositorios
 from saturday.dados.modelos import Conversa
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.dados.trava import travar_conversa
+from saturday.painel import acoes
 from saturday.schemas import MIME_TYPES, AgentReply, Attachment, ChatRequest
 from saturday.services.anexos import AnexoInvalido
 from saturday.services.webhook import WebhookClient
@@ -216,20 +218,45 @@ class AgentService:
 
         if not self.estado_atual(self.config(conversation_id)):
             return None
+        config = self.config(conversation_id)
         with self._trava(conversation_id) as sessao:
-            if sessao is not None:
-                conversa = repositorios.buscar_conversa(sessao, conversation_id)
-                if conversa is not None and conversa.atendimento != "ia":
-                    repositorios.mudar_atendimento(sessao, conversa, "ia")
-            self.limpar_handoff(conversation_id)
+            conversa = repositorios.buscar_conversa(sessao, conversation_id) if sessao else None
+            if sessao is not None and conversa is not None and conversa.atendimento != "ia":
+                self._devolver_sem_usuario(sessao, conversa, config)
+            else:
+                self._liberar_handoff(config)
         return {"conversation_id": conversation_id, "status": "in_progress"}
 
-    def limpar_handoff(self, conversation_id: str) -> None:
-        """Zera o handoff no checkpoint. Quem responde é decidido em `conversas`."""
+    def devolver(self, conversa_id: uuid.UUID, usuario_id: uuid.UUID, gestor: bool) -> str:
+        """Devolve a conversa à IA a pedido de alguém do painel.
 
-        config = self.config(conversation_id)
-        if self.estado_atual(config):
-            self.graph.update_state(config, self._atualizacao_liberacao())
+        Tudo sob a trava: a regra de dono, o banco, os alertas e a auditoria
+        (`acoes.devolver`) e, antes do commit, o handoff do checkpoint. Se o
+        checkpoint falhar, o banco desfaz: banco em `ia` com checkpoint em
+        `handoff` reabriria o handoff na próxima mensagem do cliente. Levanta
+        `acoes.AcaoRecusada`. Devolve o `conversation_id`.
+        """
+
+        if self.fabrica is None:
+            raise RuntimeError("devolver exige o banco")
+        with acoes.conversa_travada(self.fabrica, conversa_id) as (sessao, conversa):
+            acoes.devolver(sessao, conversa, usuario_id, gestor)
+            config = self.config(conversa.conversation_id)
+            if self.estado_atual(config):
+                self._liberar_handoff(config)
+            return conversa.conversation_id
+
+    def _devolver_sem_usuario(
+        self, sessao: Session, conversa: Conversa, config: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Prazo do handoff ou rota `/release`: ninguém do painel agiu.
+
+        Os alertas se resolvem sem usuário e não há auditoria.
+        """
+
+        repositorios.mudar_atendimento(sessao, conversa, "ia")
+        repositorios.resolver_alertas(sessao, conversa.id, acoes.ALERTAS_DE_DEVOLVER, None)
+        return self._liberar_handoff(config)
 
     def editar_ficha(self, conversation_id: str, campos: dict[str, Any]) -> None:
         """Grava na ficha os dados corrigidos pela equipe no painel.
@@ -438,8 +465,7 @@ class AgentService:
         if conversa.atendimento == "handoff":
             if not self._expirou(conversa.atendimento_em):
                 return True, estado
-            repositorios.mudar_atendimento(sessao, conversa, "ia")
-            return False, self._liberar_handoff(config)
+            return False, self._devolver_sem_usuario(sessao, conversa, config)
         return False, estado
 
     def _silencio_pelo_checkpoint(

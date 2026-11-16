@@ -525,16 +525,11 @@ def assumir(conversa_id: uuid.UUID, usuario: ComCsrf, fabrica: Fabrica) -> Respo
 def devolver(
     conversa_id: uuid.UUID, usuario: ComCsrf, fabrica: Fabrica, service: Servico
 ) -> Response:
-    conversation_id = _executar(fabrica, conversa_id, _devolver, usuario)
-    # O checkpoint fica fora da transação do banco: quem decide quem responde
-    # é `conversas`, já gravado; aqui só se zera o handoff do grafo.
-    service.limpar_handoff(conversation_id)
+    try:
+        service.devolver(conversa_id, usuario.id, usuario.gestor)
+    except acoes.AcaoRecusada as exc:
+        raise _recusa(exc) from exc
     return Response(status_code=204)
-
-
-def _devolver(sessao: Session, conversa: Conversa, usuario: UsuarioLogado) -> str:
-    acoes.devolver(sessao, conversa, usuario.id, usuario.gestor)
-    return conversa.conversation_id
 
 
 @router.post("/conversas/{conversa_id}/desfazer", status_code=204)

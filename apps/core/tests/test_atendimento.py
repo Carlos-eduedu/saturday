@@ -5,11 +5,20 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+import pytest
 from conftest import resultado_jev
 from sqlalchemy import func, select
 
 from saturday.dados import repositorios
-from saturday.dados.modelos import Alerta, Conversa, Mensagem, Outbox, Turno, UsuarioPainel
+from saturday.dados.modelos import (
+    Alerta,
+    Auditoria,
+    Conversa,
+    Mensagem,
+    Outbox,
+    Turno,
+    UsuarioPainel,
+)
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.schemas import ChatRequest
 
@@ -196,3 +205,74 @@ def test_erro_interno_grava_o_aviso_no_historico_e_no_outbox(
         )
         assert envio.payload["mensagem_id"] == saida.id
         assert envio.payload["handoff_reason"] == "erro_interno"
+
+
+# ------------------------------------------------- devolver em uma operação
+
+
+def _alertas(fabrica):
+    """Tipo e quem resolveu cada alerta; aberto aparece como `"aberto"`."""
+
+    with abrir_sessao(fabrica) as sessao:
+        return [
+            (a.tipo, "aberto" if a.resolvido_em is None else a.resolvido_por)
+            for a in sessao.scalars(select(Alerta).order_by(Alerta.id))
+        ]
+
+
+def _em_handoff(service, fakes, conversation_id):
+    fakes.jev.resultado = resultado_jev("humano", 0.95)
+    service.process_message(ChatRequest(conversation_id=conversation_id, message="humano"))
+    fakes.jev.resultado = resultado_jev()
+
+
+def test_devolver_resolve_o_alerta_e_zera_o_checkpoint(service_pg, fakes, fabrica, conversa):
+    _em_handoff(service_pg, fakes, conversa)
+    ana = _atendente(fabrica)
+
+    service_pg.devolver(_conversa(fabrica, conversa).id, ana, gestor=False)
+
+    assert _conversa(fabrica, conversa).atendimento == "ia"
+    assert _alertas(fabrica) == [("handoff", ana)]
+    assert service_pg.estado_atual(service_pg.config(conversa))["status"] == "in_progress"
+
+
+def test_devolver_com_o_checkpoint_falhando_nao_muda_nada(
+    service_pg, fakes, fabrica, conversa, monkeypatch
+):
+    _em_handoff(service_pg, fakes, conversa)
+
+    def checkpoint_fora_do_ar(*_args, **_kwargs):
+        raise RuntimeError("falha proposital")
+
+    monkeypatch.setattr(service_pg.graph, "update_state", checkpoint_fora_do_ar)
+    with pytest.raises(RuntimeError, match="falha proposital"):
+        service_pg.devolver(_conversa(fabrica, conversa).id, _atendente(fabrica), gestor=False)
+
+    # Banco em `ia` com checkpoint em `handoff` reabriria o handoff sozinho.
+    assert _conversa(fabrica, conversa).atendimento == "handoff"
+    assert _alertas(fabrica) == [("handoff", "aberto")]
+    with abrir_sessao(fabrica) as sessao:
+        assert sessao.scalars(select(Auditoria)).all() == []
+
+
+def test_liberacao_automatica_resolve_o_alerta_sem_usuario(
+    service_pg, fakes, fabrica, conversa, monkeypatch
+):
+    service_pg.settings.handoff_auto_release_horas = 1
+    _em_handoff(service_pg, fakes, conversa)
+    daqui_a_duas_horas = datetime.now(TZ) + timedelta(hours=2)
+    monkeypatch.setattr("saturday.agent.service.agora", lambda: daqui_a_duas_horas)
+
+    service_pg.process_message(ChatRequest(conversation_id=conversa, message="oi"))
+
+    assert _alertas(fabrica) == [("handoff", None)]
+
+
+def test_release_resolve_o_alerta_sem_usuario(client_pg, fakes, fabrica, conversa):
+    fakes.jev.resultado = resultado_jev("humano", 0.95)
+    client_pg.post("/chat", json={"conversation_id": conversa, "message": "humano"})
+
+    assert client_pg.post(f"/conversations/{conversa}/release").status_code == 200
+
+    assert _alertas(fabrica) == [("handoff", None)]
