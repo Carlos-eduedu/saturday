@@ -7,6 +7,7 @@
 #
 #   infra/painel_local.sh            # API em :8000 e painel em :5173
 #   infra/painel_local.sh usuario    # antes, cria um gestor (pede e-mail e senha)
+#   infra/painel_local.sh seed       # antes, cria os casos de infra/painel_seed.py e .sql
 #
 # Rode da raiz do repositório (ou da worktree), com o Postgres do compose no ar.
 set -euo pipefail
@@ -32,6 +33,11 @@ uv run --project apps/core alembic -c apps/core/alembic.ini upgrade head
 if [ "${1:-}" = "usuario" ]; then
   read -r -p "E-mail do gestor: " email
   uv run --project apps/core saturday criar-usuario --email "$email" --perfil gestor
+fi
+
+if [ "${1:-}" = "seed" ]; then
+  uv run --project apps/core python infra/painel_seed.py
+  docker exec -i saturday-postgres-1 psql -q -U saturday -d "$BANCO" < infra/painel_seed.sql
 fi
 
 uv run --project apps/core saturday &
