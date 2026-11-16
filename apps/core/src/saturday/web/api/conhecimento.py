@@ -26,15 +26,15 @@ from saturday.painel.auditoria import auditar
 from saturday.web.dependencies import (
     UsuarioLogado,
     editor_do_agente,
-    exigir_fabrica,
     get_agent_service,
+    get_fabrica,
     get_settings,
     usuario_logado,
 )
 
 router = APIRouter(prefix="/admin/agente/conhecimento", tags=["painel"])
 
-Fabrica = Annotated[sessionmaker[Session], Depends(exigir_fabrica)]
+Fabrica = Annotated[sessionmaker[Session], Depends(get_fabrica)]
 Logado = Annotated[UsuarioLogado, Depends(usuario_logado)]
 Editor = Annotated[UsuarioLogado, Depends(editor_do_agente)]
 Servico = Annotated[AgentService, Depends(get_agent_service)]

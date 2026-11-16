@@ -320,7 +320,12 @@ def _servico_com_banco(
     fabrica: sessionmaker[Session],
     storage: MemoriaStorage | None,
 ) -> AgentService:
-    contexto = AgentContext(jev=fakes.jev, llm=fakes.llm, anexos=fakes.anexos)  # type: ignore[arg-type]
+    contexto = AgentContext(
+        jev=fakes.jev,  # type: ignore[arg-type]
+        llm=fakes.llm,  # type: ignore[arg-type]
+        anexos=fakes.anexos,  # type: ignore[arg-type]
+        fabrica=fabrica,
+    )
     return AgentService(
         graph=build_graph(checkpointer),
         context=contexto,

@@ -91,7 +91,7 @@ class Turno:
         simulador (produção), o membro segue com a Granatech real e o SIM.
         """
 
-        if self.contexto.granatech_teste is None or self.contexto.fabrica is None:
+        if self.contexto.granatech_teste is None:
             return False
         if self._membro is None:
             with abrir_sessao(self.contexto.fabrica) as sessao:

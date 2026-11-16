@@ -45,17 +45,17 @@ from saturday.settings import TZ_OPERACAO, Settings
 from saturday.web.dependencies import (
     UsuarioLogado,
     exigir_csrf,
-    exigir_fabrica,
     gestor_com_csrf,
     gestor_logado,
     get_agent_service,
+    get_fabrica,
     get_settings,
     usuario_logado,
 )
 
 router = APIRouter(prefix="/admin/granatech", tags=["painel"])
 
-Fabrica = Annotated[sessionmaker[Session], Depends(exigir_fabrica)]
+Fabrica = Annotated[sessionmaker[Session], Depends(get_fabrica)]
 Logado = Annotated[UsuarioLogado, Depends(usuario_logado)]
 ComCsrf = Annotated[UsuarioLogado, Depends(exigir_csrf)]
 Gestor = Annotated[UsuarioLogado, Depends(gestor_logado)]

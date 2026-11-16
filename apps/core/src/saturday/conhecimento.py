@@ -116,7 +116,7 @@ class Conhecimento:
         self,
         http: httpx.Client,
         settings: Settings,
-        fabrica: sessionmaker[Session] | None,
+        fabrica: sessionmaker[Session],
         modelos: Modelos | None = None,
     ) -> None:
         self._openrouter = OpenRouterClient(http, settings.openrouter_api_key.get_secret_value())
@@ -158,7 +158,7 @@ class Conhecimento:
     def buscar(self, pergunta: str) -> list[Trecho]:
         """Trechos parecidos com a pergunta. Qualquer falha vira lista vazia: a FAQ fixa segue."""
 
-        if self._fabrica is None or not pergunta.strip():
+        if not pergunta.strip():
             return []
         try:
             with abrir_sessao(self._fabrica) as sessao:
@@ -205,8 +205,6 @@ class Conhecimento:
     def indexar_pendente(self, storage: Storage) -> bool:
         """Indexa uma fonte pendente (worker). Devolve se havia alguma."""
 
-        if self._fabrica is None:
-            return False
         with abrir_sessao(self._fabrica) as sessao:
             fonte = sessao.scalar(
                 select(FonteConhecimento)
@@ -260,8 +258,6 @@ class Conhecimento:
         return True
 
     def _marcar(self, fonte_id: Any, **campos: Any) -> None:
-        if self._fabrica is None:
-            return
         with abrir_sessao(self._fabrica) as sessao:
             fonte = sessao.get(FonteConhecimento, fonte_id)
             if fonte is not None and fonte.status == "indexando":

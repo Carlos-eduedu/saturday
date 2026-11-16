@@ -33,9 +33,9 @@ from saturday.privacidade import mascarar_telefone
 from saturday.settings import Settings
 from saturday.web.dependencies import (
     UsuarioLogado,
-    exigir_fabrica,
     gestor_com_csrf,
     gestor_logado,
+    get_fabrica,
     get_settings,
 )
 
@@ -52,7 +52,7 @@ def get_cliente_evolution(request: Request) -> EvolutionClient:
     return EvolutionClient(request.app.state.http, settings)
 
 
-Fabrica = Annotated[sessionmaker[Session], Depends(exigir_fabrica)]
+Fabrica = Annotated[sessionmaker[Session], Depends(get_fabrica)]
 Gestor = Annotated[UsuarioLogado, Depends(gestor_logado)]
 GestorCsrf = Annotated[UsuarioLogado, Depends(gestor_com_csrf)]
 Evolution = Annotated[EvolutionClient, Depends(get_cliente_evolution)]

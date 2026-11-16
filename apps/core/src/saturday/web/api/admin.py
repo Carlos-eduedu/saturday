@@ -47,8 +47,8 @@ from saturday.web.dependencies import (
     COOKIE_SESSAO,
     UsuarioLogado,
     exigir_csrf,
-    exigir_fabrica,
     get_agent_service,
+    get_fabrica,
     get_settings,
     usuario_logado,
 )
@@ -56,7 +56,7 @@ from saturday.web.eventos import Difusor, fluxo_sse
 
 router = APIRouter(prefix="/admin", tags=["painel"])
 
-Fabrica = Annotated[sessionmaker[Session], Depends(exigir_fabrica)]
+Fabrica = Annotated[sessionmaker[Session], Depends(get_fabrica)]
 Logado = Annotated[UsuarioLogado, Depends(usuario_logado)]
 ComCsrf = Annotated[UsuarioLogado, Depends(exigir_csrf)]
 Servico = Annotated[AgentService, Depends(get_agent_service)]

@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from saturday.bancos.granatech.cliente import ErroGranatech
 from saturday.dados import links
 from saturday.dados.sessao import sessao as abrir_sessao
-from saturday.web.dependencies import exigir_fabrica, get_agent_service
+from saturday.web.dependencies import get_agent_service, get_fabrica
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ router = APIRouter(tags=["links"])
 def redirecionar(
     codigo: str,
     request: Request,
-    fabrica: Annotated[sessionmaker[Session], Depends(exigir_fabrica)],
+    fabrica: Annotated[sessionmaker[Session], Depends(get_fabrica)],
 ) -> RedirectResponse:
     with abrir_sessao(fabrica) as sessao:
         link = links.buscar(sessao, codigo)

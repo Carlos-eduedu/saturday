@@ -70,7 +70,7 @@ def verificar(
 async def receber(
     request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
-    fabrica: Annotated[sessionmaker[Session] | None, Depends(get_fabrica)],
+    fabrica: Annotated[sessionmaker[Session], Depends(get_fabrica)],
 ) -> Response:
     """Grava os eventos e responde 200. Nunca roda turno aqui."""
 
@@ -90,7 +90,7 @@ async def receber(
     encontrados = parser.eventos(payload)
     aceitos = _dos_numeros_configurados(encontrados, settings)
 
-    if fabrica is not None and aceitos:
+    if aceitos:
         _gravar(fabrica, aceitos)
 
     # 200 mesmo sem evento: a Meta não deve reenviar por falta de interesse nosso.

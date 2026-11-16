@@ -38,15 +38,15 @@ from saturday.services.openrouter import OpenRouterClient, OpenRouterError
 from saturday.web.dependencies import (
     UsuarioLogado,
     editor_do_agente,
-    exigir_fabrica,
     gestor_com_csrf,
+    get_fabrica,
     get_settings,
     usuario_logado,
 )
 
 router = APIRouter(prefix="/admin/agente", tags=["painel"])
 
-Fabrica = Annotated[sessionmaker[Session], Depends(exigir_fabrica)]
+Fabrica = Annotated[sessionmaker[Session], Depends(get_fabrica)]
 Logado = Annotated[UsuarioLogado, Depends(usuario_logado)]
 Editor = Annotated[UsuarioLogado, Depends(editor_do_agente)]
 GestorCsrf = Annotated[UsuarioLogado, Depends(gestor_com_csrf)]

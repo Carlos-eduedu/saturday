@@ -111,7 +111,7 @@ def evento_id(payload: dict[str, Any]) -> str:
 async def receber(
     request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
-    fabrica: Annotated[sessionmaker[Session] | None, Depends(get_fabrica)],
+    fabrica: Annotated[sessionmaker[Session], Depends(get_fabrica)],
 ) -> Response:
     esperado = settings.granatech_webhook_token.get_secret_value()
     simulador = settings.granatech_simulador_webhook_token.get_secret_value()
@@ -139,7 +139,6 @@ async def receber(
     if teste:
         payload = {**payload, MARCA_TESTE: True}
 
-    if fabrica is not None:
-        with abrir_sessao(fabrica) as sessao:
-            enfileirar(sessao, origem=ORIGEM, evento_id=evento_id(payload), payload=payload)
+    with abrir_sessao(fabrica) as sessao:
+        enfileirar(sessao, origem=ORIGEM, evento_id=evento_id(payload), payload=payload)
     return Response(status_code=200)

@@ -31,10 +31,10 @@ def get_settings(request: Request) -> Settings:
     return cast(Settings, request.app.state.settings)
 
 
-def get_fabrica(request: Request) -> sessionmaker[Session] | None:
-    """Fábrica de sessões. ``None`` em `pytest`, onde não há Postgres."""
+def get_fabrica(request: Request) -> sessionmaker[Session]:
+    """Fábrica de sessões: a subida sempre a cria (decisão 0022)."""
 
-    return cast("sessionmaker[Session] | None", getattr(request.app.state, "fabrica", None))
+    return cast("sessionmaker[Session]", request.app.state.fabrica)
 
 
 def verificar_api_key(
@@ -52,15 +52,6 @@ def verificar_api_key(
 
     if recebida is None or not secrets.compare_digest(recebida.encode(), esperada.encode()):
         raise HTTPException(status_code=401, detail="não autorizado")
-
-
-def exigir_fabrica(request: Request) -> sessionmaker[Session]:
-    """O painel não existe sem Postgres: estado de atendimento mora lá."""
-
-    fabrica = get_fabrica(request)
-    if fabrica is None:
-        raise HTTPException(status_code=503, detail="painel indisponível sem banco")
-    return fabrica
 
 
 @dataclass(frozen=True)
@@ -85,7 +76,7 @@ class UsuarioLogado:
 
 
 def usuario_logado(
-    fabrica: Annotated[sessionmaker[Session], Depends(exigir_fabrica)],
+    fabrica: Annotated[sessionmaker[Session], Depends(get_fabrica)],
     token: Annotated[str | None, Cookie(alias=COOKIE_SESSAO)] = None,
 ) -> UsuarioLogado:
     if not token:

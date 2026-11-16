@@ -16,6 +16,7 @@ from langgraph.checkpoint.postgres import PostgresSaver
 from psycopg import Connection
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
+from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.agent.context import AgentContext
 from saturday.agent.graph import build_graph
@@ -41,8 +42,8 @@ from saturday.storage.base import Storage
 def criar_contexto(
     http: httpx.Client,
     settings: Settings,
-    storage: Storage | None = None,
-    fabrica: Any = None,
+    storage: Storage | None,
+    fabrica: sessionmaker[Session],
 ) -> AgentContext:
     """Clientes de IA, de anexo e, com a Granatech ligada, os do ramo CLT.
 
@@ -61,7 +62,7 @@ def criar_contexto(
         brasilapi=BrasilAPI(http, fabrica) if granatech is not None else None,
         fabrica=fabrica,
         dominio_publico=settings.dominio_publico,
-        conhecimento=Conhecimento(http, settings, fabrica, modelos) if fabrica else None,
+        conhecimento=Conhecimento(http, settings, fabrica, modelos),
     )
 
 
@@ -142,11 +143,11 @@ def criar_canal_evolution(
 def criar_cliente_granatech(
     http: httpx.Client,
     settings: Settings,
-    fabrica: Any,
+    fabrica: sessionmaker[Session],
 ) -> ClienteGranatech | None:
     """Cliente da Granatech, ou ``None`` com ``SATURDAY_GRANATECH_ATIVO`` desligado."""
 
-    if not settings.granatech_ativo or fabrica is None:
+    if not settings.granatech_ativo:
         return None
     return ClienteGranatech(http, settings, fabrica)
 
@@ -154,11 +155,11 @@ def criar_cliente_granatech(
 def criar_cliente_granatech_teste(
     http: httpx.Client,
     settings: Settings,
-    fabrica: Any,
+    fabrica: sessionmaker[Session],
 ) -> ClienteGranatech | None:
     """Cliente do simulador para membro testador, ou ``None`` sem o simulador."""
 
-    if not settings.granatech_ativo or fabrica is None or not settings.granatech_simulador_url:
+    if not settings.granatech_ativo or not settings.granatech_simulador_url:
         return None
     simulador = settings.model_copy(
         update={

@@ -118,9 +118,11 @@ def test_sem_token_na_requisicao_responde_401(service: AgentService) -> None:
     ],
 )
 def test_token_aceito_nas_tres_formas(
-    service: AgentService, url: str, cabecalhos: dict[str, str]
+    service: AgentService, fabrica: sessionmaker[Session], url: str, cabecalhos: dict[str, str]
 ) -> None:
-    assert _api(service).post(url, json=EVENTO, headers=cabecalhos).status_code == 200
+    api = _api(service, fabrica)
+
+    assert api.post(url, json=EVENTO, headers=cabecalhos).status_code == 200
 
 
 def test_corpo_que_nao_e_objeto_responde_400(service: AgentService) -> None:

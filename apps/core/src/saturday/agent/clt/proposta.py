@@ -249,8 +249,6 @@ def aceite(t: Turno) -> dict[str, Any]:
 
 def _criar_proposta(t: Turno) -> dict[str, Any]:
     fabrica = t.contexto.fabrica
-    if fabrica is None:
-        return t.handoff("granatech_indisponivel")
     consentimentos.gravar_prova(
         fabrica,
         conversa_id=t.conversa_id,
@@ -349,7 +347,7 @@ def _link(t: Turno) -> tuple[str, str] | None:
     """Endereço e código do link curto da biometria (um por proposta)."""
 
     fabrica = t.contexto.fabrica
-    if fabrica is None or not t.contexto.dominio_publico:
+    if not t.contexto.dominio_publico:
         return None
     codigo = t.clt.get("link")
     if not codigo:
@@ -437,7 +435,7 @@ def evento(t: Turno, acao: str) -> dict[str, Any]:
 
 def marketing(t: Turno) -> str | None:
     fabrica, conversa_id = t.contexto.fabrica, t.conversa_id
-    if fabrica is None or conversa_id is None:
+    if conversa_id is None:
         return None
     with abrir_sessao(fabrica) as sessao:
         return sessao.scalar(select(Conversa.marketing).where(Conversa.id == conversa_id))

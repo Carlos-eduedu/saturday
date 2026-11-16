@@ -39,7 +39,7 @@ ORIGEM = "evolution"
 async def receber(
     request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
-    fabrica: Annotated[sessionmaker[Session] | None, Depends(get_fabrica)],
+    fabrica: Annotated[sessionmaker[Session], Depends(get_fabrica)],
 ) -> Response:
     """Grava os eventos e responde 200. Nunca roda turno aqui."""
 
@@ -68,7 +68,7 @@ async def receber(
         # Sem id no evento de conexão: o hash do JSON separa reenvio de evento novo.
         linhas.append((evento_id(payload), conexao))
 
-    if fabrica is not None and linhas:
+    if linhas:
         with abrir_sessao(fabrica) as sessao:
             for identificador, dados in linhas:
                 enfileirar(sessao, origem=ORIGEM, evento_id=identificador, payload=dados)

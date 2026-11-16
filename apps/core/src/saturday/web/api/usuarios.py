@@ -25,14 +25,14 @@ from saturday.privacidade import MASCARAS
 from saturday.web.api.admin import url_foto
 from saturday.web.dependencies import (
     UsuarioLogado,
-    exigir_fabrica,
     gestor_com_csrf,
     gestor_logado,
+    get_fabrica,
 )
 
 router = APIRouter(prefix="/admin/gestao/usuarios", tags=["painel"])
 
-Fabrica = Annotated[sessionmaker[Session], Depends(exigir_fabrica)]
+Fabrica = Annotated[sessionmaker[Session], Depends(get_fabrica)]
 Gestor = Annotated[UsuarioLogado, Depends(gestor_logado)]
 GestorCsrf = Annotated[UsuarioLogado, Depends(gestor_com_csrf)]
 

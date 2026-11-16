@@ -212,7 +212,7 @@ def _consentimento(t: Turno) -> dict[str, Any]:
 
 
 def _autorizou(t: Turno) -> dict[str, Any]:
-    if t.contexto.fabrica is None or t.contexto.granatech is None:
+    if t.contexto.granatech is None:
         return t.handoff("granatech_indisponivel")
     consentimentos.gravar_prova(
         t.contexto.fabrica,
@@ -231,7 +231,7 @@ def _consultar(t: Turno, *, recontato: int | None) -> dict[str, Any]:
     """Abre (ou reaproveita) a consulta. Só depois de uma prova gravada."""
 
     fabrica = t.contexto.fabrica
-    if t.contexto.granatech is None or fabrica is None:
+    if t.contexto.granatech is None:
         return t.handoff("granatech_indisponivel")
     with abrir_sessao(fabrica) as sessao:
         provado = consentimentos.existe_prova(
@@ -273,7 +273,7 @@ def _cota_esgotada(t: Turno, recontato: int | None) -> dict[str, Any]:
     tentativas = 0 if recontato is None else recontato + 1
     if tentativas > MAX_RECONTATOS_COTA:
         return t.handoff("cota_esgotada")
-    if t.contexto.fabrica is not None and t.conversa_id is not None:
+    if t.conversa_id is not None:
         with abrir_sessao(t.contexto.fabrica) as sessao:
             recontatos.agendar(
                 sessao,
@@ -332,7 +332,7 @@ def _optin_tempo_casa(t: Turno) -> dict[str, Any]:
         proposta.gravar_marketing(t, "opt_out")
         return t.responder(texto("optin_recusado"))
     proposta.gravar_marketing(t, "opt_in")
-    if t.contexto.fabrica is not None and t.conversa_id is not None:
+    if t.conversa_id is not None:
         with abrir_sessao(t.contexto.fabrica) as sessao:
             recontatos.agendar(
                 sessao,

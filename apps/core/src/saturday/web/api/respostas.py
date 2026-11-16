@@ -19,14 +19,14 @@ from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.painel.auditoria import auditar
 from saturday.web.dependencies import (
     UsuarioLogado,
-    exigir_fabrica,
     gestor_com_csrf,
+    get_fabrica,
     usuario_logado,
 )
 
 router = APIRouter(prefix="/admin/respostas-rapidas", tags=["painel"])
 
-Fabrica = Annotated[sessionmaker[Session], Depends(exigir_fabrica)]
+Fabrica = Annotated[sessionmaker[Session], Depends(get_fabrica)]
 Logado = Annotated[UsuarioLogado, Depends(usuario_logado)]
 GestorCsrf = Annotated[UsuarioLogado, Depends(gestor_com_csrf)]
 

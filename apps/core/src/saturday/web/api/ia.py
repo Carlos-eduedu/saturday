@@ -22,11 +22,11 @@ from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.privacidade import MASCARAS
 from saturday.settings import TZ_OPERACAO
 from saturday.web.api.canais import Gestor
-from saturday.web.dependencies import UsuarioLogado, exigir_fabrica, usuario_logado
+from saturday.web.dependencies import UsuarioLogado, get_fabrica, usuario_logado
 
 router = APIRouter(prefix="/admin", tags=["painel"])
 
-Fabrica = Annotated[sessionmaker[Session], Depends(exigir_fabrica)]
+Fabrica = Annotated[sessionmaker[Session], Depends(get_fabrica)]
 Logado = Annotated[UsuarioLogado, Depends(usuario_logado)]
 
 LIMITE_TURNOS = 100

@@ -29,14 +29,14 @@ from saturday.settings import get_settings
 from saturday.web.api.ia import turno_json
 from saturday.web.dependencies import (
     UsuarioLogado,
-    exigir_fabrica,
     get_agent_service,
+    get_fabrica,
     usuario_logado,
 )
 
 router = APIRouter(prefix="/admin/agente", tags=["painel"])
 
-Fabrica = Annotated[sessionmaker[Session], Depends(exigir_fabrica)]
+Fabrica = Annotated[sessionmaker[Session], Depends(get_fabrica)]
 Logado = Annotated[UsuarioLogado, Depends(usuario_logado)]
 Servico = Annotated[AgentService, Depends(get_agent_service)]
 

@@ -22,11 +22,11 @@ from saturday.painel import membros as regras
 from saturday.painel.sessoes import agora as hora_atual
 from saturday.privacidade import MASCARAS
 from saturday.web.api.admin import url_foto
-from saturday.web.dependencies import UsuarioLogado, exigir_fabrica, usuario_logado
+from saturday.web.dependencies import UsuarioLogado, get_fabrica, usuario_logado
 
 router = APIRouter(prefix="/admin/membros", tags=["painel"])
 
-Fabrica = Annotated[sessionmaker[Session], Depends(exigir_fabrica)]
+Fabrica = Annotated[sessionmaker[Session], Depends(get_fabrica)]
 Logado = Annotated[UsuarioLogado, Depends(usuario_logado)]
 
 

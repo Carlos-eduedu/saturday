@@ -47,7 +47,7 @@ class BrasilAPI:
     def __init__(
         self,
         http: httpx.Client,
-        fabrica: sessionmaker[Session] | None,
+        fabrica: sessionmaker[Session],
         *,
         base_url: str = BASE_URL,
         dormir: Callable[[float], None] = time.sleep,
@@ -100,8 +100,6 @@ class BrasilAPI:
         return {campo: dados.get(campo) for campo in CAMPOS}
 
     def _do_cache(self, cnpj: str) -> dict[str, Any] | None:
-        if self._fabrica is None:
-            return None
         with abrir_sessao(self._fabrica) as sessao:
             linha = sessao.get(EmpresaCnpj, cnpj)
             if linha is None or linha.buscada_em < datetime.now(UTC) - CACHE:
@@ -109,8 +107,6 @@ class BrasilAPI:
             return dict(linha.dados)
 
     def _guardar(self, cnpj: str, dados: dict[str, Any]) -> None:
-        if self._fabrica is None:
-            return
         with abrir_sessao(self._fabrica) as sessao:
             sessao.execute(
                 insert(EmpresaCnpj)
@@ -125,8 +121,6 @@ class BrasilAPI:
         duracao_ms = (time.monotonic() - inicio) * 1000
         registrar_chamada(SERVICO, duracao_ms, status=situacao if situacao else "erro")
         logger.info("brasilapi_chamada rota=%s status=%s ms=%.0f", ROTA, situacao, duracao_ms)
-        if self._fabrica is None:
-            return
         try:
             with abrir_sessao(self._fabrica) as sessao:
                 sessao.add(
