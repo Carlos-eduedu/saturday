@@ -22,6 +22,14 @@ As 24 h desde a última mensagem do cliente em que a Meta aceita texto livre;
 fora dela, só modelo. Só existe no canal `whatsapp`.
 _Evitar_: sessão
 
+**Turno**:
+Uma rodada do grafo para uma conversa, com a resposta que ela produz.
+_Evitar_: execução, rodada (rodada é da homologação)
+
+**Turno de sistema**:
+Turno sem mensagem do cliente, disparado por um evento do banco, por um
+recontato ou pelo gestor.
+
 **Estado de atendimento**:
 Quem responde a conversa naquele momento: a IA, ninguém (handoff) ou um
 atendente (assumida).

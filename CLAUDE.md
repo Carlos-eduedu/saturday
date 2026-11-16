@@ -52,9 +52,12 @@ os dois processos o recebam. `web/lifespan.py` cuida só de abrir e fechar.
 3. `canais/whatsapp/entrada.py` normaliza o evento (mídia para o S3,
    transcrição de áudio) em um `ChatRequest` e chama `AgentService`.
 4. `agent/service.py` é o orquestrador: abre a sessão, pega
-   `pg_advisory_xact_lock` da conversa (`dados/trava.py`), roda o grafo, grava a
-   resposta em `mensagens` e no `outbox` **na mesma transação**. Também trata
-   `message_id` repetido, handoff, retenção e poda de checkpoints.
+   `pg_advisory_xact_lock` da conversa (`dados/trava.py`) e trata `message_id`
+   repetido, silêncio com humano, retenção e poda de checkpoints. Quem roda o
+   grafo e fecha o turno é `agent/turno.py` (`Turnos.de_cliente` e
+   `Turnos.de_sistema`): trilha, handoff e a resposta em `mensagens` e no
+   `outbox` **na mesma transação**. O que vai para o banco passa pelo
+   `RegistroDoTurno` (Postgres ou, sem banco, memória).
 5. `jobs/outbox.py` entrega por `EntregadorPorCanal` (`whatsapp` ou `webhook`).
    O canal só **classifica** o resultado (`ok`, `temporario`,
    `temporario_incerto`, `permanente`, `janela_fechada`); reagendar é só do

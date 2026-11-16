@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import logging
-import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import Any, Literal, cast
 from zoneinfo import ZoneInfo
 
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import HumanMessage
 from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.agent.context import AgentContext
@@ -18,16 +17,14 @@ from saturday.agent.state import turno_inicial
 from saturday.agent.textos import (
     COMANDO_REINICIAR,
     MENSAGEM_REINICIADA,
-    chave_handoff,
-    mensagem_handoff,
 )
-from saturday.canais.base import CANAIS_WHATSAPP, OrigemCanal
+from saturday.agent.turno import RegistroDoTurno, RegistroMemoria, RegistroPostgres, Turnos
+from saturday.agent.turno import etapa_do_estado as etapa_do_estado
+from saturday.canais.base import OrigemCanal
 from saturday.dados import repositorios
-from saturday.dados.modelos import Conversa, Turno
-from saturday.dados.outbox import enfileirar
+from saturday.dados.modelos import Conversa
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.dados.trava import travar_conversa
-from saturday.metrics import TurnMetrics, iniciar_metricas, metricas_atuais
 from saturday.schemas import MIME_TYPES, AgentReply, Attachment, ChatRequest
 from saturday.services.anexos import AnexoInvalido
 from saturday.services.webhook import WebhookClient
@@ -36,17 +33,6 @@ from saturday.storage.base import Storage
 
 # Quantos pares mensagem/resposta ficam no checkpoint para idempotência.
 JANELA_IDEMPOTENCIA = 50
-
-
-def etapa_do_estado(estado: dict[str, Any]) -> str | None:
-    """Etapa CLT em curso; `inss` na jornada de portabilidade; senão nada."""
-
-    clt = estado.get("clt")
-    if isinstance(clt, dict) and clt.get("etapa"):
-        return str(clt["etapa"])[:32]
-    if estado.get("publico") == "inss" or estado.get("hiscon"):
-        return "inss"
-    return None
 
 
 logger = logging.getLogger(__name__)
@@ -87,6 +73,12 @@ class AgentService:
         # outro ambiente `validar_para_subir` exige `SATURDAY_DATABASE_URL`.
         self.fabrica = fabrica
         self.storage = storage
+
+    @property
+    def turnos(self) -> Turnos:
+        """Montado a cada uso: os testes trocam `graph` e o relógio deste módulo."""
+
+        return Turnos(self.graph, self.context, self.evento, lambda: agora())
 
     def config(self, conversation_id: str) -> dict[str, Any]:
         return {"configurable": {"thread_id": conversation_id}}
@@ -274,117 +266,6 @@ class AgentService:
             return False
         return self._expirou(self._parse_iso(estado.get("handoff_em")))
 
-    @staticmethod
-    def _registrar_turno(
-        sessao: Session,
-        conversa: Conversa,
-        estado: dict[str, Any],
-        caminho: list[str],
-        metricas: TurnMetrics | None,
-        inicio: float,
-        erro: str | None = None,
-    ) -> int:
-        """Etapa na conversa (para a lista) e a trilha do turno (abas "IA" e Agente).
-
-        Só códigos, números e tempos: nenhum texto do cliente ou do modelo. O
-        aviso `turno` atualiza ao vivo a lista de execuções do painel. Devolve o
-        id do turno, que vai na mensagem de saída (procedência, decisão 0018).
-        """
-
-        conversa.etapa = etapa_do_estado(estado)
-        resumo = metricas.resumo() if metricas else {"chamadas": [], "custo_total_usd": 0.0}
-        classificou = "classify_intent" in caminho
-        turno = Turno(
-            conversa_id=conversa.id,
-            caminho=list(caminho),
-            status=estado.get("status"),
-            motivo=estado.get("handoff_reason"),
-            etapa=conversa.etapa,
-            classificacao=(
-                {
-                    "intencao": estado.get("intent"),
-                    "publico": estado.get("publico"),
-                    "confianca": estado.get("intent_confidence"),
-                }
-                if classificou
-                else None
-            ),
-            chamadas=resumo["chamadas"],
-            custo_usd=resumo["custo_total_usd"],
-            tokens=resumo.get("tokens_total", 0),
-            duracao_ms=round((time.monotonic() - inicio) * 1000),
-            erro=erro,
-        )
-        sessao.add(turno)
-        sessao.flush()
-        repositorios.notificar(sessao, "turno", conversa=conversa.id)
-        return turno.id
-
-    def _log_turno(
-        self,
-        conversation_id: str,
-        estado: dict[str, Any],
-        caminho: list[str],
-        inicio: float,
-        metricas: TurnMetrics | None,
-    ) -> None:
-        resumo = (
-            metricas.resumo()
-            if metricas
-            else {
-                "chamadas": [],
-                "custo_total_usd": 0.0,
-            }
-        )
-        extra: dict[str, Any] = {
-            "conversation_id": conversation_id,
-            "status": estado.get("status"),
-            "handoff_reason": estado.get("handoff_reason"),
-            "caminho": caminho,
-            "latencia_total_ms": round((time.monotonic() - inicio) * 1000, 2),
-            "chamadas": resumo["chamadas"],
-            "custo_total_usd": resumo["custo_total_usd"],
-        }
-        resultado = estado.get("portability_result")
-        if resultado is not None:
-            extra["calculo_ok"] = resultado.get("ok")
-            extra["contratos_elegiveis"] = sum(
-                1 for contrato in resultado.get("contratos", []) if contrato.get("elegivel")
-            )
-        logger.info("turno", extra=extra)
-
-    def _fallback_erro_interno(
-        self,
-        conversation_id: str,
-        config: dict[str, Any],
-        *,
-        inicio: float,
-        caminho: list[str],
-    ) -> AgentReply:
-        resposta = mensagem_handoff("erro_interno")
-        atualizacao: dict[str, Any] = {
-            "status": "handoff",
-            "handoff_reason": "erro_interno",
-            "answer": resposta,
-            "handoff_em": agora().isoformat(),
-            "messages": [AIMessage(content=resposta)],
-        }
-        try:
-            self.graph.update_state(config, atualizacao)
-        except Exception:
-            logger.exception(
-                "falha_ao_gravar_erro_interno conversation_id=%s",
-                conversation_id,
-            )
-        self._log_turno(
-            conversation_id,
-            atualizacao,
-            caminho,
-            inicio,
-            metricas_atuais(),
-        )
-        return self.evento(conversation_id, atualizacao, status="handoff")
-
     def _processar_turno(
         self,
         payload: ChatRequest,
@@ -462,7 +343,7 @@ class AgentService:
         resposta = self.evento(
             payload.conversation_id, {}, status="answered", answer=MENSAGEM_REINICIADA
         )
-        self._gravar_saida(sessao, conversa, resposta, {"chave_mensagem": "reiniciar"})
+        self._registro(sessao, conversa).gravar_saida(resposta, {"chave_mensagem": "reiniciar"})
         logger.info("conversa_reiniciada conversation_id=%s", payload.conversation_id)
         return resposta
 
@@ -551,7 +432,7 @@ class AgentService:
 
         if conversa.atendimento == "ia" and estado.get("status") == "handoff":
             # Handoff anterior à Fase 3, gravado só no checkpoint.
-            self._abrir_handoff(sessao, conversa, "handoff", estado.get("handoff_reason"))
+            self._registro(sessao, conversa).abrir_handoff("handoff", estado.get("handoff_reason"))
         if conversa.atendimento == "assumida":
             return True, estado
         if conversa.atendimento == "handoff":
@@ -574,22 +455,12 @@ class AgentService:
             return True, estado
         return False, self._liberar_handoff(config)
 
-    @staticmethod
-    def _abrir_handoff(
-        sessao: Session,
-        conversa: Conversa,
-        tipo_alerta: str,
-        motivo: str | None,
-        detalhe: dict[str, Any] | None = None,
-    ) -> None:
-        repositorios.mudar_atendimento(sessao, conversa, "handoff")
-        repositorios.abrir_alerta(
-            sessao,
-            tipo_alerta,
-            conversa_id=conversa.id,
-            detalhe={"motivo": motivo, **(detalhe or {})},
-            unico=True,
-        )
+    def _registro(self, sessao: Session | None, conversa: Conversa | None) -> RegistroDoTurno:
+        """Onde o turno grava: no Postgres ou, sem banco (`pytest`), em lugar nenhum."""
+
+        if sessao is None or conversa is None:
+            return RegistroMemoria()
+        return RegistroPostgres(sessao, conversa, self.webhook)
 
     def _liberar_handoff(self, config: dict[str, Any]) -> dict[str, Any]:
         self.graph.update_state(config, self._atualizacao_liberacao())
@@ -607,77 +478,16 @@ class AgentService:
     ) -> AgentReply:
         entrada = self._entrada_do_grafo(estado, payload)
         entrada.update(self._dados_da_conversa(conversa), message_id=payload.message_id)
-        metricas = iniciar_metricas()
-        inicio = time.monotonic()
-        caminho: list[str] = []
-        try:
-            self._stream(entrada, config, caminho)
-        except Exception as exc:
-            logger.exception(
-                "erro_interno conversation_id=%s",
-                payload.conversation_id,
-            )
-            turno_id = None
-            if sessao is not None and conversa is not None:
-                turno_id = self._registrar_turno(
-                    sessao,
-                    conversa,
-                    {**estado, "status": "handoff", "handoff_reason": "erro_interno"},
-                    caminho,
-                    metricas,
-                    inicio,
-                    erro=type(exc).__name__,
-                )
-            self._registrar_resposta(
-                config,
-                ids_recentes,
-                respostas,
-                payload.message_id,
-                mensagem_handoff("erro_interno"),
-            )
-            resposta = self._fallback_erro_interno(
-                payload.conversation_id,
-                config,
-                inicio=inicio,
-                caminho=caminho,
-            )
-            if sessao is not None and conversa is not None:
-                self._abrir_handoff(sessao, conversa, "erro_interno", "erro_interno")
-                # O aviso vai ao cliente e ao histórico como qualquer handoff.
-                chave = chave_handoff("handoff:erro_interno", resposta.answer)
-                self._gravar_saida(
-                    sessao, conversa, resposta, {"chave_mensagem": chave}, turno_id=turno_id
-                )
-            return resposta
-
-        final = dict(self.graph.get_state(config).values or {})
-        self._log_turno(
+        return self.turnos.de_cliente(
             payload.conversation_id,
-            final,
-            caminho,
-            inicio,
-            metricas,
+            config,
+            entrada,
+            self._registro(sessao, conversa),
+            estado=estado,
+            guardar_resposta=lambda answer: self._registrar_resposta(
+                config, ids_recentes, respostas, payload.message_id, answer
+            ),
         )
-        turno_id = None
-        if sessao is not None and conversa is not None:
-            turno_id = self._registrar_turno(sessao, conversa, final, caminho, metricas, inicio)
-        resposta = self.evento(payload.conversation_id, final)
-
-        if payload.message_id and resposta.answer:
-            self._registrar_resposta(
-                config, ids_recentes, respostas, payload.message_id, resposta.answer
-            )
-        if sessao is not None and conversa is not None:
-            if resposta.status == "handoff":
-                self._abrir_handoff(
-                    sessao,
-                    conversa,
-                    "handoff",
-                    resposta.handoff_reason,
-                    final.get("handoff_detalhe"),
-                )
-            self._gravar_saida(sessao, conversa, resposta, final, turno_id=turno_id)
-        return resposta
 
     @staticmethod
     def _dados_da_conversa(conversa: Conversa | None) -> dict[str, Any]:
@@ -717,37 +527,14 @@ class AgentService:
 
             entrada = turno_inicial(user_message="", attachments=[])
             entrada.update(self._dados_da_conversa(conversa), evento_sistema=evento)
-            caminho: list[str] = []
-            inicio = time.monotonic()
-            metricas = iniciar_metricas()
-            self._stream(entrada, config, caminho)
-            final = dict(self.graph.get_state(config).values or {})
-            self._log_turno(conversation_id, final, caminho, inicio, metricas)
-            turno_id = None
-            if sessao is not None and conversa is not None:
-                turno_id = self._registrar_turno(sessao, conversa, final, caminho, metricas, inicio)
-            resposta = self.evento(conversation_id, final)
-            if sessao is not None and conversa is not None:
-                if forcar and conversa.atendimento != "ia" and resposta.status == "handoff":
-                    # A conversa já está com humano: o aviso de handoff não vai ao cliente.
-                    repositorios.abrir_alerta(
-                        sessao,
-                        "evento_com_humano",
-                        conversa_id=conversa.id,
-                        detalhe={"evento": evento, "motivo": resposta.handoff_reason},
-                    )
-                    return resposta
-                if resposta.status == "handoff":
-                    self._abrir_handoff(
-                        sessao,
-                        conversa,
-                        "handoff",
-                        resposta.handoff_reason,
-                        final.get("handoff_detalhe"),
-                    )
-                if resposta.answer or resposta.status == "handoff" or final.get("modelo_envio"):
-                    self._gravar_saida(sessao, conversa, resposta, final, turno_id=turno_id)
-            return resposta
+            return self.turnos.de_sistema(
+                conversation_id,
+                config,
+                entrada,
+                self._registro(sessao, conversa),
+                evento=evento,
+                forcar=forcar,
+            )
 
     def _entrada_do_grafo(
         self,
@@ -766,101 +553,6 @@ class AgentService:
         if payload.message.strip():
             entrada["messages"] = [HumanMessage(content=payload.message)]
         return entrada
-
-    def _stream(
-        self,
-        entrada: dict[str, Any],
-        config: dict[str, Any],
-        caminho: list[str],
-    ) -> None:
-        """Consome o grafo, guardando o caminho mesmo quando ele falha depois."""
-
-        for atualizacao in self.graph.stream(
-            entrada,
-            config,
-            context=self.context,
-            stream_mode="updates",
-        ):
-            if isinstance(atualizacao, dict):
-                caminho.extend(
-                    nome
-                    for nome in atualizacao
-                    if isinstance(nome, str) and not nome.startswith("__")
-                )
-
-    def _gravar_saida(
-        self,
-        sessao: Session,
-        conversa: Conversa,
-        resposta: AgentReply,
-        final: dict[str, Any] | None = None,
-        *,
-        turno_id: int | None = None,
-    ) -> None:
-        """Histórico da resposta e, quando houver canal, o envio no outbox.
-
-        ``final`` (o estado do turno) pode pedir um modelo: ``modelo_envio`` sai
-        sempre como modelo (marketing); ``modelo_aviso`` e ``link_aviso`` são o
-        aviso usado se a janela de 24 h estiver fechada. ``turno_id`` e a
-        ``chave_mensagem`` do estado dão a procedência da fala (decisão 0018).
-        """
-
-        final = final or {}
-        if final.get("marketing") in ("opt_in", "opt_out"):
-            conversa.marketing = final["marketing"]
-        modelo_envio = final.get("modelo_envio")
-        conteudo = resposta.answer or (f"[modelo {modelo_envio}]" if modelo_envio else "")
-        mensagem_id = repositorios.registrar_saida(
-            sessao,
-            conversa,
-            conteudo=conteudo,
-            turno_id=turno_id,
-            chave_mensagem=final.get("chave_mensagem"),
-        )
-        canal = self._canal_de_saida(conversa, resposta)
-        if canal is None:
-            return
-        # O id volta no payload: é nesta linha que o worker grava o `wamid` e o
-        # status de entrega quando a Meta confirmar.
-        payload = self._payload_de_saida(conversa, resposta, canal)
-        payload["mensagem_id"] = mensagem_id
-        if canal in CANAIS_WHATSAPP:
-            for chave, destino in (
-                ("modelo_envio", "modelo"),
-                ("modelo_aviso", "modelo_aviso"),
-                ("link_aviso", "link_aviso"),
-            ):
-                if final.get(chave):
-                    payload[destino] = final[chave]
-        enfileirar(sessao, conversa_id=conversa.id, canal=canal, payload=payload)
-
-    def _canal_de_saida(self, conversa: Conversa, resposta: AgentReply) -> str | None:
-        """Quem entrega esta resposta.
-
-        No WhatsApp (Meta ou Evolution) a resposta sempre passa pelo outbox, inclusive no handoff —
-        o cliente precisa saber que a conversa foi para uma pessoa. No webhook,
-        o handoff continua não gerando envio, como antes.
-        """
-
-        if resposta.status == "duplicate":
-            return None
-        if conversa.canal in CANAIS_WHATSAPP:
-            return conversa.canal
-        if self.webhook.configurado and resposta.status != "with_human":
-            return "webhook"
-        return None
-
-    @staticmethod
-    def _payload_de_saida(
-        conversa: Conversa,
-        resposta: AgentReply,
-        canal: str,
-    ) -> dict[str, Any]:
-        payload = resposta.model_dump(mode="json")
-        if canal in CANAIS_WHATSAPP:
-            payload["numero"] = conversa.telefone
-            payload["phone_number_id"] = conversa.phone_number_id
-        return payload
 
     def _registrar_resposta(
         self,
