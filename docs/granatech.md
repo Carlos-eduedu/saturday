@@ -174,7 +174,9 @@ tempo do `historico` e a cota, e se atualiza pelo SSE (aviso `granatech`).
 Atendente e gestor veem; só o gestor age, e cada ação grava a auditoria antes
 de chamar o banco. A API fica em `web/api/granatech_admin.py`
 (`/admin/granatech/*`), e quem decide se uma ação cabe é
-`acoes_da_consulta`/`acoes_da_proposta`.
+`acoes_da_consulta`/`acoes_da_proposta`. Em cada proposta ou consulta roda uma
+ação por vez: a segunda recebe 409, e o link de biometria só é reenviado de
+novo depois de 1 minuto ([decisão 0024](decisoes/0024-uma-acao-do-gestor-por-vez.md)).
 
 | Ação | O que faz |
 | --- | --- |
