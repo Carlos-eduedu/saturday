@@ -14,14 +14,15 @@ import io
 import json
 import uuid
 import zipfile
-from collections.abc import Callable
-from datetime import date, datetime, time
+from collections.abc import Callable, Iterator
+from datetime import date, datetime, time, timedelta
+from math import ceil
 from typing import Annotated, Any, Literal, cast
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -31,12 +32,14 @@ from saturday.bancos.granatech import status as ordem
 from saturday.bancos.granatech.cliente import ClienteGranatech, ErroGranatech, ErroIncerto
 from saturday.dados import repositorios
 from saturday.dados.modelos import (
+    Auditoria,
     ConsultaGranatech,
     HomologacaoGranatech,
     PropostaGranatech,
     UsuarioPainel,
 )
 from saturday.dados.sessao import sessao as abrir_sessao
+from saturday.dados.trava import tentar_trava
 from saturday.jobs.granatech import aplicar_status_da_consulta
 from saturday.painel import acoes
 from saturday.painel.auditoria import auditar
@@ -369,6 +372,57 @@ def bancos(request: Request, _usuario: Logado) -> list[dict[str, str]]:
 
 # ------------------------------------------------------------------ ações do gestor
 
+# Depois de um reenvio, o link da mesma proposta espera este prazo (decisão 0024).
+PRAZO_REENVIO = timedelta(minutes=1)
+
+
+def _travar(fabrica: sessionmaker[Session], tipo: str, item_id: int) -> Iterator[None]:
+    """Uma ação por vez em cada item: a segunda é recusada, não espera.
+
+    A trava vive nesta sessão, que fica aberta até a resposta sair. Não é a
+    da conversa: o turno de sistema pega aquela em outra sessão, e a ação
+    ficaria esperando por si mesma.
+    """
+
+    with abrir_sessao(fabrica) as sessao:
+        if not tentar_trava(sessao, f"granatech:{tipo}:{item_id}"):
+            raise HTTPException(status_code=409, detail=f"outra ação em andamento nesta {tipo}")
+        yield
+
+
+# O gestor entra na assinatura para a trava só ser tentada por quem pode agir.
+def _proposta_travada(proposta_id: int, fabrica: Fabrica, _usuario: GestorCsrf) -> Iterator[None]:
+    yield from _travar(fabrica, "proposta", proposta_id)
+
+
+def _consulta_travada(consulta_id: int, fabrica: Fabrica, _usuario: GestorCsrf) -> Iterator[None]:
+    yield from _travar(fabrica, "consulta", consulta_id)
+
+
+UMA_POR_PROPOSTA = [Depends(_proposta_travada)]
+
+
+def _conferir_prazo_do_reenvio(fabrica: sessionmaker[Session], proposta_id: int) -> None:
+    """Recusa o link reenviado há pouco. Roda sob a trava da proposta."""
+
+    with abrir_sessao(fabrica) as sessao:
+        # O SQLAlchemy tipa a diferença como data; o Postgres devolve um intervalo.
+        ha = cast(
+            "timedelta | None",
+            sessao.scalar(
+                select(func.now() - func.max(Auditoria.criada_em)).where(
+                    Auditoria.acao == "granatech_reenviar_link",
+                    Auditoria.alvo == f"proposta:{proposta_id}",
+                )
+            ),
+        )
+    if ha is not None and ha < PRAZO_REENVIO:
+        falta = ceil((PRAZO_REENVIO - ha).total_seconds())
+        raise HTTPException(
+            status_code=409,
+            detail=f"link reenviado há {int(ha.total_seconds())} s; tente de novo em {falta} s",
+        )
+
 
 def _proposta(
     fabrica: sessionmaker[Session], proposta_id: int, acao: str, conta_ativa: bool = False
@@ -384,7 +438,7 @@ def _proposta(
         return linha, repositorios.conversation_id_de(sessao, linha.conversa_id) or ""
 
 
-@router.post("/propostas/{proposta_id}/reconciliar")
+@router.post("/propostas/{proposta_id}/reconciliar", dependencies=UMA_POR_PROPOSTA)
 def reconciliar(
     proposta_id: int,
     request: Request,
@@ -418,7 +472,9 @@ def reconciliar(
     return {"achada": True, "id_externo": achada}
 
 
-@router.post("/propostas/{proposta_id}/reenviar-link", status_code=204)
+@router.post(
+    "/propostas/{proposta_id}/reenviar-link", status_code=204, dependencies=UMA_POR_PROPOSTA
+)
 def reenviar_link(
     proposta_id: int, request: Request, usuario: GestorCsrf, fabrica: Fabrica, service: Servico
 ) -> Response:
@@ -426,13 +482,14 @@ def reenviar_link(
 
     _cliente(request)
     linha, conversation_id = _proposta(fabrica, proposta_id, "reenviar_link")
+    _conferir_prazo_do_reenvio(fabrica, proposta_id)
     _auditar(fabrica, usuario, "granatech_reenviar_link", f"proposta:{proposta_id}")
     acao = ordem.acao_da_proposta(linha.status, linha.tipo_notificacao)
     service.continuar(conversation_id, f"proposta:{acao}", forcar=True)
     return Response(status_code=204)
 
 
-@router.post("/propostas/{proposta_id}/cancelar", status_code=204)
+@router.post("/propostas/{proposta_id}/cancelar", status_code=204, dependencies=UMA_POR_PROPOSTA)
 def cancelar(
     proposta_id: int,
     dados: Cancelamento,
@@ -455,7 +512,7 @@ def cancelar(
     return Response(status_code=204)
 
 
-@router.post("/propostas/{proposta_id}/conta", status_code=204)
+@router.post("/propostas/{proposta_id}/conta", status_code=204, dependencies=UMA_POR_PROPOSTA)
 def corrigir_conta(
     proposta_id: int,
     dados: Conta,
@@ -488,7 +545,9 @@ def corrigir_conta(
     return Response(status_code=204)
 
 
-@router.post("/consultas/{consulta_id}/atualizar-detalhe")
+@router.post(
+    "/consultas/{consulta_id}/atualizar-detalhe", dependencies=[Depends(_consulta_travada)]
+)
 def atualizar_detalhe(
     consulta_id: int, request: Request, usuario: GestorCsrf, fabrica: Fabrica, service: Servico
 ) -> dict[str, bool]:

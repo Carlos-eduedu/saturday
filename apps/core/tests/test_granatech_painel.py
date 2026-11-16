@@ -8,13 +8,14 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterator
+from datetime import timedelta
 from types import ModuleType
 from typing import Any
 
 import pytest
 from conftest import _montar_app, entrar_como
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session, sessionmaker
 from test_clt_jornada import (  # noqa: F401 - fixtures
     ATE_CONSENTIMENTO,
@@ -44,6 +45,7 @@ from saturday.dados.modelos import (
     PropostaGranatech,
 )
 from saturday.dados.sessao import sessao as abrir_sessao
+from saturday.dados.trava import tentar_trava
 from saturday.web.api.granatech_admin import SEM_CONVERSA, acoes_da_proposta
 
 pytestmark = pytest.mark.filterwarnings("ignore:You should not use the 'timeout' argument")
@@ -319,3 +321,64 @@ def test_detalhe_mostra_as_condicoes_depois_que_a_conversa_segue(
     )
 
     assert client.get(f"{ROTA}/propostas/{linha['id']}").json()["oferta"] == oferta
+
+
+# ---------------------------------------------------------------- uma ação por vez (decisão 0024)
+
+
+def _com_link(painel: Any, fabrica: sessionmaker[Session]) -> tuple[Jornada, TestClient, str, dict]:
+    jornada, client = painel()
+    _ate_proposta(jornada)
+    cabecalhos = entrar_como(client, fabrica, "gestor")
+    _evento(jornada, "PENDING_FORMALIZATION", "AGUARDANDO_FORMALIZACAO")
+    proposta_id = _id_proposta(fabrica)
+    return jornada, client, f"{ROTA}/propostas/{proposta_id}/reenviar-link", cabecalhos
+
+
+def test_acao_com_outra_em_andamento_no_mesmo_item_e_recusada(
+    painel: Any, fabrica: sessionmaker[Session]
+) -> None:
+    jornada, client, rota, cabecalhos = _com_link(painel, fabrica)
+    proposta_id = _id_proposta(fabrica)
+    antes = _saidas(jornada)
+
+    # A outra sessão faz o papel da primeira ação, ainda em andamento.
+    with fabrica() as outra:
+        assert tentar_trava(outra, f"granatech:proposta:{proposta_id}")
+        resposta = client.post(rota, headers=cabecalhos)
+
+        assert resposta.status_code == 409
+        assert "em andamento" in resposta.json()["detail"]
+        assert _saidas(jornada) == antes
+        assert _auditoria(fabrica, "granatech_reenviar_link") == []
+
+    # A trava é por item: a de outra proposta não barra esta.
+    with fabrica() as outra:
+        assert tentar_trava(outra, f"granatech:proposta:{proposta_id + 1}")
+        assert client.post(rota, headers=cabecalhos).status_code == 204
+    assert _saidas(jornada) == antes + 1
+
+
+def test_link_reenviado_ha_menos_de_um_minuto_nao_sai_de_novo(
+    painel: Any, fabrica: sessionmaker[Session]
+) -> None:
+    jornada, client, rota, cabecalhos = _com_link(painel, fabrica)
+    assert client.post(rota, headers=cabecalhos).status_code == 204
+    antes = _saidas(jornada)
+
+    resposta = client.post(rota, headers=cabecalhos)
+
+    assert resposta.status_code == 409
+    assert "tente de novo em" in resposta.json()["detail"]
+    assert _saidas(jornada) == antes
+    assert len(_auditoria(fabrica, "granatech_reenviar_link")) == 1
+
+    # Passado o prazo, o gestor reenvia de novo.
+    with abrir_sessao(fabrica) as sessao:
+        sessao.execute(
+            update(Auditoria)
+            .where(Auditoria.acao == "granatech_reenviar_link")
+            .values(criada_em=func.now() - timedelta(minutes=2))
+        )
+    assert client.post(rota, headers=cabecalhos).status_code == 204
+    assert _saidas(jornada) == antes + 1

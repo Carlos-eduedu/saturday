@@ -57,3 +57,17 @@ def travar_e_reler(sessao: Session, conversation_id: str) -> Conversa:
         .where(Conversa.conversation_id == conversation_id)
         .execution_options(populate_existing=True)
     ).one()
+
+
+def tentar_trava(sessao: Session, chave: str) -> bool:
+    """Pega a trava de ``chave`` se estiver livre, sem esperar.
+
+    Vale até o fim da transação, como a da conversa. Serve a quem prefere
+    recusar a esperar: a segunda ação do gestor no mesmo item (decisão 0024).
+    """
+
+    return bool(
+        sessao.scalar(
+            text("SELECT pg_try_advisory_xact_lock(:chave)"), {"chave": chave_trava(chave)}
+        )
+    )
