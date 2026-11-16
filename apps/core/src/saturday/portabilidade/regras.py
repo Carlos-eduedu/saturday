@@ -8,7 +8,6 @@ from __future__ import annotations
 from saturday.portabilidade.bancos_cip import CODIGOS_CIP
 
 PRAZO_C6 = 108
-PRAZO_96 = 96
 TAXA_TETO_C6 = 0.0185  # taxa usada na ponderação do teto
 MARGEM_SEGURANCA_PP = 0.10  # pontos percentuais, sempre aplicada
 TAXA_ORIGEM_MIN = 1.35  # % a.m.
@@ -20,15 +19,14 @@ TOLERANCIA_CONFERENCIA = 1.00
 
 IDADE_COLETA_MIN, IDADE_COLETA_MAX = 18, 110
 
-IDADE_MIN, IDADE_MAX = 21, 73
-# 21–71 → 108x (atendido). 72–73 → 96x (handoff idade_prazo_96 nesta versão).
-IDADE_PRAZO_96_MIN = 72
+IDADE_MIN, IDADE_MAX = 21, 73  # 108x em toda a faixa (regra de 07/11/2026)
 
 BANCOS_C6 = {"336", "626"}  # motivo ja_c6
-BANCOS_NAO_PORTA = {"707", "121", "012", "070", "925", "422", "260", "386"}
-# Daycoval, Agibank, Inbursa, BRB (070 e 925), Safra, Nubank (260 e 386)
+BANCOS_NAO_PORTA = {"707", "121", "012", "070", "925", "422"}
+# Daycoval, Agibank, Inbursa, BRB (070 e 925), Safra. Nubank porta desde 07/11/2026.
 BANCOS_ALERTA_REFIN = {"623", "707"}  # Pan, Daycoval
-BANCOS_REDE = {"001", "104", "237", "033", "341"}  # BB, Caixa, Bradesco, Santander, Itaú
+BANCOS_REDE = {"001", "104", "237", "033", "341", "748", "756"}
+# BB, Caixa, Bradesco, Santander, Itaú, Sicredi, Sicoob
 PAGAS_MIN_POR_BANCO = {"623": 37, "254": 25}  # Pan, Paraná
 PAGAS_MIN_DEMAIS = 12
 DIAS_INCLUSAO_ALTERNATIVA = 360

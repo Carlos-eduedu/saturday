@@ -148,10 +148,24 @@ def test_idade_65_sem_uf_pergunta_uf_e_alerta_webplus(client, fakes: Fakes):
     assert "assinar o contrato em papel" in body["answer"]
 
 
-@pytest.mark.parametrize(
-    "idade,motivo",
-    [(72, "idade_prazo_96"), (74, "idade_fora_regra")],
-)
+def test_73_anos_calcula_em_108_parcelas(client, fakes: Fakes):
+    fakes.llm.extrato = dados_extrato()
+
+    r = client.post(
+        "/chat",
+        json={
+            "conversation_id": cid(),
+            "message": "",
+            "attachments": [anexo_pdf()],
+            "cliente": {"data_nascimento": idade_anos(73), "uf": "MS"},
+        },
+    )
+    resultado = r.json()["portability_result"]
+    assert resultado["motivo"] != "idade_fora_regra"
+    assert resultado["prazo"] == 108
+
+
+@pytest.mark.parametrize("idade,motivo", [(74, "idade_fora_regra")])
 def test_idades_limite_vao_para_handoff(client, fakes: Fakes, idade, motivo):
     fakes.llm.extrato = dados_extrato()
 

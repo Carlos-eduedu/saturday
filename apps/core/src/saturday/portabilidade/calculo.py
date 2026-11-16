@@ -26,13 +26,11 @@ from saturday.portabilidade.regras import (
     FATOR_CARENCIA_EXPOENTE,
     IDADE_MAX,
     IDADE_MIN,
-    IDADE_PRAZO_96_MIN,
     IDADE_WEBPLUS,
     IOF_PCT_TROCO,
     MARGEM_SEGURANCA_PP,
     PAGAS_MIN_DEMAIS,
     PAGAS_MIN_POR_BANCO,
-    PRAZO_96,
     PRAZO_C6,
     PRAZO_ORIGINAL_EXIGE_CARENCIA,
     TABELAS_REFIN,
@@ -327,9 +325,6 @@ def calcular_portabilidade(
 
     if idade < IDADE_MIN or idade > IDADE_MAX:
         resultado.update(ok=False, motivo="idade_fora_regra")
-        return resultado
-    if idade >= IDADE_PRAZO_96_MIN:
-        resultado.update(ok=False, motivo="idade_prazo_96", prazo=PRAZO_96)
         return resultado
 
     if emissao is None:

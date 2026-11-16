@@ -176,6 +176,18 @@ def test_santander_108x_zero_pagas_e_elegivel() -> None:
     assert c["motivo"] == "ok"
 
 
+@pytest.mark.parametrize("banco", ["748 - SICREDI", "756 - SICOOB"])
+def test_sicredi_e_sicoob_sao_rede_sem_carencia(banco: str) -> None:
+    c = avaliar_contrato(contrato(banco, 50, 108, 0, 2.1, inclusao="01/09/2026"), EMISSAO)
+    assert c["motivo"] == "ok"
+
+
+@pytest.mark.parametrize("banco", ["260 - NU PAGAMENTOS", "386 - NU FINANCEIRA"])
+def test_nubank_porta(banco: str) -> None:
+    c = avaliar_contrato(contrato(banco, 100, 84, 20, 2.0), EMISSAO)
+    assert c["motivo"] == "ok"
+
+
 def test_taxa_abaixo_do_c6() -> None:
     c = avaliar_contrato(contrato("033 - SANTANDER", 100, 84, 10, 1.30), EMISSAO)
     assert c["motivo"] == "taxa_abaixo_c6"
