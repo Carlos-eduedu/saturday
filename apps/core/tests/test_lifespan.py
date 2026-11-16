@@ -104,6 +104,13 @@ def test_granatech_ativa_exige_chave_e_token() -> None:
         settings.validar_para_subir()
 
 
+def test_c6_ativo_exige_endereco_e_credencial() -> None:
+    settings = _completo(environment="dev", c6_ativo=True, c6_base_url="http://c6")
+
+    with pytest.raises(RuntimeError, match="SATURDAY_C6_USUARIO, SATURDAY_C6_SENHA"):
+        settings.validar_para_subir()
+
+
 def test_evolution_ligada_exige_chave_e_token() -> None:
     with pytest.raises(RuntimeError, match="SATURDAY_EVOLUTION_API_KEY"):
         _completo(environment="dev", evolution_ativo=True).validar_para_subir()

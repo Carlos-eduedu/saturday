@@ -411,13 +411,11 @@ def anexo_fake() -> dict[str, str]:
 _RAIZ = Path(__file__).resolve().parents[3]
 
 
-def _carregar_simulador_granatech() -> ModuleType:
-    nome = "simulador_granatech"
+def _carregar_simulador(parceiro: str) -> ModuleType:
+    nome = f"simulador_{parceiro}"
     if nome in sys.modules:
         return sys.modules[nome]
-    spec = importlib.util.spec_from_file_location(
-        nome, _RAIZ / "simuladores" / "granatech" / "app.py"
-    )
+    spec = importlib.util.spec_from_file_location(nome, _RAIZ / "simuladores" / parceiro / "app.py")
     assert spec is not None and spec.loader is not None
     modulo = importlib.util.module_from_spec(spec)
     sys.modules[nome] = modulo
@@ -427,7 +425,7 @@ def _carregar_simulador_granatech() -> ModuleType:
 
 @pytest.fixture
 def simulador_granatech() -> Iterator[ModuleType]:
-    modulo = _carregar_simulador_granatech()
+    modulo = _carregar_simulador("granatech")
     modulo.limpar()
     original = dict(modulo.CONFIG)
     modulo.CONFIG.update(atraso_detalhe_s=0, expira_em="1h")
@@ -440,6 +438,23 @@ def simulador_granatech() -> Iterator[ModuleType]:
 @pytest.fixture
 def http_granatech(simulador_granatech: ModuleType) -> Iterator[TestClient]:
     with TestClient(simulador_granatech.app, base_url="http://granatech") as cliente:
+        yield cliente
+
+
+@pytest.fixture
+def simulador_c6() -> Iterator[ModuleType]:
+    modulo = _carregar_simulador("c6")
+    modulo.limpar()
+    original = dict(modulo.CONFIG)
+    yield modulo
+    modulo.CONFIG.clear()
+    modulo.CONFIG.update(original)
+    modulo.limpar()
+
+
+@pytest.fixture
+def http_c6(simulador_c6: ModuleType) -> Iterator[TestClient]:
+    with TestClient(simulador_c6.app, base_url="http://c6") as cliente:
         yield cliente
 
 

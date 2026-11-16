@@ -106,6 +106,14 @@ class Settings(BaseSettings):
     granatech_cota_diaria: int = 20
     granatech_reaproveitar_dias: int = 30
 
+    # C6 Consignado (decisão 0026): contrato novo e refinanciamento INSS. Sem
+    # valor padrão de endereço: o manual só traz o de produção.
+    c6_ativo: bool = False
+    c6_base_url: str = ""
+    c6_usuario: str = ""
+    c6_senha: SecretStr = SecretStr("")
+    c6_codigo_promotora: str = ""
+
     # Domínio dos links curtos (`https://{dominio}/l/{codigo}`), obrigatório com a
     # proposta ligada.
     dominio_publico: str = ""
@@ -208,6 +216,20 @@ class Settings(BaseSettings):
                 raise RuntimeError(
                     "SATURDAY_GRANATECH_ATIVO=true exige " + ", ".join(faltando) + "."
                 )
+
+        if self.c6_ativo and self.environment != "pytest":
+            faltando = [
+                nome
+                for nome, valor in {
+                    "SATURDAY_C6_BASE_URL": self.c6_base_url,
+                    "SATURDAY_C6_USUARIO": self.c6_usuario,
+                    "SATURDAY_C6_SENHA": self.c6_senha.get_secret_value(),
+                    "SATURDAY_C6_CODIGO_PROMOTORA": self.c6_codigo_promotora,
+                }.items()
+                if not valor
+            ]
+            if faltando:
+                raise RuntimeError("SATURDAY_C6_ATIVO=true exige " + ", ".join(faltando) + ".")
 
         if self.granatech_simulador_url:
             faltando = [
