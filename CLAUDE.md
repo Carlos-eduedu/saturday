@@ -80,7 +80,9 @@ pelo outbox; sem ela, volta na própria requisição.
 textos fixos. São dois ramos: INSS → C6, com regras e cálculos em
 `portabilidade/` (`hiscon.py` lê o extrato, `calculo.py` e `regras.py` decidem),
 e CLT em `agent/clt/` (mapa em `docs/clt.md`).
-O estado guarda só a chave do anexo no storage, nunca o conteúdo.
+O estado guarda só a chave do anexo no storage, nunca o conteúdo. O painel lê a
+jornada por `AgentService.jornada` (`Jornada`, em `agent/service.py`), não por
+chave do estado.
 
 **IA (`services/`).** `jev.py` é o classificador de intenção/público; `llm.py`
 responde dúvidas ancoradas na FAQ (`faq.py`); `anexos.py` lê foto/PDF por modelo

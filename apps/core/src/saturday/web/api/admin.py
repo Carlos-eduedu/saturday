@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from starlette.concurrency import run_in_threadpool
 
 from saturday.agent.clt import leitura
-from saturday.agent.service import AgentService, ficha_do_estado
+from saturday.agent.service import AgentService, Jornada
 from saturday.canais.whatsapp.telefone import normalizar_telefone
 from saturday.dados import repositorios
 from saturday.dados.modelos import (
@@ -484,7 +484,7 @@ def exportar(
         retrato = exportacao.carregar(
             sessao,
             conversa,
-            ficha=_ficha(conversa, _estado(conversa, service)),
+            ficha=_ficha(conversa, service.jornada(conversa.conversation_id)),
             supervisao=supervisionado,
             gestor=usuario.gestor,
             agora=agora,
@@ -592,12 +592,8 @@ async def enviar_anexo(
 # ------------------------------------------------------------------ ficha
 
 
-def _estado(conversa: Conversa, service: AgentService) -> dict[str, Any]:
-    return service.estado_atual(service.config(conversa.conversation_id))
-
-
-def _dados_sensiveis(conversa: Conversa, estado: dict[str, Any]) -> dict[str, str]:
-    dados = ficha_do_estado(estado)
+def _dados_sensiveis(conversa: Conversa, jornada: Jornada) -> dict[str, str]:
+    dados = jornada.ficha
     valores = {
         "telefone": conversa.telefone,
         "cpf": dados.get("cpf"),
@@ -607,18 +603,18 @@ def _dados_sensiveis(conversa: Conversa, estado: dict[str, Any]) -> dict[str, st
     return {campo: str(valor) for campo, valor in valores.items() if valor}
 
 
-def _ficha(conversa: Conversa, estado: dict[str, Any]) -> dict[str, Any]:
+def _ficha(conversa: Conversa, jornada: Jornada) -> dict[str, Any]:
     """A ficha como a tela e a exportação a mostram: só com dado mascarado."""
 
-    dados = ficha_do_estado(estado)
-    sensiveis = _dados_sensiveis(conversa, estado)
+    dados = jornada.ficha
+    sensiveis = _dados_sensiveis(conversa, jornada)
     return {
         "nome": dados.get("nome"),
         "dados": {campo: MASCARAS[campo](valor) for campo, valor in sensiveis.items()},
         "uf": dados.get("uf"),
-        "publico": estado.get("publico"),
-        "handoff_reason": estado.get("handoff_reason"),
-        "portabilidade": estado.get("portability_result"),
+        "publico": jornada.publico,
+        "handoff_reason": jornada.motivo_do_handoff,
+        "portabilidade": jornada.portabilidade,
     }
 
 
@@ -630,8 +626,8 @@ def ficha(
         conversa = sessao.get(Conversa, conversa_id)
         if conversa is None:
             raise HTTPException(status_code=404, detail="conversa não encontrada")
-        estado = _estado(conversa, service)
-        return {**_ficha(conversa, estado), **_acompanhamento(sessao, conversa, estado)}
+        jornada = service.jornada(conversa.conversation_id)
+        return {**_ficha(conversa, jornada), **_acompanhamento(sessao, conversa, jornada)}
 
 
 # O que a oferta guardada no checkpoint mostra na ficha: só valores, nenhum ID.
@@ -647,7 +643,7 @@ CAMPOS_DA_OFERTA = (
 )
 
 
-def _acompanhamento(sessao: Session, conversa: Conversa, estado: dict[str, Any]) -> dict[str, Any]:
+def _acompanhamento(sessao: Session, conversa: Conversa, jornada: Jornada) -> dict[str, Any]:
     """O que a IA ofereceu, o que o banco registrou e as provas do SIM.
 
     Fica ao lado da conversa para a equipe conferir a fala da IA sem trocar de
@@ -657,7 +653,7 @@ def _acompanhamento(sessao: Session, conversa: Conversa, estado: dict[str, Any])
     def so_valores(dados: dict[str, Any] | None) -> dict[str, Any] | None:
         return {campo: dados.get(campo) for campo in CAMPOS_DA_OFERTA} if dados else None
 
-    guardada = (estado.get("clt") or {}).get("oferta") or {}
+    guardada = jornada.oferta or {}
     oferta = so_valores(guardada)
     proposta = sessao.scalars(
         select(PropostaGranatech)
@@ -738,7 +734,9 @@ def revelar(
         conversa = sessao.get(Conversa, conversa_id)
         if conversa is None:
             raise HTTPException(status_code=404, detail="conversa não encontrada")
-        valor = _dados_sensiveis(conversa, _estado(conversa, service)).get(dados.campo)
+        valor = _dados_sensiveis(conversa, service.jornada(conversa.conversation_id)).get(
+            dados.campo
+        )
         if valor is None:
             raise HTTPException(status_code=404, detail="dado não informado")
         # Na mesma transação: sem a linha de auditoria, o dado não sai.

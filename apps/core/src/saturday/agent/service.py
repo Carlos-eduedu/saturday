@@ -6,6 +6,7 @@ import logging
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Literal, cast
 from zoneinfo import ZoneInfo
@@ -69,6 +70,38 @@ def ficha_do_estado(estado: dict[str, Any]) -> dict[str, Any]:
     return {campo: valor for campo, valor in ficha.items() if valor}
 
 
+@dataclass(frozen=True)
+class Jornada:
+    """O que o painel lê do estado do grafo, com nome.
+
+    Só `jornada_do_estado` sabe em que chave do estado cada campo vive: fora
+    de `agent/`, leia daqui, e não do dicionário do checkpoint.
+    """
+
+    ficha: dict[str, Any]
+    publico: str | None
+    motivo_do_handoff: str | None
+    portabilidade: Any
+    # Etapa crua do ramo CLT; vazia no INSS (`etapa_do_estado` é a da conversa).
+    etapa_clt: str | None
+    oferta: dict[str, Any] | None
+    # Id da proposta na Granatech para a qual a conversa aponta.
+    proposta: str | None
+
+
+def jornada_do_estado(estado: dict[str, Any]) -> Jornada:
+    clt = estado.get("clt") or {}
+    return Jornada(
+        ficha=ficha_do_estado(estado),
+        publico=estado.get("publico"),
+        motivo_do_handoff=estado.get("handoff_reason"),
+        portabilidade=estado.get("portability_result"),
+        etapa_clt=clt.get("etapa"),
+        oferta=clt.get("oferta"),
+        proposta=clt.get("proposta"),
+    )
+
+
 class AgentService:
     """Orquestra o grafo, o checkpointer, o outbox e a trava por conversa."""
 
@@ -103,6 +136,9 @@ class AgentService:
     def estado_atual(self, config: dict[str, Any]) -> dict[str, Any]:
         snapshot = self.graph.get_state(config)
         return dict(snapshot.values or {})
+
+    def jornada(self, conversation_id: str) -> Jornada:
+        return jornada_do_estado(self.estado_atual(self.config(conversation_id)))
 
     @contextmanager
     def _trava(self, conversation_id: str) -> Iterator[Session]:

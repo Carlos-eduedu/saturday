@@ -25,7 +25,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
-from saturday.agent.service import AgentService
+from saturday.agent.service import AgentService, Jornada
 from saturday.bancos.granatech import homologacao
 from saturday.bancos.granatech import status as ordem
 from saturday.bancos.granatech.cliente import ClienteGranatech, ErroGranatech, ErroIncerto
@@ -109,11 +109,8 @@ def _iso(valor: datetime | None) -> str | None:
     return valor.isoformat() if valor else None
 
 
-def _clt(service: AgentService, conversation_id: str | None) -> dict[str, Any]:
-    if conversation_id is None:
-        return {}
-    estado = service.estado_atual(service.config(conversation_id))
-    return dict(estado.get("clt") or {})
+def _jornada(service: AgentService, conversation_id: str | None) -> Jornada | None:
+    return service.jornada(conversation_id) if conversation_id else None
 
 
 def _falha(exc: ErroGranatech) -> HTTPException:
@@ -305,6 +302,7 @@ def ver_consulta(
             select(PropostaGranatech.id).where(PropostaGranatech.consulta_id == linha.id)
         ).all()
         detalhe = linha.detalhe or {}
+        jornada = _jornada(service, conversation_id)
         # Da pessoa só idade e sexo: nome, mãe e endereço ficam fora do painel.
         pessoa = detalhe.get("pessoa_natural") or {}
         return {
@@ -314,7 +312,7 @@ def ver_consulta(
             "idade": pessoa.get("age"),
             "sexo": pessoa.get("gender"),
             "propostas": list(propostas),
-            "etapa": _clt(service, conversation_id).get("etapa"),
+            "etapa": jornada.etapa_clt if jornada else None,
             "acoes": acoes_da_consulta(linha),
         }
 
@@ -332,15 +330,15 @@ def ver_proposta(
             select(ConsultaGranatech.cpf).where(ConsultaGranatech.id == linha.consulta_id)
         )
         conversation_id = repositorios.conversation_id_de(sessao, linha.conversa_id)
-        clt = _clt(service, conversation_id)
+        jornada = _jornada(service, conversation_id)
         return {
             **_linha_proposta(linha, cpf or ""),
             "historico": linha.historico,
-            "etapa": clt.get("etapa"),
+            "etapa": jornada.etapa_clt if jornada else None,
             # Propostas antigas não guardam as condições: só a oferta do checkpoint,
             # enquanto a conversa ainda aponta para esta proposta.
             "oferta": linha.condicoes
-            or (clt.get("oferta") if clt.get("proposta") == linha.id_externo else None),
+            or (jornada.oferta if jornada and jornada.proposta == linha.id_externo else None),
             "conta_ativa": conta_ativa,
             "acoes": acoes_da_proposta(linha, conta_ativa),
         }
