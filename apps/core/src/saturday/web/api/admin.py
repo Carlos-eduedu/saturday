@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from starlette.concurrency import run_in_threadpool
 
 from saturday.agent.clt import leitura
-from saturday.agent.service import AgentService
+from saturday.agent.service import AgentService, ficha_do_estado
 from saturday.canais.whatsapp.janela import janela_aberta
 from saturday.canais.whatsapp.telefone import normalizar_telefone
 from saturday.dados import repositorios
@@ -595,20 +595,13 @@ def _estado(conversa: Conversa, service: AgentService) -> dict[str, Any]:
     return service.estado_atual(service.config(conversa.conversation_id))
 
 
-def _dados_clt(estado: dict[str, Any]) -> dict[str, Any]:
-    """O que o ramo CLT coletou; o INSS guarda em ``cliente``."""
-
-    return dict((estado.get("clt") or {}).get("dados") or {})
-
-
 def _dados_sensiveis(conversa: Conversa, estado: dict[str, Any]) -> dict[str, str]:
-    cliente = estado.get("cliente") or {}
-    clt = _dados_clt(estado)
+    dados = ficha_do_estado(estado)
     valores = {
         "telefone": conversa.telefone,
-        "cpf": cliente.get("cpf") or clt.get("cpf"),
-        "data_nascimento": cliente.get("data_nascimento") or clt.get("nascimento"),
-        "email": clt.get("email"),
+        "cpf": dados.get("cpf"),
+        "data_nascimento": dados.get("nascimento"),
+        "email": dados.get("email"),
     }
     return {campo: str(valor) for campo, valor in valores.items() if valor}
 
@@ -616,12 +609,12 @@ def _dados_sensiveis(conversa: Conversa, estado: dict[str, Any]) -> dict[str, st
 def _ficha(conversa: Conversa, estado: dict[str, Any]) -> dict[str, Any]:
     """A ficha como a tela e a exportação a mostram: só com dado mascarado."""
 
-    cliente = estado.get("cliente") or {}
+    dados = ficha_do_estado(estado)
     sensiveis = _dados_sensiveis(conversa, estado)
     return {
-        "nome": cliente.get("nome") or _dados_clt(estado).get("nome"),
+        "nome": dados.get("nome"),
         "dados": {campo: MASCARAS[campo](valor) for campo, valor in sensiveis.items()},
-        "uf": cliente.get("uf"),
+        "uf": dados.get("uf"),
         "publico": estado.get("publico"),
         "handoff_reason": estado.get("handoff_reason"),
         "portabilidade": estado.get("portability_result"),

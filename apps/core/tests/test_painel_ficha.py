@@ -9,6 +9,7 @@ import pytest
 from sqlalchemy import select
 from test_painel_api import _cliente_escreve, _conversa_id, _criar, _entrar
 
+from saturday.agent.service import ficha_do_estado
 from saturday.dados.modelos import Auditoria, ConsultaGranatech, PropostaGranatech
 from saturday.dados.sessao import sessao as abrir
 
@@ -180,3 +181,34 @@ def test_respostas_rapidas_so_o_gestor_mexe(client_pg, fabrica, ana):
         "resposta_rapida:editar",
         "resposta_rapida:apagar",
     } <= set(_acoes(fabrica))
+
+
+# ------------------------------------------------------------------ ler a ficha
+
+
+@pytest.mark.parametrize(
+    ("semente", "campos"),
+    [
+        (
+            {"clt": {"etapa": "dados_proposta", "dados": {"nome": "Maria"}}},
+            {
+                "nome": "Maria Silva",
+                "cpf": "00189004967",
+                "nascimento": "1990-05-20",
+                "email": "maria@exemplo.test",
+            },
+        ),
+        (
+            {"cliente": {"nome": "João"}},
+            {"nome": "João Pereira", "cpf": "00189004967", "nascimento": "1960-01-31"},
+        ),
+    ],
+    ids=["clt", "inss"],
+)
+def test_o_que_a_edicao_grava_a_leitura_devolve(service, semente, campos):
+    config = service.config("ficha-ida-e-volta")
+    service.graph.update_state(config, semente)
+
+    service.editar_ficha("ficha-ida-e-volta", campos)
+
+    assert ficha_do_estado(service.estado_atual(config)) == campos

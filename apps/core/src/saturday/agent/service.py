@@ -52,6 +52,23 @@ def agora() -> datetime:
 CAMPOS_FICHA_INSS = {"nome": "nome", "cpf": "cpf", "nascimento": "data_nascimento"}
 
 
+def ficha_do_estado(estado: dict[str, Any]) -> dict[str, Any]:
+    """Dados do cliente com os nomes que `editar_ficha` aceita, nos dois ramos.
+
+    É a leitura par de `AgentService.editar_ficha`: só aqui e lá se sabe onde
+    cada ramo guarda cada campo. Devolve só os preenchidos.
+    """
+
+    cliente = estado.get("cliente") or {}
+    clt = (estado.get("clt") or {}).get("dados") or {}
+    ficha = {
+        campo: cliente.get(chave) or clt.get(campo) for campo, chave in CAMPOS_FICHA_INSS.items()
+    }
+    ficha["email"] = clt.get("email")
+    ficha["uf"] = cliente.get("uf")
+    return {campo: valor for campo, valor in ficha.items() if valor}
+
+
 class AgentService:
     """Orquestra o grafo, o checkpointer, o outbox e a trava por conversa."""
 
