@@ -42,7 +42,12 @@ Cerca de 50 testes do agente rodavam nesse caminho. Passavam sem provar
   385 testes e roda 348. Quem mexe em `agent/` roda com o Postgres de teste.
 - A consequência da 0003 "conversas do `POST /chat` sem Postgres não têm onde
   guardar o estado" deixa de existir.
-- **Ficou de fora:** o "sem banco" dos clientes do contexto (`agent/clt`,
-  `fontes/brasilapi.py`, `conhecimento.py`, `agente_config.py`,
-  `web/composicao.py`) e dos webhooks em `web/api/`. O `AgentContext.fabrica`
-  continua opcional.
+- **Estendida em 2026-11-16 para fora do serviço:** a fábrica de sessões é
+  obrigatória também em `AgentContext`, `agent/clt`, `fontes/brasilapi.py`,
+  `conhecimento.py`, `web/composicao.py`, nos webhooks de `web/api/` e em
+  `get_fabrica` (o `exigir_fabrica` e o 503 "painel indisponível sem banco"
+  deixaram de existir). Webhook sem banco não responde mais 200 sem gravar.
+- **Continua sem fábrica, de propósito:** `Modelos(settings)` em
+  `agente_config.py` resolve os modelos só pelo ambiente, ignorando a versão
+  gravada. Não é modo sem banco: é o que o teste de modelo do painel e os
+  clientes de IA sem configuração usam.
