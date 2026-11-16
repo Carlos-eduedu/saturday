@@ -20,6 +20,8 @@ const ACOES: Record<string, string> = {
   resolver_alerta: "Resolveu um alerta",
   exportar: "Exportou uma conversa",
   perfil_editar: "Editou o próprio perfil",
+  perfil_foto: "Trocou a própria foto",
+  perfil_foto_remover: "Removeu a própria foto",
   perfil_disponibilidade: "Mudou a disponibilidade",
   granatech_reenviar_link: "Reenviou um link da Granatech",
   usuario_criar: "Adicionou um membro",
@@ -36,6 +38,7 @@ const FAMILIAS: [string, string][] = [
   ["conhecimento_", "Editou a base de conhecimento"],
   ["agente_", "Editou o agente"],
   ["resposta_rapida:", "Editou as respostas rápidas"],
+  ["granatech", "Agiu numa consulta ou proposta da Granatech"],
 ];
 
 const DADOS: Record<string, string> = {

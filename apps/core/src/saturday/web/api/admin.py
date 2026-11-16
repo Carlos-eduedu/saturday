@@ -352,8 +352,12 @@ def _gravar_foto(
             raise HTTPException(status_code=404, detail="usuário não encontrado")
         antiga = linha.foto_chave
         linha.foto_chave = chave
-        acao = "perfil_foto" if chave else "perfil_foto_remover"
-        auditar(sessao, usuario_id, acao, str(usuario_id))
+        auditar(
+            sessao,
+            usuario_id,
+            "perfil_foto" if chave else "perfil_foto_remover",
+            str(usuario_id),
+        )
         return antiga
 
 
