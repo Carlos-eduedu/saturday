@@ -119,11 +119,12 @@ function ListaExecucoes({ nos }: { nos: NoDoGrafo[] }) {
   );
 
   function maisAntigas() {
-    if (!lista?.length) return;
+    const ultima = lista?.at(-1);
+    if (!ultima) return;
     setCarregandoMais(true);
     const pedida = chave;
     api
-      .execucoes({ situacao, no: filtroNo || undefined, antes_de: lista[lista.length - 1].id })
+      .execucoes({ situacao, no: filtroNo || undefined, antes_de: ultima.id })
       .then((r) => {
         // Filtro trocado no meio do pedido: a página é da lista anterior.
         if (chaveAtual.current !== pedida) return;

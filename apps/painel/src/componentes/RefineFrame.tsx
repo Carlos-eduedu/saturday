@@ -100,13 +100,16 @@ export function RefineFrame({
       const i = Math.min(n, Math.floor(nivel + 1e-6));
       const fracao = nivel - i;
       ctx.globalAlpha = 1;
-      ctx.drawImage(s.niveis[i], 0, 0);
-      if (i < n && fracao > 0) {
+      // Índice fora da lista não desenha: um nível que falta não pode travar a revelação.
+      const atual = s.niveis[i];
+      const seguinte = s.niveis[i + 1];
+      if (atual) ctx.drawImage(atual, 0, 0);
+      if (seguinte && fracao > 0) {
         // O nível seguinte desce como uma frente, com a borda esfumada em faixas.
         const borda = BORDA * dpr;
         const frente = fracao * (s.a + borda) - borda / 2;
         const topo = Math.max(0, Math.floor(frente - borda / 2));
-        if (topo > 0) ctx.drawImage(s.niveis[i + 1], 0, 0, s.l, topo, 0, 0, s.l, topo);
+        if (topo > 0) ctx.drawImage(seguinte, 0, 0, s.l, topo, 0, 0, s.l, topo);
         const alturaFaixa = borda / FAIXAS;
         for (let k = 0; k < FAIXAS; k += 1) {
           const y = frente - borda / 2 + k * alturaFaixa;
@@ -115,7 +118,7 @@ export function RefineFrame({
           ctx.globalAlpha = t * t * (3 - 2 * t);
           const y0 = Math.max(0, y);
           const h0 = Math.min(s.a, y + alturaFaixa) - y0;
-          if (h0 > 0) ctx.drawImage(s.niveis[i + 1], 0, y0, s.l, h0, 0, y0, s.l, h0);
+          if (h0 > 0) ctx.drawImage(seguinte, 0, y0, s.l, h0, 0, y0, s.l, h0);
         }
         ctx.globalAlpha = 1;
       }

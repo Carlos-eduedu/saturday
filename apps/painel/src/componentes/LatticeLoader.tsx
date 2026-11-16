@@ -39,7 +39,7 @@ const MARKS: Record<Grade, { done: number[]; error: number[] }> = {
 
 const resolvePattern = (pattern: string | PadraoCustom, grid: Grade): Padrao => {
   if (typeof pattern === "string") {
-    return PATTERNS[pattern]?.[grid] ?? (PATTERNS[DEFAULT_PATTERN[grid]][grid] as Padrao);
+    return PATTERNS[pattern]?.[grid] ?? (PATTERNS[DEFAULT_PATTERN[grid]]?.[grid] as Padrao);
   }
   const cells = Array.from({ length: grid * grid }, (_, i) => pattern.cells[i] ?? null);
   const max = Math.max(0, ...cells.filter((v): v is number => v != null));

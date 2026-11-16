@@ -8,7 +8,7 @@ const REAIS = /R\$\s?(\d{1,3}(?:\.\d{3})*|\d+)(?:,(\d{2}))?/g;
 
 export function centavosCitados(texto: string): number[] {
   return [...texto.matchAll(REAIS)].map(
-    ([, inteiro, decimal]) => Number(inteiro.replaceAll(".", "")) * 100 + Number(decimal ?? 0),
+    ([, inteiro, decimal]) => Number((inteiro ?? "").replaceAll(".", "")) * 100 + Number(decimal ?? 0),
   );
 }
 

@@ -76,11 +76,12 @@ const FILAS: { valor: "" | Exclude<keyof Contagens, "todas" | "atencao">; rotulo
   { valor: "minhas", rotulo: "Minhas" },
 ];
 
+const VAZIO_GERAL = {
+  titulo: "Nenhuma conversa ainda.",
+  texto: "As conversas aparecem aqui assim que um cliente escrever.",
+};
+
 const VAZIOS: Record<string, { titulo: string; texto: string }> = {
-  "": {
-    titulo: "Nenhuma conversa ainda.",
-    texto: "As conversas aparecem aqui assim que um cliente escrever.",
-  },
   ia: {
     titulo: "Nenhuma conversa com a IA.",
     texto: "Conversas que a IA está atendendo sozinha aparecem aqui.",
@@ -278,7 +279,7 @@ export function Inbox({
       let base = links.findIndex((l) => !!ativo && !!l.closest("li")?.contains(ativo));
       if (base < 0) base = links.findIndex((l) => l.getAttribute("aria-current") === "page");
       const prox = base < 0 ? (passo > 0 ? 0 : links.length - 1) : base + passo;
-      links[Math.min(links.length - 1, Math.max(0, prox))].focus();
+      links[Math.min(links.length - 1, Math.max(0, prox))]?.focus();
     }
     window.addEventListener("keydown", teclas);
     return () => window.removeEventListener("keydown", teclas);
@@ -300,9 +301,10 @@ export function Inbox({
             : e.key === "End"
               ? n - 1
               : -1;
-    if (prox < 0) return;
+    const destino = FILAS[prox];
+    if (!destino) return;
     e.preventDefault();
-    setFila(FILAS[prox].valor);
+    setFila(destino.valor);
     abas.current[prox]?.focus();
   }
 
@@ -382,7 +384,7 @@ export function Inbox({
         titulo: "Nenhum telefone encontrado.",
         texto: "Confira os últimos dígitos ou troque de fila.",
       }
-    : (VAZIOS[fila] ?? VAZIOS[""]);
+    : (VAZIOS[fila] ?? VAZIO_GERAL);
 
   const desatualizada = conversas !== null && carregada !== `${fila}|${busca}`;
   const mostrarDica =

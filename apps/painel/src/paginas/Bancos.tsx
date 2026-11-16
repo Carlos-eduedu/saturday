@@ -4,7 +4,7 @@ import { Granatech } from "./Granatech";
 
 // Os bancos ligados ao agente, cada um na sua seção. Hoje só a Granatech; sem
 // interface `Banco` no código até existir o segundo (decisão 0004).
-const BANCOS = [{ id: "granatech", nome: "Granatech", produto: "Crédito do Trabalhador (CLT)" }];
+const BANCOS = [{ id: "granatech", nome: "Granatech", produto: "Crédito do Trabalhador (CLT)" }] as const;
 
 export function Bancos({ eu }: { eu: Eu }) {
   const { banco } = useParams();

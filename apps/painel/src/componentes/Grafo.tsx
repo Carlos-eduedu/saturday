@@ -40,7 +40,7 @@ function posicionar(grafo: Grafo): { pos: Map<string, Posicao>; largura: number;
   grafo.nos.forEach((n) => camada.has(n.id) || camada.set(n.id, ultima - 1));
 
   const camadas: string[][] = Array.from({ length: ultima + 1 }, () => []);
-  grafo.nos.forEach((n) => camadas[camada.get(n.id) ?? 0].push(n.id));
+  grafo.nos.forEach((n) => camadas[camada.get(n.id) ?? 0]?.push(n.id));
 
   const ordem = new Map<string, number>();
   camadas.forEach((ids) => {

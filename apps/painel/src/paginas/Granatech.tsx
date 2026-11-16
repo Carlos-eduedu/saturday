@@ -536,7 +536,7 @@ function ConteudoRodada({ rodada }: { rodada: RodadaDetalhe }) {
                 </span>
                 <div>
                   <p className="nome">
-                    {nome} <span className="estado">{ESTADO_ITEM[estado]}</span>
+                    {nome} <span className="estado">{estado && ESTADO_ITEM[estado]}</span>
                   </p>
                   {item?.observacao && <p className="nota">{item.observacao}</p>}
                   {item && <code className="arquivos">{item.arquivo}</code>}

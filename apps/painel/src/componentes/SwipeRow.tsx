@@ -80,15 +80,16 @@ const rubber = (o: number, dim: number, c: number) => (o * dim * c) / (dim + c *
 const unrubber = (y: number, dim: number, c: number) => (y * dim) / (c * Math.max(1, dim - Math.abs(y)));
 const project = (v: number) => ((v / 1000) * DECEL) / (1 - DECEL);
 const velocityOf = (hist: Sample[]) => {
-  if (hist.length < 2) return 0;
   const a = hist[0];
   const b = hist[hist.length - 1];
+  if (hist.length < 2 || !a || !b) return 0;
   return ((b[1] - a[1]) / Math.max(1, b[0] - a[0])) * 1000;
 };
 const onColor = (hex: string) => {
   const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex.trim());
-  if (!m) return '#ffffff';
-  const h = m[1].length === 3 ? [...m[1]].map(ch => ch + ch).join('') : m[1];
+  const cor = m?.[1];
+  if (!cor) return '#ffffff';
+  const h = cor.length === 3 ? [...cor].map(ch => ch + ch).join('') : cor;
   const r = parseInt(h.slice(0, 2), 16);
   const g = parseInt(h.slice(2, 4), 16);
   const b = parseInt(h.slice(4, 6), 16);

@@ -42,7 +42,7 @@ export interface GlideSelectProps {
 
 type Phase = 'closed' | 'open' | 'closing';
 
-const SIZES: Record<string, { chip: number; row: number; font: number }> = {
+const SIZES: Record<'sm' | 'md' | 'lg', { chip: number; row: number; font: number }> = {
   sm: { chip: 28, row: 26, font: 12 },
   md: { chip: 32, row: 30, font: 13 },
   lg: { chip: 44, row: 40, font: 14 }
@@ -59,7 +59,8 @@ const typeaheadIndex = (items: GlideSelectOption[], from: number, ch: string) =>
   const n = items.length;
   for (let k = 1; k <= n; k++) {
     const i = (from + k) % n;
-    if (textOf(items[i]).toLowerCase().startsWith(c)) return i;
+    const it = items[i];
+    if (it && textOf(it).toLowerCase().startsWith(c)) return i;
   }
   return from;
 };
@@ -321,7 +322,7 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
         onKeyDown={onTriggerKey}
       >
         <span className="glide-select__label" key={current} data-empty={selected < 0 ? '' : undefined}>
-          {selected >= 0 ? items[selected].label : placeholder}
+          {selected >= 0 ? items[selected]?.label : placeholder}
         </span>
         <span className="glide-select__chevron" aria-hidden="true">
           <HugeiconsIcon icon={ArrowDown01Icon} size={12} strokeWidth={2.5} />

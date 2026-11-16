@@ -66,7 +66,7 @@ export function useGravador(aoTerminar: (audio: File) => void): Gravador {
       setGravando(false);
       gravador.current = null;
       if (descartar.current || partes.length === 0) return;
-      const tipo = (rec.mimeType || formato || "audio/webm").split(";")[0];
+      const tipo = (rec.mimeType || formato || "audio/webm").split(";")[0] ?? "audio/webm";
       const extensao = tipo === "audio/mp4" ? "m4a" : tipo.split("/")[1];
       terminar.current(new File(partes, `audio.${extensao}`, { type: tipo }));
     };

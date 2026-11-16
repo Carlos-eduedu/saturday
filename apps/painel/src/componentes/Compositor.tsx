@@ -119,7 +119,7 @@ export function Compositor({
   const audio = anexo?.arquivo.type.startsWith("audio/") ?? false;
 
   function escolherArquivo(arquivo: File) {
-    const limite = ANEXOS_ACEITOS[arquivo.type.split(";")[0]];
+    const limite = ANEXOS_ACEITOS[arquivo.type.split(";")[0] ?? ""];
     if (!limite) {
       setErroAnexo("Tipo não aceito: envie JPG, PNG, PDF ou áudio.");
       return;
@@ -174,7 +174,8 @@ export function Compositor({
       }
       if (e.key === "Enter" || e.key === "Tab") {
         e.preventDefault();
-        escolher(sugestoes[ativa]);
+        const sugestao = sugestoes[ativa];
+        if (sugestao) escolher(sugestao);
         return;
       }
       if (e.key === "Escape") {

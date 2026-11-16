@@ -100,10 +100,10 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
       const ativo = document.activeElement;
       if (e.shiftKey && (ativo === primeiro || !focaveis.includes(ativo as HTMLElement))) {
         e.preventDefault();
-        ultimo.focus();
+        ultimo?.focus();
       } else if (!e.shiftKey && (ativo === ultimo || !focaveis.includes(ativo as HTMLElement))) {
         e.preventDefault();
-        primeiro.focus();
+        primeiro?.focus();
       }
     };
     document.addEventListener('keydown', aoTeclar);

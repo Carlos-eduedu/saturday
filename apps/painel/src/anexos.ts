@@ -6,7 +6,7 @@ export type TipoDeAnexo = "imagem" | "audio" | "video" | "pdf" | "outro";
 const IMAGENS = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 export function tipoDoAnexo(mime: string): TipoDeAnexo {
-  const limpo = mime.split(";")[0].trim().toLowerCase();
+  const limpo = (mime.split(";")[0] ?? "").trim().toLowerCase();
   if (IMAGENS.has(limpo)) return "imagem";
   if (limpo === "application/pdf") return "pdf";
   if (limpo.startsWith("audio/")) return "audio";

@@ -32,8 +32,10 @@ export function Abas<T extends string>({
       End: opcoes.length - 1,
     }[e.key];
     if (destino === undefined) return;
+    const opcao = opcoes[destino];
+    if (!opcao) return;
     e.preventDefault();
-    mudar(opcoes[destino][0]);
+    mudar(opcao[0]);
     lista.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[destino]?.focus();
   }
 
