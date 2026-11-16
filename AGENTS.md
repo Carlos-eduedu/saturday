@@ -102,6 +102,7 @@ docker compose --profile postgres --profile minio up --build
 ## Forma de trabalho
 
 - Antes de codar uma mudança de comportamento ou uma refatoração de mais de um arquivo, envie o plano pelo Plannotator e espere a aprovação.
+- Mudança de UX/UI: envie pelo Plannotator um relatório com prints ou vídeo curto de antes e depois; o commit só sai com a aprovação.
 - Uma fase só está pronta quando os testes passam, os critérios de aceite foram
   demonstrados e a documentação foi atualizada (`README.md`, `docs/` e
   `docs/estado.md`).
