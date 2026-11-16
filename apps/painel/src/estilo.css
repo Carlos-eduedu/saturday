@@ -1466,8 +1466,7 @@ main:has(.historico) { padding-bottom: 0; }
 .compositor .cancelar-gravacao + .enviar { margin-left: 0.5rem; }
 
 /* Anexos no histórico. */
-.msg .anexo-imagem { display: block; margin-top: 0.35rem; }
-.msg .anexo-imagem img { display: block; max-width: min(100%, 16rem); max-height: 16rem; border-radius: var(--raio-m); border: 1px solid var(--borda); }
+.msg .anexo-imagem { display: block; width: 16rem; max-width: 100%; margin-top: 0.35rem; border-radius: var(--raio-m); }
 .msg .anexo-audio { display: block; margin-top: 0.35rem; max-width: 100%; height: 2.5rem; }
 .msg .anexo-arquivo { display: block; margin: 0.35rem 0 0.15rem; overflow-wrap: anywhere; }
 @media (max-width: 599px) {

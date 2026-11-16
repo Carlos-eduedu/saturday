@@ -217,7 +217,7 @@ Ao lado das mensagens, antes da Ficha: a oferta vigente (liberado, parcelas, tax
 Sob cada fala da IA que cita reais, três estados: confere com a oferta (grafite, discreto); valor sem origem registrada ou vindo do modelo (selo âmbar, com texto); valor que difere da oferta (selo âmbar cheio, com os valores). A espera relativa da lista ("ontem", "há 12 min") é texto; datas e horas de tabela e ficha vão em mono.
 
 ### Balões da conversa
-Cliente à esquerda em branco; IA à direita em verde tingido; equipe à direita em cobalto suave; sistema centrado, sem balão, em grafite.
+Cliente à esquerda em branco; IA à direita em verde tingido; equipe à direita em cobalto suave; sistema centrado, sem balão, em grafite. Imagem anexada vai numa moldura fixa de 16rem em 4:3 (RefineFrame), que guarda o lugar enquanto carrega e revela a imagem do mosaico em ~0,5 s; se falha, diz "Não carregou" e oferece "Tentar de novo". O clique abre o arquivo inteiro.
 
 ## Do's and Don'ts
 

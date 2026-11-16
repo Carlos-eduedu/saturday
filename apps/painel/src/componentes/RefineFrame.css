@@ -1,0 +1,96 @@
+/* RefineFrame, da React Bits, com os tokens do painel (claro e escuro). */
+.refine-frame {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-m);
+  overflow: hidden;
+  background: var(--superficie-2);
+  color: var(--texto);
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1;
+}
+
+/* A imagem só aparece resolvida: antes disso quem mostra é o mosaico. */
+.refine-frame__print {
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+}
+.refine-frame[data-resolvido] .refine-frame__print { opacity: 1; }
+.refine-frame__print > * {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.refine-frame__mosaic {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.refine-frame__sweep {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 38%,
+    color-mix(in srgb, var(--texto) 10%, transparent) 50%,
+    transparent 62%
+  );
+  background-size: 260% 100%;
+  opacity: 0;
+  pointer-events: none;
+}
+.refine-frame[data-status="carregando"] .refine-frame__sweep {
+  opacity: 1;
+  animation: refine-frame-sweep 2.2s linear infinite;
+}
+@keyframes refine-frame-sweep {
+  from { background-position: 130% 0; }
+  to { background-position: -130% 0; }
+}
+
+.refine-frame__chip {
+  position: absolute;
+  bottom: 0.5rem;
+  left: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 1.65rem;
+  padding: 0 0.6rem 0 0.45rem;
+  border-radius: 999px;
+  background: var(--superficie);
+  pointer-events: none;
+}
+.refine-frame__mark { display: inline-flex; color: var(--suave); }
+.refine-frame__mark[data-status="carregando"] { animation: refine-frame-spin 1.1s linear infinite; }
+.refine-frame__mark[data-status="falhou"] { color: var(--erro); }
+@keyframes refine-frame-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* O botão herda o estilo global; aqui só fica no centro da moldura. */
+.refine-frame__retry {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .refine-frame[data-status="carregando"] .refine-frame__sweep { animation: none; opacity: 0; }
+  .refine-frame__mark[data-status="carregando"] { animation: none; }
+}

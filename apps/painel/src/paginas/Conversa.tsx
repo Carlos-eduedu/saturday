@@ -23,6 +23,7 @@ import { Compositor } from "../componentes/Compositor";
 import { Falha } from "../componentes/Falha";
 import { ModalGrafo } from "../componentes/Grafo";
 import { ItemTurno } from "../componentes/ItemTurno";
+import { RefineFrame, type StatusQuadro } from "../componentes/RefineFrame";
 import { Vazio } from "../componentes/Vazio";
 import {
   PUBLICOS,
@@ -56,6 +57,33 @@ const STATUS_ENTREGA: Record<string, string> = {
   read: "lida",
   failed: "falhou",
 };
+
+// Imagem anexada, na moldura que guarda o lugar enquanto ela carrega. O clique
+// abre o arquivo inteiro.
+function MiniaturaAnexo({ url, nome }: { url: string; nome: string }) {
+  const [status, setStatus] = useState<StatusQuadro>("carregando");
+  const quadro = (
+    <RefineFrame status={status} aoTentarDeNovo={() => setStatus("carregando")}>
+      {status !== "falhou" && (
+        <img
+          src={url}
+          alt={nome}
+          loading="lazy"
+          onLoad={() => setStatus("pronto")}
+          onError={() => setStatus("falhou")}
+        />
+      )}
+    </RefineFrame>
+  );
+  // Na falha não há link (botão dentro de link não vale); "Tentar de novo"
+  // monta um <img> novo, que refaz o pedido.
+  if (status === "falhou") return <div className="anexo-imagem">{quadro}</div>;
+  return (
+    <a className="anexo-imagem" href={url} target="_blank" rel="noreferrer">
+      {quadro}
+    </a>
+  );
+}
 
 // Conteúdo que `painel/acoes.enviar_anexo` grava quando o anexo vai sem legenda.
 const ANEXO_SEM_LEGENDA = /^\[(imagem|documento|áudio) .+\]$/;
@@ -318,11 +346,7 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
                     if (anexo.mime_type.startsWith("audio/"))
                       return <audio key={indice} className="anexo-audio" controls preload="none" src={url} />;
                     if (anexo.mime_type.startsWith("image/"))
-                      return (
-                        <a key={indice} className="anexo-imagem" href={url} target="_blank" rel="noreferrer">
-                          <img src={url} alt={anexo.nome ?? "Imagem enviada"} loading="lazy" />
-                        </a>
-                      );
+                      return <MiniaturaAnexo key={indice} url={url} nome={anexo.nome ?? "Imagem enviada"} />;
                     return (
                       <a key={indice} className="anexo-arquivo" href={url} target="_blank" rel="noreferrer">
                         {anexo.nome ?? `Anexo (${anexo.mime_type})`}
