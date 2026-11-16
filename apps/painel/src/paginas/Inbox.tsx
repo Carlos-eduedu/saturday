@@ -123,12 +123,15 @@ const falasDoCliente = (lista: Resumo[]) =>
   );
 
 // Atalhos da lista. Valem fora de campos de texto.
-const ATALHOS = "Atalhos: / busca; J e K (ou as setas na lista) andam entre as conversas; Enter abre.";
+const ATALHOS =
+  "Atalhos: / busca; J e K (ou as setas na lista) andam entre as conversas; Enter abre; na conversa, A assume e D devolve.";
 
 export function textoDaEspera(c: Resumo, agora: number): string {
   if (!c.aguardando_desde) return relativo(c.ultima_atividade, agora);
   const quanto = relativo(c.aguardando_desde, agora);
-  return quanto === "agora" ? "cliente acabou de escrever" : `cliente espera ${quanto}`;
+  if (quanto === "agora") return "cliente acabou de escrever";
+  // "ontem" e "12/11" pedem o "desde"; "há 3 min" já se lê sozinho.
+  return `cliente espera ${quanto.startsWith("há") ? quanto : `desde ${quanto}`}`;
 }
 
 export const ROTULO_ATENDIMENTO = { ia: "IA", handoff: "Handoff", assumida: "Assumida" } as const;
@@ -431,12 +434,8 @@ export function Inbox({
                 onKeyDown={(e) => teclaNaAba(e, i)}
               >
                 {f.rotulo}
-                {contagens && (
-                  <>
-                    {" "}
-                    <span className="aba-contagem">{contagens[f.valor || "todas"]}</span>
-                  </>
-                )}
+                {/* O lugar da contagem existe antes de ela chegar: as abas não pulam. */}{" "}
+                <span className="aba-contagem">{contagens?.[f.valor || "todas"]}</span>
               </button>
             );
           })}
@@ -483,6 +482,10 @@ export function Inbox({
       >
         <p className="sr" id={`${idBase}-atalhos`}>
           {ATALHOS}
+        </p>
+        {/* A mesma lista, curta e à vista onde há teclado. */}
+        <p className="atalhos" aria-hidden="true">
+          / busca · J K andam · Enter abre · A assume · D devolve
         </p>
         {!visiveis ? (
           erro ? (

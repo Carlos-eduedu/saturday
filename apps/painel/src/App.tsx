@@ -78,8 +78,17 @@ function Logado({
   const [menuAberto, setMenuAberto] = useState(false);
   const emConversas = pathname === "/" || pathname.startsWith("/conversas");
   const em = (base: string) => pathname === base || pathname.startsWith(`${base}/`);
-  const itens = [
+  const alertas = useAlertasAbertos();
+  const itens: { label: string; ariaLabel: string; link: string; ativo: boolean; contagem?: number }[] = [
     { label: "Conversas", ariaLabel: "Ir para as conversas", link: "/", ativo: emConversas },
+    // Alerta é intervenção, não assunto de conta: fica na navegação, com a contagem.
+    {
+      label: "Alertas",
+      ariaLabel: alertas ? `Ir para os alertas, ${alertas} em aberto` : "Ir para os alertas",
+      link: "/alertas",
+      ativo: em("/alertas"),
+      contagem: alertas,
+    },
     { label: "Bancos", ariaLabel: "Ir para os bancos", link: "/bancos", ativo: em("/bancos") },
     { label: "Agente", ariaLabel: "Ir para o agente", link: "/agente", ativo: em("/agente") },
     ...(eu.perfil === "gestor"
@@ -110,7 +119,7 @@ function Logado({
         onMenuOpen={() => setMenuAberto(true)}
         onMenuClose={() => setMenuAberto(false)}
         position="right"
-        items={itens}
+        items={itens.map((it) => ({ ...it, label: it.contagem ? `${it.label} (${it.contagem})` : it.label }))}
         displaySocials={false}
         displayItemNumbering={false}
         colors={["var(--superficie-2)"]}
@@ -126,8 +135,14 @@ function Logado({
             {/* Desktop: navegação e conta à vista; o menu animado fica só no celular. */}
             <nav className="nav-topo" aria-label="Principal">
               {itens.map((it) => (
-                <Link key={it.link} to={it.link} aria-current={it.ativo ? "page" : undefined}>
+                <Link
+                  key={it.link}
+                  to={it.link}
+                  aria-label={it.contagem ? it.ariaLabel : undefined}
+                  aria-current={it.ativo ? "page" : undefined}
+                >
                   {it.label}
+                  {!!it.contagem && <span className="nav-contagem">{it.contagem > 99 ? "99+" : it.contagem}</span>}
                 </Link>
               ))}
             </nav>
@@ -143,9 +158,6 @@ function Logado({
             <span className="quem">
               {eu.nome} ({eu.perfil})
             </span>
-            <button type="button" onClick={aoSair}>
-              Sair
-            </button>
           </div>
         }
       />
@@ -171,6 +183,25 @@ function Logado({
       </main>
     </div>
   );
+}
+
+// Quantos alertas estão abertos, em tempo real, para a navegação.
+function useAlertasAbertos(): number {
+  const [alertas, setAlertas] = useState(0);
+  const carregar = useCallback(() => {
+    api
+      .alertas()
+      .then((lista) => setAlertas(lista.length))
+      .catch(() => undefined);
+  }, []);
+  useEffect(carregar, [carregar]);
+  useAvisos(
+    useCallback(
+      (aviso) => (aviso.tipo === "alerta" || aviso.tipo === "reconectado") && carregar(),
+      [carregar],
+    ),
+  );
+  return alertas;
 }
 
 function ContadorCota() {

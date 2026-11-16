@@ -326,6 +326,12 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
             id={fichaEmAba ? "conversa-painel" : undefined}
             aria-labelledby={fichaEmAba ? idAba("conversa-painel", aba) : undefined}
           >
+            {conversa.mensagens.length === 0 && (
+              <Vazio
+                titulo="Nenhuma mensagem nesta conversa."
+                texto="As falas do cliente, da IA e da equipe aparecem aqui assim que chegam."
+              />
+            )}
             <ol className="mensagens" ref={lista} onScroll={medir}>
               {conversa.mensagens.map((m) => (
                 <li key={m.id} className={`msg msg-${m.direcao} msg-${m.autor}`}>
@@ -452,14 +458,19 @@ function Conferencia({ m, turnos, ficha }: { m: Mensagem; turnos: Turno[]; ficha
           {origem.exato ? "Modelo (FAQ)" : "Turno com o modelo (FAQ)"}
         </strong>
       )}
-      {origem.tipo === "sem-registro" && <span>Sem turno registrado</span>}
+      {/* Sem turno gravado não dá para dizer de onde o valor saiu: pede conferência. */}
+      {origem.tipo === "sem-registro" && (
+        <strong className="atencao">Valor sem origem registrada: confira</strong>
+      )}
       {fora === null ? (
         <span>
-          sem oferta vigente
+          sem oferta vigente para comparar
           {proposta && ` · proposta: ${proposta.numero_parcelas} × ${reais(proposta.valor_parcela)}`}
         </span>
       ) : fora.length > 0 ? (
-        <strong className="atencao">Difere da oferta: {fora.map(reaisDeCentavos).join(", ")}</strong>
+        <strong className="atencao difere">
+          Difere da oferta: {fora.map(reaisDeCentavos).join(", ")}
+        </strong>
       ) : (
         <span>confere com a oferta</span>
       )}
@@ -725,7 +736,7 @@ function FichaCliente({
                   ) : (
                     <button
                       type="button"
-                      className="link"
+                      className="link alvo"
                       aria-describedby="aviso-auditoria"
                       disabled={revelando !== null}
                       onClick={() => revelar(campo)}

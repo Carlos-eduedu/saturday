@@ -147,7 +147,7 @@ Cinza frio com um único cobalto de ação, mais três cores de estado com signi
 **Character:** Red Hat é humanista e firme, legível em texto pequeno; Plex Mono marca o que é dado e não prosa.
 
 ### Hierarchy
-- **Display** (500, 1.6rem, 1.2): título de cada tela ("Conversas", "Alertas", "Custos") com a contagem ao lado em grafite.
+- **Display** (500, 1.6rem, 1.2): título de cada tela ("Conversas", "Alertas", "Operação") com a contagem ao lado em grafite.
 - **Headline** (500, 1.25rem, 1.2): títulos de seção e de cartão ("Ficha", "Por dia"). O telefone no topo da conversa é maior (1.45rem, mono), porque é o título dela.
 - **Body** (400, 15px, 1.5): falas, prévias, textos de tela vazia.
 - **Label** (500, 0.85rem): rótulos de campo, selos, metadados.
@@ -158,7 +158,7 @@ Cinza frio com um único cobalto de ação, mais três cores de estado com signi
 
 ## Layout
 
-Coluna única centrada com largura máxima de 82rem e respiro lateral de 1–2rem (clamp). O topo fixo tem 60px; no desktop (a partir de 1024px) leva a navegação, a cota e o Sair; abaixo disso, um botão Menu abre o painel lateral. Conversas tem layout de chat a partir de 1024px: lista de 21rem à esquerda, com rolagem própria e a conversa aberta marcada em Cobalto Suave, e a conversa à direita; a Ficha ganha coluna de 20rem a partir de 1280px e, entre 1024 e 1279px, vira aba ao lado de Mensagens. Abaixo de 1024px, lista e conversa são telas separadas. A lista se adapta pela própria largura (container query), não pela da janela. Linhas e cartões se agrupam com gap de 0.5rem; seções com 1.25–1.5rem. Tabelas viram cartões com rótulos abaixo de 768px.
+Coluna única centrada com largura máxima de 96rem e respiro lateral de 1–2rem (clamp). O topo fixo tem 60px; no desktop (a partir de 1024px) leva a navegação (Conversas, Alertas com a contagem dos abertos, Bancos, Agente, Canais, Membros, Operação), a cota e a conta (perfil e Sair); abaixo disso, um botão Menu abre o painel lateral. Conversas tem layout de chat a partir de 1024px: lista de 21rem à esquerda, com rolagem própria e a conversa aberta marcada em Cobalto Suave, e a conversa à direita; a Ficha ganha coluna de 20rem a partir de 1280px e, entre 1024 e 1279px, vira aba ao lado de Mensagens. Abaixo de 1024px, lista e conversa são telas separadas. A lista se adapta pela própria largura (container query), não pela da janela. Linhas e cartões se agrupam com gap de 0.5rem; seções com 1.25–1.5rem. Tabelas viram cartões com rótulos abaixo de 768px.
 
 ## Elevation & Depth
 
@@ -191,7 +191,7 @@ Cantos suaves em três passos: 6px para foco e detalhes, 10px para botões e cam
 
 ### Cards / Containers
 - **Corner Style:** 14px.
-- **Background:** Superfície sobre o fundo; conversa que pede atenção ganha fundo âmbar a 5%.
+- **Background:** Superfície sobre o fundo; a linha que pede atenção não muda de fundo.
 - **Shadow Strategy:** repouso; elevada no hover de linhas clicáveis.
 - **Border:** 1px Borda.
 - **Internal Padding:** 1.1–1.25rem.
@@ -208,10 +208,13 @@ Cantos suaves em três passos: 6px para foco e detalhes, 10px para botões e cam
 Um estilo só de aba de página (Agente, Granatech, Ficha e IA da conversa): texto em grafite sobre um fio de 1px em Borda; a aba atual em cobalto com sublinhado de 2px. Sem trilho, fundo ou sombra. Setas, Home e End trocam de aba; o conteúdo fica num `tabpanel` ligado à aba. Rolam de lado se faltar espaço, nunca cortam.
 
 ### Linha de conversa (assinatura)
-Prévia da última fala com o autor colorido como conteúdo principal; telefone mascarado e canal em segundo plano; à direita, rótulo de atenção, etapa, selo de estado e espera relativa ("cliente espera há 12 min"). No desktop tem o botão Assumir/Devolver; arrastar para a esquerda é atalho (no celular, o caminho). Assumir e devolver valem na hora, na lista e no cabeçalho da conversa; por 5s o aviso "Desfazer" devolve a conversa ao estado de antes. O botão Assumir só é principal (cobalto) na linha que pede atenção.
+Prévia da última fala com o autor colorido como conteúdo principal; telefone mascarado e canal em segundo plano; à direita, rótulo de atenção só para envio que falhou (os outros motivos aparecem no tempo, na etapa, no filtro "pedem atenção" e na ordem da lista; em texto, só para leitor de tela), etapa, selo de estado e espera relativa ("cliente espera há 12 min"). No desktop tem o botão Assumir/Devolver; arrastar para a esquerda é atalho (no celular, o caminho). Assumir e devolver valem na hora, na lista e no cabeçalho da conversa; por 5s o aviso "Desfazer" devolve a conversa ao estado de antes. O botão Assumir só é principal (cobalto) na linha que pede atenção.
 
 ### Acompanhamento na conversa
 Ao lado das mensagens, antes da Ficha: a oferta vigente (liberado, parcelas, taxa e CET, seguro), a proposta no banco e as provas de consentimento, para conferir a fala da IA sem trocar de tela. Valores em mono. A situação da proposta usa o mesmo rótulo em português da aba Granatech (um mapa só); a formalização no link do banco se chama "assinatura" ("Aguardando assinatura", "Refazer assinatura"). Quando a proposta do banco não bate com a oferta, uma faixa âmbar diz "Difere da oferta vigente".
+
+### Conferência da fala da IA
+Sob cada fala da IA que cita reais, três estados: confere com a oferta (grafite, discreto); valor sem origem registrada ou vindo do modelo (selo âmbar, com texto); valor que difere da oferta (selo âmbar cheio, com os valores). A espera relativa da lista ("ontem", "há 12 min") é texto; datas e horas de tabela e ficha vão em mono.
 
 ### Balões da conversa
 Cliente à esquerda em branco; IA à direita em verde tingido; equipe à direita em cobalto suave; sistema centrado, sem balão, em grafite.
@@ -220,7 +223,7 @@ Cliente à esquerda em branco; IA à direita em verde tingido; equipe à direita
 
 ### Do:
 - **Do** usar o Cobalto de Ação só para ação, página atual e a fala da equipe.
-- **Do** mostrar o porquê da atenção em texto ("Sem resposta · Falando de valores").
+- **Do** mostrar o porquê da atenção em texto na conversa aberta e nos alertas; na linha da lista, só "Envio falhou" ganha rótulo visível.
 - **Do** usar mono e números tabulares para telefone, hora, custo e tokens.
 - **Do** manter alvos de 44px e foco visível de 2px em cobalto.
 - **Do** desligar movimento com `prefers-reduced-motion`.

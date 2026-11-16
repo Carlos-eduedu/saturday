@@ -1,32 +1,16 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
-import { api, type Eu } from "../api";
-import { useAvisos } from "../tempoReal";
+import type { Eu } from "../api";
 import { Avatar } from "./Avatar";
 
-// O ícone do usuário no topo, com a contagem de alertas abertos. Abre a conta:
-// alertas, o próprio perfil e sair. Fica à vista também no celular, ao lado do Menu.
+// O ícone do usuário no topo. Abre a conta: o próprio perfil e sair. Fica à
+// vista também no celular, ao lado do Menu. Os alertas moram na navegação.
 export function MenuConta({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
   const [aberto, setAberto] = useState(false);
-  const [alertas, setAlertas] = useState(0);
   const raiz = useRef<HTMLDivElement>(null);
   const botao = useRef<HTMLButtonElement>(null);
   const idPainel = useId();
   const { pathname } = useLocation();
-
-  const carregar = useCallback(() => {
-    api
-      .alertas()
-      .then((lista) => setAlertas(lista.length))
-      .catch(() => undefined);
-  }, []);
-  useEffect(carregar, [carregar]);
-  useAvisos(
-    useCallback(
-      (aviso) => (aviso.tipo === "alerta" || aviso.tipo === "reconectado") && carregar(),
-      [carregar],
-    ),
-  );
 
   // Navegar fecha; clicar fora ou Esc também (Esc devolve o foco ao botão).
   useEffect(() => setAberto(false), [pathname]);
@@ -48,7 +32,6 @@ export function MenuConta({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
     };
   }, [aberto]);
 
-  const textoAlertas = alertas === 1 ? "1 alerta aberto" : `${alertas} alertas abertos`;
   return (
     <div className="menu-conta" ref={raiz}>
       <button
@@ -57,15 +40,10 @@ export function MenuConta({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
         className="menu-conta__botao"
         aria-expanded={aberto}
         aria-controls={idPainel}
-        aria-label={`Conta de ${eu.nome}${alertas ? `, ${textoAlertas}` : ""}`}
+        aria-label={`Conta de ${eu.nome}`}
         onClick={() => setAberto((a) => !a)}
       >
         <Avatar nome={eu.nome} foto={eu.foto} />
-        {alertas > 0 && (
-          <span className="menu-conta__selo" aria-hidden="true">
-            {alertas > 99 ? "99+" : alertas}
-          </span>
-        )}
       </button>
       {aberto && (
         <div id={idPainel} className="menu-conta__painel">
@@ -75,10 +53,6 @@ export function MenuConta({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
           </p>
           <Link to="/membros" className="menu-conta__item">
             Seu perfil
-          </Link>
-          <Link to="/alertas" className="menu-conta__item">
-            Alertas
-            {alertas > 0 && <span className="menu-conta__contagem">{alertas}</span>}
           </Link>
           <button type="button" className="menu-conta__item" onClick={aoSair}>
             Sair

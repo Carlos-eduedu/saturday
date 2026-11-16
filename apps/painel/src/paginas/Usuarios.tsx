@@ -274,7 +274,9 @@ function Equipe({ eu }: { eu: Eu }) {
                     </span>
                   </td>
                   <td data-rotulo="Cadastro">
-                    {new Date(u.criado_em).toLocaleDateString("pt-BR")}
+                    <time className="dado" dateTime={u.criado_em}>
+                      {new Date(u.criado_em).toLocaleDateString("pt-BR")}
+                    </time>
                   </td>
                   <td className="acoes">
                     <button type="button" onClick={() => setEditando(u.id)}>

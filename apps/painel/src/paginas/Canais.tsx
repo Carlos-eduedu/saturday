@@ -140,8 +140,8 @@ export function Canais() {
         <h2>Evolution (WhatsApp Web)</h2>
         {!canais.evolution.ativo ? (
           <p className="vazio">
-            Canal desligado neste ambiente. Para ligar, defina{" "}
-            <code>SATURDAY_EVOLUTION_ATIVO</code> e reinicie a API.
+            Canal desligado neste ambiente. Quem cuida do servidor liga pela configuração{" "}
+            <code>SATURDAY_EVOLUTION_ATIVO</code> e reinicia a API.
           </p>
         ) : (
           <>

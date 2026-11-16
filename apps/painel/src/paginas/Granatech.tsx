@@ -53,6 +53,16 @@ function mensagemDe(erro: unknown): string {
   return erro instanceof ErroApi ? erro.message : "falha inesperada";
 }
 
+// Data e hora em tabela ou ficha são dado: mono e números tabulares.
+const Quando = ({ iso }: { iso: string | null }) =>
+  iso ? (
+    <time className="dado" dateTime={iso}>
+      {dataHora(iso)}
+    </time>
+  ) : (
+    "—"
+  );
+
 const dataHora = (iso: string | null) =>
   iso
     ? new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })
@@ -303,7 +313,7 @@ function Homologacao() {
           <tbody>
             {dados.rodadas.map((r) => (
               <tr key={r.id}>
-                <td>{dataHora(r.criado_em)}</td>
+                <td><Quando iso={r.criado_em} /></td>
                 <td data-rotulo="Fase">{r.fase}</td>
                 <td data-rotulo="Situação">
                   <SeloRodada situacao={r.situacao} />
@@ -312,7 +322,7 @@ function Homologacao() {
                   <ProgressoRodada estados={estadosDaLista(r)} />
                 </td>
                 <td data-rotulo="Por">{r.pedido_por ?? "—"}</td>
-                <td data-rotulo="Terminou">{dataHora(r.terminado_em)}</td>
+                <td data-rotulo="Terminou"><Quando iso={r.terminado_em} /></td>
                 <td className="acoes">
                   <button type="button" onClick={() => setAberta(r.id)} aria-haspopup="dialog">
                     Ver
@@ -505,13 +515,13 @@ function ConteudoRodada({ rodada }: { rodada: RodadaDetalhe }) {
         {rodada.iniciado_em && (
           <>
             <dt>Começou</dt>
-            <dd>{dataHora(rodada.iniciado_em)}</dd>
+            <dd><Quando iso={rodada.iniciado_em} /></dd>
           </>
         )}
         {rodada.terminado_em && (
           <>
             <dt>Terminou</dt>
-            <dd>{dataHora(rodada.terminado_em)}</dd>
+            <dd><Quando iso={rodada.terminado_em} /></dd>
           </>
         )}
       </dl>
@@ -686,7 +696,7 @@ function ListaConsultas({
       <tbody>
         {linhas.map((c) => (
           <tr key={c.id}>
-            <td>{dataHora(c.criada_em)}</td>
+            <td><Quando iso={c.criada_em} /></td>
             <td data-rotulo="CPF" className="dado">{c.cpf}</td>
             <td data-rotulo="Status">{rotulo(SITUACAO_DA_CONSULTA, c.status)}</td>
             <td data-rotulo="Detalhe">{c.tem_detalhe ? "gravado" : "—"}</td>
@@ -730,7 +740,7 @@ function ListaPropostas({
       <tbody>
         {linhas.map((p) => (
           <tr key={p.id}>
-            <td>{dataHora(p.intencao_em)}</td>
+            <td><Quando iso={p.intencao_em} /></td>
             <td data-rotulo="CPF" className="dado">{p.cpf}</td>
             <td data-rotulo="Envio">{p.estado_envio}</td>
             <td data-rotulo="Status">
