@@ -10,8 +10,9 @@ import json
 
 import httpx
 import pytest
+from conftest import entrar_como
 from pydantic import SecretStr
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select
 
 from saturday.conhecimento import (
     TRECHO_CARACTERES,
@@ -21,9 +22,8 @@ from saturday.conhecimento import (
     extrair_texto,
     quebrar,
 )
-from saturday.dados.modelos import FonteConhecimento, TrechoConhecimento, UsuarioPainel
+from saturday.dados.modelos import FonteConhecimento, TrechoConhecimento
 from saturday.dados.sessao import sessao as abrir
-from saturday.painel import sessoes
 from saturday.services.llm import _system_prompt
 
 SENHA = "senha-bem-comprida-1"  # noqa: S105 - senha de teste
@@ -79,17 +79,6 @@ def com_chave(settings):
     return settings.model_copy(update={"openrouter_api_key": SecretStr("chave-de-teste")})
 
 
-def _entrar(client, fabrica, email, *, editor=True, perfil="atendente") -> dict[str, str]:
-    with abrir(fabrica) as s:
-        u = sessoes.criar_usuario(s, email, SENHA, perfil)
-        s.execute(
-            update(UsuarioPainel).where(UsuarioPainel.id == u.id).values(pode_editar_agente=editor)
-        )
-    client.cookies.clear()
-    r = client.post("/admin/login", json={"email": email, "senha": SENHA})
-    return {"X-CSRF-Token": r.json()["csrf"]}
-
-
 # ------------------------------------------------------------------ sem banco
 
 
@@ -124,7 +113,7 @@ def test_trechos_entram_no_prompt_so_quando_existem():
 
 
 def test_texto_indexado_e_encontrado_pela_pergunta(client_pg, fabrica, service_pg, com_chave):
-    csrf = _entrar(client_pg, fabrica, "edita@exemplo.test")
+    csrf = entrar_como(client_pg, fabrica, "atendente", "edita@exemplo.test", editor=True)
     for titulo, texto in (("Pix", "O pix cai em até 1 dia útil."), ("Taxas", "Não há taxa.")):
         r = client_pg.post(
             "/admin/agente/conhecimento/texto",
@@ -152,7 +141,7 @@ def test_texto_indexado_e_encontrado_pela_pergunta(client_pg, fabrica, service_p
 def test_arquivo_pdf_vai_para_o_storage_e_some_ao_remover(
     client_pg, fabrica, service_pg, com_chave
 ):
-    csrf = _entrar(client_pg, fabrica, "edita@exemplo.test")
+    csrf = entrar_como(client_pg, fabrica, "atendente", "edita@exemplo.test", editor=True)
 
     def enviar(nome, dados):
         return client_pg.post(
@@ -187,7 +176,7 @@ def test_arquivo_pdf_vai_para_o_storage_e_some_ao_remover(
 
 
 def test_falha_de_embeddings_vira_erro_visivel(client_pg, fabrica, service_pg, settings):
-    csrf = _entrar(client_pg, fabrica, "edita@exemplo.test")
+    csrf = entrar_como(client_pg, fabrica, "atendente", "edita@exemplo.test", editor=True)
     client_pg.post(
         "/admin/agente/conhecimento/texto", json={"titulo": "A", "texto": "b"}, headers=csrf
     )
@@ -199,7 +188,7 @@ def test_falha_de_embeddings_vira_erro_visivel(client_pg, fabrica, service_pg, s
 
 
 def test_editar_texto_e_trocar_o_modelo_mandam_reindexar(client_pg, fabrica, service_pg, com_chave):
-    csrf = _entrar(client_pg, fabrica, "edita@exemplo.test")
+    csrf = entrar_como(client_pg, fabrica, "atendente", "edita@exemplo.test", editor=True)
     fonte_id = client_pg.post(
         "/admin/agente/conhecimento/texto", json={"titulo": "A", "texto": "pix"}, headers=csrf
     ).json()["id"]
@@ -226,7 +215,7 @@ def test_editar_texto_e_trocar_o_modelo_mandam_reindexar(client_pg, fabrica, ser
 
 
 def test_sem_permissao_so_ve(client_pg, fabrica):
-    csrf = _entrar(client_pg, fabrica, "ana@exemplo.test", editor=False, perfil="gestor")
+    csrf = entrar_como(client_pg, fabrica, "gestor", "ana@exemplo.test", editor=False)
     assert client_pg.get("/admin/agente/conhecimento").json()["pode_editar"] is False
     r = client_pg.post(
         "/admin/agente/conhecimento/texto", json={"titulo": "A", "texto": "b"}, headers=csrf

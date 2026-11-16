@@ -13,10 +13,11 @@ from typing import Any
 
 import httpx
 import pytest
+from conftest import entrar
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 from sqlalchemy import select, update
-from test_painel_api import TELEFONE, _cliente_escreve, _conversa_id, _criar, _entrar
+from test_painel_api import TELEFONE, _cliente_escreve, _conversa_id, _criar
 
 from saturday.canais.base import Resultado
 from saturday.canais.evolution.cliente import EvolutionClient
@@ -41,7 +42,7 @@ def ana(fabrica):
 def _assumida(client, service, fabrica, conversation_id):
     _cliente_escreve(service, conversation_id, "oi")
     alvo = _conversa_id(fabrica, conversation_id)
-    csrf = _entrar(client, "ana@exemplo.test")
+    csrf = entrar(client, "ana@exemplo.test")
     assert client.post(f"/admin/conversas/{alvo}/assumir", headers=csrf).status_code == 204
     return alvo, csrf
 
@@ -105,7 +106,7 @@ def test_anexo_recusado_por_tipo_assinatura_ou_tamanho(
 def test_anexo_exige_dono_e_janela_aberta_na_meta(client_pg, service_pg, fabrica, ana, conversa):
     _cliente_escreve(service_pg, conversa, "oi")
     alvo = _conversa_id(fabrica, conversa)
-    csrf = _entrar(client_pg, "ana@exemplo.test")
+    csrf = entrar(client_pg, "ana@exemplo.test")
     assert _anexar(client_pg, alvo, csrf, PNG, "image/png").status_code == 409
 
     client_pg.post(f"/admin/conversas/{alvo}/assumir", headers=csrf)

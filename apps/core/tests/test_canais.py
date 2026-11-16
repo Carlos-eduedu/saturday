@@ -17,6 +17,7 @@ from typing import Any
 import httpx
 import pytest
 import uvicorn
+from conftest import entrar_como
 from fastapi.testclient import TestClient
 from pydantic import SecretStr, ValidationError
 from sqlalchemy import select
@@ -27,7 +28,6 @@ from saturday.canais.evolution.cliente import EvolutionClient
 from saturday.dados.modelos import Alerta, Auditoria, EventoRecebido, Instancia
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.jobs import instancias as eventos_instancias
-from saturday.painel import sessoes
 from saturday.settings import Settings
 
 CAMINHO_SIMULADOR = Path(__file__).resolve().parents[3] / "simuladores" / "evolution" / "app.py"
@@ -92,16 +92,6 @@ def cliente(settings: Settings) -> Iterator[EvolutionClient]:
         yield EvolutionClient(http, settings)
 
 
-def _entrar(client: TestClient, fabrica: sessionmaker[Session], perfil: str) -> dict[str, str]:
-    email = f"{perfil}-canais@exemplo.test"
-    with abrir_sessao(fabrica) as sessao:
-        sessoes.criar_usuario(sessao, email, SENHA, perfil)
-    client.cookies.clear()
-    resposta = client.post("/admin/login", json={"email": email, "senha": SENHA})
-    assert resposta.status_code == 200
-    return {"X-CSRF-Token": resposta.json()["csrf"]}
-
-
 def _conexao(
     estado: str, telefone: str = TELEFONE, instancia: str = "mex-vendas"
 ) -> dict[str, Any]:
@@ -118,7 +108,7 @@ def _conexao(
 
 
 def test_atendente_nao_ve_a_tela(api: TestClient, fabrica: sessionmaker[Session]) -> None:
-    cabecalhos = _entrar(api, fabrica, "atendente")
+    cabecalhos = entrar_como(api, fabrica, "atendente")
     assert api.get("/admin/canais").status_code == 403
     resposta = api.post("/admin/canais/evolution", json={"nome": "mex-x"}, headers=cabecalhos)
     assert resposta.status_code == 403
@@ -130,7 +120,7 @@ def test_criar_lista_e_audita(
     simulador: tuple[str, ModuleType],
     settings: Settings,
 ) -> None:
-    cabecalhos = _entrar(api, fabrica, "gestor")
+    cabecalhos = entrar_como(api, fabrica, "gestor")
 
     resposta = api.post("/admin/canais/evolution", json={"nome": "mex-vendas"}, headers=cabecalhos)
     assert resposta.status_code == 201
@@ -154,7 +144,7 @@ def test_criar_lista_e_audita(
 
 
 def test_nome_invalido_e_recusado(api: TestClient, fabrica: sessionmaker[Session]) -> None:
-    cabecalhos = _entrar(api, fabrica, "gestor")
+    cabecalhos = entrar_como(api, fabrica, "gestor")
     resposta = api.post("/admin/canais/evolution", json={"nome": "Mex Vendas"}, headers=cabecalhos)
     assert resposta.status_code == 422
 
@@ -162,7 +152,7 @@ def test_nome_invalido_e_recusado(api: TestClient, fabrica: sessionmaker[Session
 def test_reconectar_recusa_instancia_conectada(
     api: TestClient, fabrica: sessionmaker[Session], simulador: tuple[str, ModuleType]
 ) -> None:
-    cabecalhos = _entrar(api, fabrica, "gestor")
+    cabecalhos = entrar_como(api, fabrica, "gestor")
     api.post("/admin/canais/evolution", json={"nome": "mex-vendas"}, headers=cabecalhos)
     _, modulo = simulador
     modulo.INSTANCIAS["mex-vendas"].update(estado="open", telefone=TELEFONE)
@@ -174,7 +164,7 @@ def test_reconectar_recusa_instancia_conectada(
 def test_reconectar_reaplica_configuracao_e_devolve_qr(
     api: TestClient, fabrica: sessionmaker[Session], simulador: tuple[str, ModuleType]
 ) -> None:
-    cabecalhos = _entrar(api, fabrica, "gestor")
+    cabecalhos = entrar_como(api, fabrica, "gestor")
     _, modulo = simulador
     # Criada fora do painel, sem webhook.
     modulo.INSTANCIAS["mex-dev"] = {"estado": "close", "telefone": "", "webhook": None}
@@ -188,7 +178,7 @@ def test_reconectar_reaplica_configuracao_e_devolve_qr(
 def test_detalhes_de_instancia_criada_pelo_painel_conferem(
     api: TestClient, fabrica: sessionmaker[Session], settings: Settings
 ) -> None:
-    cabecalhos = _entrar(api, fabrica, "gestor")
+    cabecalhos = entrar_como(api, fabrica, "gestor")
     api.post("/admin/canais/evolution", json={"nome": "mex-vendas"}, headers=cabecalhos)
 
     resposta = api.get("/admin/canais/evolution/mex-vendas/detalhes")
@@ -207,7 +197,7 @@ def test_detalhes_de_instancia_criada_pelo_painel_conferem(
 def test_detalhes_apontam_o_que_diverge(
     api: TestClient, fabrica: sessionmaker[Session], simulador: tuple[str, ModuleType]
 ) -> None:
-    _entrar(api, fabrica, "gestor")
+    entrar_como(api, fabrica, "gestor")
     _, modulo = simulador
     # Criada fora do painel: outro token, faltando eventos, sem ler mensagens.
     modulo.INSTANCIAS["mex-dev"] = {
@@ -242,10 +232,10 @@ def test_detalhes_sem_webhook_e_so_para_gestor(
     _, modulo = simulador
     modulo.INSTANCIAS["mex-crua"] = {"estado": "close", "telefone": "", "webhook": None}
 
-    _entrar(api, fabrica, "atendente")
+    entrar_como(api, fabrica, "atendente")
     assert api.get("/admin/canais/evolution/mex-crua/detalhes").status_code == 403
 
-    _entrar(api, fabrica, "gestor")
+    entrar_como(api, fabrica, "gestor")
     detalhes = api.get("/admin/canais/evolution/mex-crua/detalhes").json()
     assert detalhes["webhook"]["configurado"] is False
     assert detalhes["configuracoes"] == []
@@ -256,7 +246,7 @@ def test_detalhes_sem_webhook_e_so_para_gestor(
 def test_gestor_ajusta_configuracoes_sem_perder_o_que_nao_passa_pelo_painel(
     api: TestClient, fabrica: sessionmaker[Session], simulador: tuple[str, ModuleType]
 ) -> None:
-    cabecalhos = _entrar(api, fabrica, "gestor")
+    cabecalhos = entrar_como(api, fabrica, "gestor")
     _, modulo = simulador
     modulo.INSTANCIAS["mex-dev"] = {
         "estado": "open",
@@ -305,18 +295,18 @@ def test_configuracoes_exigem_os_seis_campos_e_gestor(
     _, modulo = simulador
     modulo.INSTANCIAS["mex-dev"] = {"estado": "open", "telefone": TELEFONE, "webhook": None}
 
-    cabecalhos = _entrar(api, fabrica, "atendente")
+    cabecalhos = entrar_como(api, fabrica, "atendente")
     rota = "/admin/canais/evolution/mex-dev/configuracoes"
     assert api.put(rota, json={}, headers=cabecalhos).status_code == 403
 
-    cabecalhos = _entrar(api, fabrica, "gestor")
+    cabecalhos = entrar_como(api, fabrica, "gestor")
     assert api.put(rota, json={"readMessages": True}, headers=cabecalhos).status_code == 422
 
 
 def test_reaplicar_webhook_com_a_instancia_conectada(
     api: TestClient, fabrica: sessionmaker[Session], simulador: tuple[str, ModuleType]
 ) -> None:
-    cabecalhos = _entrar(api, fabrica, "gestor")
+    cabecalhos = entrar_como(api, fabrica, "gestor")
     _, modulo = simulador
     modulo.INSTANCIAS["mex-dev"] = {
         "estado": "open",
@@ -337,7 +327,7 @@ def test_reaplicar_webhook_com_a_instancia_conectada(
 def test_gestor_liga_eventos_a_mais_sem_perder_os_do_saturday(
     api: TestClient, fabrica: sessionmaker[Session], simulador: tuple[str, ModuleType]
 ) -> None:
-    cabecalhos = _entrar(api, fabrica, "gestor")
+    cabecalhos = entrar_como(api, fabrica, "gestor")
     api.post("/admin/canais/evolution", json={"nome": "mex-vendas"}, headers=cabecalhos)
     _, modulo = simulador
     rota = "/admin/canais/evolution/mex-vendas/eventos"
@@ -370,7 +360,7 @@ def test_gestor_liga_eventos_a_mais_sem_perder_os_do_saturday(
 def test_evento_desconhecido_e_recusado(
     api: TestClient, fabrica: sessionmaker[Session], simulador: tuple[str, ModuleType]
 ) -> None:
-    cabecalhos = _entrar(api, fabrica, "gestor")
+    cabecalhos = entrar_como(api, fabrica, "gestor")
     api.post("/admin/canais/evolution", json={"nome": "mex-vendas"}, headers=cabecalhos)
 
     resposta = api.put(
@@ -429,7 +419,7 @@ def test_apagar_solta_o_telefone(
     cliente: EvolutionClient,
     simulador: tuple[str, ModuleType],
 ) -> None:
-    cabecalhos = _entrar(api, fabrica, "gestor")
+    cabecalhos = entrar_como(api, fabrica, "gestor")
     _, modulo = simulador
     modulo.INSTANCIAS["mex-vendas"] = {"estado": "open", "telefone": TELEFONE, "webhook": None}
     eventos_instancias.aplicar(fabrica, cliente, _conexao("open"))
@@ -469,7 +459,7 @@ def test_numero_da_meta_sai_com_o_rotulo_configurado(
     api: TestClient, fabrica: sessionmaker[Session], settings: Settings
 ) -> None:
     settings.whatsapp_rotulos = {"100000000000001": "Vendas"}
-    _entrar(api, fabrica, "gestor")
+    entrar_como(api, fabrica, "gestor")
 
     meta = api.get("/admin/canais").json()["meta"]
 
@@ -495,7 +485,7 @@ def test_nao_tira_o_unico_canal_ativo(
 ) -> None:
     # Sem número da Meta: a Evolution conectada é o único canal ativo.
     api.app.state.settings = settings.model_copy(update={"whatsapp_numeros": []})
-    cabecalhos = _entrar(api, fabrica, "gestor")
+    cabecalhos = entrar_como(api, fabrica, "gestor")
     _, modulo = simulador
     modulo.INSTANCIAS["mex-vendas"] = {"estado": "open", "telefone": TELEFONE, "webhook": None}
     modulo.INSTANCIAS["mex-parada"] = {"estado": "close", "telefone": "", "webhook": None}

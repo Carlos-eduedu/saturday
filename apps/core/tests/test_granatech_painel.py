@@ -12,7 +12,7 @@ from types import ModuleType
 from typing import Any
 
 import pytest
-from conftest import _montar_app
+from conftest import _montar_app, entrar_como
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
@@ -44,7 +44,6 @@ from saturday.dados.modelos import (
     PropostaGranatech,
 )
 from saturday.dados.sessao import sessao as abrir_sessao
-from saturday.painel import sessoes
 from saturday.web.api.granatech_admin import SEM_CONVERSA, acoes_da_proposta
 
 pytestmark = pytest.mark.filterwarnings("ignore:You should not use the 'timeout' argument")
@@ -62,16 +61,6 @@ def painel(nova: Any, fabrica: sessionmaker[Session]) -> Any:  # noqa: F811
         return jornada, TestClient(app)
 
     return criar
-
-
-def _entrar(client: TestClient, fabrica: sessionmaker[Session], perfil: str) -> dict[str, str]:
-    email = f"{perfil}-{uuid.uuid4().hex[:6]}@exemplo.test"
-    with abrir_sessao(fabrica) as sessao:
-        sessoes.criar_usuario(sessao, email, SENHA, perfil)
-    client.cookies.clear()
-    resposta = client.post("/admin/login", json={"email": email, "senha": SENHA})
-    assert resposta.status_code == 200, resposta.text
-    return {"X-CSRF-Token": resposta.json()["csrf"]}
 
 
 def _id_proposta(fabrica: sessionmaker[Session]) -> int:
@@ -125,7 +114,7 @@ def test_atendente_le_com_cpf_mascarado_mas_nao_age(
 ) -> None:
     jornada, client = painel()
     _ate_proposta(jornada)
-    cabecalhos = _entrar(client, fabrica, "atendente")
+    cabecalhos = entrar_como(client, fabrica, "atendente")
 
     [linha] = client.get(f"{ROTA}/propostas").json()
     assert "*" in linha["cpf"]
@@ -165,7 +154,7 @@ def test_reconciliar_achada_segue_a_jornada_sem_novo_post(
 ) -> None:
     jornada, client = painel()
     _ate_handoff_incerto(jornada)
-    cabecalhos = _entrar(client, fabrica, "gestor")
+    cabecalhos = entrar_como(client, fabrica, "gestor")
     proposta_id = _id_proposta(fabrica)
 
     resposta = client.post(f"{ROTA}/propostas/{proposta_id}/reconciliar", headers=cabecalhos)
@@ -196,7 +185,7 @@ def test_reconciliar_nao_achada_fica_em_handoff(
     )
     jornada, client = painel()
     _ate_handoff_incerto(jornada)
-    cabecalhos = _entrar(client, fabrica, "gestor")
+    cabecalhos = entrar_como(client, fabrica, "gestor")
 
     resposta = client.post(
         f"{ROTA}/propostas/{_id_proposta(fabrica)}/reconciliar", headers=cabecalhos
@@ -214,7 +203,7 @@ def test_reenviar_link_fala_mesmo_com_a_conversa_assumida(
 ) -> None:
     jornada, client = painel()
     _ate_proposta(jornada)
-    cabecalhos = _entrar(client, fabrica, "gestor")
+    cabecalhos = entrar_como(client, fabrica, "gestor")
     proposta_id = _id_proposta(fabrica)
     rota = f"{ROTA}/propostas/{proposta_id}/reenviar-link"
 
@@ -237,7 +226,7 @@ def test_cancelar_exige_motivo_audita_e_nao_avisa_no_clique(
 ) -> None:
     jornada, client = painel()
     _ate_proposta(jornada)
-    cabecalhos = _entrar(client, fabrica, "gestor")
+    cabecalhos = entrar_como(client, fabrica, "gestor")
     rota = f"{ROTA}/propostas/{_id_proposta(fabrica)}/cancelar"
     antes = _saidas(jornada)
 
@@ -264,7 +253,7 @@ def test_corrigir_conta_so_com_a_flag_e_banco_da_lista(
     }
     desligada, client_off = painel()
     _ate_proposta(desligada)
-    cabecalhos = _entrar(client_off, fabrica, "gestor")
+    cabecalhos = entrar_como(client_off, fabrica, "gestor")
     rota = f"{ROTA}/propostas/{_id_proposta(fabrica)}/conta"
     assert client_off.post(rota, json=conta, headers=cabecalhos).status_code == 404
 
@@ -279,7 +268,7 @@ def test_corrigir_conta_com_a_flag(painel: Any, fabrica: sessionmaker[Session]) 
     }
     jornada, client = painel(granatech_dados_bancarios_ativo=True)
     _ate_proposta(jornada)
-    cabecalhos = _entrar(client, fabrica, "gestor")
+    cabecalhos = entrar_como(client, fabrica, "gestor")
     rota = f"{ROTA}/propostas/{_id_proposta(fabrica)}/conta"
 
     assert client.post(rota, json=conta, headers=cabecalhos).status_code == 422
@@ -296,7 +285,7 @@ def test_corrigir_conta_com_a_flag(painel: Any, fabrica: sessionmaker[Session]) 
 def test_atualizar_detalhe_destrava_a_consulta(painel: Any, fabrica: sessionmaker[Session]) -> None:
     jornada, client = painel()
     assert jornada.roteiro(*ATE_CONSENTIMENTO, "SIM").answer == texto("consultando")
-    cabecalhos = _entrar(client, fabrica, "gestor")
+    cabecalhos = entrar_como(client, fabrica, "gestor")
     with abrir_sessao(fabrica) as sessao:
         consulta_id = sessao.scalars(select(ConsultaGranatech.id)).one()
 
@@ -315,7 +304,7 @@ def test_detalhe_mostra_as_condicoes_depois_que_a_conversa_segue(
     jornada, client = painel()
     _ate_proposta(jornada)
     oferta = jornada.clt()["oferta"]
-    _entrar(client, fabrica, "atendente")
+    entrar_como(client, fabrica, "atendente")
     [linha] = client.get(f"{ROTA}/propostas").json()
 
     # Nova jornada: o checkpoint não aponta mais para a proposta.

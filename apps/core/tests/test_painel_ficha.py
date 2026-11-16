@@ -6,8 +6,9 @@ import uuid
 from decimal import Decimal
 
 import pytest
+from conftest import entrar
 from sqlalchemy import select
-from test_painel_api import _cliente_escreve, _conversa_id, _criar, _entrar
+from test_painel_api import _cliente_escreve, _conversa_id, _criar
 
 from saturday.agent.service import ficha_do_estado
 from saturday.dados.modelos import Auditoria, ConsultaGranatech, PropostaGranatech
@@ -34,7 +35,7 @@ def _ficha_clt(client, service, fabrica, conversation_id):
     clt = {"etapa": "dados_proposta", "dados": {"nome": "Maria Silva"}}
     service.graph.update_state(service.config(conversation_id), {"clt": clt})
     alvo = _conversa_id(fabrica, conversation_id)
-    csrf = _entrar(client, "ana@exemplo.test")
+    csrf = entrar(client, "ana@exemplo.test")
     assert client.post(f"/admin/conversas/{alvo}/assumir", headers=csrf).status_code == 204
     return alvo, csrf
 
@@ -88,7 +89,7 @@ def test_editar_ficha_do_ramo_inss_so_aceita_os_campos_dele(
     _cliente_escreve(service_pg, conversa, "oi")
     service_pg.graph.update_state(service_pg.config(conversa), {"cliente": {"nome": "João"}})
     alvo = _conversa_id(fabrica, conversa)
-    csrf = _entrar(client_pg, "ana@exemplo.test")
+    csrf = entrar(client_pg, "ana@exemplo.test")
     client_pg.post(f"/admin/conversas/{alvo}/assumir", headers=csrf)
     rota = f"/admin/conversas/{alvo}/ficha"
 
@@ -109,7 +110,7 @@ def test_editar_ficha_exige_ser_dono_e_dado_valido(client_pg, service_pg, fabric
     _cliente_escreve(service_pg, conversa, "oi")
     service_pg.graph.update_state(service_pg.config(conversa), {"clt": {"dados": {}}})
     alvo = _conversa_id(fabrica, conversa)
-    csrf = _entrar(client_pg, "ana@exemplo.test")
+    csrf = entrar(client_pg, "ana@exemplo.test")
     rota = f"/admin/conversas/{alvo}/ficha"
 
     assert client_pg.patch(rota, headers=csrf, json={"sexo": "F"}).status_code == 403
@@ -154,7 +155,7 @@ def test_cpf_e_conta_travam_depois_do_banco(client_pg, service_pg, fabrica, ana,
 def test_respostas_rapidas_so_o_gestor_mexe(client_pg, fabrica, ana):
     _criar(fabrica, "gil@exemplo.test", "gestor")
     rota = "/admin/respostas-rapidas"
-    gestor = _entrar(client_pg, "gil@exemplo.test")
+    gestor = entrar(client_pg, "gil@exemplo.test")
 
     criada = client_pg.post(rota, headers=gestor, json={"atalho": "pix", "texto": "Envie o Pix."})
     assert criada.status_code == 201
@@ -168,13 +169,13 @@ def test_respostas_rapidas_so_o_gestor_mexe(client_pg, fabrica, ana):
     )
     assert editada.json()["texto"] == "Mande o Pix."
 
-    atendente = _entrar(client_pg, "ana@exemplo.test")
+    atendente = entrar(client_pg, "ana@exemplo.test")
     assert client_pg.get(rota).json() == [{"id": rid, "atalho": "pix", "texto": "Mande o Pix."}]
     nova = {"atalho": "a", "texto": "b"}
     assert client_pg.post(rota, headers=atendente, json=nova).status_code == 403
     assert client_pg.delete(f"{rota}/{rid}", headers=atendente).status_code == 403
 
-    gestor = _entrar(client_pg, "gil@exemplo.test")
+    gestor = entrar(client_pg, "gil@exemplo.test")
     assert client_pg.delete(f"{rota}/{rid}", headers=gestor).status_code == 204
     assert {
         "resposta_rapida:criar",

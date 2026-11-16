@@ -5,14 +5,13 @@ from __future__ import annotations
 import functools
 import io
 import threading
-import uuid
 import zipfile
 from collections.abc import Iterator
 from types import ModuleType
 from typing import Any
 
 import pytest
-from conftest import _montar_app, settings_granatech
+from conftest import _montar_app, entrar_como, settings_granatech
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
@@ -23,7 +22,6 @@ from saturday.dados.modelos import Alerta, Auditoria, HomologacaoGranatech
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.jobs import granatech as jobs_granatech
 from saturday.jobs import homologacao as jobs_homologacao
-from saturday.painel import sessoes
 
 pytestmark = pytest.mark.filterwarnings("ignore:You should not use the 'timeout' argument")
 
@@ -135,16 +133,6 @@ def test_login_recusado_para_a_rodada(http_granatech: TestClient) -> None:
 # ---------------------------------------------------------------- painel e worker (Postgres)
 
 
-def _entrar(client: TestClient, fabrica: sessionmaker[Session], perfil: str) -> dict[str, str]:
-    email = f"{perfil}-{uuid.uuid4().hex[:6]}@exemplo.test"
-    with abrir_sessao(fabrica) as sessao:
-        sessoes.criar_usuario(sessao, email, SENHA, perfil)
-    client.cookies.clear()
-    resposta = client.post("/admin/login", json={"email": email, "senha": SENHA})
-    assert resposta.status_code == 200, resposta.text
-    return {"X-CSRF-Token": resposta.json()["csrf"]}
-
-
 def _painel(service: AgentService, fabrica: sessionmaker[Session], **extras: Any) -> TestClient:
     return TestClient(_montar_app(settings_granatech(**extras), service, fabrica))
 
@@ -183,7 +171,7 @@ def test_gestor_pede_rodada_uma_por_vez_com_auditoria(
 ) -> None:
     # Com a URL inteira na variável, o https:// não sai dobrado.
     client = _painel(service, fabrica, dominio_publico="https://saturday.exemplo.test/")
-    cabecalhos = _entrar(client, fabrica, "gestor")
+    cabecalhos = entrar_como(client, fabrica, "gestor")
 
     resposta = client.post(ROTA, json={"fase": 2}, headers=cabecalhos)
     assert resposta.status_code == 201, resposta.text
@@ -202,7 +190,7 @@ def test_gestor_pede_rodada_uma_por_vez_com_auditoria(
 
 def test_atendente_nao_ve_nem_pede(service: AgentService, fabrica: sessionmaker[Session]) -> None:
     client = _painel(service, fabrica)
-    cabecalhos = _entrar(client, fabrica, "atendente")
+    cabecalhos = entrar_como(client, fabrica, "atendente")
 
     assert client.get(ROTA).status_code == 403
     assert client.post(ROTA, json={"fase": 1}, headers=cabecalhos).status_code == 403
@@ -212,7 +200,7 @@ def test_indisponivel_com_a_granatech_de_producao(
     service: AgentService, fabrica: sessionmaker[Session]
 ) -> None:
     client = _painel(service, fabrica, granatech_base_url="https://api.granatech.com.br")
-    cabecalhos = _entrar(client, fabrica, "gestor")
+    cabecalhos = entrar_como(client, fabrica, "gestor")
 
     assert client.get(ROTA).status_code == 404
     assert client.post(ROTA, json={"fase": 1}, headers=cabecalhos).status_code == 404
@@ -222,7 +210,7 @@ def test_worker_roda_a_rodada_e_o_zip_traz_o_relatorio(
     service: AgentService, fabrica: sessionmaker[Session], rodadas: jobs_homologacao.Rodadas
 ) -> None:
     client = _painel(service, fabrica)
-    cabecalhos = _entrar(client, fabrica, "gestor")
+    cabecalhos = entrar_como(client, fabrica, "gestor")
     rodada_id = client.post(ROTA, json={"fase": 1}, headers=cabecalhos).json()["id"]
 
     assert rodadas.verificar() is True

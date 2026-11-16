@@ -6,11 +6,12 @@ import json
 from typing import Any
 
 import httpx
+from conftest import entrar_como
 from pydantic import SecretStr
-from sqlalchemy import select, update
+from sqlalchemy import select
 
 from saturday.agente_config import Modelos
-from saturday.dados.modelos import Auditoria, UsuarioPainel
+from saturday.dados.modelos import Auditoria
 from saturday.dados.sessao import sessao as abrir
 from saturday.painel import sessoes
 
@@ -52,20 +53,6 @@ EMBEDDINGS = {
 }
 
 
-def _entrar(client, fabrica, email, perfil, *, editor=False) -> dict[str, str]:
-    with abrir(fabrica) as s:
-        usuario = sessoes.criar_usuario(s, email, SENHA, perfil)
-        s.execute(
-            update(UsuarioPainel)
-            .where(UsuarioPainel.id == usuario.id)
-            .values(pode_editar_agente=editor)
-        )
-    client.cookies.clear()
-    resposta = client.post("/admin/login", json={"email": email, "senha": SENHA})
-    assert resposta.status_code == 200
-    return {"X-CSRF-Token": resposta.json()["csrf"]}
-
-
 def _http(client, rotas: dict[str, Any]) -> list[httpx.Request]:
     pedidos: list[httpx.Request] = []
 
@@ -83,7 +70,7 @@ def _acoes(fabrica) -> list[str]:
 
 
 def test_editor_salva_versao_e_o_turno_seguinte_usa(client_pg, fabrica, settings):
-    csrf = _entrar(client_pg, fabrica, "edita@exemplo.test", "atendente", editor=True)
+    csrf = entrar_como(client_pg, fabrica, "atendente", "edita@exemplo.test", editor=True)
     inicio = client_pg.get("/admin/agente/modelos").json()
     assert inicio["vigente"] is None and inicio["pode_editar"] is True
     llm = next(p for p in inicio["papeis"] if p["papel"] == "llm")
@@ -120,13 +107,13 @@ def test_editor_salva_versao_e_o_turno_seguinte_usa(client_pg, fabrica, settings
 
 def test_sem_permissao_nao_salva_nem_atualiza_catalogo(client_pg, fabrica):
     # Nem gestor: a permissão independe do perfil.
-    csrf = _entrar(client_pg, fabrica, "gestor@exemplo.test", "gestor", editor=False)
+    csrf = entrar_como(client_pg, fabrica, "gestor", "gestor@exemplo.test", editor=False)
     assert client_pg.get("/admin/agente/modelos").json()["pode_editar"] is False
     corpo = {"versao_base": None, "modelos": {"llm": "x/y"}}
     assert client_pg.post("/admin/agente/versoes", json=corpo, headers=csrf).status_code == 403
     assert client_pg.post("/admin/agente/catalogo/atualizar", headers=csrf).status_code == 403
     # Sem CSRF também não.
-    _entrar(client_pg, fabrica, "edita2@exemplo.test", "atendente", editor=True)
+    entrar_como(client_pg, fabrica, "atendente", "edita2@exemplo.test", editor=True)
     assert client_pg.post("/admin/agente/versoes", json=corpo).status_code == 403
 
 
@@ -138,7 +125,7 @@ def test_catalogo_traz_preco_por_milhao_e_valida_a_escolha(client_pg, fabrica):
             "https://openrouter.ai/api/v1/embeddings/models": EMBEDDINGS,
         },
     )
-    csrf = _entrar(client_pg, fabrica, "edita@exemplo.test", "atendente", editor=True)
+    csrf = entrar_como(client_pg, fabrica, "atendente", "edita@exemplo.test", editor=True)
 
     assert client_pg.post("/admin/agente/catalogo/atualizar", headers=csrf).json() == {"modelos": 3}
     assert "authorization" not in pedidos[0].headers
@@ -171,7 +158,7 @@ def test_catalogo_traz_preco_por_milhao_e_valida_a_escolha(client_pg, fabrica):
 
 
 def test_restaurar_cria_versao_nova_com_os_modelos_antigos(client_pg, fabrica, settings):
-    csrf = _entrar(client_pg, fabrica, "edita@exemplo.test", "atendente", editor=True)
+    csrf = entrar_como(client_pg, fabrica, "atendente", "edita@exemplo.test", editor=True)
     for base, modelo in ((None, "a/um"), (1, "b/dois")):
         r = client_pg.post(
             "/admin/agente/versoes",
@@ -200,13 +187,13 @@ def test_testar_modelo_e_so_do_gestor_e_usa_o_prompt_real(client_pg, fabrica, se
     pedidos = _http(client_pg, {"https://openrouter.ai/api/v1/chat/completions": resposta})
     corpo = {"papel": "llm", "modelo": "openai/gpt-4o-mini", "texto": "vocês cobram algo?"}
 
-    atendente = _entrar(client_pg, fabrica, "ana@exemplo.test", "atendente", editor=True)
+    atendente = entrar_como(client_pg, fabrica, "atendente", "ana@exemplo.test", editor=True)
     assert (
         client_pg.post("/admin/agente/modelos/testar", json=corpo, headers=atendente).status_code
         == 403
     )
 
-    gestor = _entrar(client_pg, fabrica, "gestor@exemplo.test", "gestor")
+    gestor = entrar_como(client_pg, fabrica, "gestor", "gestor@exemplo.test")
     r = client_pg.post("/admin/agente/modelos/testar", json=corpo, headers=gestor).json()
     assert r["ok"] is True and r["resposta"] == "Oi!" and r["detalhe"] == {"resolvido": True}
     assert r["custo_usd"] == 0.0002 and r["tokens_entrada"] == 900
@@ -225,7 +212,7 @@ def test_testar_modelo_e_so_do_gestor_e_usa_o_prompt_real(client_pg, fabrica, se
 
 
 def test_eu_e_usuarios_mostram_a_permissao(client_pg, fabrica):
-    csrf = _entrar(client_pg, fabrica, "gestor@exemplo.test", "gestor")
+    csrf = entrar_como(client_pg, fabrica, "gestor", "gestor@exemplo.test")
     assert client_pg.get("/admin/eu").json()["pode_editar_agente"] is False
     with abrir(fabrica) as s:
         alvo = sessoes.criar_usuario(s, "ana@exemplo.test", SENHA, "atendente")

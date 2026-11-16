@@ -4,25 +4,17 @@ from __future__ import annotations
 
 import json
 
+from conftest import entrar_como
 from sqlalchemy import select
 
 from saturday.canais.base import OrigemCanal
 from saturday.dados.modelos import Conversa, Mensagem, Turno
 from saturday.dados.sessao import sessao as abrir
 from saturday.metrics import iniciar_metricas, registrar_chamada, uso_do_payload
-from saturday.painel import sessoes
 from saturday.schemas import ChatRequest
 
 SENHA = "senha-bem-comprida-1"  # noqa: S105 - senha de teste
 WHATSAPP = OrigemCanal(canal="whatsapp", telefone="11987654321", phone_number_id="100000000000001")
-
-
-def _entrar(client, fabrica, email, perfil):
-    with abrir(fabrica) as s:
-        sessoes.criar_usuario(s, email, SENHA, perfil)
-    client.cookies.clear()
-    resposta = client.post("/admin/login", json={"email": email, "senha": SENHA})
-    assert resposta.status_code == 200
 
 
 def test_uso_le_custo_e_tokens_da_openrouter():
@@ -69,7 +61,7 @@ def test_trilha_para_todos_custo_so_para_gestor(client_pg, service_pg, fabrica, 
             )
         )
 
-    _entrar(client_pg, fabrica, "ana-trilha@exemplo.test", "atendente")
+    entrar_como(client_pg, fabrica, "atendente", "ana-trilha@exemplo.test")
     trilha = client_pg.get(f"/admin/conversas/{alvo}/turnos").json()
     assert trilha["custo_usd"] is None and trilha["tokens"] is None
     assert len(trilha["turnos"]) == 2
@@ -77,7 +69,7 @@ def test_trilha_para_todos_custo_so_para_gestor(client_pg, service_pg, fabrica, 
     assert all(c["custo_usd"] is None for t in trilha["turnos"] for c in t["chamadas"])
     assert client_pg.get("/admin/custos").status_code == 403
 
-    _entrar(client_pg, fabrica, "gestor-trilha@exemplo.test", "gestor")
+    entrar_como(client_pg, fabrica, "gestor", "gestor-trilha@exemplo.test")
     trilha = client_pg.get(f"/admin/conversas/{alvo}/turnos").json()
     assert trilha["custo_usd"] == 0.5
     assert trilha["tokens"] == 1000

@@ -2,23 +2,16 @@
 
 from __future__ import annotations
 
+from conftest import entrar_como
 from sqlalchemy import select
 
 from saturday.canais.base import OrigemCanal
 from saturday.dados.modelos import Conversa, Turno
 from saturday.dados.sessao import sessao as abrir
-from saturday.painel import sessoes
 from saturday.schemas import ChatRequest
 
 SENHA = "senha-bem-comprida-1"  # noqa: S105 - senha de teste
 WHATSAPP = OrigemCanal(canal="whatsapp", telefone="11987654321", phone_number_id="100000000000001")
-
-
-def _entrar(client, fabrica, email, perfil):
-    with abrir(fabrica) as s:
-        sessoes.criar_usuario(s, email, SENHA, perfil)
-    client.cookies.clear()
-    assert client.post("/admin/login", json={"email": email, "senha": SENHA}).status_code == 200
 
 
 def _turnos(fabrica, conversa):
@@ -29,7 +22,7 @@ def _turnos(fabrica, conversa):
 
 def test_grafo_e_o_compilado_com_modelo_e_passagens(client_pg, service_pg, fabrica, conversa):
     service_pg.process_message(ChatRequest(conversation_id=conversa, message="oi"), WHATSAPP)
-    _entrar(client_pg, fabrica, "ana-grafo@exemplo.test", "atendente")
+    entrar_como(client_pg, fabrica, "atendente", "ana-grafo@exemplo.test")
 
     grafo = client_pg.get("/admin/agente/grafo").json()
     nos = {n["id"]: n for n in grafo["nos"]}
@@ -59,7 +52,7 @@ def test_execucoes_filtram_e_escondem_custo_de_atendente(
     # Só o nome da exceção: a mensagem pode ter dado do cliente.
     assert quebrado.erro == "TimeoutError" and quebrado.status == "handoff"
 
-    _entrar(client_pg, fabrica, "ana-exec@exemplo.test", "atendente")
+    entrar_como(client_pg, fabrica, "atendente", "ana-exec@exemplo.test")
     todas = client_pg.get("/admin/agente/execucoes").json()
     assert [e["id"] for e in todas["execucoes"]] == [quebrado.id, ok.id]
     assert todas["execucoes"][0]["telefone"] == "(11) *****-4321"
@@ -73,7 +66,7 @@ def test_execucoes_filtram_e_escondem_custo_de_atendente(
     antes = client_pg.get("/admin/agente/execucoes", params={"antes_de": quebrado.id}).json()
     assert [e["id"] for e in antes["execucoes"]] == [ok.id]
 
-    _entrar(client_pg, fabrica, "gestor-exec@exemplo.test", "gestor")
+    entrar_como(client_pg, fabrica, "gestor", "gestor-exec@exemplo.test")
     gestor = client_pg.get("/admin/agente/execucoes").json()
     assert gestor["execucoes"][0]["custo_usd"] is not None
 
@@ -92,7 +85,7 @@ def test_passos_mostram_o_estado_tecnico_de_cada_no_sem_dado_pessoal(
         ChatRequest(conversation_id=conversa, message="meu cpf é 123.456.789-09, como funciona?"),
         WHATSAPP,
     )
-    _entrar(client_pg, fabrica, "ana-passos@exemplo.test", "atendente")
+    entrar_como(client_pg, fabrica, "atendente", "ana-passos@exemplo.test")
     primeiro, segundo = sorted(_turnos(fabrica, conversa), key=lambda t: t.id)
 
     resposta = client_pg.get(f"/admin/agente/execucoes/{segundo.id}/passos")
@@ -114,7 +107,7 @@ def test_passos_mostram_o_estado_tecnico_de_cada_no_sem_dado_pessoal(
 def test_passos_somem_quando_os_checkpoints_foram_podados(client_pg, service_pg, fabrica, conversa):
     service_pg.process_message(ChatRequest(conversation_id=conversa, message="oi"), WHATSAPP)
     service_pg.process_message(ChatRequest(conversation_id=conversa, message="e aí"), WHATSAPP)
-    _entrar(client_pg, fabrica, "ana-poda@exemplo.test", "atendente")
+    entrar_como(client_pg, fabrica, "atendente", "ana-poda@exemplo.test")
     primeiro, _ = sorted(_turnos(fabrica, conversa), key=lambda t: t.id)
 
     service_pg._podar_checkpoints(service_pg.config(conversa))

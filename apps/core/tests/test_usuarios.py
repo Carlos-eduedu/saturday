@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+from conftest import entrar
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
@@ -26,16 +27,9 @@ def _usuario(fabrica: sessionmaker[Session], email: str, perfil: str = "atendent
         return sessoes.criar_usuario(sessao, email, SENHA, perfil).id
 
 
-def _entrar(client: TestClient, email: str, senha: str = SENHA) -> dict[str, str]:
-    client.cookies.clear()
-    resposta = client.post("/admin/login", json={"email": email, "senha": senha})
-    assert resposta.status_code == 200, resposta.text
-    return {"X-CSRF-Token": resposta.json()["csrf"]}
-
-
 def _gestor(client: TestClient, fabrica: sessionmaker[Session]) -> tuple[uuid.UUID, dict[str, str]]:
     gestor_id = _usuario(fabrica, "gestora@exemplo.test", "gestor")
-    return gestor_id, _entrar(client, "gestora@exemplo.test")
+    return gestor_id, entrar(client, "gestora@exemplo.test")
 
 
 def _auditoria(fabrica: sessionmaker[Session], acao: str) -> list[Any]:
@@ -45,7 +39,7 @@ def _auditoria(fabrica: sessionmaker[Session], acao: str) -> list[Any]:
 
 def test_atendente_nao_ve_a_aba(client_pg: TestClient, fabrica: sessionmaker[Session]) -> None:
     _usuario(fabrica, "ana@exemplo.test")
-    cabecalhos = _entrar(client_pg, "ana@exemplo.test")
+    cabecalhos = entrar(client_pg, "ana@exemplo.test")
     assert client_pg.get(ROTA).status_code == 403
     resposta = client_pg.post(
         ROTA,
@@ -76,7 +70,7 @@ def test_cadastra_lista_e_quem_foi_cadastrado_entra(
     repetido = client_pg.post(ROTA, json={**corpo, "senha": SENHA}, headers=cabecalhos)
     assert repetido.status_code == 409
 
-    _entrar(client_pg, "ana@exemplo.test")
+    entrar(client_pg, "ana@exemplo.test")
     assert client_pg.get("/admin/eu").json()["nome"] == "Ana Souza"
 
 
@@ -122,7 +116,7 @@ def test_redefinir_senha_derruba_sessoes_e_desbloqueia(
         abertas = sessao.scalars(select(SessaoPainel).where(SessaoPainel.usuario_id == ana)).all()
         assert abertas == []
     assert _auditoria(fabrica, "usuario_senha") == [None]
-    _entrar(client_pg, "ana@exemplo.test", OUTRA)
+    entrar(client_pg, "ana@exemplo.test", OUTRA)
 
 
 def test_desbloquear(client_pg: TestClient, fabrica: sessionmaker[Session]) -> None:
@@ -135,7 +129,7 @@ def test_desbloquear(client_pg: TestClient, fabrica: sessionmaker[Session]) -> N
         usuario.bloqueado_ate = sessoes.agora() + sessoes.BLOQUEIO
 
     assert client_pg.post(f"{ROTA}/{ana}/desbloquear", headers=cabecalhos).status_code == 204
-    _entrar(client_pg, "ana@exemplo.test")
+    entrar(client_pg, "ana@exemplo.test")
 
 
 def test_desativar_devolve_conversas_derruba_sessao_e_barra_login(
@@ -183,14 +177,14 @@ def test_desativar_devolve_conversas_derruba_sessao_e_barra_login(
     novo = client_pg.post(
         ROTA,
         json={"nome": "Ana", "email": "ana@exemplo.test", "perfil": "atendente", "senha": SENHA},
-        headers=_entrar(client_pg, "gestora@exemplo.test"),
+        headers=entrar(client_pg, "gestora@exemplo.test"),
     )
     assert novo.status_code == 409
     assert "reative" in novo.json()["detail"]
 
-    cabecalhos = _entrar(client_pg, "gestora@exemplo.test")
+    cabecalhos = entrar(client_pg, "gestora@exemplo.test")
     assert client_pg.post(f"{ROTA}/{ana}/reativar", headers=cabecalhos).status_code == 204
-    _entrar(client_pg, "ana@exemplo.test")
+    entrar(client_pg, "ana@exemplo.test")
 
 
 def test_travas_do_gestor(client_pg: TestClient, fabrica: sessionmaker[Session]) -> None:
@@ -219,7 +213,7 @@ def test_ultimo_gestor_nao_e_desativado_por_outro(
 ) -> None:
     gestor_id, _ = _gestor(client_pg, fabrica)
     bia = _usuario(fabrica, "bia@exemplo.test", "gestor")
-    cabecalhos = _entrar(client_pg, "bia@exemplo.test")
+    cabecalhos = entrar(client_pg, "bia@exemplo.test")
     assert client_pg.post(f"{ROTA}/{gestor_id}/desativar", headers=cabecalhos).status_code == 200
 
     # Bia agora é a única gestora ativa: ninguém mais pode desativá-la.
@@ -242,7 +236,7 @@ def test_cada_um_edita_o_proprio_perfil_e_o_telefone_fica_fora_da_auditoria(
     client_pg: TestClient, fabrica: sessionmaker[Session]
 ) -> None:
     _usuario(fabrica, "ana@exemplo.test")
-    csrf = _entrar(client_pg, "ana@exemplo.test")
+    csrf = entrar(client_pg, "ana@exemplo.test")
 
     resposta = client_pg.patch(
         "/admin/eu",
@@ -273,7 +267,7 @@ def test_foto_do_perfil_vai_para_o_storage_e_so_logado_ve(
     client_pg: TestClient, fabrica: sessionmaker[Session], storage: Any
 ) -> None:
     ana = _usuario(fabrica, "ana@exemplo.test")
-    csrf = _entrar(client_pg, "ana@exemplo.test")
+    csrf = entrar(client_pg, "ana@exemplo.test")
 
     def subir(dados: bytes, tipo: str) -> Any:
         return client_pg.put(
@@ -304,7 +298,7 @@ def test_foto_do_perfil_vai_para_o_storage_e_so_logado_ve(
     client_pg.cookies.clear()
     assert client_pg.get(segunda).status_code == 401
 
-    _entrar(client_pg, "ana@exemplo.test")
+    entrar(client_pg, "ana@exemplo.test")
     csrf = {"X-CSRF-Token": client_pg.get("/admin/eu").json()["csrf"]}
     assert client_pg.delete("/admin/eu/foto", headers=csrf).json()["foto"] is None
     assert not [k for k in storage._objetos if k.startswith("painel/usuarios/")]

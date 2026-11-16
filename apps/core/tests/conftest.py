@@ -20,7 +20,7 @@ from langgraph.checkpoint.postgres import PostgresSaver
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 from pydantic import SecretStr
-from sqlalchemy import Engine, create_engine, select
+from sqlalchemy import Engine, create_engine, select, update
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import NullPool
 
@@ -28,8 +28,10 @@ from saturday.agent.context import AgentContext
 from saturday.agent.graph import build_graph
 from saturday.agent.service import AgentService
 from saturday.dados.base import Base
-from saturday.dados.modelos import Outbox
+from saturday.dados.modelos import Outbox, UsuarioPainel
 from saturday.dados.sessao import criar_factory
+from saturday.dados.sessao import sessao as abrir_sessao
+from saturday.painel import sessoes
 from saturday.services.anexos import Anexo
 from saturday.services.jev import JevResult
 from saturday.services.llm import LLMAnswer
@@ -446,3 +448,38 @@ def settings_granatech(**extras: Any) -> Settings:
     }
     base.update(extras)
     return Settings(**base)
+
+
+# ------------------------------------------------------------------ login do painel
+
+SENHA_DO_PAINEL = "senha-bem-comprida-1"  # noqa: S105 - senha de teste
+
+
+def entrar(client: TestClient, email: str, senha: str = SENHA_DO_PAINEL) -> dict[str, str]:
+    """Faz o login de um usuário que já existe; devolve o cabeçalho de CSRF."""
+
+    client.cookies.clear()
+    resposta = client.post("/admin/login", json={"email": email, "senha": senha})
+    assert resposta.status_code == 200, resposta.text
+    return {"X-CSRF-Token": resposta.json()["csrf"]}
+
+
+def entrar_como(
+    client: TestClient,
+    fabrica: sessionmaker[Session],
+    perfil: str,
+    email: str | None = None,
+    *,
+    editor: bool = False,
+) -> dict[str, str]:
+    """Cria o usuário (e-mail gerado quando não vem) e entra com ele."""
+
+    email = email or f"{perfil}-{uuid.uuid4().hex[:6]}@exemplo.test"
+    with abrir_sessao(fabrica) as sessao:
+        usuario = sessoes.criar_usuario(sessao, email, SENHA_DO_PAINEL, perfil)
+        sessao.execute(
+            update(UsuarioPainel)
+            .where(UsuarioPainel.id == usuario.id)
+            .values(pode_editar_agente=editor)
+        )
+    return entrar(client, email)

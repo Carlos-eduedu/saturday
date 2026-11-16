@@ -6,7 +6,7 @@ import uuid
 from decimal import Decimal
 
 import pytest
-from conftest import resultado_jev
+from conftest import entrar, resultado_jev
 from sqlalchemy import func, select, update
 
 from saturday.canais.base import OrigemCanal
@@ -35,13 +35,6 @@ WHATSAPP = OrigemCanal(canal="whatsapp", telefone=TELEFONE, phone_number_id="100
 def _criar(fabrica, email, perfil="atendente"):
     with abrir(fabrica) as s:
         return str(sessoes.criar_usuario(s, email, SENHA, perfil).id)
-
-
-def _entrar(client, email):
-    client.cookies.clear()
-    resposta = client.post("/admin/login", json={"email": email, "senha": SENHA})
-    assert resposta.status_code == 200
-    return {"X-CSRF-Token": resposta.json()["csrf"]}
 
 
 def _cliente_escreve(service, conversation_id, texto):
@@ -99,7 +92,7 @@ def test_sem_sessao_401_e_sem_csrf_403(client_pg, service_pg, fabrica, ana, conv
     alvo = _conversa_id(fabrica, conversa)
     assert client_pg.get("/admin/conversas").status_code == 401
 
-    csrf = _entrar(client_pg, "ana@exemplo.test")
+    csrf = entrar(client_pg, "ana@exemplo.test")
     assert client_pg.post(f"/admin/conversas/{alvo}/assumir").status_code == 403
     errado = {"X-CSRF-Token": "0" * 64}
     assert client_pg.post(f"/admin/conversas/{alvo}/assumir", headers=errado).status_code == 403
@@ -107,7 +100,7 @@ def test_sem_sessao_401_e_sem_csrf_403(client_pg, service_pg, fabrica, ana, conv
 
 
 def test_logout_encerra_a_sessao(client_pg, ana):
-    csrf = _entrar(client_pg, "ana@exemplo.test")
+    csrf = entrar(client_pg, "ana@exemplo.test")
     assert client_pg.post("/admin/logout", headers=csrf).status_code == 204
     assert client_pg.get("/admin/eu").status_code == 401
 
@@ -120,7 +113,7 @@ def test_atendente_assume_responde_e_ia_cala_ate_devolver(
 ):
     _cliente_escreve(service_pg, conversa, "oi")
     alvo = _conversa_id(fabrica, conversa)
-    csrf = _entrar(client_pg, "ana@exemplo.test")
+    csrf = entrar(client_pg, "ana@exemplo.test")
 
     assert client_pg.post(f"/admin/conversas/{alvo}/assumir", headers=csrf).status_code == 204
     enviada = client_pg.post(
@@ -153,7 +146,7 @@ def test_atendente_assume_responde_e_ia_cala_ate_devolver(
 def test_so_o_dono_envia(client_pg, service_pg, fabrica, ana, conversa):
     _cliente_escreve(service_pg, conversa, "oi")
     alvo = _conversa_id(fabrica, conversa)
-    csrf = _entrar(client_pg, "ana@exemplo.test")
+    csrf = entrar(client_pg, "ana@exemplo.test")
     resposta = client_pg.post(
         f"/admin/conversas/{alvo}/mensagens", headers=csrf, json={"texto": "oi"}
     )
@@ -167,7 +160,7 @@ def test_janela_fechada_so_aceita_modelo(client_pg, service_pg, fabrica, ana, co
         conversa_db = s.get(Conversa, uuid.UUID(alvo))
         assert conversa_db is not None
         conversa_db.ultima_entrada_em = conversa_db.criada_em.replace(year=2020)
-    csrf = _entrar(client_pg, "ana@exemplo.test")
+    csrf = entrar(client_pg, "ana@exemplo.test")
     client_pg.post(f"/admin/conversas/{alvo}/assumir", headers=csrf)
 
     texto = client_pg.post(f"/admin/conversas/{alvo}/mensagens", headers=csrf, json={"texto": "oi"})
@@ -196,7 +189,7 @@ def test_transferir_e_tomar_de_outro(client_pg, service_pg, fabrica, ana, conver
     _cliente_escreve(service_pg, conversa, "oi")
     alvo = _conversa_id(fabrica, conversa)
 
-    csrf = _entrar(client_pg, "ana@exemplo.test")
+    csrf = entrar(client_pg, "ana@exemplo.test")
     client_pg.post(f"/admin/conversas/{alvo}/assumir", headers=csrf)
     transferida = client_pg.post(
         f"/admin/conversas/{alvo}/transferir", headers=csrf, json={"usuario_id": bia}
@@ -207,7 +200,7 @@ def test_transferir_e_tomar_de_outro(client_pg, service_pg, fabrica, ana, conver
     assert client_pg.post(f"/admin/conversas/{alvo}/assumir", headers=csrf).status_code == 403
     assert client_pg.post(f"/admin/conversas/{alvo}/devolver", headers=csrf).status_code == 403
 
-    csrf = _entrar(client_pg, "gestor@exemplo.test")
+    csrf = entrar(client_pg, "gestor@exemplo.test")
     assert client_pg.post(f"/admin/conversas/{alvo}/assumir", headers=csrf).status_code == 204
     detalhe = client_pg.get(f"/admin/conversas/{alvo}").json()
     assert detalhe["atendimento"] == "assumida"
@@ -228,7 +221,7 @@ def test_desfazer_devolve_o_estado_de_antes(client_pg, service_pg, fabrica, ana,
         s.get(Conversa, uuid.UUID(alvo)).atendimento = "handoff"
 
     # Assumir um handoff e desfazer volta ao handoff, não à IA.
-    csrf = _entrar(client_pg, "ana@exemplo.test")
+    csrf = entrar(client_pg, "ana@exemplo.test")
     client_pg.post(f"/admin/conversas/{alvo}/assumir", headers=csrf)
     assert client_pg.post(f"/admin/conversas/{alvo}/desfazer", headers=csrf).status_code == 204
     assert _atendimento(client_pg, alvo) == ("handoff", None)
@@ -242,16 +235,16 @@ def test_desfazer_devolve_o_estado_de_antes(client_pg, service_pg, fabrica, ana,
     assert _atendimento(client_pg, alvo) == ("assumida", ana)
 
     # O gestor toma a conversa da Ana e desfaz: ela volta para a Ana.
-    csrf = _entrar(client_pg, "gestor@exemplo.test")
+    csrf = entrar(client_pg, "gestor@exemplo.test")
     client_pg.post(f"/admin/conversas/{alvo}/assumir", headers=csrf)
     assert client_pg.post(f"/admin/conversas/{alvo}/desfazer", headers=csrf).status_code == 204
     assert _atendimento(client_pg, alvo) == ("assumida", ana)
 
     # Só desfaz quem agiu, e só enquanto nada mais mexeu no atendimento.
     client_pg.post(f"/admin/conversas/{alvo}/assumir", headers=csrf)
-    csrf_ana = _entrar(client_pg, "ana@exemplo.test")
+    csrf_ana = entrar(client_pg, "ana@exemplo.test")
     assert client_pg.post(f"/admin/conversas/{alvo}/desfazer", headers=csrf_ana).status_code == 409
-    csrf = _entrar(client_pg, "gestor@exemplo.test")
+    csrf = entrar(client_pg, "gestor@exemplo.test")
     client_pg.post(f"/admin/conversas/{alvo}/transferir", headers=csrf, json={"usuario_id": bia})
     assert client_pg.post(f"/admin/conversas/{alvo}/desfazer", headers=csrf).status_code == 409
 
@@ -259,7 +252,7 @@ def test_desfazer_devolve_o_estado_de_antes(client_pg, service_pg, fabrica, ana,
 def test_desfazer_vence_com_o_prazo(client_pg, service_pg, fabrica, ana, conversa):
     _cliente_escreve(service_pg, conversa, "oi")
     alvo = _conversa_id(fabrica, conversa)
-    csrf = _entrar(client_pg, "ana@exemplo.test")
+    csrf = entrar(client_pg, "ana@exemplo.test")
     client_pg.post(f"/admin/conversas/{alvo}/assumir", headers=csrf)
     with abrir(fabrica) as s:
         s.execute(
@@ -276,7 +269,7 @@ def test_conversa_do_chat_nao_tem_janela_nem_envio(client_pg, service_pg, ana, c
     """Janela é da Meta: no canal `chat` o painel não mostra o selo nem envia."""
 
     service_pg.process_message(ChatRequest(conversation_id=conversa, message="oi"))
-    _entrar(client_pg, "ana@exemplo.test")
+    entrar(client_pg, "ana@exemplo.test")
 
     [item] = client_pg.get("/admin/conversas").json()
     assert (item["envia"], item["janela"], item["modelos"]) == (False, None, [])
@@ -285,7 +278,7 @@ def test_conversa_do_chat_nao_tem_janela_nem_envio(client_pg, service_pg, ana, c
 def test_inbox_filtra_por_fila_e_marca_lida(client_pg, service_pg, fabrica, ana, conversa):
     _cliente_escreve(service_pg, conversa, "oi")
     alvo = _conversa_id(fabrica, conversa)
-    csrf = _entrar(client_pg, "ana@exemplo.test")
+    csrf = entrar(client_pg, "ana@exemplo.test")
 
     [item] = client_pg.get("/admin/conversas", params={"fila": "ia"}).json()
     assert item["id"] == alvo
@@ -308,7 +301,7 @@ def test_contagens_das_filas_e_a_fila_minhas(client_pg, service_pg, fabrica, ana
     _cliente_escreve(service_pg, conversa, "oi")
     alvo = _conversa_id(fabrica, conversa)
     assert client_pg.get("/admin/conversas/contagens").status_code == 401
-    csrf = _entrar(client_pg, "ana@exemplo.test")
+    csrf = entrar(client_pg, "ana@exemplo.test")
 
     contagens = client_pg.get("/admin/conversas/contagens").json()
     assert contagens == {
@@ -324,7 +317,7 @@ def test_contagens_das_filas_e_a_fila_minhas(client_pg, service_pg, fabrica, ana
     contagens = client_pg.get("/admin/conversas/contagens").json()
     assert (contagens["ia"], contagens["assumida"], contagens["minhas"]) == (0, 1, 1)
     _criar(fabrica, "bia@exemplo.test")
-    _entrar(client_pg, "bia@exemplo.test")
+    entrar(client_pg, "bia@exemplo.test")
     assert client_pg.get("/admin/conversas/contagens").json()["minhas"] == 0
 
 
@@ -341,7 +334,7 @@ def test_ficha_mostra_os_dados_do_ramo_clt(client_pg, service_pg, fabrica, ana, 
     }
     service_pg.graph.update_state(service_pg.config(conversa), {"clt": {"dados": dados}})
     alvo = _conversa_id(fabrica, conversa)
-    csrf = _entrar(client_pg, "ana@exemplo.test")
+    csrf = entrar(client_pg, "ana@exemplo.test")
 
     ficha = client_pg.get(f"/admin/conversas/{alvo}/ficha").json()
     assert ficha["nome"] == "Maria da Silva"
@@ -357,7 +350,7 @@ def test_ficha_mostra_os_dados_do_ramo_clt(client_pg, service_pg, fabrica, ana, 
 def test_ficha_mostra_oferta_proposta_e_provas(client_pg, service_pg, fabrica, ana, conversa):
     _cliente_escreve(service_pg, conversa, "oi")
     alvo = _conversa_id(fabrica, conversa)
-    _entrar(client_pg, "ana@exemplo.test")
+    entrar(client_pg, "ana@exemplo.test")
 
     vazia = client_pg.get(f"/admin/conversas/{alvo}/ficha").json()
     assert (vazia["oferta"], vazia["proposta"], vazia["consentimentos"]) == (None, None, [])
@@ -429,7 +422,7 @@ def test_revelar_cpf_grava_auditoria(client_pg, service_pg, fabrica, ana, conver
     _cliente_escreve(service_pg, conversa, "oi")
     service_pg.graph.update_state(service_pg.config(conversa), {"cliente": {"cpf": "00189004967"}})
     alvo = _conversa_id(fabrica, conversa)
-    csrf = _entrar(client_pg, "ana@exemplo.test")
+    csrf = entrar(client_pg, "ana@exemplo.test")
 
     ficha = client_pg.get(f"/admin/conversas/{alvo}/ficha").json()
     assert ficha["dados"]["cpf"] == "***.***.***-67"
@@ -450,7 +443,7 @@ def test_revelar_cpf_grava_auditoria(client_pg, service_pg, fabrica, ana, conver
 def test_revelar_exige_csrf(client_pg, service_pg, fabrica, ana, conversa):
     _cliente_escreve(service_pg, conversa, "oi")
     alvo = _conversa_id(fabrica, conversa)
-    _entrar(client_pg, "ana@exemplo.test")
+    entrar(client_pg, "ana@exemplo.test")
     resposta = client_pg.post(f"/admin/conversas/{alvo}/revelar", json={"campo": "telefone"})
     assert resposta.status_code == 403
 
@@ -461,7 +454,7 @@ def test_revelar_exige_csrf(client_pg, service_pg, fabrica, ana, conversa):
 def test_exportar_devolve_a_conversa_em_markdown(client_pg, service_pg, fabrica, ana, conversa):
     _cliente_escreve(service_pg, conversa, "oi, quero simular")
     alvo = _conversa_id(fabrica, conversa)
-    _entrar(client_pg, "ana@exemplo.test")
+    entrar(client_pg, "ana@exemplo.test")
 
     resposta = client_pg.get(f"/admin/conversas/{alvo}/exportar")
 
@@ -509,7 +502,7 @@ def test_assumir_resolve_o_handoff_e_desfazer_reabre(
     assert tipo == "handoff"
     evento = _abrir_alerta(fabrica, alvo, "evento_com_humano")
 
-    csrf = _entrar(client_pg, "ana@exemplo.test")
+    csrf = entrar(client_pg, "ana@exemplo.test")
     client_pg.post(f"/admin/conversas/{alvo}/assumir", headers=csrf)
     assert _alertas_abertos(fabrica) == [("evento_com_humano", evento)]
     with abrir(fabrica) as s:
@@ -534,7 +527,7 @@ def test_desfazer_de_auditoria_antiga_abre_o_alerta_de_handoff(
     alvo = _conversa_id(fabrica, conversa)
     with abrir(fabrica) as s:
         s.get(Conversa, uuid.UUID(alvo)).atendimento = "handoff"
-    csrf = _entrar(client_pg, "ana@exemplo.test")
+    csrf = entrar(client_pg, "ana@exemplo.test")
     client_pg.post(f"/admin/conversas/{alvo}/assumir", headers=csrf)
     with abrir(fabrica) as s:
         # Linha gravada antes da decisão 0018: sem a lista de alertas.
@@ -554,7 +547,7 @@ def test_devolver_resolve_sem_resposta_e_transferir_nao_mexe(
     bia = _criar(fabrica, "bia@exemplo.test")
     _cliente_escreve(service_pg, conversa, "oi")
     alvo = _conversa_id(fabrica, conversa)
-    csrf = _entrar(client_pg, "ana@exemplo.test")
+    csrf = entrar(client_pg, "ana@exemplo.test")
     client_pg.post(f"/admin/conversas/{alvo}/assumir", headers=csrf)
     sem_resposta = _abrir_alerta(fabrica, alvo, "sem_resposta")
     handoff = _abrir_alerta(fabrica, alvo, "handoff")
@@ -564,7 +557,7 @@ def test_devolver_resolve_sem_resposta_e_transferir_nao_mexe(
         [("sem_resposta", sem_resposta), ("handoff", handoff)]
     )
 
-    csrf = _entrar(client_pg, "bia@exemplo.test")
+    csrf = entrar(client_pg, "bia@exemplo.test")
     assert client_pg.post(f"/admin/conversas/{alvo}/devolver", headers=csrf).status_code == 204
     assert _alertas_abertos(fabrica) == []
 
@@ -574,7 +567,7 @@ def test_alerta_de_handoff_e_resolvido_com_auditoria(
 ):
     fakes.jev.resultado = resultado_jev("humano", 0.95)
     _cliente_escreve(service_pg, conversa, "humano")
-    csrf = _entrar(client_pg, "ana@exemplo.test")
+    csrf = entrar(client_pg, "ana@exemplo.test")
 
     [alerta] = client_pg.get("/admin/alertas").json()
     assert alerta["tipo"] == "handoff"
@@ -587,7 +580,7 @@ def test_alerta_de_handoff_e_resolvido_com_auditoria(
 
 
 def test_cota_zerada_mostra_os_tetos(client_pg, ana):
-    _entrar(client_pg, "ana@exemplo.test")
+    entrar(client_pg, "ana@exemplo.test")
     assert client_pg.get("/admin/cota").json() == {
         "mes": {"usadas": 0, "teto": 500},
         "dia": {"usadas": 0, "teto": 20},
@@ -611,7 +604,7 @@ def test_cota_por_dia_traz_so_o_mes_corrente(client_pg, fabrica, ana):
                 Cota(parceiro="outro", dia=hoje, usadas=5),
             ]
         )
-    _entrar(client_pg, "ana@exemplo.test")
+    entrar(client_pg, "ana@exemplo.test")
     resposta = client_pg.get("/admin/cota/dias").json()
     assert resposta["de"] == inicio.isoformat() and resposta["ate"] == hoje.isoformat()
     assert resposta["teto_diario"] == 20 and resposta["teto_mensal"] == 500
@@ -628,7 +621,7 @@ def test_midia_passa_pela_api_com_sessao(client_pg, service_pg, fabrica, storage
         mensagem_id = mensagem.id
 
     assert client_pg.get(f"/admin/midia/{mensagem_id}/0").status_code == 401
-    _entrar(client_pg, "ana@exemplo.test")
+    entrar(client_pg, "ana@exemplo.test")
     resposta = client_pg.get(f"/admin/midia/{mensagem_id}/0")
     assert resposta.status_code == 200
     assert resposta.content == b"%PDF-1.4"
@@ -653,7 +646,7 @@ def test_midia_fora_da_lista_so_baixa(client_pg, service_pg, fabrica, storage, a
         mensagem.anexos = [{"chave": chave, "mime_type": mime}]
         mensagem_id = mensagem.id
 
-    _entrar(client_pg, "ana@exemplo.test")
+    entrar(client_pg, "ana@exemplo.test")
     resposta = client_pg.get(f"/admin/midia/{mensagem_id}/0")
     assert resposta.status_code == 200
     assert resposta.headers["content-type"] == "application/octet-stream"
@@ -685,7 +678,7 @@ def test_historico_traz_o_turno_e_a_chave_da_fala(
     fakes.jev.resultado = resultado_jev(intent="saudacao")
     _cliente_escreve(service_pg, conversa, "oi")
     alvo = _conversa_id(fabrica, conversa)
-    _entrar(client_pg, "ana@exemplo.test")
+    entrar(client_pg, "ana@exemplo.test")
 
     mensagens = client_pg.get(f"/admin/conversas/{alvo}").json()["mensagens"]
     entrada, saida = mensagens
