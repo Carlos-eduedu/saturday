@@ -96,7 +96,7 @@ uma entrega fora das fases.
   pacote e colhe o aceite com prova; o atendente grava a proposta. Webhook
   assinado em `/webhooks/icred`, simulador em `simuladores/icred/` e tudo atrás
   de `SATURDAY_ICRED_ATIVO`. **Pendentes:** cadastro da aplicação do Saturday no
-  motor (chave, webhook e segredo), a consulta na ficha do painel, a fase 2
+  motor (chave, webhook e segredo), a fase 2
   (gravação pelo agente, condicionada aos pedidos ao motor listados na 0027) e
   os `TODO(icred)` de seguro, CET e do que o cliente faz no link. Ver
   `docs/icred.md`.

@@ -111,6 +111,7 @@ def turno_inicial(
         "message_id": None,
         "telefone": None,
         "clt_faq": False,
+        "icred_rota": None,
         "modelo_aviso": None,
         "link_aviso": None,
         "modelo_envio": None,

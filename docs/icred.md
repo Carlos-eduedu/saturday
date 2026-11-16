@@ -11,7 +11,9 @@ decisões estão em `docs/decisoes/0027-icred-pelo-motor-da-mex.md`.
    consultada.
 2. SIM: o agente pede o CPF (o ramo INSS não o tem). Com o CPF válido, grava a
    prova `icred_consulta` e abre a consulta (`acao: consultar`,
-   `Idempotency-Key`). NÃO, CPF inválido duas vezes ou motor fora do ar: a
+   `Idempotency-Key`). Só "sim", "autorizo" ou "aceito" valem como SIM, aqui e
+   no aceite. NÃO, duas respostas que não são sim nem não, CPF inválido duas
+   vezes, motor fora do ar ou CPF com consulta aberta em outra conversa: a
    conversa segue o caminho de antes.
 3. O resultado chega pelo webhook `consulta.concluida` e vira um turno de
    sistema. `agent/icred/regras.py` decide:

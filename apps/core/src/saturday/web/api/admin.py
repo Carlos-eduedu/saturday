@@ -29,6 +29,7 @@ from saturday.dados import repositorios
 from saturday.dados.modelos import (
     Alerta,
     Consentimento,
+    ConsultaIcred,
     Conversa,
     Cota,
     Mensagem,
@@ -710,8 +711,24 @@ def _acompanhamento(sessao: Session, conversa: Conversa, jornada: Jornada) -> di
         .where(Consentimento.conversa_id == conversa.id)
         .order_by(Consentimento.id)
     )
+    icred = sessao.scalars(
+        select(ConsultaIcred)
+        .where(ConsultaIcred.conversa_id == conversa.id)
+        .order_by(ConsultaIcred.id.desc())
+        .limit(1)
+    ).first()
     return {
         "oferta": oferta,
+        # A última consulta ao iCred (decisão 0027): o pacote já vem sem comissão.
+        "icred": None
+        if icred is None
+        else {
+            "estado": icred.estado,
+            "situacao": icred.situacao,
+            "contratos": icred.contratos or [],
+            "valido_ate": icred.valido_ate,
+            "atualizada_em": icred.atualizada_em,
+        },
         "proposta": None
         if proposta is None
         else {

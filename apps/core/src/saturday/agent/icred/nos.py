@@ -87,14 +87,29 @@ def _valor_c6(state: AgentState) -> Decimal:
 def porta(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
     """Depois do cálculo: pede o SIM da consulta, uma vez por conversa."""
 
-    if (
-        runtime.context.icred is None
-        or (state.get("icred") or {}).get("etapa")
-        or not state.get("telefone")
-        or state.get("handoff_reason") not in _MOTIVOS_COM_CONSULTA
-    ):
+    if runtime.context.icred is None or state.get("handoff_reason") not in _MOTIVOS_COM_CONSULTA:
+        return {}
+    dados = dict(state.get("icred") or {})
+    etapa = dados.get("etapa")
+    # Extrato novo no meio da jornada do iCred: a pergunta aberta continua valendo,
+    # senão o SIM seguinte responderia à oferta errada.
+    if etapa in ("sim", "cpf"):
+        return _falar({"etapa": "sim"}, textos.PEDIR_SIM, "icred:pedir_sim")
+    if etapa == "consultando":
+        return _falar(dados, textos.CONSULTANDO, "icred:consultando")
+    if etapa == "oferta":
+        return _falar(dados, textos.oferta(list(dados.get("contratos") or [])), "icred:oferta")
+    if etapa or not state.get("telefone"):
         return {}
     return _falar({"etapa": "sim"}, textos.PEDIR_SIM, "icred:pedir_sim")
+
+
+def _resposta(texto: str) -> bool | None:
+    """SIM explícito (regra 3), NÃO, ou ``None`` quando não é nenhum dos dois."""
+
+    if leitura.consentiu(texto):
+        return True
+    return False if leitura.NEGACAO.search(texto) else None
 
 
 def icred(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
@@ -116,9 +131,14 @@ def icred(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
 
 def _sim(state: AgentState, dados: dict[str, Any]) -> dict[str, Any]:
     texto = state.get("user_message", "")
-    resposta = leitura.sim_ou_nao(texto)
+    resposta = _resposta(texto)
     if resposta is None:
-        return {"icred_rota": "classify_intent"}
+        # Uma dúvida vai para o classificador; na segunda, o resultado do
+        # extrato não espera mais pelo iCred.
+        dados["tentativas"] = int(dados.get("tentativas") or 0) + 1
+        if dados["tentativas"] >= 2:
+            return _seguir(dados)
+        return {"icred": dados, "icred_rota": "classify_intent"}
     if not resposta:
         return _seguir(dados)
     # A prova é gravada com o CPF, na etapa seguinte; aqui fica o SIM literal.
@@ -191,7 +211,7 @@ def _evento(
 
 def _aceite(state: AgentState, contexto: AgentContext, dados: dict[str, Any]) -> dict[str, Any]:
     texto = state.get("user_message", "")
-    resposta = leitura.sim_ou_nao(texto)
+    resposta = _resposta(texto)
     if resposta is None:
         return {"icred_rota": "classify_intent"}
     if not resposta:

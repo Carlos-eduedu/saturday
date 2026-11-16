@@ -11,7 +11,12 @@ from sqlalchemy import select
 from test_painel_api import _cliente_escreve, _conversa_id, _criar
 
 from saturday.agent.service import ficha_do_estado
-from saturday.dados.modelos import Auditoria, ConsultaGranatech, PropostaGranatech
+from saturday.dados.modelos import (
+    Auditoria,
+    ConsultaGranatech,
+    ConsultaIcred,
+    PropostaGranatech,
+)
 from saturday.dados.sessao import sessao as abrir
 
 
@@ -119,6 +124,32 @@ def test_editar_ficha_exige_ser_dono_e_dado_valido(client_pg, service_pg, fabric
         assert client_pg.patch(rota, headers=csrf, json=invalido).status_code == 422
     assert client_pg.patch(rota, headers=csrf, json={}).status_code == 422
     assert client_pg.patch(rota, json={"sexo": "F"}).status_code == 403
+
+
+def test_ficha_mostra_a_ultima_consulta_do_icred(client_pg, service_pg, fabrica, ana, conversa):
+    _cliente_escreve(service_pg, conversa, "oi")
+    alvo = _conversa_id(fabrica, conversa)
+    entrar(client_pg, "ana@exemplo.test")
+    rota = f"/admin/conversas/{alvo}/ficha"
+    assert client_pg.get(rota).json()["icred"] is None
+
+    contrato = {"tipo": "novo", "taxa": "1.80", "prazo": 84, "parcela": "100", "liberado": "5000"}
+    with abrir(fabrica) as s:
+        s.add(
+            ConsultaIcred(
+                chave=uuid.uuid4().hex,
+                cpf="00189004967",
+                conversa_id=uuid.UUID(alvo),
+                estado="concluida",
+                situacao="COM_OFERTA",
+                contratos=[contrato],
+            )
+        )
+
+    icred = client_pg.get(rota).json()["icred"]
+    assert (icred["situacao"], icred["contratos"]) == ("COM_OFERTA", [contrato])
+    # O CPF da consulta não sai por aqui: ele já está na ficha, mascarado.
+    assert "cpf" not in icred
 
 
 def test_cpf_e_conta_travam_depois_do_banco(client_pg, service_pg, fabrica, ana, conversa):

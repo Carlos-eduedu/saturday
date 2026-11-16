@@ -520,3 +520,120 @@ def test_sem_o_icred_ligado_o_ramo_inss_nao_muda(service: AgentService, fakes: F
         OrigemCanal(canal="whatsapp", telefone=TELEFONE, phone_number_id="100000000000001"),
     )
     assert (resposta.answer or "").startswith("Analisei o seu extrato.")
+
+
+# ------------------------------------------------- achados da revisão do diff
+
+
+def _atendimento(jornada: Jornada) -> str:
+    with abrir_sessao(jornada.fabrica) as sessao:
+        return str(
+            sessao.scalars(
+                select(Conversa.atendimento).where(Conversa.conversation_id == jornada.id)
+            ).one()
+        )
+
+
+def test_so_o_sim_explicito_autoriza_e_a_duvida_nao_prende_a_rota(jornada: Jornada) -> None:
+    jornada.extrato()
+
+    # "tenho" é sim na triagem do CLT, mas não é consentimento (regra 3).
+    assert jornada.falar("tenho uma dúvida").answer != textos.PEDIR_CPF
+    assert jornada.estado()["icred"]["etapa"] == "sim"
+    assert jornada.provas() == []
+    # A rota da dúvida não fica no checkpoint: o SIM seguinte pede o CPF.
+    assert jornada.falar("sim").answer == textos.PEDIR_CPF
+
+
+def test_segunda_resposta_sem_sim_nem_nao_entrega_o_resultado_do_extrato(
+    jornada: Jornada, simulador_icred: ModuleType
+) -> None:
+    jornada.extrato()
+    jornada.falar("ok")
+
+    assert (jornada.falar("e o resultado?").answer or "").startswith("Analisei o seu extrato.")
+    assert simulador_icred.CHAMADAS == []
+
+
+def test_pergunta_na_oferta_nao_e_aceite(jornada: Jornada, simulador_icred: ModuleType) -> None:
+    jornada.ate_a_consulta()
+    jornada.resultado("COM_OFERTA", [_produto(simulador_icred, liberado=50000.0)])
+
+    jornada.falar("tem seguro?")
+
+    assert _atendimento(jornada) != "handoff"
+    assert [tipo for tipo, _cpf, _resposta in jornada.provas()] == ["icred_consulta"]
+
+
+def test_extrato_repetido_mantem_a_pergunta_do_icred(jornada: Jornada) -> None:
+    assert jornada.extrato().answer == textos.PEDIR_SIM
+
+    assert jornada.extrato().answer == textos.PEDIR_SIM
+    assert jornada.falar("sim").answer == textos.PEDIR_CPF
+
+
+def test_pacote_lido_pela_metade_vai_para_o_atendente(
+    jornada: Jornada, simulador_icred: ModuleType
+) -> None:
+    jornada.ate_a_consulta()
+
+    inteiro = _produto(simulador_icred, liberado=50000.0)
+    jornada.resultado("COM_OFERTA", [inteiro, _produto(simulador_icred, parcela=None)])
+
+    assert _atendimento(jornada) == "handoff"
+    assert "R$" not in jornada.ultima_saida()
+
+
+def test_cpf_com_consulta_aberta_em_outra_conversa_segue_sem_o_icred(
+    jornada: Jornada, fabrica: sessionmaker[Session], http_icred: TestClient, fakes: Fakes
+) -> None:
+    jornada.ate_a_consulta()
+    outra = Jornada(fabrica, http_icred, fakes, jornada.simulador)
+    outra.extrato()
+    outra.falar("sim")
+
+    # O motor devolve a consulta da primeira conversa (`ja_existia`).
+    assert (outra.falar(CPF).answer or "").startswith("Analisei o seu extrato.")
+    assert outra.estado()["icred"]["etapa"] == "fim"
+
+
+def test_evento_de_consulta_desconhecida_falha_para_a_fila_tentar_de_novo(
+    jornada: Jornada,
+) -> None:
+    dados = {"id": "nao-existe", "estado": "concluida"}
+    evento = {"evento": job.CONSULTA_CONCLUIDA, "dados": dados}
+
+    with pytest.raises(ValueError, match="desconhecida"):
+        job.aplicar(jornada.fabrica, evento, jornada.servico)
+
+
+def test_desistir_de_evento_sem_id_nao_toca_em_conversa_alheia(
+    jornada: Jornada, simulador_icred: ModuleType
+) -> None:
+    # Deixa uma linha `falhou`, sem id do motor.
+    simulador_icred.FALHAS.append(
+        {"rota": "/consultas", "metodo": "POST", "status": 500, "vezes": 1}
+    )
+    jornada.extrato()
+    jornada.falar("sim")
+    jornada.falar(CPF)
+
+    job.desistir(jornada.fabrica, {"evento": job.CONSULTA_CONCLUIDA}, jornada.servico)
+
+    assert _atendimento(jornada) != "handoff"
+
+
+def test_turno_que_falha_no_prazo_manda_a_conversa_para_um_humano(
+    jornada: Jornada, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    jornada.ate_a_consulta()
+    with abrir_sessao(jornada.fabrica) as sessao:
+        sessao.execute(update(ConsultaIcred).values(criada_em=func.now() - timedelta(minutes=6)))
+
+    def quebra(*_args: Any, **_kwargs: Any) -> None:
+        raise RuntimeError("turno quebrou")
+
+    monkeypatch.setattr(jornada.servico, "continuar", quebra)
+
+    assert job.verificar_prazo(jornada.fabrica, jornada.cliente, jornada.servico) == 1
+    assert _atendimento(jornada) == "handoff"

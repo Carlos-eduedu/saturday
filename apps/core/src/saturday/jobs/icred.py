@@ -42,8 +42,9 @@ def _gravar(fabrica: sessionmaker[Session], resultado: Resultado) -> str | None:
             select(ConsultaIcred).where(ConsultaIcred.id_externo == resultado.id_externo)
         )
         if linha is None:
-            logger.warning("icred_consulta_desconhecida")
-            return None
+            # O resultado pode chegar antes de `abrir_consulta` gravar o id do
+            # motor: falhar faz a fila tentar de novo.
+            raise ValueError("consulta do iCred desconhecida")
         if linha.estado != resultado.estado or not resultado.final:
             return None
         return repositorios.conversation_id_de(sessao, linha.conversa_id)
@@ -68,7 +69,11 @@ def desistir(
 ) -> None:
     """A fila desistiu do evento: a conversa que espera o resultado vai para um humano."""
 
-    id_externo = (payload.get("dados") or {}).get("id")
+    dados = payload.get("dados")
+    id_externo = dados.get("id") if isinstance(dados, dict) else None
+    # Sem id, a comparação viraria `IS NULL` e pegaria a consulta de outra conversa.
+    if not isinstance(id_externo, str):
+        return
     with abrir_sessao(fabrica) as sessao:
         linha = sessao.scalar(select(ConsultaIcred).where(ConsultaIcred.id_externo == id_externo))
         conversation_id = (
@@ -76,6 +81,17 @@ def desistir(
         )
     if conversation_id:
         servico.desistir_de_sistema(conversation_id, EVENTO_RESULTADO)
+
+
+def _avisar(servico: AgentService, conversation_id: str, evento: str) -> None:
+    """Turno de sistema fora da fila: se falhar, ninguém tenta de novo, então a
+    conversa vai para um humano em vez de ficar esperando o resultado."""
+
+    try:
+        servico.continuar(conversation_id, evento)
+    except Exception:
+        logger.exception("icred_turno_falhou evento=%s", evento)
+        servico.desistir_de_sistema(conversation_id, evento)
 
 
 def verificar_prazo(
@@ -92,17 +108,22 @@ def verificar_prazo(
         ).all()
 
     abandonadas = 0
+    # O laço do worker é um só: com o motor fora do ar, a primeira leitura que
+    # falha vale para todas, e as demais não gastam o timeout de novo.
+    motor_fora = False
     for id_local, id_externo in vencidas:
         if id_externo is None:  # consulta aberta sempre tem o id do motor
             continue
-        try:
-            resultado = cliente.ler(id_externo)
-        except ErroIcred:
-            resultado = None
+        resultado = None
+        if not motor_fora:
+            try:
+                resultado = cliente.ler(id_externo)
+            except ErroIcred as erro:
+                motor_fora = erro.status is None or erro.status >= 500
         if resultado is not None and resultado.final:
             conversation_id = _gravar(fabrica, resultado)
             if conversation_id:
-                servico.continuar(conversation_id, EVENTO_RESULTADO)
+                _avisar(servico, conversation_id, EVENTO_RESULTADO)
             continue
 
         with abrir_sessao(fabrica) as sessao:
@@ -120,5 +141,5 @@ def verificar_prazo(
             conversation_id = repositorios.conversation_id_de(sessao, linha.conversa_id)
         abandonadas += 1
         if conversation_id:
-            servico.continuar(conversation_id, EVENTO_PRAZO)
+            _avisar(servico, conversation_id, EVENTO_PRAZO)
     return abandonadas

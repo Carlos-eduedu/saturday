@@ -60,7 +60,9 @@ def gravar_resultado(sessao: Session, resultado: Resultado) -> ConsultaIcred | N
         return None
     linha.estado = resultado.estado
     linha.situacao = resultado.situacao
-    linha.contratos = resultado.contratos
+    # Pacote lido pela metade não é apresentado (decisão 0027): sem contratos,
+    # a regra manda um atendente conferir.
+    linha.contratos = resultado.contratos if resultado.completo else []
     linha.valido_ate = resultado.valido_ate
     return linha
 
@@ -193,12 +195,17 @@ class ClienteIcred:
             antiga = sessao.scalar(
                 select(ConsultaIcred).where(ConsultaIcred.id_externo == id_externo)
             )
-            if antiga is not None:
+            if antiga is None:
+                nova.id_externo = id_externo
+                nova.estado = estado
+                return id_local
+            if antiga.conversa_id == conversa_id and antiga.estado in ABERTAS:
                 sessao.delete(nova)
                 return antiga.id
-            nova.id_externo = id_externo
-            nova.estado = estado
-        return id_local
+            # A consulta aberta é de outra conversa (ou já foi abandonada): o
+            # resultado dela não chegaria a esta, que segue sem o iCred.
+            nova.estado = FALHOU
+        raise ErroIcred("POST /consultas: o CPF já tem consulta aberta em outra conversa")
 
     def ler(self, id_externo: str, *, conversa_id: Any = None) -> Resultado:
         rota = "/consultas/{cid}"
