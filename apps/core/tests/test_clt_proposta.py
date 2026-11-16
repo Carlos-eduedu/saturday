@@ -276,14 +276,15 @@ def test_negar_o_resumo_volta_para_a_oferta(nova: Any, simulador_granatech: Modu
     assert not simulador_granatech.PROPOSTAS
 
 
-def test_oferta_sem_seguro_vai_para_handoff(nova: Any) -> None:
+def test_oferta_sem_seguro_cria_a_proposta(nova: Any, simulador_granatech: ModuleType) -> None:
     jornada = nova()
     _ate_oferta(jornada)
     clt = jornada.clt()
     clt["oferta"]["seguro_aplicado"] = False
     jornada.servico.graph.update_state(jornada.servico.config(jornada.id), {"clt": clt})
-    resposta = jornada.falar("quero")
-    assert resposta.status == "handoff" and resposta.handoff_reason == "proposta_sem_seguro"
+    jornada.roteiro(*DADOS_ATE_RESUMO)
+    assert jornada.falar("SIM").answer == texto("proposta_enviada")
+    assert _posts_de_proposta(simulador_granatech) == 1
 
 
 # ---------------------------------------------------------------- pós-venda

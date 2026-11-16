@@ -1,7 +1,7 @@
 # 0015 — Formatos reais da api-dev da Granatech no lugar dos documentados
 
 - **Data:** 2026-11-13
-- **Status:** aceita (aguardando confirmação da Granatech)
+- **Status:** aceita (`id_externo` como número confirmado pela Granatech em 2026-11-16; os outros pontos aguardam)
 
 ## Contexto
 

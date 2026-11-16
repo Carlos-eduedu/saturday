@@ -188,7 +188,8 @@ def acoes_da_proposta(linha: PropostaGranatech, conta_ativa: bool) -> dict[str, 
         "corrigir_conta": ("correção de conta desligada" if not conta_ativa else None)
         or sem_conversa
         or sem_id
-        or encerrada,
+        # A Granatech só aceita a conta nova com a proposta parada na revisão.
+        or (None if linha.status == "PENDING_USER_REVIEW" else "proposta fora da revisão de dados"),
     }
 
 

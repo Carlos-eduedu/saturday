@@ -271,6 +271,12 @@ def test_corrigir_conta_com_a_flag(painel: Any, fabrica: sessionmaker[Session]) 
     cabecalhos = entrar_como(client, fabrica, "gestor")
     rota = f"{ROTA}/propostas/{_id_proposta(fabrica)}/conta"
 
+    # Fora da revisão de dados a Granatech não aceita a conta nova.
+    assert (
+        client.post(rota, json={**conta, "banco_codigo": "341"}, headers=cabecalhos).status_code
+        == 409
+    )
+    _evento(jornada, "PENDING_USER_REVIEW", "FALHA_PAGAMENTO")
     assert client.post(rota, json=conta, headers=cabecalhos).status_code == 422
     resposta = client.post(rota, json={**conta, "banco_codigo": "341"}, headers=cabecalhos)
     assert resposta.status_code == 204, resposta.text

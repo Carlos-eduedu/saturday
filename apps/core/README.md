@@ -82,7 +82,6 @@ Todas usam o prefixo `SATURDAY_`. O `.env` é lido automaticamente.
 | `SATURDAY_GRANATECH_COTA_MENSAL` | `500` | Teto de consultas no mês (alerta a 80%). |
 | `SATURDAY_GRANATECH_COTA_DIARIA` | `20` | Limite de consultas no dia. |
 | `SATURDAY_GRANATECH_REAPROVEITAR_DIAS` | `30` | Janela para reaproveitar consulta do mesmo CPF. |
-| `SATURDAY_GRANATECH_TIPO_EMPREGADOR` | `1` | `tipo_empregador` do corpo da proposta (pendente de confirmação). |
 
 > **Atenção:** todas as variáveis de ambiente agora usam o prefixo `SATURDAY_`.
 > Por exemplo, `OPENROUTER_API_KEY` virou `SATURDAY_OPENROUTER_API_KEY`,

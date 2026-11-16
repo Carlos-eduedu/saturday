@@ -305,7 +305,6 @@ class Homologacao:
             vinculo=vinculo,
             produto=produto,
             simulacao=simulacao,
-            tipo_empregador=1,
         )
         status, dados, arquivo = self.chamar(
             f"proposta-contratacao{numero}", "POST", "/propostas", corpo=corpo

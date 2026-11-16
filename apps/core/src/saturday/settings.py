@@ -99,14 +99,12 @@ class Settings(BaseSettings):
     granatech_simulador_chave: SecretStr = SecretStr("")
     granatech_simulador_webhook_token: SecretStr = SecretStr("")
     granatech_proposta_ativa: bool = False
-    # TODO(granatech): corpo do PATCH de dados bancários; até lá, desligado.
+    # PATCH de dados bancários: confirmado pela Granatech, ainda sem teste na api-dev.
     granatech_dados_bancarios_ativo: bool = False
     granatech_teto_liberado: Decimal = Decimal("6999")
     granatech_cota_mensal: int = 500
     granatech_cota_diaria: int = 20
     granatech_reaproveitar_dias: int = 30
-    # TODO(granatech): confirmar o `tipo_empregador` do corpo da proposta.
-    granatech_tipo_empregador: int = 1
 
     # Domínio dos links curtos (`https://{dominio}/l/{codigo}`), obrigatório com a
     # proposta ligada.

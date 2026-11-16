@@ -458,12 +458,11 @@ class ClienteGranatech:
             )
 
     def listar_consultas_por_cpf(self, cpf: str) -> list[dict[str, Any]]:
-        # TODO(granatech): qual dos dois parâmetros vale, `filterBy` ou `filtrar_por`.
         dados = self._chamar(
             "GET",
             f"{CONSIGNADO}/consulta-saldo/usuario",
             f"{CONSIGNADO}/consulta-saldo/usuario",
-            params={"pagina": 1, "filterBy": "cpf", "filtrar_por": "cpf", "valor_filtro": cpf},
+            params={"pagina": 1, "filtrar_por": "cpf", "valor_filtro": cpf},
         )
         return itens_da_listagem(dados)
 
@@ -580,10 +579,6 @@ class ClienteGranatech:
     @property
     def dados_bancarios_ativo(self) -> bool:
         return self._settings.granatech_dados_bancarios_ativo
-
-    @property
-    def tipo_empregador(self) -> int:
-        return self._settings.granatech_tipo_empregador
 
     def historico_proposta(self, id_proposta: str) -> list[dict[str, Any]]:
         """Eventos recebidos da proposta, do mais antigo ao mais novo."""
@@ -829,9 +824,10 @@ class ClienteGranatech:
     ) -> None:
         """Nova conta depois de uma falha de pagamento.
 
-        TODO(granatech): corpo do ``PATCH /propostas/{id}/dados-bancarios``. Enviamos
-        o mesmo ``banco_detalhe`` dos dados do tomador; fica atrás de
-        ``SATURDAY_GRANATECH_DADOS_BANCARIOS_ATIVO`` até a Granatech confirmar.
+        O corpo é o mesmo ``banco_detalhe`` dos dados do tomador e a rota só vale
+        com a proposta em ``PENDING_USER_REVIEW`` (resposta da Granatech,
+        2026-11-16). Ainda não rodou contra a api-dev: fica atrás de
+        ``SATURDAY_GRANATECH_DADOS_BANCARIOS_ATIVO``.
         """
 
         if not self._settings.granatech_dados_bancarios_ativo:

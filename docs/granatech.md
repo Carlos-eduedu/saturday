@@ -181,7 +181,7 @@ de chamar o banco. A API fica em `web/api/granatech_admin.py`
 | Reconciliar | Proposta com envio `incerta`: procura na listagem. Achada, devolve a conversa à IA e roda o turno `painel:reconciliar`, que segue do aceite sem novo POST (dados do tomador e aviso). Não achada, nada muda |
 | Reenviar link | Proposta em formalização: turno `proposta:formalizar`/`refazer` com `forcar=True`, que fala com o cliente mesmo com a conversa com humano |
 | Cancelar | `POST /propostas/{id}/cancelar` com motivo na auditoria; o cliente é avisado quando o webhook `CANCELED` chegar |
-| Corrigir conta | Só com `SATURDAY_GRANATECH_DADOS_BANCARIOS_ATIVO`; banco da lista `GET /bancos`; a auditoria guarda só o banco e os 2 últimos dígitos |
+| Corrigir conta | Só com `SATURDAY_GRANATECH_DADOS_BANCARIOS_ATIVO` e a proposta em `PENDING_USER_REVIEW`; banco da lista `GET /bancos`; a auditoria guarda só o banco e os 2 últimos dígitos |
 | Atualizar detalhe | Consulta sem detalhe: relê o `GET /consulta-saldo/{id}`; com margens, marca `SUCCESS` e roda `consulta_pronta` |
 
 Abrir consulta, simular e criar proposta não existem no painel: dependem do SIM
@@ -191,19 +191,11 @@ do cliente. Item sem conversa fica só para leitura.
 
 Cada uma está no código como `TODO(granatech)`:
 
-- qual parâmetro da listagem por CPF vale, `filterBy` ou `filtrar_por` (vão os
-  dois);
 - formato das listagens de consulta e de proposta (aceitamos lista ou `data`,
   `dados`, `items`, `content`);
 - formato da resposta do `POST /propostas`: a api-dev devolve só o id, como
   texto JSON (rodada 10, 2026-11-13); aceitamos também `id`, `id_proposta` ou
   `data.id`;
-- `informacaoDeSeguros` de proposta sem seguro;
-- confirmar que `informacaoDeSeguros.id_externo` é o `id_cobertura_seguro`:
-  a api-dev recusa com 400 (`must be a number`) o `"SM-…"` da simulação e,
-  sem o bloco, recusa produto com seguro. Homologação e jornada mandam a
-  cobertura como número, aceita nas rodadas 10, 11 e 13
-  (docs/decisoes/0015). Perguntas enviadas à Granatech em 2026-11-13;
 - lista completa dos status de consulta em português: a api-dev manda o
   webhook em português, e só `AGUARDANDO_AUTORIZACAO_DO_CLIENTE` e `CONCLUIDO`
   (já vistos) são traduzidos para os nomes da documentação; outro nome vira
@@ -217,16 +209,31 @@ Cada uma está no código como `TODO(granatech)`:
   (`data_nascimento must be a Date instance`, `nome_completo_mae must be a
   string`). A homologação usa os dados de teste do exemplo da collection; a
   jornada do agente ainda não pede ao cliente o que faltar;
-- `tipo_empregador` (padrão 1, por configuração);
 - significado de `FIDUCIARY_INSTITUTION_NO_AUTHORIZATION` e
   `WORKER_MUST_CANCEL_RETURN_REQUEST` (por ora, alerta);
-- corpo do `PATCH /propostas/{id}/dados-bancarios` (atrás de
-  `SATURDAY_GRANATECH_DADOS_BANCARIOS_ATIVO`, desligada; até lá, a equipe
-  corrige a conta);
 - em que campo o `GET /propostas/{id}` devolve o status (por isso a aba não tem
   "atualizar status"; o status chega só pelo webhook);
 - valores aceitos de `estado_civil` nos dados do tomador (enviamos SOLTEIRO,
   CASADO, DIVORCIADO, VIUVO, UNIAO_ESTAVEL ou SEPARADO).
+
+### Respondidas em 2026-11-16
+
+- **Filtro da listagem por CPF:** `filtrar_por`; o `filterBy` do Swagger saiu.
+- **`informacaoDeSeguros.id_externo`:** vai só o número (o
+  `id_cobertura_seguro`, decisão 0015); a Granatech troca o valor sozinha
+  depois dos dados do tomador, quando o seguro é contratado.
+- **Proposta sem seguro:** vai sem o bloco `informacaoDeSeguros`. Na
+  homologação todo produto tem seguro; o produto sem seguro só aparece em
+  produção, quando a margem do tomador se enquadra nele.
+- **`tipo_empregador`:** 1 = CNPJ, 2 = CPF. Sai do `documento_empregador` do
+  vínculo (11 dígitos, 2; senão, 1).
+- **`PATCH /propostas/{id}/dados-bancarios`:** mesmo `banco_detalhe` dos dados
+  do tomador, e só com a proposta em `PENDING_USER_REVIEW`. Continua atrás de
+  `SATURDAY_GRANATECH_DADOS_BANCARIOS_ATIVO` (desligada por padrão): o PATCH
+  ainda não rodou contra a api-dev.
+- **Termo de consentimento:** a assinatura pela API
+  (`POST termo-consentimento`) basta em produção; o link só vai ao cliente se
+  a assinatura falhar.
 
 ## Homologação com a Granatech
 

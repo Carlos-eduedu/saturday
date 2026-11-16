@@ -117,7 +117,9 @@ Com `SATURDAY_GRANATECH_PROPOSTA_ATIVA=true`, quando o cliente quer seguir com a
 oferta, a jornada continua: `dados_proposta` → `aceite` → `proposta` →
 `formalizacao` → `pago` ([decisão 0008](decisoes/0008-dados-da-proposta-antes-do-sim.md)).
 Com a flag desligada, o aceite vai para handoff (`aceite_clt`). Oferta sem seguro
-também vai para handoff, porque o contrato da proposta sem seguro é pendente.
+segue o mesmo caminho da com seguro: a proposta vai sem o bloco
+`informacaoDeSeguros` (resposta da Granatech, 2026-11-16; na homologação todo
+produto tem seguro, então esse corpo só roda em produção).
 
 - **Dados:** confirma o nome da mãe e o endereço da Granatech (se divergirem,
   handoff), pede o estado civil e a conta, um dado por mensagem: banco por nome

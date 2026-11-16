@@ -109,10 +109,6 @@ def iniciar(t: Turno) -> dict[str, Any]:
     if not t.granatech.proposta_ativa:
         # Proposta automática desligada: um especialista segue daqui.
         return t.handoff("aceite_clt", texto("aceite"))
-    oferta = t.clt["oferta"]
-    if not oferta.get("seguro_aplicado"):
-        # TODO(granatech): `informacaoDeSeguros` de proposta sem seguro.
-        return t.handoff("proposta_sem_seguro", texto("aceite"))
     pessoa = _pessoa(t)
     if pessoa is None or not pessoa.nome_mae or pessoa.endereco is None:
         return t.handoff("dados_divergentes")
@@ -278,7 +274,6 @@ def seguir_proposta(t: Turno) -> dict[str, Any]:
         vinculo=vinculo,
         produto=produto,
         simulacao=_simulacao(oferta),
-        tipo_empregador=t.granatech.tipo_empregador,
     )
     try:
         id_proposta = t.granatech.criar_proposta(
@@ -326,7 +321,7 @@ def aguardando(t: Turno) -> dict[str, Any]:
 def _conta_corrigida(t: Turno) -> dict[str, Any]:
     conta_ = t.dados["conta"]
     if not t.granatech.dados_bancarios_ativo:
-        # TODO(granatech): corpo do PATCH; até lá, a equipe corrige no banco.
+        # PATCH desligado neste ambiente: a equipe corrige no banco.
         t.clt.update(etapa="proposta", passo=None, erros=0)
         return t.handoff("falha_pagamento", detalhe={"conta": conta_})
     detalhe = {k: v for k, v in conta_.items() if k != "banco_nome"}

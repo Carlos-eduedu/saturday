@@ -340,13 +340,18 @@ def _numero(valor: Decimal) -> float:
     return float(valor)
 
 
+def tipo_empregador(documento: str) -> int:
+    """1 para empregador com CNPJ, 2 para CPF (resposta da Granatech, 2026-11-16)."""
+
+    return 2 if sum(c.isdigit() for c in documento) == 11 else 1
+
+
 def montar_corpo_proposta(
     *,
     id_consulta: str,
     vinculo: Vinculo,
     produto: Produto,
     simulacao: Simulacao,
-    tipo_empregador: int,
 ) -> dict[str, Any]:
     """Corpo do ``POST /propostas`` a partir da simulação aceita.
 
@@ -358,8 +363,7 @@ def montar_corpo_proposta(
     """
 
     financeiro = {
-        # TODO(granatech): confirmar `tipo_empregador` (padrão 1 por config).
-        "tipo_empregador": tipo_empregador,
+        "tipo_empregador": tipo_empregador(vinculo.documento_empregador),
         "documento_empregador": vinculo.documento_empregador,
         "valor_solicitado": _numero(simulacao.liberado),
         "valor_total_financiado": _numero(simulacao.valor_total_financiado),
@@ -380,8 +384,7 @@ def montar_corpo_proposta(
         "id_margem": vinculo.id_margem,
         "informacoesFinanceira": [financeiro],
     }
-    # TODO(granatech): confirmar que `informacaoDeSeguros.id_externo` é o
-    # `id_cobertura_seguro` (pergunta enviada em 2026-11-13). Sem cobertura
+    # A Granatech confirmou o número em `id_externo` (2026-11-16). Sem cobertura
     # numérica, sobra o `id_externo` da simulação, que a api-dev recusa.
     if simulacao.seguro_aplicado:
         cobertura = produto.id_produto_seguro
@@ -398,7 +401,7 @@ def montar_corpo_proposta(
             "valor_seguro": _numero(simulacao.valor_seguro),
             "iof": _numero(simulacao.valor_iof),
         }
-    # TODO(granatech): `informacaoDeSeguros` de uma proposta sem seguro.
+    # Proposta sem seguro vai sem o bloco (resposta da Granatech, 2026-11-16).
     return corpo
 
 

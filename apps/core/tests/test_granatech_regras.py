@@ -20,6 +20,7 @@ from saturday.bancos.granatech.normalizacao import (
     normalizar_detalhe,
     normalizar_simulacao,
     recortar_detalhe,
+    tipo_empregador,
 )
 from saturday.bancos.granatech.numeros import decimal_de
 from saturday.bancos.granatech.teto import proxima_parcela
@@ -318,10 +319,12 @@ def test_corpo_da_proposta_leva_seguro_e_valores_da_simulacao() -> None:
         vinculo=vinculo,
         produto=produto,
         simulacao=simulacao,
-        tipo_empregador=1,
     )
 
     financeiro = corpo["informacoesFinanceira"][0]
+    # 1 = CNPJ, 2 = CPF: sai do documento do empregador.
+    assert financeiro["tipo_empregador"] == 1
+    assert tipo_empregador("123.456.789-09") == 2
     assert financeiro["valor_solicitado"] == 4619.53
     assert financeiro["valor_liberado_habilitado"] is True
     assert corpo["id_margem"] == "m1"
@@ -334,6 +337,14 @@ def test_corpo_da_proposta_leva_seguro_e_valores_da_simulacao() -> None:
         vinculo=vinculo,
         produto=replace(produto, id_produto_seguro=None),
         simulacao=simulacao,
-        tipo_empregador=1,
     )
     assert sem_cobertura["informacaoDeSeguros"]["id_externo"] == "SM-100000721-6"
+
+    # Proposta sem seguro vai sem o bloco.
+    sem_seguro = montar_corpo_proposta(
+        id_consulta="c1",
+        vinculo=vinculo,
+        produto=produto,
+        simulacao=replace(simulacao, seguro_aplicado=False),
+    )
+    assert "informacaoDeSeguros" not in sem_seguro
