@@ -54,7 +54,7 @@ cd apps/core
 uv sync --locked
 uv run ruff check --fix && uv run ruff format         # corrige estilo
 uv run mypy                                           # strict, só src/saturday
-uv run pytest -q                                      # os de banco são pulados
+uv run pytest -q                                      # sem o Postgres de teste, pula os do agente e os de banco
 uv run pytest tests/test_whatsapp.py::nome_do_teste   # um teste
 uv run pytest -k janela -q                            # por nome
 
@@ -84,7 +84,9 @@ docker compose --profile postgres --profile minio up --build
 - Testes marcados `jev` chamam o classificador de verdade e são pulados sem
   `SATURDAY_OPENROUTER_API_KEY`.
 - Com `environment == "pytest"` o checkpointer é `InMemorySaver` e o storage é
-  `MemoriaStorage` (também sem `S3_BUCKET`).
+  `MemoriaStorage` (também sem `S3_BUCKET`). O banco não tem versão em memória:
+  o `AgentService` exige o Postgres também nos testes (decisão 0022), então
+  quem mexe em `agent/` roda com `SATURDAY_TEST_DATABASE_URL`.
 - O Postgres de teste precisa do pgvector (decisão 0017): a imagem é
   `pgvector/pgvector:pg17`; um container antigo em `postgres:17-alpine` falha em
   `CREATE EXTENSION`.

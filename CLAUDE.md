@@ -54,7 +54,7 @@ os dois processos o recebam. `web/lifespan.py` cuida só de abrir e fechar.
    grafo e fecha o turno é `agent/turno.py` (`Turnos.de_cliente` e
    `Turnos.de_sistema`): trilha, handoff e a resposta em `mensagens` e no
    `outbox` **na mesma transação**. O que vai para o banco passa pelo
-   `RegistroDoTurno` (Postgres ou, sem banco, memória).
+   `RegistroPostgres`; não há modo sem banco (decisão 0022).
 5. `jobs/outbox.py` entrega por `EntregadorPorCanal` (`whatsapp` ou `webhook`).
    O canal só **classifica** o resultado (`ok`, `temporario`,
    `temporario_incerto`, `permanente`, `janela_fechada`); reagendar é só do

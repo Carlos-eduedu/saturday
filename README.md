@@ -183,7 +183,7 @@ cd apps/core
 uv run ruff format --check            # formatação
 uv run ruff check                     # lint
 uv run mypy                           # tipos
-uv run pytest -q                      # testes sem Postgres (os de banco são pulados)
+uv run pytest -q                      # sem o Postgres de teste, pula os do agente e os de banco
 ```
 
 Os testes que exercitam o backend real (trava consultiva, poda de checkpoints,
