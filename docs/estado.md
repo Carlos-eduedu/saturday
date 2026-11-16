@@ -34,6 +34,10 @@ uma entrega fora das fases.
   Aba Membros para todos: lista da equipe e página do membro
   (`/membros/:id`) com estado, carga, atividade de 7 dias, últimas ações e a
   gestão do gestor; o servidor decide o que cada um vê (docs/decisoes/0023).
+  Comandos de chat do membro testador: `/ajuda`, `/estado`, `/reiniciar`,
+  `/humano`, `/devolver` e, só com a Granatech simulada, `/ir` e `/cenario`; o
+  simulador manda sozinho o resultado da consulta aberta com cenário
+  (docs/decisoes/0024).
 - **Fase 4 concluída:** cliente Granatech em `bancos/granatech/` (token em cache,
   retry só em GET, normalização em `Decimal`, teto, proposta única com
   reconciliação pela listagem), cota com trava e alerta a 80%, reaproveitamento

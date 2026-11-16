@@ -244,7 +244,11 @@ def _consultar(t: Turno, *, recontato: int | None) -> dict[str, Any]:
 
     try:
         consulta = t.granatech.abrir_consulta(
-            t.dados["cpf"], t.dados["nome"], t.dados["celular"], conversa_id=t.conversa_id
+            t.dados["cpf"],
+            t.dados["nome"],
+            t.dados["celular"],
+            conversa_id=t.conversa_id,
+            cenario=t.clt.get("cenario"),
         )
     except CotaEsgotada:
         return _cota_esgotada(t, recontato)
@@ -357,7 +361,8 @@ def _pos_consulta(t: Turno, detalhe: DetalheConsulta) -> dict[str, Any]:
     vinculos = regras.vinculos_ofertaveis(detalhe)
     if not vinculos:
         return t.nao_elegivel("nao_elegivel_sem_margem")
-    if len(vinculos) == 1:
+    # `pular_vinculo`: o `/ir oferta` do membro testador fica com o primeiro.
+    if len(vinculos) == 1 or t.clt.pop("pular_vinculo", False):
         t.clt["id_margem"] = vinculos[0].id_margem
         return _simular(t, vinculos[0])
     t.clt.update(etapa="escolha_vinculo", passo="vinculo", erros=0)
@@ -526,6 +531,11 @@ def _evento(t: Turno, evento: str) -> dict[str, Any]:
         if etapa != "aceite":
             return t.responder()
         return proposta.seguir_proposta(t)
+    if nome == "membro":
+        # `/ir` de membro testador (decisão 0024): só com a Granatech simulada.
+        if not t.teste or etapa != "consentimento":
+            return t.responder()
+        return _autorizou(t)
     if nome == "recontato_tempo_casa":
         return _recontato_tempo_casa_vencido(t)
     if nome == "recontato":

@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 from langchain_core.messages import HumanMessage
 from sqlalchemy.orm import Session, sessionmaker
 
+from saturday.agent import comandos
 from saturday.agent.context import AgentContext
 from saturday.agent.state import turno_inicial
 from saturday.agent.textos import (
@@ -355,8 +356,9 @@ class AgentService:
 
         self._registrar_entrada(sessao, conversa, payload, historico)
 
-        if self._pediu_reinicio(sessao, conversa, payload):
-            return self._reiniciar(payload, config, estado, sessao, conversa)
+        comando = self._comando_de_membro(sessao, conversa, payload)
+        if comando is not None:
+            return self._executar_comando(comando, payload, config, estado, sessao, conversa)
 
         silencio, estado = self._silencio_pelo_banco(sessao, conversa, config, estado)
         if silencio:
@@ -373,24 +375,111 @@ class AgentService:
         )
 
     @staticmethod
-    def _pediu_reinicio(sessao: Session, conversa: Conversa, payload: ChatRequest) -> bool:
-        """`/reiniciar` de membro testador (decisão 0020); de cliente é texto comum."""
+    def _comando_de_membro(
+        sessao: Session, conversa: Conversa, payload: ChatRequest
+    ) -> tuple[str, str] | None:
+        """Comando de membro testador (decisões 0020 e 0024); de cliente é texto comum."""
 
-        if (payload.message or "").strip().lower() != COMANDO_REINICIAR:
-            return False
-        return repositorios.testador(sessao, conversa.telefone) is not None
+        comando = comandos.ler(payload.message or "")
+        if comando is None or repositorios.testador(sessao, conversa.telefone) is None:
+            return None
+        return comando
 
-    def _reiniciar(
+    def _executar_comando(
         self,
+        comando: tuple[str, str],
         payload: ChatRequest,
         config: dict[str, Any],
         estado: dict[str, Any],
         sessao: Session,
         conversa: Conversa,
     ) -> AgentReply:
+        """Roda o comando sem passar pelo grafo, fora o `/ir` que abre consulta.
+
+        Vem antes do silêncio com humano: o membro comanda a conversa de teste
+        mesmo em handoff ou assumida.
+        """
+
+        nome, alvo = comando
+        com_humano = conversa.atendimento != "ia"
+        jornada = dict(estado.get("clt") or {})
+
+        def dizer(texto: str, chave: str = "comando") -> AgentReply:
+            return self._responder_comando(payload, config, sessao, conversa, chave, texto)
+
+        if nome == COMANDO_REINICIAR:
+            self._reiniciar(payload, config, estado, conversa)
+            aviso = f"\n\n{comandos.REINICIADA_COM_HUMANO}" if com_humano else ""
+            return dizer(MENSAGEM_REINICIADA + aviso, "reiniciar")
+        if nome == "/ajuda":
+            return dizer(comandos.ajuda(self.context.granatech_teste is not None))
+        if nome == "/estado":
+            return dizer(comandos.estado(jornada, etapa_do_estado(estado), conversa.atendimento))
+        if nome == "/humano":
+            if com_humano:
+                return dizer(comandos.JA_COM_HUMANO)
+            self._registro(sessao, conversa).abrir_handoff(
+                "handoff", "pediu_humano", {"teste": True}
+            )
+            return dizer(comandos.ENVIADA_A_HUMANO)
+        if nome == "/devolver":
+            if not com_humano:
+                return dizer(comandos.JA_COM_IA)
+            atendimento.devolver(sessao, conversa, None)
+            if estado:
+                self._liberar_handoff(config)
+            return dizer(comandos.DEVOLVIDA)
+        if nome not in ("/ir", "/cenario"):
+            return dizer(comandos.DESCONHECIDO)
+        # Regras 3 e 5: sem a Granatech simulada, nada de pular triagem, SIM ou cota.
+        if self.context.granatech_teste is None:
+            return dizer(comandos.SEM_SIMULADOR)
+        if nome == "/cenario":
+            if alvo not in comandos.CENARIOS:
+                return dizer(comandos.LISTA_DE_CENARIOS)
+            self.graph.update_state(config, {"clt": {**jornada, "cenario": alvo}})
+            return dizer(comandos.CENARIO_ESCOLHIDO.format(cenario=alvo))
+        if com_humano:
+            return dizer(comandos.COM_HUMANO)
+        if alvo not in comandos.DESTINOS:
+            return dizer(comandos.LISTA_DE_DESTINOS)
+        return self._ir(alvo, payload, config, estado, sessao, conversa)
+
+    def _responder_comando(
+        self,
+        payload: ChatRequest,
+        config: dict[str, Any],
+        sessao: Session,
+        conversa: Conversa,
+        chave: str,
+        texto: str,
+    ) -> AgentReply:
+        """Resposta fixa de comando: histórico, outbox e idempotência."""
+
+        estado = self.estado_atual(config)
+        # O `message_id` entra no estado: um webhook repetido não roda o comando de novo.
+        self._registrar_resposta(
+            config,
+            list(estado.get("message_ids_recentes") or []),
+            dict(estado.get("respostas_recentes") or {}),
+            payload.message_id,
+            texto,
+        )
+        resposta = self.evento(payload.conversation_id, {}, status="answered", answer=texto)
+        self._registro(sessao, conversa).gravar_saida(resposta, {"chave_mensagem": chave})
+        return resposta
+
+    def _reiniciar(
+        self,
+        payload: ChatRequest,
+        config: dict[str, Any],
+        estado: dict[str, Any],
+        conversa: Conversa,
+    ) -> None:
         """Zera a jornada: estado do grafo, etapa e arquivos do estado.
 
-        A conversa, as mensagens e as provas de consentimento ficam no banco.
+        A conversa, as mensagens e as provas de consentimento ficam no banco. O
+        atendimento não muda: com humano, só o `/devolver` traz a IA de volta.
         """
 
         self._apagar_anexos(estado.get("attachments") or [])
@@ -398,13 +487,58 @@ class AgentService:
         if hasattr(self.checkpointer, "delete_thread"):
             self.checkpointer.delete_thread(thread_id)
         conversa.etapa = None
-        # O `message_id` entra no estado novo: um webhook repetido não reinicia de novo.
-        self._registrar_resposta(config, [], {}, payload.message_id, MENSAGEM_REINICIADA)
-        resposta = self.evento(
-            payload.conversation_id, {}, status="answered", answer=MENSAGEM_REINICIADA
-        )
-        self._registro(sessao, conversa).gravar_saida(resposta, {"chave_mensagem": "reiniciar"})
         logger.info("conversa_reiniciada conversation_id=%s", payload.conversation_id)
+
+    def _ir(
+        self,
+        destino: str,
+        payload: ChatRequest,
+        config: dict[str, Any],
+        estado: dict[str, Any],
+        sessao: Session,
+        conversa: Conversa,
+    ) -> AgentReply:
+        """`/ir <etapa>`: a jornada CLT parada na etapa, com dados fictícios.
+
+        Até o consentimento, só o estado muda. Para `consultando` e `oferta`,
+        um turno de sistema segue do pedido do SIM: a prova, a cota e a consulta
+        saem do grafo, na Granatech simulada.
+        """
+
+        jornada = comandos.jornada_em(
+            destino, conversa.telefone, (estado.get("clt") or {}).get("cenario")
+        )
+        self.graph.update_state(
+            config, {**self._atualizacao_liberacao(), "publico": "clt", "clt": jornada}
+        )
+        if destino == jornada["etapa"]:
+            conversa.etapa = destino
+            return self._responder_comando(
+                payload, config, sessao, conversa, "comando", comandos.pergunta(jornada)
+            )
+        # O comando vai como texto do turno: é a resposta guardada na prova de teste.
+        entrada = turno_inicial(user_message=payload.message, attachments=[])
+        entrada.update(
+            self._dados_da_conversa(conversa),
+            message_id=payload.message_id,
+            evento_sistema=comandos.EVENTO_IR,
+        )
+        resposta = self.turnos.de_sistema(
+            payload.conversation_id,
+            config,
+            entrada,
+            self._registro(sessao, conversa),
+            estado=estado,
+            evento=comandos.EVENTO_IR,
+            forcar=False,
+        )
+        self._registrar_resposta(
+            config,
+            list(estado.get("message_ids_recentes") or []),
+            dict(estado.get("respostas_recentes") or {}),
+            payload.message_id,
+            resposta.answer,
+        )
         return resposta
 
     def _conversa(

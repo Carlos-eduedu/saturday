@@ -153,6 +153,17 @@ completar. O SIM grava `conversas.marketing = opt_in` e o recontato
 `recontato_tempo_casa` e a jornada recomeça pela triagem. "Não quero receber"
 grava `opt_out` em qualquer etapa, e o recontato não sai.
 
+## Comandos do membro testador
+
+Na conversa de membro testador, `/ajuda`, `/estado`, `/reiniciar`, `/humano` e
+`/devolver` valem sempre; `/ir <etapa>` e `/cenario <resultado>` só com a
+Granatech simulada ([decisão 0024](decisoes/0024-comandos-do-membro-testador.md)).
+A leitura e os textos ficam em `agent/comandos.py`; quem executa é o
+`AgentService._executar_comando`, antes do silêncio com humano. O `/ir` para
+`consultando` ou `oferta` vira o turno de sistema `membro:ir`, que segue do
+pedido do SIM pelo mesmo `_autorizou` da jornada. Os testes estão em
+`tests/test_membros_testadores.py`.
+
 ## Testes
 
 - `tests/test_clt_regras.py` e `tests/test_clt_mensagens.py`: sem rede nem banco.
