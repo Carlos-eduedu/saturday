@@ -43,10 +43,12 @@ function emitir(aviso: Aviso): void {
   window.dispatchEvent(new CustomEvent<Aviso>(EVENTO, { detail: aviso }));
 }
 
+export function ouvirAvisos(aoAvisar: (aviso: Aviso) => void): () => void {
+  const ouvir = (evento: Event) => aoAvisar((evento as CustomEvent<Aviso>).detail);
+  window.addEventListener(EVENTO, ouvir);
+  return () => window.removeEventListener(EVENTO, ouvir);
+}
+
 export function useAvisos(aoAvisar: (aviso: Aviso) => void): void {
-  useEffect(() => {
-    const ouvir = (evento: Event) => aoAvisar((evento as CustomEvent<Aviso>).detail);
-    window.addEventListener(EVENTO, ouvir);
-    return () => window.removeEventListener(EVENTO, ouvir);
-  }, [aoAvisar]);
+  useEffect(() => ouvirAvisos(aoAvisar), [aoAvisar]);
 }

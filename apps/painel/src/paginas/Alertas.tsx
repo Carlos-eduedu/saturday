@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router";
 import { type Alerta, api, mensagemDeFalha } from "../api";
 import { useConfirmar } from "../componentes/Confirmar";
 import { Falha } from "../componentes/Falha";
 import { Vazio } from "../componentes/Vazio";
-import { useAvisos } from "../tempoReal";
+import { useRecurso } from "../useRecurso";
 import { formatarHora } from "./Inbox";
 
 const ROTULOS: Record<string, string> = {
@@ -22,22 +22,15 @@ const ROTULOS: Record<string, string> = {
 
 export function Alertas() {
   // null = ainda não carregou: a tela não diz "nenhum alerta" antes de saber.
-  const [alertas, setAlertas] = useState<Alerta[] | null>(null);
-  const [erro, setErro] = useState("");
+  const {
+    dado: alertas,
+    falha,
+    carregar,
+  } = useRecurso("alertas", api.alertas, { recarrega: (aviso) => aviso.tipo !== "mensagem" });
+  // Falha de uma ação (resolver); a de carga vem do recurso.
+  const [erroDaAcao, setErro] = useState("");
+  const erro = erroDaAcao || (falha === null ? "" : mensagemDeFalha(falha, "carregar os alertas"));
   const [resolvendo, setResolvendo] = useState<number | null>(null);
-  const carregar = useCallback(() => {
-    api
-      .alertas()
-      .then((lista) => {
-        setAlertas(lista);
-        setErro("");
-      })
-      .catch((e: unknown) =>
-        setErro(mensagemDeFalha(e, "carregar os alertas")),
-      );
-  }, []);
-  useEffect(carregar, [carregar]);
-  useAvisos(useCallback((aviso) => aviso.tipo !== "mensagem" && carregar(), [carregar]));
 
   // Resolver todos: um por um, com a rota de sempre (cada um vai para a
   // auditoria). Falha num não para os outros; o aviso diz quantos ficaram.
@@ -74,6 +67,7 @@ export function Alertas() {
 
   async function resolver(id: number) {
     if (resolvendo !== null || emLote) return;
+    setErro("");
     setResolvendo(id);
     try {
       await api.resolverAlerta(id);

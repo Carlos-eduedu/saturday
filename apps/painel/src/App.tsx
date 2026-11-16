@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, Navigate, Route, Routes, useLocation } from "react-router";
-import { api, type Cota, type Eu, ErroApi, guardarCsrf, SESSAO_EXPIRADA } from "./api";
+import { api, type Eu, ErroApi, guardarCsrf, SESSAO_EXPIRADA } from "./api";
 import { ConfirmarProvider } from "./componentes/Confirmar";
 import { Falha } from "./componentes/Falha";
 import { MenuConta } from "./componentes/MenuConta";
@@ -13,7 +13,8 @@ import StaggeredMenu from "./componentes/StaggeredMenu";
 import { Caixa } from "./paginas/Caixa";
 import { Login } from "./paginas/Login";
 import { Membros } from "./paginas/Usuarios";
-import { iniciarTempoReal, useAvisos } from "./tempoReal";
+import { iniciarTempoReal } from "./tempoReal";
+import { useRecurso } from "./useRecurso";
 
 export function App() {
   const [eu, setEu] = useState<Eu | null>(null);
@@ -187,35 +188,17 @@ function Logado({
 
 // Quantos alertas estão abertos, em tempo real, para a navegação.
 function useAlertasAbertos(): number {
-  const [alertas, setAlertas] = useState(0);
-  const carregar = useCallback(() => {
-    api
-      .alertas()
-      .then((lista) => setAlertas(lista.length))
-      .catch(() => undefined);
-  }, []);
-  useEffect(carregar, [carregar]);
-  useAvisos(
-    useCallback(
-      (aviso) => (aviso.tipo === "alerta" || aviso.tipo === "reconectado") && carregar(),
-      [carregar],
-    ),
-  );
-  return alertas;
+  // Falha de carga deixa a última contagem.
+  const { dado } = useRecurso("alertas", api.alertas, {
+    recarrega: (aviso) => aviso.tipo === "alerta",
+  });
+  return dado?.length ?? 0;
 }
 
 function ContadorCota() {
-  const [cota, setCota] = useState<Cota | null>(null);
-  const carregar = useCallback(() => {
-    // Sessão vencida já volta ao login pelo `api`; o resto deixa a última cota.
-    api
-      .cota()
-      .then(setCota)
-      .catch(() => undefined);
-  }, []);
-  useEffect(carregar, [carregar]);
+  // Sessão vencida já volta ao login pelo `api`; o resto deixa a última cota.
   // A cota só muda com consulta à Granatech (Fase 4): basta recarregar ao reconectar.
-  useAvisos(useCallback((aviso) => aviso.tipo === "reconectado" && carregar(), [carregar]));
+  const { dado: cota } = useRecurso("cota", api.cota);
 
   if (!cota) return null;
   const alerta = cota.mes.usadas >= cota.mes.teto * 0.8;

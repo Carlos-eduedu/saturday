@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link, useParams } from "react-router";
@@ -37,7 +37,7 @@ import {
   TIPOS_DE_PROVA,
   tokens,
 } from "../rotulos";
-import { useAvisos } from "../tempoReal";
+import { useRecurso } from "../useRecurso";
 import { centavosCitados, foraDaOferta, origemDaMensagem, reaisDeCentavos } from "./conferencia";
 import { formatarHora, ROTULO_ATENDIMENTO, textoDaEspera } from "./Inbox";
 
@@ -68,28 +68,10 @@ type Aba = "mensagens" | "ficha" | "ia";
 // Trocar de conversa esconde o que era da anterior; recarregar mantém à vista
 // o que já estava (e uma falha ao recarregar também).
 function useDaConversa<T>(id: string, buscar: (id: string) => Promise<T>, oQue: string) {
-  const [estado, setEstado] = useState<{ id: string; dado: T } | null>(null);
-  const [erro, setErro] = useState<{ id: string; texto: string } | null>(null);
-  const carregar = useCallback(() => {
-    buscar(id)
-      .then((dado) => {
-        setEstado({ id, dado });
-        setErro(null);
-      })
-      .catch((e: unknown) => setErro({ id, texto: mensagemDeFalha(e, oQue) }));
-  }, [id, buscar, oQue]);
-  useEffect(carregar, [carregar]);
-  useAvisos(
-    useCallback(
-      (aviso) => (aviso.conversa === id || aviso.tipo === "reconectado") && carregar(),
-      [id, carregar],
-    ),
-  );
-  return {
-    dado: estado?.id === id ? estado.dado : null,
-    erro: erro?.id === id ? erro.texto : "",
-    carregar,
-  };
+  const { dado, falha, carregar } = useRecurso(id, () => buscar(id), {
+    recarrega: (aviso) => aviso.conversa === id,
+  });
+  return { dado, erro: falha === null ? "" : mensagemDeFalha(falha, oQue), carregar };
 }
 
 // Prévia curta para o leitor de tela anunciar a mensagem que chegou.
