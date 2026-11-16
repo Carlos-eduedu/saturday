@@ -84,7 +84,7 @@ def mensagem_oferta(resultado: dict[str, Any], uf: str | None = None) -> str:
         [
             "O valor é aproximado: o valor certo só sai quando o seu banco atual "
             "informar o saldo devedor.",
-            "O processo leva de 10 a 15 dias úteis, e a MEX não cobra nada de você.",
+            "O processo leva de 15 a 20 dias úteis, e a MEX não cobra nada de você.",
             "Se o seu banco atual oferecer uma contraproposta e você aceitar, a "
             "portabilidade é cancelada.",
         ]
