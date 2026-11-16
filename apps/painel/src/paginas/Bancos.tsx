@@ -37,13 +37,17 @@ const BANCOS = [
     id: "icred",
     nome: "iCred",
     produto: "INSS: portabilidade, refinanciamento e contrato novo",
-    situacao: "A integrar",
-    faz: ["Nada ainda. Existe só a pesquisa da API, em docs/icred.md."],
+    situacao: "Consulta e oferta",
+    faz: [
+      "Depois do extrato, pede o SIM e o CPF do cliente e consulta o iCred.",
+      "Apresenta a proposta do iCred quando ela põe mais dinheiro na conta do que a portabilidade C6, com taxa de até 1,85% ao mês.",
+      "No aceite, guarda a prova e passa a conversa para um atendente gravar a proposta.",
+    ],
     falta: [
-      "Decidir se o iCred entra no escopo do agente.",
-      "Chave de acesso à API.",
-      "Guardar a prova do consentimento no Saturday: a API recebe só a confirmação.",
-      "Cliente da API, recebimento dos avisos e testes com simulador.",
+      "Ligar: cadastrar a chave e o aviso de resultado no motor do iCred.",
+      "Gravar a proposta pelo agente: depende de mudanças no motor.",
+      "Acompanhar a proposta depois da gravação.",
+      "Confirmar se a oferta do iCred tem seguro.",
     ],
     regras: null,
   },
@@ -54,7 +58,7 @@ type Banco = (typeof BANCOS)[number];
 const SELO: Record<Banco["situacao"], string> = {
   Integrado: "selo-ia",
   "Só cálculo": "selo-assumida",
-  "A integrar": "selo-handoff",
+  "Consulta e oferta": "selo-assumida",
 };
 
 export function Bancos({ eu }: { eu: Eu }) {

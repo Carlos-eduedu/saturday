@@ -16,6 +16,7 @@ const ROTULOS: Record<string, string> = {
   cota_80: "Cota da Granatech passou de 80% do mês",
   consulta_parada: "Consulta da Granatech sem resposta há mais de 15 min",
   granatech_evento: "Evento da Granatech pede atenção",
+  icred_consulta_parada: "Consulta do iCred sem resposta: a conversa seguiu sem ela",
   instancia_desconectada: "Instância da Evolution desconectada",
   instancia_numero_trocado: "Instância reconectada com outro celular (desconectada)",
 };
