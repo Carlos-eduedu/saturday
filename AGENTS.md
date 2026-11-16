@@ -9,7 +9,7 @@ existentes continuam funcionando em toda mudança.
 
 Se uma tarefa parecer exigir quebrar uma destas regras, pare e pergunte.
 
-1. **Auto-suficiência:** o Saturday não chama, não lê e não escreve em nenhum sistema da MEX (CRM, Supabase do Deu Plim, hub `mex-granatech-api`). Só parceiros externos: Meta, Granatech, BrasilAPI, OpenRouter.
+1. **Auto-suficiência:** o Saturday não chama, não lê e não escreve em nenhum sistema da MEX (CRM, Supabase do Deu Plim, hub `mex-granatech-api`). Só parceiros externos: Meta, Granatech, C6, BrasilAPI, OpenRouter.
 2. **Decisões em código:** triagem, consentimento, regras de banco, cálculos, escolha de produto e transições de estado são determinísticos e testados. O LLM só classifica intenção e responde dúvidas ancoradas na FAQ; nunca escreve números, valores ou condições.
 3. **Consentimento do cliente:** nenhuma consulta e nenhuma proposta sem um "SIM" explícito do próprio cliente, conferido em código, com prova gravada. Nunca simule aceite com dados de aparelho inventados.
 4. **Proposta nunca repetida automaticamente:** `POST` de proposta não tem retry. Grave a intenção antes; em resultado incerto (timeout, 5xx), procure a proposta na listagem antes de qualquer nova tentativa.
@@ -24,6 +24,9 @@ Se uma tarefa parecer exigir quebrar uma destas regras, pare e pergunte.
 
 **Fora do escopo:** Finqia, V8, Presença, C6 CLT, Facta e demais bancos; FGTS;
 NovaVida; qualquer dependência do CRM da MEX.
+
+Contrato novo e refinanciamento INSS no C6, pela API do banco, entraram no
+escopo pela decisão 0026.
 
 ## Especificação
 
