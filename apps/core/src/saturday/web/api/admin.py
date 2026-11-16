@@ -820,6 +820,22 @@ def cota_por_dia(request: Request, _usuario: Logado, fabrica: Fabrica) -> dict[s
 
 # ------------------------------------------------------------------ mídia
 
+# O que o navegador mostra sem rodar nada do arquivo. A mesma lista do painel
+# (`apps/painel/src/anexos.ts`): mude as duas juntas.
+IMAGENS_QUE_ABREM = frozenset({"image/jpeg", "image/png", "image/webp", "image/gif"})
+
+
+def abre_no_navegador(mime: str) -> bool:
+    """O anexo vem do cliente, com o tipo que ele declarou: HTML ou SVG aberto no
+    endereço do painel rodaria com a sessão do atendente. Fora da lista, só baixa."""
+
+    limpo = mime.split(";", 1)[0].strip().lower()
+    return (
+        limpo in IMAGENS_QUE_ABREM
+        or limpo == "application/pdf"
+        or limpo.startswith(("audio/", "video/"))
+    )
+
 
 @router.get("/midia/{mensagem_id}/{indice}")
 def midia(
@@ -838,11 +854,12 @@ def midia(
     except Exception as exc:
         # A retenção apaga o arquivo e mantém a mensagem.
         raise HTTPException(status_code=404, detail="anexo não encontrado") from exc
-    return Response(
-        content=dados,
-        media_type=str(anexo.get("mime_type") or "application/octet-stream"),
-        headers={"Cache-Control": "private, no-store"},
-    )
+    mime = str(anexo.get("mime_type") or "")
+    headers = {"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"}
+    if not abre_no_navegador(mime):
+        mime = "application/octet-stream"
+        headers["Content-Disposition"] = "attachment"
+    return Response(content=dados, media_type=mime, headers=headers)
 
 
 # ------------------------------------------------------------------ tempo real

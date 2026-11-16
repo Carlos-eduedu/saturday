@@ -179,7 +179,7 @@ nunca pelo `conversation_id`, que no WhatsApp carrega o telefone.
 | `GET` | `/admin/alertas` | Alertas abertos (`handoff`, `erro_interno`, `atendente_desativado`, `envio_falhou`, `sem_resposta`). |
 | `POST` | `/admin/alertas/{id}/resolver` | Resolve e audita. |
 | `GET` | `/admin/cota` | Consultas Granatech no dia e no mês contra os tetos. |
-| `GET` | `/admin/midia/{mensagem_id}/{indice}` | Anexo da mensagem, servido pela API (sem URL pré-assinada). |
+| `GET` | `/admin/midia/{mensagem_id}/{indice}` | Anexo da mensagem, servido pela API (sem URL pré-assinada). Imagem (JPG, PNG, WebP, GIF), áudio, vídeo e PDF abrem no navegador; qualquer outro tipo sai como download (`Content-Disposition: attachment`), porque o tipo é o que o cliente declarou. |
 | `GET` | `/admin/eventos` | SSE: avisos `{tipo, conversa\|alerta}` com IDs, sem dado pessoal. |
 
 O painel só envia os modelos de utilidade sem botão de link, e sem variáveis:

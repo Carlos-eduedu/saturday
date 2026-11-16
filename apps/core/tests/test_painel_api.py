@@ -24,6 +24,7 @@ from saturday.dados.modelos import (
 from saturday.dados.sessao import sessao as abrir
 from saturday.painel import acoes, sessoes
 from saturday.schemas import ChatRequest
+from saturday.web.api.admin import abre_no_navegador
 
 SENHA = "senha-bem-comprida-1"
 TELEFONE = "11987654321"
@@ -620,7 +621,50 @@ def test_midia_passa_pela_api_com_sessao(client_pg, service_pg, fabrica, storage
     assert resposta.status_code == 200
     assert resposta.content == b"%PDF-1.4"
     assert resposta.headers["content-type"] == "application/pdf"
+    assert "content-disposition" not in resposta.headers
+    assert resposta.headers["x-content-type-options"] == "nosniff"
     assert client_pg.get(f"/admin/midia/{mensagem_id}/1").status_code == 404
+
+
+@pytest.mark.parametrize(
+    "mime",
+    ["text/html", "TEXT/HTML; charset=utf-8", "image/svg+xml", "application/xhtml+xml", ""],
+)
+def test_midia_fora_da_lista_so_baixa(client_pg, service_pg, fabrica, storage, ana, conversa, mime):
+    """O tipo é o que o cliente declarou: HTML ou SVG não pode abrir no painel."""
+
+    chave = storage.salvar(b"<script>alert(1)</script>", mime_type="text/html")
+    _cliente_escreve(service_pg, conversa, "oi")
+    with abrir(fabrica) as s:
+        mensagem = s.scalars(select(Mensagem).where(Mensagem.direcao == "entrada")).first()
+        assert mensagem is not None
+        mensagem.anexos = [{"chave": chave, "mime_type": mime}]
+        mensagem_id = mensagem.id
+
+    _entrar(client_pg, "ana@exemplo.test")
+    resposta = client_pg.get(f"/admin/midia/{mensagem_id}/0")
+    assert resposta.status_code == 200
+    assert resposta.headers["content-type"] == "application/octet-stream"
+    assert resposta.headers["content-disposition"] == "attachment"
+    assert resposta.headers["x-content-type-options"] == "nosniff"
+
+
+@pytest.mark.parametrize(
+    ("mime", "abre"),
+    [
+        ("image/jpeg", True),
+        ("IMAGE/PNG", True),
+        ("audio/ogg; codecs=opus", True),
+        ("video/mp4", True),
+        ("application/pdf", True),
+        ("image/svg+xml", False),
+        ("text/html", False),
+        ("application/octet-stream", False),
+        ("", False),
+    ],
+)
+def test_abre_no_navegador(mime, abre):
+    assert abre_no_navegador(mime) is abre
 
 
 def test_historico_traz_o_turno_e_a_chave_da_fala(
