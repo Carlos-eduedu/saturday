@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router";
+import { Link, useLocation } from "react-router";
 import { api, type Custos as DadosCustos, type Eu, mensagemDeFalha } from "../api";
 import { Falha } from "../componentes/Falha";
 import { Vazio } from "../componentes/Vazio";
@@ -31,6 +31,13 @@ export function Operacao({ eu }: { eu: Eu }) {
 function Produtos() {
   const { dado: produtos, falha, carregar } = useRecurso("produtos", api.produtos);
   const erro = falha === null ? "" : mensagemDeFalha(falha, "carregar os produtos");
+
+  // Quem chega por /operacao#<produto> (link da tela Bancos) cai no produto: a
+  // seção só existe depois da carga, então o navegador não rola sozinho.
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (produtos && hash) document.getElementById(hash.slice(1))?.scrollIntoView();
+  }, [produtos, hash]);
 
   if (erro) return <Falha titulo="Não deu para carregar os produtos." texto={erro} aoTentar={carregar} />;
   if (!produtos) return <p className="centro">Carregando…</p>;

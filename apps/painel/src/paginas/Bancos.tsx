@@ -80,9 +80,8 @@ export function Bancos({ eu }: { eu: Eu }) {
         className="painel-aba"
       >
         <header className="banco-cabeca">
-          <h2>
-            {atual.nome} <span className="contagem">· {atual.produto}</span>
-          </h2>
+          {/* A aba já diz o banco: o título da seção é o produto. */}
+          <h2>{atual.produto}</h2>
           <span className={`selo ${SELO[atual.situacao]}`}>{atual.situacao}</span>
           {atual.regras && (
             <Link to={`/operacao#${atual.regras}`}>Ver as regras vigentes na Operação</Link>
