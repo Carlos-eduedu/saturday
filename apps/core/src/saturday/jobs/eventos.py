@@ -67,12 +67,14 @@ def processar(
                 _processar_um(fabrica, servico, entrada, linha)
         except Exception as exc:  # noqa: BLE001 - o erro fica na linha, não derruba o laço
             logger.exception("evento_falhou id=%s", linha.id)
-            _registrar_resultado(
+            desistiu = _registrar_resultado(
                 fabrica,
                 linha.id,
                 erro=f"{type(exc).__name__}: {exc}",
                 settings=settings,
             )
+            if desistiu and linha.origem == ORIGEM_GRANATECH:
+                _avisar_desistencia(fabrica, servico, linha)
         else:
             _registrar_resultado(fabrica, linha.id, erro="", settings=settings)
 
@@ -89,20 +91,30 @@ def _registrar_resultado(
     *,
     erro: str,
     settings: Settings,
-) -> None:
+) -> bool:
+    """Grava o resultado na linha. Devolve se a fila desistiu do evento."""
+
     with abrir_sessao(fabrica) as sessao:
         atual = sessao.get(EventoRecebido, linha_id)
         if atual is None:
-            return
+            return False
         if not erro:
             fila.marcar_processado(sessao, atual)
-            return
-        fila.marcar_falha(
-            sessao,
-            atual,
-            erro=erro,
-            desistir=atual.tentativas >= settings.eventos_max_tentativas,
-        )
+            return False
+        desistir = atual.tentativas >= settings.eventos_max_tentativas
+        fila.marcar_falha(sessao, atual, erro=erro, desistir=desistir)
+        return desistir
+
+
+def _avisar_desistencia(
+    fabrica: sessionmaker[Session], servico: AgentService, linha: EventoRecebido
+) -> None:
+    """Sem isto o cliente fica esperando um evento que ninguém mais vai tentar."""
+
+    try:
+        eventos_granatech.desistir(fabrica, linha.payload or {}, servico)
+    except Exception:  # noqa: BLE001 - o aviso não derruba o laço
+        logger.exception("aviso_de_desistencia_falhou id=%s", linha.id)
 
 
 def _processar_um(

@@ -28,6 +28,7 @@ from saturday.agent.graph import build_graph
 from saturday.agent.service import AgentService
 from saturday.bancos.granatech.cliente import ClienteGranatech
 from saturday.canais.base import OrigemCanal
+from saturday.dados import eventos as fila
 from saturday.dados.modelos import (
     Alerta,
     Consentimento,
@@ -42,6 +43,7 @@ from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.fontes.brasilapi import ErroBrasilAPI
 from saturday.jobs import granatech as eventos_granatech
 from saturday.jobs import recontatos as job_recontatos
+from saturday.jobs.eventos import ORIGEM_GRANATECH, processar
 from saturday.schemas import AgentReply, ChatRequest
 
 # O cliente passa `timeout` ao `httpx`; o `TestClient` do simulador avisa.
@@ -666,3 +668,135 @@ def test_procedencia_das_falas_com_checkpoint_no_postgres(
     assert "consentimento" in chaves
     assert chaves[-3:] == ["consultando", "escolher_vinculo+opcao_vinculo", "aviso_teto+oferta"]
     assert None not in chaves
+
+
+# ------------------------------------------- falha no turno de sistema
+
+
+class _GrafoQueFalha:
+    """O grafo de verdade, com o `stream` falhando as primeiras `falhas` vezes."""
+
+    def __init__(self, real: Any, falhas: int) -> None:
+        self.real = real
+        self.falhas = falhas
+
+    def stream(self, *args: Any, **kwargs: Any) -> Any:
+        if self.falhas > 0:
+            self.falhas -= 1
+            raise RuntimeError("falha proposital")
+        return self.real.stream(*args, **kwargs)
+
+    def __getattr__(self, nome: str) -> Any:
+        return getattr(self.real, nome)
+
+
+def _consultando(jornada: Jornada, falhas: int) -> None:
+    resposta = jornada.roteiro(*ATE_CONSENTIMENTO, "SIM")
+    assert resposta.answer == texto("consultando")
+    jornada.servico.graph = _GrafoQueFalha(jornada.servico.graph, falhas)
+
+
+def _fila_com_consulta_pronta(jornada: Jornada) -> None:
+    payload = {"tipo": "CONSULTA", "id_solicitacao": jornada.consulta(), "status": "SUCCESS"}
+    with abrir_sessao(jornada.fabrica) as sessao:
+        fila.enfileirar(sessao, origem=ORIGEM_GRANATECH, evento_id="evt-falha", payload=payload)
+
+
+def _rodar_fila(jornada: Jornada) -> None:
+    # A entrada do WhatsApp não é usada por eventos da Granatech.
+    while processar(
+        jornada.fabrica,
+        jornada.servico,
+        None,  # type: ignore[arg-type]
+        jornada.servico.settings,
+        jornada.cliente,
+    ):
+        pass
+
+
+def _situacao(jornada: Jornada) -> tuple[str, list[str | None], list[tuple[str, dict[str, Any]]]]:
+    """Estado de atendimento, erro de cada turno e alertas da conversa."""
+
+    with abrir_sessao(jornada.fabrica) as sessao:
+        conversa = sessao.scalars(
+            select(Conversa).where(Conversa.conversation_id == jornada.id)
+        ).one()
+        erros = sessao.scalars(
+            select(Turno.erro).where(Turno.conversa_id == conversa.id).order_by(Turno.id)
+        ).all()
+        alertas = sessao.scalars(
+            select(Alerta).where(Alerta.conversa_id == conversa.id).order_by(Alerta.id)
+        ).all()
+        return conversa.atendimento, list(erros), [(a.tipo, a.detalhe or {}) for a in alertas]
+
+
+def test_falha_no_turno_de_sistema_deixa_a_trilha_e_relanca(nova: Any) -> None:
+    jornada = nova()
+    _consultando(jornada, falhas=1)
+
+    with pytest.raises(RuntimeError, match="falha proposital"):
+        jornada.servico.continuar(jornada.id, "consulta_pronta")
+
+    atendimento, erros, alertas = _situacao(jornada)
+    assert erros[-1] == "RuntimeError"
+    # Quem chamou decide o que fazer: a conversa segue com a IA.
+    assert atendimento == "ia"
+    assert alertas == []
+    assert jornada.ultima_saida() == texto("consultando")
+
+
+def test_falha_passageira_no_turno_de_sistema_nao_vira_handoff(nova: Any) -> None:
+    jornada = nova()
+    _consultando(jornada, falhas=1)
+    _fila_com_consulta_pronta(jornada)
+
+    _rodar_fila(jornada)
+
+    atendimento, erros, alertas = _situacao(jornada)
+    assert jornada.clt()["etapa"] == "escolha_vinculo"
+    assert atendimento == "ia"
+    assert erros.count("RuntimeError") == 1
+    assert erros[-1] is None
+    assert alertas == []
+
+
+def test_fila_que_desiste_do_evento_abre_handoff_erro_interno(nova: Any) -> None:
+    jornada = nova(eventos_max_tentativas=2)
+    _consultando(jornada, falhas=99)
+    _fila_com_consulta_pronta(jornada)
+
+    _rodar_fila(jornada)
+
+    atendimento, erros, alertas = _situacao(jornada)
+    assert atendimento == "handoff"
+    assert erros[-2:] == ["RuntimeError", "RuntimeError"]
+    assert alertas == [("erro_interno", {"motivo": "erro_interno", "evento": "granatech:consulta"})]
+    # O cliente não escreveu nada: nenhum aviso vai para ele.
+    assert jornada.ultima_saida() == texto("consultando")
+
+
+def test_fila_que_desiste_com_humano_na_conversa_so_alerta(
+    nova: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    jornada = nova(eventos_max_tentativas=1)
+    _consultando(jornada, falhas=0)
+    with abrir_sessao(jornada.fabrica) as sessao:
+        sessao.execute(
+            update(Conversa)
+            .where(Conversa.conversation_id == jornada.id)
+            .values(atendimento="assumida")
+        )
+
+    def detalhe_fora_do_ar(_id: str) -> None:
+        raise RuntimeError("falha proposital")
+
+    monkeypatch.setattr(jornada.cliente, "gravar_detalhe", detalhe_fora_do_ar)
+    _fila_com_consulta_pronta(jornada)
+
+    _rodar_fila(jornada)
+
+    atendimento, _erros, alertas = _situacao(jornada)
+    assert atendimento == "assumida"
+    assert alertas == [
+        ("evento_com_humano", {"evento": "granatech:consulta", "motivo": "erro_interno"})
+    ]

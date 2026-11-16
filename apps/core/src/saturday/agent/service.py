@@ -460,7 +460,7 @@ class AgentService:
 
         if sessao is None or conversa is None:
             return RegistroMemoria()
-        return RegistroPostgres(sessao, conversa, self.webhook)
+        return RegistroPostgres(sessao, conversa, self.webhook, self.fabrica)
 
     def _liberar_handoff(self, config: dict[str, Any]) -> dict[str, Any]:
         self.graph.update_state(config, self._atualizacao_liberacao())
@@ -532,9 +532,17 @@ class AgentService:
                 config,
                 entrada,
                 self._registro(sessao, conversa),
+                estado=estado,
                 evento=evento,
                 forcar=forcar,
             )
+
+    def desistir_de_sistema(self, conversation_id: str, evento: str) -> None:
+        """A fila desistiu do evento: a conversa vai para um humano (`Turnos.desistir`)."""
+
+        with self._trava(conversation_id) as sessao:
+            conversa = repositorios.buscar_conversa(sessao, conversation_id) if sessao else None
+            self.turnos.desistir(self._registro(sessao, conversa), evento)
 
     def _entrada_do_grafo(
         self,

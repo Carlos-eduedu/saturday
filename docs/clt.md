@@ -93,6 +93,14 @@ Os eventos são estes:
 | `termo_pendente` | `jobs/alertas`, consulta parada em `AWAITING_CLIENT_AUTHORIZATION` | Link do termo |
 | `recontato:<n>` | `jobs/recontatos` | Nova tentativa de consulta |
 
+Se o grafo falhar num turno de sistema, a exceção sobe para quem chamou e o
+turno com erro fica na trilha (gravado em transação própria, porque a do turno
+é desfeita). A fila de eventos tenta de novo até `eventos_max_tentativas`;
+quando desiste de um evento da Granatech, a conversa vai para handoff
+`erro_interno` com alerta, sem aviso ao cliente. Se ela já estiver com humano,
+abre só o alerta `evento_com_humano`. Rotas do painel e `jobs/alertas` não
+tentam de novo: o erro volta para quem pediu.
+
 Só a etapa `consultando` reage aos eventos de consulta. Um evento repetido ou
 atrasado não gera mensagem.
 

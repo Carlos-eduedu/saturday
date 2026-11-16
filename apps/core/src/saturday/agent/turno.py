@@ -15,7 +15,7 @@ from datetime import datetime
 from typing import Any, Protocol
 
 from langchain_core.messages import AIMessage
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.agent.context import AgentContext
 from saturday.agent.textos import chave_handoff, mensagem_handoff
@@ -23,6 +23,7 @@ from saturday.canais.base import CANAIS_WHATSAPP
 from saturday.dados import repositorios
 from saturday.dados.modelos import Conversa, Turno
 from saturday.dados.outbox import enfileirar
+from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.metrics import TurnMetrics, iniciar_metricas, metricas_atuais
 from saturday.schemas import AgentReply
 from saturday.services.webhook import WebhookClient
@@ -58,6 +59,15 @@ class RegistroDoTurno(Protocol):
         erro: str | None = None,
     ) -> int | None: ...
 
+    def registrar_falha(
+        self,
+        estado: dict[str, Any],
+        caminho: list[str],
+        metricas: TurnMetrics | None,
+        inicio: float,
+        erro: str,
+    ) -> None: ...
+
     def abrir_handoff(
         self,
         tipo_alerta: str,
@@ -91,6 +101,16 @@ class RegistroMemoria:
     ) -> int | None:
         return None
 
+    def registrar_falha(
+        self,
+        estado: dict[str, Any],
+        caminho: list[str],
+        metricas: TurnMetrics | None,
+        inicio: float,
+        erro: str,
+    ) -> None:
+        return None
+
     def abrir_handoff(
         self,
         tipo_alerta: str,
@@ -119,6 +139,7 @@ class RegistroPostgres:
     sessao: Session
     conversa: Conversa
     webhook: WebhookClient
+    fabrica: sessionmaker[Session] | None = None
 
     @property
     def com_humano(self) -> bool:
@@ -139,16 +160,55 @@ class RegistroPostgres:
         id do turno, que vai na mensagem de saída (procedência, decisão 0018).
         """
 
-        conversa = self.conversa
-        conversa.etapa = etapa_do_estado(estado)
+        self.conversa.etapa = etapa_do_estado(estado)
+        turno = self._turno(estado, caminho, metricas, inicio, erro)
+        self.sessao.add(turno)
+        self.sessao.flush()
+        repositorios.notificar(self.sessao, "turno", conversa=self.conversa.id)
+        return turno.id
+
+    def registrar_falha(
+        self,
+        estado: dict[str, Any],
+        caminho: list[str],
+        metricas: TurnMetrics | None,
+        inicio: float,
+        erro: str,
+    ) -> None:
+        """Trilha de um turno que falhou e cuja transação vai ser desfeita.
+
+        Grava em transação própria, para o erro aparecer nas execuções do
+        painel. Só insere o turno: não toca na linha da conversa, que a
+        transação do turno pode estar segurando.
+        """
+
+        if self.fabrica is None:
+            return
+        try:
+            with abrir_sessao(self.fabrica) as propria:
+                propria.add(self._turno(estado, caminho, metricas, inicio, erro))
+                propria.flush()
+                repositorios.notificar(propria, "turno", conversa=self.conversa.id)
+        except Exception:
+            # A falha do turno é a que importa a quem chamou; esta não a esconde.
+            logger.exception("falha_ao_registrar_turno_com_erro conversa=%s", self.conversa.id)
+
+    def _turno(
+        self,
+        estado: dict[str, Any],
+        caminho: list[str],
+        metricas: TurnMetrics | None,
+        inicio: float,
+        erro: str | None,
+    ) -> Turno:
         resumo = metricas.resumo() if metricas else {"chamadas": [], "custo_total_usd": 0.0}
         classificou = "classify_intent" in caminho
-        turno = Turno(
-            conversa_id=conversa.id,
+        return Turno(
+            conversa_id=self.conversa.id,
             caminho=list(caminho),
             status=estado.get("status"),
             motivo=estado.get("handoff_reason"),
-            etapa=conversa.etapa,
+            etapa=self.conversa.etapa,
             classificacao=(
                 {
                     "intencao": estado.get("intent"),
@@ -164,10 +224,6 @@ class RegistroPostgres:
             duracao_ms=round((time.monotonic() - inicio) * 1000),
             erro=erro,
         )
-        self.sessao.add(turno)
-        self.sessao.flush()
-        repositorios.notificar(self.sessao, "turno", conversa=conversa.id)
-        return turno.id
 
     def abrir_handoff(
         self,
@@ -330,19 +386,26 @@ class Turnos:
         entrada: dict[str, Any],
         registro: RegistroDoTurno,
         *,
+        estado: dict[str, Any],
         evento: str,
         forcar: bool,
     ) -> AgentReply:
         """Turno sem mensagem do cliente: só grava saída quando há o que enviar.
 
         Com ``forcar`` e a conversa com humano, o handoff vira alerta: o aviso
-        não vai ao cliente.
+        não vai ao cliente. Se o grafo falhar, a exceção sobe (a fila de eventos
+        tenta de novo) e só a trilha do turno com erro fica gravada; quem
+        desiste chama `desistir`. ``estado`` é o de antes do turno.
         """
 
         metricas = iniciar_metricas()
         inicio = time.monotonic()
         caminho: list[str] = []
-        self._stream(entrada, config, caminho)
+        try:
+            self._stream(entrada, config, caminho)
+        except Exception as exc:
+            registro.registrar_falha(estado, caminho, metricas, inicio, type(exc).__name__)
+            raise
         final, resposta, turno_id = self._fechar(
             conversation_id, config, registro, caminho, metricas, inicio
         )
@@ -357,6 +420,19 @@ class Turnos:
         if resposta.answer or resposta.status == "handoff" or final.get("modelo_envio"):
             registro.gravar_saida(resposta, final, turno_id=turno_id)
         return resposta
+
+    @staticmethod
+    def desistir(registro: RegistroDoTurno, evento: str) -> None:
+        """O turno de sistema não será mais tentado: a conversa vai para um humano.
+
+        Sem aviso ao cliente, que não escreveu nada. Com a conversa já com
+        humano, vira alerta para quem está com ela.
+        """
+
+        if registro.com_humano:
+            registro.alertar_evento_com_humano({"evento": evento, "motivo": "erro_interno"})
+        else:
+            registro.abrir_handoff("erro_interno", "erro_interno", {"evento": evento})
 
     def _fechar(
         self,

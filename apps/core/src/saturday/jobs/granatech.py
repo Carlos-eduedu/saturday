@@ -58,6 +58,36 @@ def aplicar(
             _alertar(sessao, None, motivo="tipo_desconhecido", tipo=tipo or None)
 
 
+def desistir(
+    fabrica: sessionmaker[Session], payload: dict[str, Any], servico: AgentService
+) -> None:
+    """A fila desistiu do evento: a conversa dele, se houver, vai para um humano."""
+
+    tipo = str(payload.get("tipo") or "").lower()
+    teste = payload.get("_teste") is True
+    with abrir_sessao(fabrica) as sessao:
+        if tipo == "consulta":
+            id_externo = str(payload.get("id_solicitacao") or payload.get("id_consulta") or "")
+            conversa_id = sessao.scalar(
+                select(ConsultaGranatech.conversa_id).where(
+                    ConsultaGranatech.id_externo == id_externo,
+                    ConsultaGranatech.teste.is_(teste),
+                )
+            )
+        elif tipo == "proposta":
+            conversa_id = sessao.scalar(
+                select(PropostaGranatech.conversa_id).where(
+                    PropostaGranatech.id_externo == str(payload.get("id_proposta") or ""),
+                    PropostaGranatech.teste.is_(teste),
+                )
+            )
+        else:
+            return
+        conversation_id = _conversation_id(sessao, conversa_id)
+    if conversation_id:
+        servico.desistir_de_sistema(conversation_id, f"granatech:{tipo}")
+
+
 def _agora() -> str:
     return datetime.now(UTC).isoformat()
 
