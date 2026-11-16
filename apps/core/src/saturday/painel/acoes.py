@@ -16,7 +16,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from saturday.canais.base import CANAIS_WHATSAPP
+from saturday.canais.base import CANAIS_WHATSAPP, Envio
 from saturday.canais.whatsapp.janela import janela_aberta
 from saturday.canais.whatsapp.modelos import MODELOS
 from saturday.dados import repositorios
@@ -241,14 +241,25 @@ def _conferir_envio(conversa: Conversa, usuario_id: uuid.UUID) -> None:
         raise AcaoRecusada(409, "o painel só envia pelo WhatsApp")
 
 
-def _payload(conversa: Conversa, mensagem_id: int, texto: str) -> dict[str, Any]:
-    return {
-        "conversation_id": conversa.conversation_id,
-        "numero": conversa.telefone,
-        "phone_number_id": conversa.phone_number_id,
-        "answer": texto,
-        "mensagem_id": mensagem_id,
-    }
+def _enfileirar(
+    sessao: Session,
+    conversa: Conversa,
+    mensagem_id: int,
+    texto: str,
+    *,
+    modelo: str = "",
+    anexo: dict[str, Any] | None = None,
+) -> None:
+    envio = Envio(
+        conversation_id=conversa.conversation_id,
+        numero=conversa.telefone,
+        phone_number_id=conversa.phone_number_id,
+        texto=texto,
+        mensagem_id=mensagem_id,
+        modelo=modelo,
+        midia=anexo,
+    )
+    enfileirar(sessao, conversa_id=conversa.id, canal=conversa.canal, payload=envio.para_payload())
 
 
 def enviar(
@@ -282,10 +293,7 @@ def enviar(
         autor="atendente",
         usuario_id=usuario_id,
     )
-    payload = _payload(conversa, mensagem_id, texto or "")
-    if modelo is not None:
-        payload["modelo"] = modelo
-    enfileirar(sessao, conversa_id=conversa.id, canal=conversa.canal, payload=payload)
+    _enfileirar(sessao, conversa, mensagem_id, texto or "", modelo=modelo or "")
     auditar(
         sessao,
         usuario_id,
@@ -343,9 +351,7 @@ def enviar_anexo(
         usuario_id=usuario_id,
         anexos=[anexo],
     )
-    payload = _payload(conversa, mensagem_id, legenda)
-    payload["midia"] = {**anexo, "tipo": tipo}
-    enfileirar(sessao, conversa_id=conversa.id, canal=conversa.canal, payload=payload)
+    _enfileirar(sessao, conversa, mensagem_id, legenda, anexo={**anexo, "tipo": tipo})
     auditar(
         sessao,
         usuario_id,

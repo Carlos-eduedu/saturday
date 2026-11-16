@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.agent.service import AgentService
 from saturday.bancos.granatech.cliente import ClienteGranatech
-from saturday.canais.base import OrigemCanal
+from saturday.canais.base import Envio, OrigemCanal
 from saturday.canais.evolution.cliente import EvolutionClient
 from saturday.canais.whatsapp import webhook as parser
 from saturday.canais.whatsapp.entrada import Entrada, EntradaWhatsApp, prefixo_do_canal
@@ -200,12 +200,14 @@ def _enfileirar_resposta(
             conversa_id=conversa.id,
             canal=canal,
             payload={
-                "conversation_id": conversa.conversation_id,
-                "numero": evento.numero,
-                "phone_number_id": evento.phone_number_id,
-                "answer": texto,
+                **Envio(
+                    conversation_id=conversa.conversation_id,
+                    numero=evento.numero,
+                    phone_number_id=evento.phone_number_id,
+                    texto=texto,
+                    mensagem_id=mensagem_id,
+                ).para_payload(),
                 "status": "answered",
-                "mensagem_id": mensagem_id,
             },
         )
 

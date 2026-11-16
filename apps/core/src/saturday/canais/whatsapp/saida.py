@@ -19,7 +19,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session, sessionmaker
 
-from saturday.canais.base import Resultado
+from saturday.canais.base import Envio, Resultado
 from saturday.canais.whatsapp.audio import ErroConversao, para_ogg_opus
 from saturday.canais.whatsapp.cliente import (
     ErroIncerto,
@@ -64,20 +64,20 @@ class SaidaWhatsApp:
     def entregar(self, linha: Outbox, *, permitir_modelo: bool = False) -> Resultado:
         """Uma tentativa. ``permitir_modelo`` vem do outbox na conversão."""
 
-        payload = linha.payload or {}
-        numero = str(payload.get("numero") or "")
-        phone_number_id = str(payload.get("phone_number_id") or "")
-        texto = str(payload.get("answer") or "")
+        envio = Envio.do_payload(linha.payload)
+        numero = envio.numero or ""
+        phone_number_id = envio.phone_number_id or ""
+        texto = envio.texto
         if not numero or not phone_number_id:
             logger.error("whatsapp_saida_sem_destino outbox=%s", linha.id)
             return Resultado.PERMANENTE
-        modelo = MODELOS.get(str(payload.get("modelo") or ""))
-        midia = payload.get("midia")
+        modelo = MODELOS.get(envio.modelo)
+        midia = envio.midia
         if modelo is None and not texto and not midia:
             logger.info("whatsapp_saida_vazia outbox=%s", linha.id)
             return Resultado.OK
 
-        aberta = self._janela_aberta(str(payload.get("conversation_id") or ""))
+        aberta = self._janela_aberta(envio.conversation_id)
 
         try:
             if modelo is not None:
@@ -87,7 +87,7 @@ class SaidaWhatsApp:
             elif permitir_modelo or not aberta:
                 self._avisar_por_modelo(linha, numero, phone_number_id)
                 return Resultado.AGUARDANDO_CLIENTE
-            elif isinstance(midia, dict):
+            elif midia is not None:
                 self._enviar_midia(linha, numero, phone_number_id, midia, texto)
             else:
                 self._enviar_texto(linha, numero, phone_number_id, texto)
@@ -160,8 +160,8 @@ class SaidaWhatsApp:
         self._marcar(linha, wamid)
 
     def _marcar(self, linha: Outbox, wamid: str | None) -> None:
-        mensagem_id = (linha.payload or {}).get("mensagem_id")
-        if isinstance(mensagem_id, int):
+        mensagem_id = Envio.do_payload(linha.payload).mensagem_id
+        if mensagem_id is not None:
             with abrir_sessao(self._fabrica) as sessao:
                 repositorios.marcar_envio(sessao, mensagem_id, wamid=wamid, status="sent")
 
@@ -180,9 +180,9 @@ class SaidaWhatsApp:
         with abrir_sessao(self._fabrica) as sessao:
             if fila.outro_esperando_cliente(sessao, linha):
                 return
-        payload = linha.payload or {}
-        modelo = MODELOS.get(str(payload.get("modelo_aviso") or "")) or MODELOS[MODELO_PADRAO]
-        sufixo = str(payload.get("link_aviso") or "") if modelo.tem_link else ""
+        envio = Envio.do_payload(linha.payload)
+        modelo = MODELOS.get(envio.modelo_aviso) or MODELOS[MODELO_PADRAO]
+        sufixo = envio.link_aviso if modelo.tem_link else ""
         if modelo.tem_link and not sufixo:
             # Modelo de link sem o código não fecha: avisa pelo genérico.
             modelo = MODELOS[MODELO_PADRAO]

@@ -13,6 +13,7 @@ from collections.abc import Callable
 
 from sqlalchemy.orm import Session, sessionmaker
 
+from saturday.canais.base import Envio
 from saturday.dados import outbox as fila
 from saturday.dados import repositorios
 from saturday.dados.modelos import Outbox
@@ -75,16 +76,15 @@ def enviar_em_partes(
     2 no celular do cliente. ``enviar`` devolve o id da mensagem no provedor.
     """
 
-    payload = linha.payload or {}
+    envio = Envio.do_payload(linha.payload)
     partes = dividir(texto)
-    inicio = int(payload.get("partes_enviadas") or 0)
+    inicio = envio.partes_enviadas
     for indice in range(inicio, len(partes)):
         if indice > inicio:
             time.sleep(INTERVALO_ENTRE_PARTES_S)
         wamid = enviar(partes[indice])
         with abrir_sessao(fabrica) as sessao:
             fila.registrar_partes_enviadas(sessao, linha.id, indice + 1)
-            mensagem_id = payload.get("mensagem_id")
             # O id da primeira parte identifica a mensagem nos status.
-            if indice == 0 and isinstance(mensagem_id, int):
-                repositorios.marcar_envio(sessao, mensagem_id, wamid=wamid, status="sent")
+            if indice == 0 and envio.mensagem_id is not None:
+                repositorios.marcar_envio(sessao, envio.mensagem_id, wamid=wamid, status="sent")

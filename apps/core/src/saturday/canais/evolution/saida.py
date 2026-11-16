@@ -13,7 +13,7 @@ from typing import Any
 from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.agent.clt.mensagens import texto as mensagem
-from saturday.canais.base import Resultado
+from saturday.canais.base import Envio, Resultado
 from saturday.canais.evolution.cliente import EvolutionClient
 from saturday.canais.whatsapp.cliente import ErroIncerto, ErroPermanente, ErroTemporario
 from saturday.canais.whatsapp.partes import enviar_em_partes
@@ -46,28 +46,28 @@ class SaidaEvolution:
     def entregar(self, linha: Outbox, *, permitir_modelo: bool = False) -> Resultado:
         """Uma tentativa; ``permitir_modelo`` não se aplica (sem janela)."""
 
-        payload = linha.payload or {}
-        numero = str(payload.get("numero") or "")
-        instancia = str(payload.get("phone_number_id") or "")
+        envio = Envio.do_payload(linha.payload)
+        numero = envio.numero or ""
+        instancia = envio.phone_number_id or ""
         if not numero or not instancia:
             logger.error("evolution_saida_sem_destino outbox=%s", linha.id)
             return Resultado.PERMANENTE
 
-        texto = str(payload.get("answer") or "")
-        modelo = str(payload.get("modelo") or "")
+        texto = envio.texto
+        modelo = envio.modelo
         if modelo:
             chave = TEXTO_DO_MODELO.get(modelo)
             if chave is None:
                 logger.error("evolution_modelo_sem_texto outbox=%s modelo=%s", linha.id, modelo)
                 return Resultado.PERMANENTE
             texto = mensagem(chave)
-        midia = payload.get("midia")
+        midia = envio.midia
         if not texto and not midia:
             logger.info("evolution_saida_vazia outbox=%s", linha.id)
             return Resultado.OK
 
         try:
-            if isinstance(midia, dict):
+            if midia is not None:
                 self._enviar_midia(linha, instancia, numero, midia, texto)
             else:
                 enviar_em_partes(
@@ -117,7 +117,7 @@ class SaidaEvolution:
                 nome=str(midia.get("nome") or "arquivo"),
                 legenda=legenda,
             )
-        mensagem_id = (linha.payload or {}).get("mensagem_id")
-        if isinstance(mensagem_id, int):
+        mensagem_id = Envio.do_payload(linha.payload).mensagem_id
+        if mensagem_id is not None:
             with abrir_sessao(self._fabrica) as sessao:
                 repositorios.marcar_envio(sessao, mensagem_id, wamid=wamid, status="sent")

@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.agent.context import AgentContext
 from saturday.agent.textos import chave_handoff, mensagem_handoff
-from saturday.canais.base import CANAIS_WHATSAPP
+from saturday.canais.base import CANAIS_WHATSAPP, Envio
 from saturday.dados import repositorios
 from saturday.dados.modelos import Conversa, Turno
 from saturday.dados.outbox import enfileirar
@@ -281,19 +281,20 @@ class RegistroPostgres:
             return
         # O id volta no payload: é nesta linha que o worker grava o `wamid` e o
         # status de entrega quando a Meta confirmar.
+        # No canal `webhook` o payload é a própria resposta (contrato HTTP).
         payload = resposta.model_dump(mode="json")
-        if canal in CANAIS_WHATSAPP:
-            payload["numero"] = conversa.telefone
-            payload["phone_number_id"] = conversa.phone_number_id
         payload["mensagem_id"] = mensagem_id
         if canal in CANAIS_WHATSAPP:
-            for chave, destino in (
-                ("modelo_envio", "modelo"),
-                ("modelo_aviso", "modelo_aviso"),
-                ("link_aviso", "link_aviso"),
-            ):
-                if final.get(chave):
-                    payload[destino] = final[chave]
+            payload |= Envio(
+                conversation_id=resposta.conversation_id,
+                numero=conversa.telefone,
+                phone_number_id=conversa.phone_number_id,
+                texto=resposta.answer,
+                mensagem_id=mensagem_id,
+                modelo=final.get("modelo_envio") or "",
+                modelo_aviso=final.get("modelo_aviso") or "",
+                link_aviso=final.get("link_aviso") or "",
+            ).para_payload()
         enfileirar(self.sessao, conversa_id=conversa.id, canal=canal, payload=payload)
 
     def _canal_de_saida(self, resposta: AgentReply) -> str | None:
