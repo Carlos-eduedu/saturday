@@ -17,6 +17,11 @@ A Fase 4 cria só o cliente da Granatech em `bancos/granatech/`. O `Protocol`
 será extraído quando o segundo banco entrar, a partir do que os dois tiverem em
 comum.
 
+**Nota de 2026-11-16 (decisão 0027).** O iCred entrou como `bancos/icred/`, ainda
+sem `Protocol`: ele vive no ramo INSS e a Granatech no CLT, e as duas jornadas
+não se cruzam. A interface fica para quando dois bancos disputarem o mesmo
+ponto do grafo (a API do C6, decisão 0026).
+
 ## Alternativas descartadas
 
 - **Criar o `Protocol` completo agora.** Uma interface com uma implementação só

@@ -87,8 +87,9 @@ _Evitar_: desmascarar, ver completo
 ## Crédito do Trabalhador
 
 **Consulta**:
-Pedido à Granatech para ver o emprego, o salário e a margem de um CPF; cada
-uma gasta cota.
+Pedido a um banco para ver o que ele oferece a um CPF. Na Granatech mostra o
+emprego, o salário e a margem e gasta cota; no iCred já devolve as condições de
+crédito.
 _Evitar_: consulta de saldo (fora da borda com a API), pesquisa
 
 **Cota**:
@@ -118,7 +119,8 @@ _Evitar_: pré-análise, qualificação
 
 **Oferta**:
 A condição de crédito simulada que o agente apresenta ao cliente, sempre
-dentro do teto e com o seguro dito por extenso.
+dentro do teto e com o seguro dito por extenso. No iCred, a oferta é o pacote:
+todos os contratos que o banco devolve para o CPF, aceitos juntos.
 _Evitar_: proposta (proposta é o que se cria no banco depois do aceite)
 
 **Aceite**:
@@ -129,7 +131,8 @@ _Evitar_: contratação, fechamento
 **Proposta**:
 O pedido de crédito criado no banco depois do aceite; acompanha a
 formalização até o pagamento.
-_Evitar_: oferta (oferta é a condição apresentada antes do aceite), contrato
+_Evitar_: oferta (oferta é a condição apresentada antes do aceite), contrato,
+gravação (gravar é o nome da operação na borda com o iCred)
 
 **Formalização**:
 A etapa em que o cliente confirma a identidade no banco (biometria) pelo link

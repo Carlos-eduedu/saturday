@@ -9,12 +9,12 @@ existentes continuam funcionando em toda mudança.
 
 Se uma tarefa parecer exigir quebrar uma destas regras, pare e pergunte.
 
-1. **Auto-suficiência:** o Saturday não chama, não lê e não escreve em nenhum sistema da MEX (CRM, Supabase do Deu Plim, hub `mex-granatech-api`). Só parceiros externos: Meta, Granatech, C6, BrasilAPI, OpenRouter.
+1. **Auto-suficiência:** o Saturday não chama, não lê e não escreve em nenhum sistema da MEX (CRM, Supabase do Deu Plim, hub `mex-granatech-api`). Só parceiros externos: Meta, Granatech, C6, BrasilAPI, OpenRouter. Única exceção: o motor de consultas do iCred, com chave própria e sem o escopo `operacao` (decisão 0027).
 2. **Decisões em código:** triagem, consentimento, regras de banco, cálculos, escolha de produto e transições de estado são determinísticos e testados. O LLM só classifica intenção e responde dúvidas ancoradas na FAQ; nunca escreve números, valores ou condições.
 3. **Consentimento do cliente:** nenhuma consulta e nenhuma proposta sem um "SIM" explícito do próprio cliente, conferido em código, com prova gravada. Nunca simule aceite com dados de aparelho inventados.
 4. **Proposta nunca repetida automaticamente:** `POST` de proposta não tem retry. Grave a intenção antes; em resultado incerto (timeout, 5xx), procure a proposta na listagem antes de qualquer nova tentativa.
 5. **Cota da Granatech:** nunca abra consulta sem passar pela triagem, pelo consentimento e pelo controle de cota (teto mensal, limite diário, reaproveitamento por CPF).
-6. **Teto de R$ 6.999:** nenhuma simulação é apresentada e nenhuma proposta é criada com valor liberado acima disso.
+6. **Teto de R$ 6.999 (CLT):** no Crédito do Trabalhador, nenhuma simulação é apresentada e nenhuma proposta é criada com valor liberado acima disso. O ramo INSS não tem teto (decisão 0027).
 7. **Seguro:** toda oferta com seguro diz que ele está incluído, o valor e que é opcional.
 8. **Segredos:** só por variável de ambiente. O serviço não sobe se faltar um obrigatório. Nada de chave, token ou senha em código, teste, fixture, log ou commit.
 9. **Dados pessoais:** CPF, e-mail, telefone, nome da mãe e endereço mascarados em logs. O log de chamadas externas guarda só metadados (rota, status, tempo, IDs). Mídia e documentos só em storage privado, nunca em base64 no estado do grafo.
@@ -26,7 +26,8 @@ Se uma tarefa parecer exigir quebrar uma destas regras, pare e pergunte.
 NovaVida; qualquer dependência do CRM da MEX.
 
 Contrato novo e refinanciamento INSS no C6, pela API do banco, entraram no
-escopo pela decisão 0026.
+escopo pela decisão 0026. O iCred (INSS), pelo motor de consultas da MEX, entrou
+pela decisão 0027; o que se sabe do motor está em `docs/icred.md`.
 
 ## Especificação
 
