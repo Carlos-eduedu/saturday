@@ -1,7 +1,7 @@
 """Simulador da API de parceiros da Granatech (consignado CLT).
 
 Emula só o que o Saturday usa, com as respostas observadas na api-dev (ver
-AGENTS.md, "Dados do simulador da Granatech"). Tudo em memória. O admin
+especificação, "Dados do simulador da Granatech"). Tudo em memória. O admin
 dispara eventos de webhook (inclusive duplicados e fora de ordem) e programa
 falhas: 401, 500 ou timeout, com a opção de executar a operação antes de falhar
 (o caso "incerto" de uma proposta).

@@ -8,7 +8,7 @@
 - [`../README.md`](../README.md) — como rodar local e com Docker, estrutura do monorepo.
 - [`../apps/core/README.md`](../apps/core/README.md) — contrato da API (`/chat`, conversas,
   webhook do WhatsApp) e variáveis de ambiente.
-- [`../AGENTS.md`](../AGENTS.md) — regras inegociáveis, arquitetura alvo e fases.
+- [`../AGENTS.md`](../AGENTS.md) — regras inegociáveis, ponteiros da especificação e comandos.
 - [`granatech.md`](granatech.md) — cliente, cota, webhook e simulador da Granatech.
 - [`clt.md`](clt.md) — ramo CLT: etapas, proposta, pós-venda, turnos de sistema e recontato.
 - [`deploy.md`](deploy.md) — ambientes, ambiente do zero, backup e restauração no Dokploy.
@@ -38,11 +38,4 @@ imutável: quando uma decisão muda, entra um registro novo que a substitui.
 
 ## Estado por fase
 
-| Fase | Entrega | Documentação |
-| --- | --- | --- |
-| 0 | monorepo, compose, CI | `README.md` |
-| 1 | Postgres, outbox, worker, S3, travas | `apps/core/README.md` |
-| 2 | canal WhatsApp e simulador da Meta | `apps/core/README.md`, ADR 0001 |
-| 3 | painel e API admin | `apps/core/README.md`, ADR 0003 |
-| 4 | cliente e simulador da Granatech | `granatech.md`, ADR 0004 |
-| 5 a 7 | pendentes | — |
+Ver [`estado.md`](estado.md).

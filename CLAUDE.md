@@ -1,44 +1,10 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-O contrato do projeto (regras inegociáveis, escopo, fases, especificações da
-Granatech, da jornada CLT e do WhatsApp) está no `AGENTS.md`, importado abaixo.
-Ele vale integralmente; este arquivo só acrescenta o mapa do código atual.
+O contrato do projeto (regras inegociáveis, ponteiros da especificação, comandos
+e forma de trabalho) está no `AGENTS.md`, importado abaixo. Este arquivo só
+acrescenta as worktrees e o mapa do código.
 
 @AGENTS.md
-
-## Comandos do dia a dia
-
-O workspace `uv` tem um único `uv.lock` e um único `.venv` na raiz
-(membros: `apps/core` e `simuladores`). Lint, tipos e testes rodam de dentro do
-membro; o servidor roda da raiz (o `.env` é lido do diretório atual).
-
-```bash
-cd apps/core
-uv run pytest tests/test_outbox.py -q                 # um arquivo
-uv run pytest tests/test_whatsapp.py::nome_do_teste   # um teste
-uv run pytest -k janela -q                            # por nome
-uv run ruff check --fix && uv run ruff format         # corrige estilo
-
-cd simuladores && uv run ruff check && uv run mypy    # o CI também cobre os simuladores
-
-# simulador da Meta (aponte SATURDAY_WHATSAPP_GRAPH_URL para ele)
-uv run --project simuladores/meta uvicorn app:app --app-dir simuladores/meta --port 8100
-```
-
-- `pytest` roda com `filterwarnings = error`: qualquer warning novo quebra a suíte.
-- Testes marcados `jev` chamam o classificador de verdade e são pulados sem
-  `SATURDAY_OPENROUTER_API_KEY`.
-- Com `environment == "pytest"` o checkpointer é `InMemorySaver` e o storage é
-  `MemoriaStorage` (também sem `S3_BUCKET`); sem `SATURDAY_TEST_DATABASE_URL`, os testes de Postgres
-  (trava, outbox, poda de checkpoints, retenção) são pulados — rode-os antes de
-  dar uma fase por pronta.
-- mypy é `strict` e só cobre `src/saturday`.
-- O Postgres de teste precisa do pgvector (decisão 0017): o `postgres` do
-  compose usa `pgvector/pgvector:pg17`; um container antigo em
-  `postgres:17-alpine` faz os testes de banco falharem em `CREATE EXTENSION`.
-- Há `.env` e `.env.backup` reais na raiz: não leia. Use o `.env.example`.
 
 ## Worktrees
 
@@ -91,8 +57,9 @@ pelo outbox; sem ela, volta na própria requisição.
 **Grafo (`agent/`).** `graph.py` monta o `StateGraph`; `nodes.py` tem os nós,
 `routing.py` as decisões de aresta (determinísticas), `state.py` o estado,
 `context.py` os clientes injetados (`jev`, `llm`, `anexos`) e `textos.py` os
-textos fixos. Hoje só existe o ramo INSS → C6, cujas regras e cálculos ficam em
-`portabilidade/` (`hiscon.py` lê o extrato, `calculo.py` e `regras.py` decidem).
+textos fixos. São dois ramos: INSS → C6, com regras e cálculos em
+`portabilidade/` (`hiscon.py` lê o extrato, `calculo.py` e `regras.py` decidem),
+e CLT em `agent/clt/` (mapa em `docs/clt.md`).
 O estado guarda só a chave do anexo no storage, nunca o conteúdo.
 
 **IA (`services/`).** `jev.py` é o classificador de intenção/público; `llm.py`
@@ -108,9 +75,6 @@ uma migração nova.
 **Configuração.** `settings.py` (`pydantic-settings`, prefixo `SATURDAY_`);
 `validar_para_subir()` derruba a subida se faltar segredo obrigatório no
 ambiente. Variável nova entra também no `.env.example`.
-
-**Decisões registradas** ficam em `docs/decisoes/NNNN-*.md`; registre ali
-qualquer desvio consciente do `AGENTS.md`.
 
 ## Agent skills
 

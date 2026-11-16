@@ -17,7 +17,7 @@ docs/                   índice e decisões registradas (docs/decisoes/)
 pyproject.toml, uv.lock workspace `uv`: um lock e um .venv para os dois membros
 compose.yaml            deploy (Dokploy): migrate, api, worker e opcionais
 compose.override.yaml   desenvolvimento local: publica portas e console do MinIO
-AGENTS.md               contrato: regras, arquitetura alvo e fases
+AGENTS.md               contrato: regras, ponteiros da especificação e comandos
 ```
 
 Desde a Fase 1 o estado das conversas vive no **Postgres**, os anexos no **S3** e
