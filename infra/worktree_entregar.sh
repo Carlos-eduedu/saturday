@@ -15,6 +15,13 @@ caminho=".claude/worktrees/${nome}"
 [ -z "$(git -C "$caminho" status --porcelain)" ] || { echo "a worktree tem mudança sem commit" >&2; exit 1; }
 
 git fetch -q origin
+# Antes de mexer em qualquer coisa: a main local e a remota têm de estar no ramo.
+for base in main origin/main; do
+  git merge-base --is-ancestor "$base" "worktree-${nome}" || {
+    echo "a ${base} andou: rode 'git rebase main' na worktree (depois de 'git pull --ff-only' aqui, se foi a origin) e os testes de novo" >&2
+    exit 1
+  }
+done
 git merge --ff-only "worktree-${nome}"
 git push origin main
 git worktree remove --force "$caminho"
