@@ -27,6 +27,8 @@
   width: 100%;
   box-sizing: border-box;
   padding: 0.5rem 0.75rem 0.5rem 1.25rem;
+  /* Fundo próprio: sem ele o menu do painel aparece atrás do nome e dos botões. */
+  background: rgb(11 12 14);
   animation: visor-surgir 100ms ease 300ms backwards;
 }
 @keyframes visor-surgir {
