@@ -9,6 +9,7 @@ import { Dialogo } from "../componentes/Dialogo";
 import { Falha } from "../componentes/Falha";
 import { Vazio } from "../componentes/Vazio";
 import { useRecurso } from "../useRecurso";
+import { useAcao } from "../useAcao";
 
 const dataHora = (iso: string) =>
   new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
@@ -38,20 +39,11 @@ export function AbaConhecimento() {
     carregar,
   } = useRecurso("conhecimento", api.conhecimento, { recarrega: (a) => a.tipo === "agente" });
   const erro = falha === null ? "" : mensagemDeFalha(falha, "carregar a base de conhecimento");
-  const [aviso, setAviso] = useState("");
+  const { agir, erro: erroDaAcao, aviso: feito } = useAcao(carregar);
+  const aviso = erroDaAcao ? `Não deu: ${erroDaAcao}` : feito;
   const [editando, setEditando] = useState<FonteConhecimento | null>(null);
   const [removendo, setRemovendo] = useState<FonteConhecimento | null>(null);
 
-
-  function agir(acao: () => Promise<unknown>, feito: string) {
-    setAviso("");
-    acao()
-      .then(() => {
-        setAviso(feito);
-        carregar();
-      })
-      .catch((e: unknown) => setAviso(`Não deu: ${mensagemDeFalha(e)}`));
-  }
 
   if (!base)
     return erro ? (

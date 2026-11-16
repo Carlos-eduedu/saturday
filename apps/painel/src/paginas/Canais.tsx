@@ -12,6 +12,7 @@ import {
   type RespostaRapida,
 } from "../api";
 import { Falha } from "../componentes/Falha";
+import { useAcao } from "../useAcao";
 
 // Tela Canais (decisão 0010), só para gestor: um resumo dos canais ativos no
 // topo (o agente precisa de pelo menos um; a API recusa tirar o último), números
@@ -93,7 +94,7 @@ function simNao(valor: boolean | null): string {
 
 export function Canais() {
   const [canais, setCanais] = useState<DadosCanais | null>(null);
-  const [erro, setErro] = useState("");
+  const { agir, erro, setErro } = useAcao(() => carregar());
   const [qrDe, setQrDe] = useState<{ nome: string; qr: Qr } | null>(null);
   const [detalhesDe, setDetalhesDe] = useState<string | null>(null);
 
@@ -106,18 +107,8 @@ export function Canais() {
         setDetalhesDe((d) => (d && novos.evolution.instancias.some((i) => i.nome === d) ? d : null));
       })
       .catch((e: unknown) => setErro(mensagemDeFalha(e)));
-  }, []);
+  }, [setErro]);
   useEffect(carregar, [carregar]);
-
-  async function agir(acao: () => Promise<unknown>) {
-    setErro("");
-    try {
-      await acao();
-    } catch (e) {
-      setErro(mensagemDeFalha(e));
-    }
-    carregar();
-  }
 
   if (!canais)
     return erro ? (
@@ -226,7 +217,7 @@ function TabelaInstancias({
   detalhar,
 }: {
   instancias: InstanciaEvolution[];
-  agir: (acao: () => Promise<unknown>) => Promise<void>;
+  agir: (acao: () => Promise<unknown>) => Promise<unknown>;
   mostrarQr: (nome: string, qr: Qr) => void;
   aberta: string | null;
   detalhar: (nome: string) => void;
@@ -321,7 +312,7 @@ function NovaInstancia({
   agir,
   mostrarQr,
 }: {
-  agir: (acao: () => Promise<unknown>) => Promise<void>;
+  agir: (acao: () => Promise<unknown>) => Promise<unknown>;
   mostrarQr: (nome: string, qr: Qr) => void;
 }) {
   const [nome, setNome] = useState("");
@@ -413,28 +404,15 @@ function useAoAbrir() {
 
 function PainelDetalhes({ nome, fechar }: { nome: string; fechar: () => void }) {
   const [detalhes, setDetalhes] = useState<DetalhesInstancia | null>(null);
-  const [erro, setErro] = useState("");
-  const [aviso, setAviso] = useState("");
+  const { agir, erro, aviso, setErro } = useAcao(() => carregar());
 
   const carregar = useCallback(() => {
     api
       .detalhesInstancia(nome)
       .then(setDetalhes)
       .catch((e: unknown) => setErro(mensagemDeFalha(e)));
-  }, [nome]);
+  }, [nome, setErro]);
   useEffect(carregar, [carregar]);
-
-  async function agir(acao: () => Promise<unknown>, feito: string) {
-    setErro("");
-    setAviso("");
-    try {
-      await acao();
-      setAviso(feito);
-    } catch (e) {
-      setErro(mensagemDeFalha(e));
-    }
-    carregar();
-  }
 
   const topo = useAoAbrir();
   return (

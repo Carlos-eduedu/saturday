@@ -12,6 +12,7 @@ import {
   type UsuarioGestao,
 } from "../api";
 import { Falha } from "../componentes/Falha";
+import { useAcao } from "../useAcao";
 
 // Aba Membros: a seção "Você" (o próprio perfil) para todos e, para o gestor,
 // a equipe (decisão 0012): cadastrar, editar, redefinir senha, desbloquear,
@@ -190,8 +191,7 @@ function Voce({ eu, atualizarEu }: { eu: Eu; atualizarEu: (eu: Eu) => void }) {
 function Equipe({ eu }: { eu: Eu }) {
   const confirmar = useConfirmar();
   const [usuarios, setUsuarios] = useState<UsuarioGestao[] | null>(null);
-  const [erro, setErro] = useState("");
-  const [aviso, setAviso] = useState("");
+  const { agir, erro, aviso, setErro, setAviso } = useAcao(() => carregar());
   const [editando, setEditando] = useState<string | null>(null);
   const [adicionando, setAdicionando] = useState(false);
 
@@ -200,23 +200,8 @@ function Equipe({ eu }: { eu: Eu }) {
       .gestaoUsuarios()
       .then(setUsuarios)
       .catch((e: unknown) => setErro(mensagemDeFalha(e)));
-  }, []);
+  }, [setErro]);
   useEffect(carregar, [carregar]);
-
-  async function agir(acao: () => Promise<unknown>, feito: string): Promise<boolean> {
-    setErro("");
-    setAviso("");
-    try {
-      await acao();
-      setAviso(feito);
-      return true;
-    } catch (e) {
-      setErro(mensagemDeFalha(e));
-      return false;
-    } finally {
-      carregar();
-    }
-  }
 
   if (!usuarios)
     return erro ? (

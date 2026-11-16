@@ -40,6 +40,7 @@ import {
 } from "../rotulos";
 import { type Aviso, useAvisos } from "../tempoReal";
 import { useRecurso } from "../useRecurso";
+import { useAcao } from "../useAcao";
 
 // Aba Granatech (decisão 0013). Todos veem consultas e propostas; só o gestor
 // age. Abrir consulta, simular e criar proposta não existem aqui: dependem do
@@ -72,7 +73,6 @@ export function Granatech({ eu }: { eu: Eu }) {
   const [filtro, setFiltro] = useState<FiltroGranatech>({});
   const [selecao, setSelecao] = useState<Selecao>(null);
   const [versao, setVersao] = useState(0);
-  const [aviso, setAviso] = useState("");
 
   // A lista vem marcada com a aba dela: a de uma não aparece na outra. Trocar
   // só o filtro mantém a lista anterior à vista até a nova chegar.
@@ -89,8 +89,16 @@ export function Granatech({ eu }: { eu: Eu }) {
   );
   const consultas = dado?.aba === "consultas" ? dado.linhas : null;
   const propostas = dado?.aba === "propostas" ? dado.linhas : null;
+  // Uma ação por vez: reenviar o link duas vezes manda duas mensagens ao cliente.
+  const {
+    agir,
+    erro: erroDaAcao,
+    aviso,
+  } = useAcao(() => {
+    carregar();
+    setVersao((v) => v + 1);
+  }, "Falando com a Granatech…");
   // Falha de uma ação; a de carga vem do recurso.
-  const [erroDaAcao, setErro] = useState("");
   const erro = erroDaAcao || (falha === null ? "" : mensagemDeFalha(falha));
 
   // Os detalhes abertos recarregam com os mesmos avisos da lista.
@@ -99,26 +107,6 @@ export function Granatech({ eu }: { eu: Eu }) {
       if (a.tipo === "granatech" || a.tipo === "reconectado") setVersao((v) => v + 1);
     }, []),
   );
-
-  // Uma ação por vez: reenviar o link duas vezes manda duas mensagens ao cliente.
-  const emAndamento = useRef(false);
-  const agir: Agir = (acao, feito) => {
-    if (emAndamento.current) return;
-    emAndamento.current = true;
-    setErro("");
-    setAviso("Falando com a Granatech…");
-    acao()
-      .then((r) => setAviso(typeof feito === "string" ? feito : feito(r)))
-      .catch((e: unknown) => {
-        setAviso("");
-        setErro(mensagemDeFalha(e));
-      })
-      .finally(() => {
-        emAndamento.current = false;
-        carregar();
-        setVersao((v) => v + 1);
-      });
-  };
 
   return (
     <div className="canais granatech">
