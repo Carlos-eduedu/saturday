@@ -1,4 +1,4 @@
-# 0024 — Aba Granatech: uma ação do gestor por vez em cada item
+# 0025 — Aba Granatech: uma ação do gestor por vez em cada item
 
 - **Data:** 2026-11-16
 - **Status:** aceita

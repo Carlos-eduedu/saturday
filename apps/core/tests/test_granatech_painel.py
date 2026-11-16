@@ -323,7 +323,7 @@ def test_detalhe_mostra_as_condicoes_depois_que_a_conversa_segue(
     assert client.get(f"{ROTA}/propostas/{linha['id']}").json()["oferta"] == oferta
 
 
-# ---------------------------------------------------------------- uma ação por vez (decisão 0024)
+# ---------------------------------------------------------------- uma ação por vez (decisão 0025)
 
 
 def _com_link(painel: Any, fabrica: sessionmaker[Session]) -> tuple[Jornada, TestClient, str, dict]:

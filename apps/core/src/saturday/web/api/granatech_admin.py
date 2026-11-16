@@ -372,7 +372,7 @@ def bancos(request: Request, _usuario: Logado) -> list[dict[str, str]]:
 
 # ------------------------------------------------------------------ ações do gestor
 
-# Depois de um reenvio, o link da mesma proposta espera este prazo (decisão 0024).
+# Depois de um reenvio, o link da mesma proposta espera este prazo (decisão 0025).
 PRAZO_REENVIO = timedelta(minutes=1)
 
 

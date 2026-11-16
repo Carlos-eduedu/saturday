@@ -63,7 +63,7 @@ def tentar_trava(sessao: Session, chave: str) -> bool:
     """Pega a trava de ``chave`` se estiver livre, sem esperar.
 
     Vale até o fim da transação, como a da conversa. Serve a quem prefere
-    recusar a esperar: a segunda ação do gestor no mesmo item (decisão 0024).
+    recusar a esperar: a segunda ação do gestor no mesmo item (decisão 0025).
     """
 
     return bool(
