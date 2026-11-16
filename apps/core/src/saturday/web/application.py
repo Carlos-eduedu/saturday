@@ -21,6 +21,7 @@ from saturday.web.api import (
     granatech_admin,
     ia,
     links,
+    membros,
     monitoring,
     respostas,
     usuarios,
@@ -59,6 +60,7 @@ def get_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(admin.router)
     app.include_router(canais.router)
     app.include_router(usuarios.router)
+    app.include_router(membros.router)
     app.include_router(granatech_admin.router)
     app.include_router(ia.router)
     app.include_router(agente.router)

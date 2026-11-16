@@ -30,6 +30,8 @@ from saturday.painel.sessoes import (
 )
 
 TAMANHO_MAXIMO_NOME = 80
+TAMANHO_MAXIMO_CARGO = 60
+TAMANHO_MAXIMO_OBSERVACAO = 500
 
 
 def _validar_nome(nome: str) -> str:
@@ -37,6 +39,15 @@ def _validar_nome(nome: str) -> str:
     if not limpo or len(limpo) > TAMANHO_MAXIMO_NOME:
         raise AcaoRecusada(422, f"nome: de 1 a {TAMANHO_MAXIMO_NOME} caracteres")
     return limpo
+
+
+def _texto_opcional(valor: str, maximo: int, campo: str) -> str | None:
+    """Texto livre do gestor: espaços aparados, vazio vira ausência."""
+
+    valor = " ".join(valor.split())
+    if len(valor) > maximo:
+        raise AcaoRecusada(422, f"{campo} longa demais (até {maximo} caracteres)")
+    return valor or None
 
 
 def _validar_senha(senha: str) -> None:
@@ -134,9 +145,20 @@ def editar(
     perfil: str | None = None,
     pode_editar_agente: bool | None = None,
     pode_testar_fluxos: bool | None = None,
+    cargo: str | None = None,
+    observacao: str | None = None,
 ) -> None:
     usuario = _buscar(sessao, usuario_id)
     mudancas: dict[str, Any] = {}
+    if cargo is not None:
+        novo = _texto_opcional(cargo, TAMANHO_MAXIMO_CARGO, "função")
+        if novo != usuario.cargo:
+            mudancas["cargo"] = novo
+    mudou_observacao = False
+    if observacao is not None:
+        nova = _texto_opcional(observacao, TAMANHO_MAXIMO_OBSERVACAO, "observação")
+        mudou_observacao = nova != usuario.observacao
+        usuario.observacao = nova
     if pode_testar_fluxos is not None and pode_testar_fluxos != usuario.pode_testar_fluxos:
         mudancas["pode_testar_fluxos"] = pode_testar_fluxos
     if pode_editar_agente is not None and pode_editar_agente != usuario.pode_editar_agente:
@@ -153,7 +175,7 @@ def editar(
                 raise AcaoRecusada(409, "você não pode tirar o seu próprio perfil de gestor")
             _exigir_outro_gestor(sessao, usuario)
         mudancas["perfil"] = perfil
-    if not mudancas:
+    if not mudancas and not mudou_observacao:
         return
     for campo, valor in mudancas.items():
         setattr(usuario, campo, valor)
@@ -162,6 +184,9 @@ def editar(
             sessao.flush()
     except IntegrityError as exc:
         raise AcaoRecusada(409, "já existe um usuário com esse e-mail") from exc
+    if mudou_observacao:
+        # Texto livre sobre uma pessoa: a auditoria guarda que mudou, não o quê.
+        mudancas["observacao"] = "alterada"
     auditar(sessao, autor_id, "usuario_editar", str(usuario.id), mudancas)
 
 

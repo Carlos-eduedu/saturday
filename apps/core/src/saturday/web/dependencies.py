@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.agent.service import AgentService
 from saturday.dados.sessao import sessao as abrir_sessao
-from saturday.painel import sessoes
+from saturday.painel import membros, sessoes
 from saturday.settings import Settings
 
 COOKIE_SESSAO = "saturday_sessao"
@@ -76,6 +76,8 @@ class UsuarioLogado:
     telefone: str | None = None
     foto_chave: str | None = None
     pode_testar_fluxos: bool = False
+    cargo: str | None = None
+    disponivel: bool = True
 
     @property
     def gestor(self) -> bool:
@@ -92,6 +94,7 @@ def usuario_logado(
         usuario = sessoes.usuario_da_sessao(sessao, token)
         if usuario is None:
             raise HTTPException(status_code=401, detail="não autenticado")
+        membros.marcar_acesso(usuario, sessoes.agora())
         return UsuarioLogado(
             usuario.id,
             usuario.email,
@@ -102,6 +105,8 @@ def usuario_logado(
             usuario.telefone,
             usuario.foto_chave,
             usuario.pode_testar_fluxos,
+            usuario.cargo,
+            usuario.disponivel,
         )
 
 

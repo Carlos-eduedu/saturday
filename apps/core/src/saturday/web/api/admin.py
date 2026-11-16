@@ -36,7 +36,7 @@ from saturday.dados.modelos import (
     UsuarioPainel,
 )
 from saturday.dados.sessao import sessao as abrir_sessao
-from saturday.painel import acoes, exportacao, sessoes, supervisao
+from saturday.painel import acoes, exportacao, membros, sessoes, supervisao
 from saturday.painel.auditoria import auditar
 from saturday.painel.canal import permitido
 from saturday.painel.midia import mime_base
@@ -150,6 +150,8 @@ def _eu(request: Request, usuario: UsuarioLogado) -> dict[str, Any]:
         "telefone": usuario.telefone,
         "foto": url_foto(usuario.id, usuario.foto_chave),
         "pode_testar_fluxos": usuario.pode_testar_fluxos,
+        "cargo": usuario.cargo,
+        "disponivel": usuario.disponivel,
         "csrf": sessoes.token_csrf(segredo, usuario.token),
     }
 
@@ -271,6 +273,35 @@ def atualizar_perfil(
     return _eu(request, replace(usuario, nome=dados.nome, telefone=dados.telefone))
 
 
+class Disponibilidade(BaseModel):
+    disponivel: bool
+
+
+@router.patch("/eu/disponibilidade")
+def marcar_disponibilidade(
+    dados: Disponibilidade, request: Request, usuario: ComCsrf, fabrica: Fabrica
+) -> dict[str, Any]:
+    """A própria pessoa marca disponível ou ausente; vale até ela trocar.
+
+    É informação para quem transfere, não bloqueio (decisão 0023).
+    """
+
+    with abrir_sessao(fabrica) as sessao:
+        linha = sessao.get(UsuarioPainel, usuario.id)
+        if linha is None:
+            raise HTTPException(status_code=404, detail="usuário não encontrado")
+        if linha.disponivel != dados.disponivel:
+            linha.disponivel = dados.disponivel
+            auditar(
+                sessao,
+                usuario.id,
+                "perfil_disponibilidade",
+                str(usuario.id),
+                {"disponivel": dados.disponivel},
+            )
+    return _eu(request, replace(usuario, disponivel=dados.disponivel))
+
+
 @router.put("/eu/foto")
 async def trocar_foto(
     request: Request, usuario: ComCsrf, fabrica: Fabrica, service: Servico
@@ -358,8 +389,16 @@ def usuarios(_usuario: Logado, fabrica: Fabrica) -> list[dict[str, Any]]:
         linhas = sessao.scalars(
             select(UsuarioPainel).where(UsuarioPainel.ativo.is_(True)).order_by(UsuarioPainel.nome)
         ).all()
+        agora = sessoes.agora()
         return [
-            {"id": str(u.id), "nome": u.nome, "email": u.email, "perfil": u.perfil} for u in linhas
+            {
+                "id": str(u.id),
+                "nome": u.nome,
+                "email": u.email,
+                "perfil": u.perfil,
+                "estado": membros.estado(u, agora),
+            }
+            for u in linhas
         ]
 
 

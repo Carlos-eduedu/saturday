@@ -50,6 +50,8 @@ class Edicao(BaseModel):
     perfil: str | None = None
     pode_editar_agente: bool | None = None
     pode_testar_fluxos: bool | None = None
+    cargo: str | None = None
+    observacao: str | None = None
 
 
 class NovaSenha(BaseModel):
@@ -126,6 +128,8 @@ def editar(usuario_id: uuid.UUID, dados: Edicao, usuario: GestorCsrf, fabrica: F
             perfil=dados.perfil,
             pode_editar_agente=dados.pode_editar_agente,
             pode_testar_fluxos=dados.pode_testar_fluxos,
+            cargo=dados.cargo,
+            observacao=dados.observacao,
         ),
     )
     return Response(status_code=204)

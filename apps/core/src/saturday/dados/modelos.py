@@ -252,6 +252,15 @@ class UsuarioPainel(Base):
     pode_testar_fluxos: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=sa_false()
     )
+    # Página do membro (decisão 0023). Função e observação são do gestor; a
+    # observação só ele lê. Disponível é a própria pessoa quem marca.
+    cargo: Mapped[str | None] = mapped_column(String(60))
+    observacao: Mapped[str | None] = mapped_column(Text)
+    disponivel: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=sa_true()
+    )
+    # Último uso do painel, regravado no máximo uma vez por minuto.
+    ultimo_acesso_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Auditoria(Base):
