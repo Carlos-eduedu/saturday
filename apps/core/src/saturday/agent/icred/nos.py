@@ -121,7 +121,7 @@ def icred(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
         return _evento(state, runtime.context, dados, evento)
     etapa = dados.get("etapa")
     if etapa == "sim":
-        return _sim(state, dados)
+        return _sim(state, runtime.context, dados)
     if etapa == "cpf":
         return _cpf(state, runtime.context, dados)
     if etapa == "oferta":
@@ -129,7 +129,7 @@ def icred(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
     return {"icred_rota": "classify_intent"}
 
 
-def _sim(state: AgentState, dados: dict[str, Any]) -> dict[str, Any]:
+def _sim(state: AgentState, contexto: AgentContext, dados: dict[str, Any]) -> dict[str, Any]:
     texto = state.get("user_message", "")
     resposta = _resposta(texto)
     if resposta is None:
@@ -143,6 +143,10 @@ def _sim(state: AgentState, dados: dict[str, Any]) -> dict[str, Any]:
         return _seguir(dados)
     # A prova é gravada com o CPF, na etapa seguinte; aqui fica o SIM literal.
     dados.update(etapa="cpf", sim=texto, sim_wamid=state.get("message_id"), tentativas=0)
+    # O CPF que a conversa já tem (pedido para o C6, decisão 0026) não é pedido de novo.
+    cpf = leitura.cpf(str((state.get("cliente") or {}).get("cpf") or ""))
+    if cpf is not None:
+        return _consultar(state, contexto, dados, cpf)
     return _falar(dados, textos.PEDIR_CPF, "icred:pedir_cpf")
 
 
@@ -153,7 +157,12 @@ def _cpf(state: AgentState, contexto: AgentContext, dados: dict[str, Any]) -> di
         if dados["tentativas"] >= 2:
             return _seguir(dados)
         return _falar(dados, textos.CPF_INVALIDO, "icred:cpf_invalido")
+    return _consultar(state, contexto, dados, cpf)
 
+
+def _consultar(
+    state: AgentState, contexto: AgentContext, dados: dict[str, Any], cpf: str
+) -> dict[str, Any]:
     cliente = contexto.icred
     telefone = state.get("telefone")
     if cliente is None or not telefone:

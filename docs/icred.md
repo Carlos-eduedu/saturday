@@ -9,7 +9,8 @@ decisões estão em `docs/decisoes/0027-icred-pelo-motor-da-mex.md`.
    elegível ou com `sem_portabilidade`), o nó `icred_porta` pede o SIM para
    consultar o iCred, uma vez por conversa. Conversa sem telefone não é
    consultada.
-2. SIM: o agente pede o CPF (o ramo INSS não o tem). Com o CPF válido, grava a
+2. SIM: o agente pede o CPF, a não ser que a conversa já o tenha (o fluxo do
+   C6, decisão 0026, guarda em `cliente.cpf`). Com o CPF válido, grava a
    prova `icred_consulta` e abre a consulta (`acao: consultar`,
    `Idempotency-Key`). Só "sim", "autorizo" ou "aceito" valem como SIM, aqui e
    no aceite. NÃO, duas respostas que não são sim nem não, CPF inválido duas

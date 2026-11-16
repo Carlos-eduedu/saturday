@@ -565,6 +565,20 @@ def test_pergunta_na_oferta_nao_e_aceite(jornada: Jornada, simulador_icred: Modu
     assert [tipo for tipo, _cpf, _resposta in jornada.provas()] == ["icred_consulta"]
 
 
+def test_cpf_que_a_conversa_ja_tem_nao_e_pedido_de_novo(
+    jornada: Jornada, simulador_icred: ModuleType
+) -> None:
+    assert jornada.extrato().answer == textos.PEDIR_SIM
+    # Como o fluxo do C6 deixa: o CPF já está nos dados do cliente.
+    cliente = {**jornada.estado()["cliente"], "cpf": CPF}
+    jornada.servico.graph.update_state(jornada.servico.config(jornada.id), {"cliente": cliente})
+
+    assert jornada.falar("sim").answer == textos.CONSULTANDO
+    assert jornada.provas() == [("icred_consulta", CPF, "sim")]
+    (remota,) = simulador_icred.CONSULTAS.values()
+    assert remota["cpf"] == CPF
+
+
 def test_extrato_repetido_mantem_a_pergunta_do_icred(jornada: Jornada) -> None:
     assert jornada.extrato().answer == textos.PEDIR_SIM
 
