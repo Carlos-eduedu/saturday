@@ -67,7 +67,7 @@ def versao_vigente(sessao: Session) -> ConfigAgente | None:
 
 
 class Modelos:
-    """Resolve o modelo de cada papel. Sem fábrica (testes, chat sem banco), só o ambiente."""
+    """Resolve o modelo de cada papel. Sem fábrica, só o ambiente: ignora a versão gravada."""
 
     def __init__(self, settings: Settings, fabrica: Any = None) -> None:
         self._settings = settings
