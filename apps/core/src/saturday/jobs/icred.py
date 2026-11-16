@@ -113,9 +113,9 @@ def verificar_prazo(
             linha.estado = DESISTIDA
             repositorios.abrir_alerta(
                 sessao,
-                "consulta_parada",
+                "icred_consulta_parada",
                 conversa_id=linha.conversa_id,
-                detalhe={"banco": "icred", "id": id_externo},
+                detalhe={"id": id_externo},
             )
             conversation_id = repositorios.conversation_id_de(sessao, linha.conversa_id)
         abandonadas += 1

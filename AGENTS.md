@@ -43,6 +43,7 @@ tema) e leia os que tocam a área.
 | Ramo CLT: etapas, triagem, consentimento, oferta, proposta, mensagens fixas | "Especificação: jornada CLT, triagem e mensagens" | `docs/clt.md` |
 | Canal WhatsApp da Meta ou painel | "Especificação: WhatsApp e painel" | `apps/core/README.md` |
 | Canal Evolution | fora do documento | `docs/evolution.md` |
+| iCred (motor de consultas) | fora do documento; decisão 0027 | `docs/icred.md` |
 | Variável de ambiente ou compose | "Variáveis de ambiente e compose" | `.env.example`, `docs/deploy.md` |
 | Pasta, módulo ou interface nova | "Arquitetura alvo e estrutura do monorepo" | `docs/estado.md` |
 | Fechar ou retomar uma fase | "Fases de implementação" | `docs/estado.md` |

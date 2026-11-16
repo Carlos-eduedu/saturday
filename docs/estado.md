@@ -91,6 +91,15 @@ uma entrega fora das fases.
   do painel, só gestor, com telefone fixado e alerta de queda
   (docs/decisoes/0010); webhook conferido e configurações da instância
   ajustadas pelo painel (docs/decisoes/0011). Ver `docs/evolution.md`.
+- iCred, fase 1 (fora das fases, docs/decisoes/0027): no ramo INSS, depois do
+  extrato, o agente pede o SIM e o CPF, consulta o motor do iCred, apresenta o
+  pacote e colhe o aceite com prova; o atendente grava a proposta. Webhook
+  assinado em `/webhooks/icred`, simulador em `simuladores/icred/` e tudo atrás
+  de `SATURDAY_ICRED_ATIVO`. **Pendentes:** cadastro da aplicação do Saturday no
+  motor (chave, webhook e segredo), a consulta na ficha do painel, a fase 2
+  (gravação pelo agente, condicionada aos pedidos ao motor listados na 0027) e
+  os `TODO(icred)` de seguro, CET e do que o cliente faz no link. Ver
+  `docs/icred.md`.
 - `migrations/` fica em `apps/core/migrations/`, não na raiz: as migrações
   descrevem os modelos daquele pacote e precisam do ambiente `uv` dele para
   importar. Desvio consciente da árvore desenhada na especificação.

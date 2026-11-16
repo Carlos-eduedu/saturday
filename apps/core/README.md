@@ -276,3 +276,25 @@ O simulador fica em `simuladores/granatech/`:
 ```bash
 uv run --project simuladores uvicorn app:app --app-dir simuladores/granatech --port 8200
 ```
+
+## iCred
+
+Arquivos em `bancos/icred/` (cliente e normalização), `agent/icred/` (regras,
+textos e nós), `web/api/icred.py` e `jobs/icred.py`. O que existe e o que o
+motor faz estão em [`docs/icred.md`](../../docs/icred.md); as decisões, na 0027.
+
+- Só com `SATURDAY_ICRED_ATIVO=true`. Sem ela, o ramo INSS é o de antes.
+- `POST /webhooks/icred` confere a assinatura HMAC em tempo constante
+  (`X-Icred-Assinatura` sobre `<timestamp>.<corpo>`), recusa timestamp com mais
+  de 5 minutos, grava em `eventos_recebidos` com o `X-Icred-Id` e responde 200.
+  Sem segredo configurado, 503.
+- O worker aplica `consulta.concluida` na consulta local e roda um turno de
+  sistema na conversa. Consulta sem resposta em `SATURDAY_ICRED_ESPERA_MIN` é
+  lida por id; continuando parada, a conversa segue sem o iCred e abre o alerta
+  `icred_consulta_parada`.
+
+O simulador fica em `simuladores/icred/`:
+
+```bash
+uv run --project simuladores uvicorn app:app --app-dir simuladores/icred --port 8400
+```

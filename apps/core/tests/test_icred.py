@@ -474,8 +474,7 @@ def test_consulta_sem_resposta_no_prazo_segue_e_abre_alerta(jornada: Jornada) ->
     with abrir_sessao(jornada.fabrica) as sessao:
         assert sessao.scalars(select(ConsultaIcred.estado)).all() == ["desistida"]
         alerta = sessao.scalars(select(Alerta)).one()
-        assert alerta.tipo == "consulta_parada"
-        assert (alerta.detalhe or {}).get("banco") == "icred"
+        assert alerta.tipo == "icred_consulta_parada"
     # O resultado que chega depois não reabre a oferta.
     jornada.resultado("COM_OFERTA", [dict(jornada.simulador.PRODUTO_NOVO)])
     assert jornada.ultima_saida().startswith("Analisei o seu extrato.")

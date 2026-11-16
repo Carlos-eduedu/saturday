@@ -10,7 +10,7 @@ Fora da API real: `SIMULADOR_ICRED_CENARIO` faz a consulta concluir sozinha
 `/admin/evento`.
 
 Rodar local:
-    uvicorn app:app --app-dir simuladores/icred --port 8300
+    uvicorn app:app --app-dir simuladores/icred --port 8400
 """
 
 from __future__ import annotations

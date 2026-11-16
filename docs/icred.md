@@ -1,6 +1,45 @@
-# iCred (pesquisa)
+# iCred
 
-> **Pesquisa, não implementação.** Lido em 2026-11-16. Nada disto está no código.
+## Como está hoje (fase 1)
+
+Só com `SATURDAY_ICRED_ATIVO=true`; sem ela o ramo INSS é o de antes. As
+decisões estão em `docs/decisoes/0027-icred-pelo-motor-da-mex.md`.
+
+1. O cliente manda o extrato. Depois do cálculo da portabilidade (com contrato
+   elegível ou com `sem_portabilidade`), o nó `icred_porta` pede o SIM para
+   consultar o iCred, uma vez por conversa. Conversa sem telefone não é
+   consultada.
+2. SIM: o agente pede o CPF (o ramo INSS não o tem). Com o CPF válido, grava a
+   prova `icred_consulta` e abre a consulta (`acao: consultar`,
+   `Idempotency-Key`). NÃO, CPF inválido duas vezes ou motor fora do ar: a
+   conversa segue o caminho de antes.
+3. O resultado chega pelo webhook `consulta.concluida` e vira um turno de
+   sistema. `agent/icred/regras.py` decide:
+   - `JA_GRAVADO`, `PROPOSTA_EXISTENTE`, `TELEFONE_VINCULADO`: handoff
+     `icred_bloqueio`;
+   - algum contrato acima de 1,85% ao mês: handoff `icred_taxa_alta`;
+   - oferta que não deu para ler inteira: handoff `icred_conferir`;
+   - sem oferta, ou total na conta menor ou igual ao da portabilidade C6: o
+     caminho de antes;
+   - senão, a oferta do pacote inteiro.
+4. Aceite: prova `icred_aceite` e handoff `icred_aceite`, com os contratos e se
+   a consulta já venceu no detalhe do alerta. O atendente grava pelo painel do
+   motor.
+5. Sem resposta em `SATURDAY_ICRED_ESPERA_MIN` (5): o worker lê a consulta por
+   id; continuando parada, a conversa segue o caminho de antes e abre o alerta
+   `icred_consulta_parada`.
+
+O agente nunca chama `/gravar`, `acao: gravar` nem `aceitar_mudanca`. A comissão
+é descartada em `bancos/icred/normalizacao.py`. A oferta não cita seguro
+(`TODO(icred)` em `agent/icred/textos.py`).
+
+Testes em `apps/core/tests/test_icred.py`, contra `simuladores/icred/`. No
+compose local o simulador sobe na porta 8400 e conclui a consulta sozinho com
+`SIMULADOR_ICRED_CENARIO`.
+
+## Pesquisa da especificação
+
+> **O que segue é a pesquisa de antes da implementação.** Lido em 2026-11-16.
 > O que foi decidido está na decisão 0027. Onde a especificação e o código-fonte
 > do motor divergem, vale a última seção
 > ([O que o código-fonte do motor respondeu](#o-que-o-código-fonte-do-motor-respondeu)).
