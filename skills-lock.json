@@ -7,36 +7,6 @@
       "skillPath": "skills/agent-browser/SKILL.md",
       "computedHash": "c3d8b82b1b229c3697cf5f21b5202375a7e6aea21c7059ab30f0bc6972664a98"
     },
-    "deep-agents-core": {
-      "source": "langchain-ai/langchain-skills",
-      "sourceType": "github",
-      "skillPath": "config/skills/deep-agents-core/SKILL.md",
-      "computedHash": "aea6d01254697bf52fd6f3a411889a29c72311adbb8a115bbf231f2d6e727839"
-    },
-    "deep-agents-memory": {
-      "source": "langchain-ai/langchain-skills",
-      "sourceType": "github",
-      "skillPath": "config/skills/deep-agents-memory/SKILL.md",
-      "computedHash": "d44c10509847f0bdeb740c2c2f15dff80899fe8321639f8515b2987d852ab6e6"
-    },
-    "deep-agents-orchestration": {
-      "source": "langchain-ai/langchain-skills",
-      "sourceType": "github",
-      "skillPath": "config/skills/deep-agents-orchestration/SKILL.md",
-      "computedHash": "6274960b05f3af622a8d52f39add9019acb24d7ee77afd624cc4afa15c7a1bcb"
-    },
-    "deepagents-python-quickstart": {
-      "source": "langchain-ai/langchain-skills",
-      "sourceType": "github",
-      "skillPath": "config/skills/deepagents-python-quickstart/SKILL.md",
-      "computedHash": "e80b75fc2bdd9c2086a9a9c1b6b9df3e944af8dd57d35a3d167d92b82e194624"
-    },
-    "deepagents-typescript-quickstart": {
-      "source": "langchain-ai/langchain-skills",
-      "sourceType": "github",
-      "skillPath": "config/skills/deepagents-typescript-quickstart/SKILL.md",
-      "computedHash": "5b0232ada547af320b03c63866664d113f2662b271c049224ff0d264f48a8350"
-    },
     "ecosystem-primer": {
       "source": "langchain-ai/langchain-skills",
       "sourceType": "github",
@@ -126,12 +96,6 @@
       "sourceType": "github",
       "skillPath": "config/skills/langgraph-typescript-quickstart/SKILL.md",
       "computedHash": "2bebd980e9c807645c2e08303a2b60956e632f7a6f8d7ac617f4ac8f446d2863"
-    },
-    "managed-deep-agents": {
-      "source": "langchain-ai/langchain-skills",
-      "sourceType": "github",
-      "skillPath": "config/skills/managed-deep-agents/SKILL.md",
-      "computedHash": "d2940e170551ef2981a21db123b98dd0bb3534266612cabba8f4cdb2991c47b2"
     },
     "swarm": {
       "source": "langchain-ai/langchain-skills",
