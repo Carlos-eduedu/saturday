@@ -81,7 +81,8 @@ de visão; tudo via OpenRouter. Os testes trocam esses clientes por falsos em
 `tests/conftest.py` (`resultado_jev`, `FakeJev`, etc.) — reaproveite-os.
 
 **Dados (`dados/`).** SQLAlchemy em `modelos.py`, consultas em
-`repositorios.py`, sessão em `sessao.py`. Migrações Alembic ficam em
+`repositorios.py`, sessão em `sessao.py`. O estado de atendimento só muda por
+`atendimento.py`, que abre e resolve os alertas de cada mudança (decisão 0021). Migrações Alembic ficam em
 `apps/core/migrations/` (não na raiz); toda mudança em `modelos.py` precisa de
 uma migração nova.
 

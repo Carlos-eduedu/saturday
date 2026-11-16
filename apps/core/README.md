@@ -71,7 +71,7 @@ Todas usam o prefixo `SATURDAY_`. O `.env` é lido automaticamente.
 | `SATURDAY_OUTBOX_MAX_TENTATIVAS` | `8` | Tentativas de entrega antes de desistir. |
 | `SATURDAY_OUTBOX_BACKOFF_BASE_S` | `2.0` | Espera inicial do backoff (dobra a cada falha). |
 | `SATURDAY_RETENCAO_EXTRATO_DIAS` | `30` | Dias de retenção do extrato; ao expirar, o extrato é apagado no próximo turno. |
-| `SATURDAY_HANDOFF_AUTO_RELEASE_HORAS` | `0` | Horas para liberar automaticamente um handoff sem dono; `0` desliga. Conversa assumida nunca é liberada sozinha. A liberação resolve os alertas `handoff`, `erro_interno` e `sem_resposta` da conversa, sem usuário. |
+| `SATURDAY_HANDOFF_AUTO_RELEASE_HORAS` | `0` | Horas para liberar automaticamente um handoff sem dono; `0` desliga. Conversa assumida nunca é liberada sozinha. A liberação resolve os alertas `handoff`, `erro_interno`, `atendente_desativado` e `sem_resposta` da conversa, sem usuário. |
 | `SATURDAY_SESSAO_SEGREDO` | vazio | Assina o CSRF do painel. Obrigatória fora de `pytest`. |
 | `SATURDAY_GRANATECH_BASE_URL` | api-dev | Base da API da Granatech; em dev, o simulador (`http://granatech:8200`). |
 | `SATURDAY_GRANATECH_CHAVE_API` | vazio | Chave do login. Obrigatória com `GRANATECH_ATIVO=true`. |
@@ -149,7 +149,7 @@ O `DELETE` devolve `204`. O `release` devolve `{conversation_id, status: "in_pro
 
 O `release` também grava `atendimento = ia` em `conversas`, que desde a Fase 3 é
 quem decide se a IA responde (docs/decisoes/0003), e resolve os alertas `handoff`,
-`erro_interno` e `sem_resposta` da conversa, sem usuário. O `status` do `GET` continua
+`erro_interno`, `atendente_desativado` e `sem_resposta` da conversa, sem usuário. O `status` do `GET` continua
 sendo o do grafo: uma conversa assumida no painel aparece ali como estava no
 último turno da IA.
 
@@ -169,14 +169,14 @@ nunca pelo `conversation_id`, que no WhatsApp carrega o telefone.
 | `GET` | `/admin/conversas?fila=ia\|handoff\|assumida\|minhas&busca=` | Inbox, com `nao_lida` e `janela_aberta` (as 200 mais recentes). |
 | `GET` | `/admin/conversas/contagens` | Quantas conversas há em cada fila (`todas`, `ia`, `handoff`, `assumida`, `minhas`) e quantas pedem atenção (`atencao`), em toda a base. |
 | `GET` | `/admin/conversas/{id}` | Histórico com autor e status de entrega; marca como vista. |
-| `POST` | `/admin/conversas/{id}/assumir` | Atendente assume da IA ou do handoff; o gestor toma de outro atendente. Resolve os alertas `handoff` e `erro_interno` da conversa (docs/decisoes/0018). |
+| `POST` | `/admin/conversas/{id}/assumir` | Atendente assume da IA ou do handoff; o gestor toma de outro atendente. Resolve os alertas `handoff`, `erro_interno` e `atendente_desativado` da conversa (docs/decisoes/0018 e 0021). |
 | `POST` | `/admin/conversas/{id}/desfazer` | Desfaz o último assumir ou devolver de quem pede, por até 15 s e enquanto nada mais mexeu no atendimento; a conversa volta ao estado de antes (IA, handoff ou o dono anterior), com os alertas que a ação resolveu reabertos. |
-| `POST` | `/admin/conversas/{id}/devolver` | Devolve para a IA (só o dono, ou o gestor). Resolve os alertas `handoff`, `erro_interno` e `sem_resposta` da conversa. |
+| `POST` | `/admin/conversas/{id}/devolver` | Devolve para a IA (só o dono, ou o gestor). Resolve os alertas `handoff`, `erro_interno`, `atendente_desativado` e `sem_resposta` da conversa. |
 | `POST` | `/admin/conversas/{id}/transferir` | `{usuario_id}`; só conversa assumida. |
 | `POST` | `/admin/conversas/{id}/mensagens` | `{texto}` ou `{modelo}`; só o dono, só WhatsApp. Janela fechada aceita só modelo. |
 | `GET` | `/admin/conversas/{id}/ficha` | Dados mascarados, mais a oferta vigente (só valores), a última proposta na Granatech com `difere_da_oferta` e as provas de consentimento (sem o CPF). |
 | `POST` | `/admin/conversas/{id}/revelar` | `{campo: cpf\|telefone\|data_nascimento}`; grava `revelar:{campo}` na auditoria. |
-| `GET` | `/admin/alertas` | Alertas abertos (`handoff`, `erro_interno`, `envio_falhou`, `sem_resposta`). |
+| `GET` | `/admin/alertas` | Alertas abertos (`handoff`, `erro_interno`, `atendente_desativado`, `envio_falhou`, `sem_resposta`). |
 | `POST` | `/admin/alertas/{id}/resolver` | Resolve e audita. |
 | `GET` | `/admin/cota` | Consultas Granatech no dia e no mês contra os tetos. |
 | `GET` | `/admin/midia/{mensagem_id}/{indice}` | Anexo da mensagem, servido pela API (sem URL pré-assinada). |

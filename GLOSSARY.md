@@ -57,8 +57,8 @@ Trocar o dono de uma conversa assumida por outro atendente.
 Quem escreveu uma mensagem de saída: a IA, um atendente ou o sistema (modelo).
 
 **Alerta**:
-Algo que pede atenção da equipe: handoff novo, erro interno, envio que desistiu
-ou cliente sem resposta numa conversa assumida.
+Algo que pede atenção da equipe: handoff novo, erro interno, envio que desistiu,
+atendente desativado com conversas ou cliente sem resposta numa conversa assumida.
 
 **Ficha**:
 Os dados pessoais e de jornada de um cliente, mostrados mascarados no painel.
