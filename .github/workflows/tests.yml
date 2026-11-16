@@ -10,6 +10,22 @@ jobs:
     defaults:
       run:
         working-directory: apps/core
+    # Banco descartável: sem ele os testes de Postgres (trava, outbox, jornadas
+    # CLT) são pulados. Precisa do pgvector (decisão 0017).
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: saturday
+          POSTGRES_PASSWORD: saturday
+          POSTGRES_DB: saturday_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U saturday"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -31,6 +47,8 @@ jobs:
         run: uv run mypy
 
       - name: Testes
+        env:
+          SATURDAY_TEST_DATABASE_URL: postgresql://saturday:saturday@127.0.0.1:5432/saturday_test
         run: uv run pytest
 
   simuladores:
