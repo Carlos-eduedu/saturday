@@ -166,7 +166,7 @@ nunca pelo `conversation_id`, que no WhatsApp carrega o telefone.
 | `POST` | `/admin/logout` | Apaga a sessão. |
 | `GET` | `/admin/eu` | Usuário, perfil e token CSRF. |
 | `GET` | `/admin/usuarios` | Destinos de transferência. |
-| `GET` | `/admin/conversas?fila=ia\|handoff\|assumida\|minhas&busca=` | Inbox, com `nao_lida` e `janela_aberta` (as 200 mais recentes). |
+| `GET` | `/admin/conversas?fila=ia\|handoff\|assumida\|minhas&busca=` | Inbox, com `nao_lida` e o que o canal permite agora: `envia`, `janela` (`aberta`, `fechada` ou `null` no canal sem janela) e `modelos` (as 200 mais recentes). |
 | `GET` | `/admin/conversas/contagens` | Quantas conversas há em cada fila (`todas`, `ia`, `handoff`, `assumida`, `minhas`) e quantas pedem atenção (`atencao`), em toda a base. |
 | `GET` | `/admin/conversas/{id}` | Histórico com autor e status de entrega; marca como vista. |
 | `POST` | `/admin/conversas/{id}/assumir` | Atendente assume da IA ou do handoff; o gestor toma de outro atendente. Resolve os alertas `handoff`, `erro_interno` e `atendente_desativado` da conversa (docs/decisoes/0018 e 0021). |

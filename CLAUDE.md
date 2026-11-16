@@ -61,7 +61,9 @@ os dois processos o recebam. `web/lifespan.py` cuida só de abrir e fechar.
    outbox — ver `docs/decisoes/0001-outbox-dono-do-reagendamento.md`. Não
    coloque retry dentro de um canal. As chaves do `payload` de WhatsApp só
    existem em `Envio` (`canais/base.py`): quem enfileira usa `para_payload`,
-   quem entrega usa `do_payload`.
+   quem entrega usa `do_payload`. O que o painel pode mandar por cada canal
+   (janela e modelo só na Meta, decisão 0009) sai de `painel/canal.py`: não
+   compare `canal` em outro lugar para decidir envio.
 
 O `POST /chat` (contrato HTTP antigo, documentado em `apps/core/README.md`) usa o
 mesmo `AgentService`: com `SATURDAY_WEBHOOK_URL` responde 202 e a resposta sai
