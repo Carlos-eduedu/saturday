@@ -19,8 +19,9 @@ for mexer no painel): `.venv` próprio e o banco `saturday_test_<nome>`.
 - Ao terminar, da raiz do checkout principal: `infra/worktree_entregar.sh <nome>`
   faz o fast-forward na `main` (`git rebase main` antes, na worktree, se a
   `main` andou), o push, remove a worktree, o ramo e o banco dela e espera o CI.
-- Na sessão presa à worktree, cada chamada leva um `git` simples, e comando com
-  heredoc é recusado: escreva o arquivo com Write/Edit e rode o script.
+- Na sessão presa à worktree, cada chamada leva um `git` simples. Comando
+  composto com subshell em segundo plano e o `eval` do `agent-browser` são
+  recusados: escreva o arquivo com Write/Edit e rode o script.
 
 ## Painel no navegador
 
@@ -30,7 +31,9 @@ Para ver telas rodando, `infra/painel_local.sh` sobe a API (banco
 sai no fim do seed, ou vem de `PAINEL_LOCAL_SENHA`), conversas nas três
 situações, uma com imagem, PDF e arquivo sem prévia num S3 local, e a conversa
 CLT com humano, ficha preenchida e consulta parada (`infra/painel_seed.py`),
-mais um alerta e um turno (`infra/painel_seed.sql`). A revisão de um diff
+mais um alerta e um turno (`infra/painel_seed.sql`).
+`infra/painel_prints.sh <pasta> <caminho>...` grava cada tela em desktop claro,
+desktop escuro e celular, para o relatório de antes e depois. A revisão de um diff
 do painel segue o `CODING_STANDARDS.md`.
 
 ## Arquitetura (o que exige ler vários arquivos)
