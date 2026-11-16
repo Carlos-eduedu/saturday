@@ -15,6 +15,9 @@ export interface Eu {
   foto: string | null;
   // Conversas do telefone do perfil são de teste (decisão 0020).
   pode_testar_fluxos: boolean;
+  // Função (o gestor preenche) e disponibilidade (a própria pessoa marca).
+  cargo: string | null;
+  disponivel: boolean;
   csrf: string;
 }
 
@@ -138,23 +141,44 @@ export interface Usuario {
   nome: string;
   email: string;
   perfil: Perfil;
+  estado: EstadoMembro;
 }
 
-// Linha da aba Usuários (só gestor).
-export interface UsuarioGestao {
+export type EstadoMembro = "disponivel" | "ausente" | "fora";
+
+export interface AcaoDoMembro {
+  acao: string;
+  quando: string;
+  conversa_id: string | null;
+}
+
+// Um membro da equipe (aba Membros, decisão 0023). O servidor decide o que
+// manda conforme o `nivel` de quem pede: do colega só vem o primeiro bloco.
+export interface Membro {
   id: string;
   nome: string;
-  email: string;
-  perfil: Perfil;
-  pode_editar_agente: boolean;
-  pode_testar_fluxos: boolean;
-  // Telefone mascarado e o endereço da foto, quando a pessoa pôs.
-  telefone: string | null;
   foto: string | null;
-  situacao: "ativo" | "bloqueado" | "desativado";
-  bloqueado_ate: string | null;
-  criado_em: string;
+  cargo: string | null;
+  perfil: Perfil;
+  estado: EstadoMembro;
   conversas_assumidas: number;
+  voce: boolean;
+  nivel: "colega" | "proprio" | "gestor";
+  // A própria pessoa e o gestor. O telefone vem mascarado.
+  email?: string;
+  telefone?: string | null;
+  pode_editar_agente?: boolean;
+  pode_testar_fluxos?: boolean;
+  ultimo_acesso_em?: string | null;
+  criado_em?: string;
+  // Só o gestor.
+  situacao?: "ativo" | "bloqueado" | "desativado";
+  bloqueado_ate?: string | null;
+  tentativas_falhas?: number;
+  observacao?: string | null;
+  // Só na página do membro (`/membros/{id}`).
+  atividade?: { mensagens: number; assumidas: number; devolvidas: number; transferidas: number };
+  acoes?: AcaoDoMembro[];
 }
 
 export interface NovoUsuario {
@@ -697,7 +721,10 @@ export const api = {
   atualizarPerfil: (nome: string, telefone: string) =>
     chamar<Eu>("PATCH", "/eu", { nome, telefone: telefone || null }),
   removerFoto: () => chamar<Eu>("DELETE", "/eu/foto"),
-  gestaoUsuarios: () => chamar<UsuarioGestao[]>("GET", "/gestao/usuarios"),
+  marcarDisponibilidade: (disponivel: boolean) =>
+    chamar<Eu>("PATCH", "/eu/disponibilidade", { disponivel }),
+  membros: () => chamar<Membro[]>("GET", "/membros"),
+  membro: (id: string) => chamar<Membro>("GET", `/membros/${id}`),
   criarUsuario: (dados: NovoUsuario) => chamar<{ id: string }>("POST", "/gestao/usuarios", dados),
   editarUsuario: (
     id: string,
@@ -707,6 +734,8 @@ export const api = {
       perfil: Perfil;
       pode_editar_agente: boolean;
       pode_testar_fluxos: boolean;
+      cargo: string;
+      observacao: string;
     },
   ) =>
     chamar<void>("PATCH", `/gestao/usuarios/${id}`, dados),

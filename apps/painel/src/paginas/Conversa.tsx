@@ -38,6 +38,7 @@ import {
   TIPOS_DE_PROVA,
   tokens,
 } from "../rotulos";
+import { ROTULO_ESTADO } from "../membros";
 import { permissoesDa } from "../permissoes";
 import { useRecurso } from "../useRecurso";
 import { centavosCitados, foraDaOferta, origemDaMensagem, reaisDeCentavos } from "./conferencia";
@@ -517,6 +518,8 @@ function Acoes({
                     .map((u) => (
                       <option key={u.id} value={u.id}>
                         {u.nome}
+                        {/* Informação, não bloqueio: dá para transferir a quem está ausente. */}
+                        {u.estado !== "disponivel" && ` (${ROTULO_ESTADO[u.estado].toLowerCase()})`}
                       </option>
                     ))}
                 </select>

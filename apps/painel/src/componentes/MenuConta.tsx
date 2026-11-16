@@ -51,7 +51,7 @@ export function MenuConta({ eu, aoSair }: { eu: Eu; aoSair: () => void }) {
             <strong>{eu.nome}</strong>
             <span>{eu.perfil === "gestor" ? "Gestor" : "Atendente"}</span>
           </p>
-          <Link to="/membros" className="menu-conta__item">
+          <Link to={`/membros/${eu.id}`} className="menu-conta__item">
             Seu perfil
           </Link>
           <button type="button" className="menu-conta__item" onClick={aoSair}>

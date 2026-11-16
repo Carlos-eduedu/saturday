@@ -12,6 +12,7 @@ import { Bancos } from "./paginas/Bancos";
 import StaggeredMenu from "./componentes/StaggeredMenu";
 import { Caixa } from "./paginas/Caixa";
 import { Login } from "./paginas/Login";
+import { PaginaDoMembro } from "./paginas/Membro";
 import { Membros } from "./paginas/Usuarios";
 import { iniciarTempoReal } from "./tempoReal";
 import { useRecurso } from "./useRecurso";
@@ -172,7 +173,11 @@ function Logado({
           <Route path="/bancos/:banco" element={<Bancos eu={eu} />} />
           <Route path="/agente" element={<Agente />} />
           {eu.perfil === "gestor" && <Route path="/canais" element={<Canais />} />}
-          <Route path="/membros" element={<Membros eu={eu} atualizarEu={atualizarEu} />} />
+          <Route path="/membros" element={<Membros eu={eu} />} />
+          <Route
+            path="/membros/:id"
+            element={<PaginaDoMembro eu={eu} atualizarEu={atualizarEu} />}
+          />
           {eu.perfil === "gestor" && <Route path="/operacao" element={<Operacao />} />}
           {/* Endereços antigos, de antes da barra nova: links salvos continuam valendo. */}
           <Route path="/granatech" element={<Navigate to="/bancos/granatech" replace />} />
