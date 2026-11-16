@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -41,3 +43,15 @@ def test_batimento_atrasado_aparece(tmp_path: Path) -> None:
 
 def test_dois_problemas_ao_mesmo_tempo(tmp_path: Path) -> None:
     assert len(problemas(lambda: False, caminho=tmp_path / "nao-existe")) == 2
+
+
+def test_checagem_http_nao_importa_banco_nem_settings() -> None:
+    """O alvo `api` só faz um GET: não pode pagar o import do worker."""
+
+    codigo = (
+        "import sys, saturday.health; "
+        "pesados = [m for m in ('sqlalchemy', 'saturday.settings') if m in sys.modules]; "
+        "sys.exit(1 if pesados else 0)"
+    )
+    resultado = subprocess.run([sys.executable, "-c", codigo], check=False)  # noqa: S603
+    assert resultado.returncode == 0

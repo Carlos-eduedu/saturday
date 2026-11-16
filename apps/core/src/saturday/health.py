@@ -15,11 +15,13 @@ import urllib.request
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from sqlalchemy import create_engine, literal, select
-from sqlalchemy.pool import NullPool
-
-from saturday.settings import Settings, get_settings
+# `sqlalchemy` e `saturday.settings` só entram no caminho do worker (dentro das
+# funções): são 80% do tempo de import, e a checagem da API e do simulador, que
+# só faz um GET, estourava o tempo do healthcheck em container com pouca CPU.
+if TYPE_CHECKING:
+    from saturday.settings import Settings
 
 BATIMENTO = Path(tempfile.gettempdir()) / "saturday-worker.beat"
 LIMITE_BATIMENTO_S = 60
@@ -62,6 +64,9 @@ def problemas(ping: Callable[[], bool], *, caminho: Path = BATIMENTO) -> list[st
 
 
 def _ping(settings: Settings) -> bool:
+    from sqlalchemy import create_engine, literal, select
+    from sqlalchemy.pool import NullPool
+
     url = settings.database_url.get_secret_value()
     if not url:
         return False
@@ -102,6 +107,8 @@ def main(argv: list[str] | None = None) -> int:
     if alvo != ["worker"]:
         print("uso: saturday-health api|worker")
         return 2
+
+    from saturday.settings import get_settings
 
     settings = get_settings()
     achados = problemas(lambda: _ping(settings))
