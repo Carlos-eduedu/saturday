@@ -14,7 +14,7 @@ import io
 import json
 import uuid
 import zipfile
-from datetime import UTC, date, datetime, time
+from datetime import date, datetime, time
 from typing import Annotated, Any, Literal, cast
 from zoneinfo import ZoneInfo
 
@@ -37,6 +37,7 @@ from saturday.dados.modelos import (
     UsuarioPainel,
 )
 from saturday.dados.sessao import sessao as abrir_sessao
+from saturday.jobs.granatech import aplicar_status_da_consulta
 from saturday.painel import acoes
 from saturday.painel.auditoria import auditar
 from saturday.privacidade import MASCARAS
@@ -507,13 +508,7 @@ def atualizar_detalhe(
             select(ConsultaGranatech).where(ConsultaGranatech.id == consulta_id).with_for_update()
         ).one()
         # Detalhe com margens é consulta pronta (contrato); o webhook pode não ter vindo.
-        if ordem.aceita_consulta(linha.status, "SUCCESS"):
-            linha.status = "SUCCESS"
-        linha.historico = [
-            *linha.historico,
-            {"status": "SUCCESS", "origem": "painel", "recebido_em": datetime.now(UTC).isoformat()},
-        ]
-        repositorios.notificar(sessao, "granatech", consulta=consulta_id)
+        aplicar_status_da_consulta(sessao, linha, "SUCCESS", origem="painel")
     # Só avança se a conversa ainda está em `consultando`; com humano vira alerta.
     service.continuar(conversation_id, "consulta_pronta")
     return {"pronto": True}

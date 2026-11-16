@@ -124,26 +124,8 @@ def _consulta(
             _alertar(sessao, None, motivo="consulta_desconhecida", id=id_externo, status=novo)
             return
 
-        # Reatribuir a lista inteira: o JSONB não acompanha `append`.
-        linha.historico = [*linha.historico, {"status": novo, "recebido_em": _agora()}]
-        repositorios.notificar(sessao, "granatech", consulta=linha.id)
-        if novo not in ordem.CONSULTA:
-            _alertar(
-                sessao, linha.conversa_id, motivo="status_desconhecido", id=id_externo, status=novo
-            )
+        if not aplicar_status_da_consulta(sessao, linha, novo):
             return
-        if ordem.aceita_consulta(linha.status, novo):
-            linha.status = novo
-            if novo in ordem.CONSULTA_ALERTA:
-                _alertar(
-                    sessao,
-                    linha.conversa_id,
-                    motivo="status_de_atencao",
-                    id=id_externo,
-                    status=novo,
-                )
-        else:
-            logger.info("granatech_consulta_status_ignorado atual=%s novo=%s", linha.status, novo)
         status = linha.status
         tem_detalhe = linha.detalhe is not None
         conversation_id = _conversation_id(sessao, linha.conversa_id)
@@ -156,6 +138,43 @@ def _consulta(
     evento = evento_da_consulta(status)
     if servico is not None and conversation_id and evento:
         servico.continuar(conversation_id, evento)
+
+
+def aplicar_status_da_consulta(
+    sessao: Session, linha: ConsultaGranatech, novo: str, *, origem: str | None = None
+) -> bool:
+    """Aplica um status à consulta já travada, sem regredir (regra 10).
+
+    Vale para o webhook e para o painel (``origem``). Devolve ``False`` quando o
+    status é desconhecido: fica só no histórico e vira alerta.
+    """
+
+    entrada = {"status": novo, **({"origem": origem} if origem else {}), "recebido_em": _agora()}
+    # Reatribuir a lista inteira: o JSONB não acompanha `append`.
+    linha.historico = [*linha.historico, entrada]
+    repositorios.notificar(sessao, "granatech", consulta=linha.id)
+    if novo not in ordem.CONSULTA:
+        _alertar(
+            sessao,
+            linha.conversa_id,
+            motivo="status_desconhecido",
+            id=linha.id_externo,
+            status=novo,
+        )
+        return False
+    if ordem.aceita_consulta(linha.status, novo):
+        linha.status = novo
+        if novo in ordem.CONSULTA_ALERTA:
+            _alertar(
+                sessao,
+                linha.conversa_id,
+                motivo="status_de_atencao",
+                id=linha.id_externo,
+                status=novo,
+            )
+    else:
+        logger.info("granatech_consulta_status_ignorado atual=%s novo=%s", linha.status, novo)
+    return True
 
 
 def evento_da_consulta(status: str) -> str | None:

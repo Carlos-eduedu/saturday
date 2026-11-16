@@ -15,9 +15,12 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.agent.service import AgentService
+from saturday.bancos.granatech import status as ordem
 from saturday.bancos.granatech.cliente import ClienteGranatech
 from saturday.dados.modelos import Alerta, ConsultaGranatech, EventoRecebido, PropostaGranatech
+from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.jobs import alertas
+from saturday.jobs import granatech as jobs
 from saturday.jobs import homologacao as jobs_homologacao
 from saturday.jobs.eventos import processar
 from saturday.settings import Settings
@@ -357,6 +360,28 @@ def test_consulta_fora_de_ordem_nao_regride(
     assert consulta.status == "SUCCESS"
     # O duplicado não entra; o atrasado entra no histórico, mas não muda o status.
     assert [h["status"] for h in consulta.historico] == ["SUCCESS", "PROCESSING"]
+
+
+def test_status_pelo_painel_grava_a_origem_e_nao_regride(
+    cliente: ClienteGranatech, fabrica: sessionmaker[Session]
+) -> None:
+    aberta = cliente.abrir_consulta(CPF, "FULANO", "11987654321")
+    final = next(s for s, n in ordem.CONSULTA.items() if n == ordem.FINAL and s != "SUCCESS")
+
+    for novo in ("SUCCESS", final):
+        with abrir_sessao(fabrica) as sessao:
+            linha = sessao.scalars(
+                select(ConsultaGranatech).where(ConsultaGranatech.id_externo == aberta.id_externo)
+            ).one()
+            assert jobs.aplicar_status_da_consulta(sessao, linha, novo, origem="painel")
+
+    consulta = _consulta(fabrica, aberta.id_externo)
+    # O segundo status final entra no histórico, mas não sobrescreve o primeiro.
+    assert consulta.status == "SUCCESS"
+    assert [(h["status"], h["origem"]) for h in consulta.historico] == [
+        ("SUCCESS", "painel"),
+        (final, "painel"),
+    ]
 
 
 def test_status_e_consulta_desconhecidos_viram_alerta(
