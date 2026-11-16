@@ -166,14 +166,14 @@ Híbrido: superfícies brancas sobre o fundo cinza com sombra quase imperceptív
 
 ### Shadow Vocabulary
 - **Repouso** (`box-shadow: 0 1px 2px rgb(11 12 14 / 6%), 0 4px 12px rgb(11 12 14 / 4%)`): cartões, linhas da lista.
-- **Elevada** (`box-shadow: 0 2px 4px rgb(11 12 14 / 8%), 0 10px 24px rgb(11 12 14 / 8%)`): linha da lista no hover e o aviso flutuante de "Desfazer".
+- **Elevada** (`box-shadow: 0 2px 4px rgb(11 12 14 / 8%), 0 10px 24px rgb(11 12 14 / 8%)`): o aviso flutuante de "Desfazer" e o que mais flutuar sobre a página.
 
 ### Named Rules
 **The Sombra É Resposta Rule.** Em repouso, a profundidade é quase plana; sombra maior só em hover ou em algo que flutua sobre a página.
 
 ## Shapes
 
-Cantos suaves em três passos: 6px para foco e detalhes, 10px para botões e campos, 14px para cartões, linhas e painéis. Selos e chips são pílulas. Bordas de 1px na cor Borda; nenhuma barra lateral colorida de mais de 1px.
+Cantos suaves em três passos: 6px para foco e detalhes, 10px para botões e campos, 14px para cartões e painéis. A linha da lista de conversas é a exceção: 18px, com 6px entre as linhas (modelo AnimatedList). Selos e chips são pílulas. Bordas de 1px na cor Borda; nenhuma barra lateral colorida de mais de 1px.
 
 ## Components
 
@@ -192,7 +192,7 @@ Cantos suaves em três passos: 6px para foco e detalhes, 10px para botões e cam
 ### Cards / Containers
 - **Corner Style:** 14px.
 - **Background:** Superfície sobre o fundo; a linha que pede atenção não muda de fundo.
-- **Shadow Strategy:** repouso; elevada no hover de linhas clicáveis.
+- **Shadow Strategy:** repouso. A linha da lista de conversas não levanta no hover: quem responde é o contorno que desliza.
 - **Border:** 1px Borda.
 - **Internal Padding:** 1.1–1.25rem.
 
@@ -208,6 +208,8 @@ Cantos suaves em três passos: 6px para foco e detalhes, 10px para botões e cam
 Um estilo só de aba de página (Agente, Granatech, Ficha e IA da conversa): texto em grafite sobre um fio de 1px em Borda; a aba atual em cobalto com sublinhado de 2px. Sem trilho, fundo ou sombra. Setas, Home e End trocam de aba; o conteúdo fica num `tabpanel` ligado à aba. Rolam de lado se faltar espaço, nunca cortam.
 
 ### Linha de conversa (assinatura)
+A lista segue o modelo AnimatedList da React Bits, com os tokens do painel: as linhas entram uma a uma (fade, 40 ms entre elas, uma vez por linha); um contorno único em grafite desliza entre as linhas atrás do ponteiro e vira cobalto de 2px quando é o foco do teclado; no desktop, a borda da rolagem que ainda tem linha esmaece. À esquerda, uma capa de 36px mostra quem está com a conversa (iniciais ou foto de quem assumiu; ícone da IA em verde; ícone do handoff em âmbar), repetindo em desenho o que o selo diz em texto.
+
 Prévia da última fala com o autor colorido como conteúdo principal; telefone mascarado e canal em segundo plano; à direita, rótulo de atenção só para envio que falhou (os outros motivos aparecem no tempo, na etapa, no filtro "pedem atenção" e na ordem da lista; em texto, só para leitor de tela), etapa, selo de estado e espera relativa ("cliente espera há 12 min"). No desktop tem o botão Assumir/Devolver; arrastar para a esquerda é atalho (no celular, o caminho). Assumir e devolver valem na hora, na lista e no cabeçalho da conversa; por 5s o aviso "Desfazer" devolve a conversa ao estado de antes. O botão Assumir só é principal (cobalto) na linha que pede atenção.
 
 ### Acompanhamento na conversa

@@ -1,0 +1,64 @@
+/* AnimatedList, da React Bits, com os tokens do painel. Parâmetros do pedido:
+   radius 18, gap 6, stagger 0,04 s, animação fade. */
+.animated-list {
+  --al-raio: 18px;
+  --al-topo: 0px;
+  --al-pe: 0px;
+  position: relative;
+}
+
+/* Entrada (fade): cada linha nova sobe 4px e aparece, 40 ms depois da anterior.
+   Roda uma vez por linha; rolar não esconde ninguém. */
+.animated-list > li:not(.al-anel) {
+  animation: al-entrar 300ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(min(var(--al-i, 0), 12) * 40ms);
+}
+@keyframes al-entrar {
+  from { opacity: 0; transform: translate3d(0, 4px, 0); }
+}
+
+/* O contorno é um só e desliza de uma linha para a outra, com mola. */
+.al-anel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  height: 0;
+  opacity: 0;
+  border-radius: var(--al-raio);
+  box-shadow: inset 0 0 0 1.5px var(--suave);
+  pointer-events: none;
+  transition:
+    transform 420ms var(--al-mola),
+    height 420ms var(--al-mola),
+    opacity 200ms ease;
+  --al-mola: cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+@supports (transition-timing-function: linear(0, 1)) {
+  .al-anel {
+    --al-mola: linear(
+      0, 0.0603, 0.2033, 0.3821, 0.5633, 0.7258, 0.8584, 0.9574, 1.0242, 1.0634, 1.0809, 1.0828,
+      1.0747, 1.0613, 1.046, 1.0313, 1.0186, 1.0085, 1.0012, 0.9965, 0.994, 0.9931, 0.9933, 0.9941,
+      0.9953, 0.9966, 0.9978, 0.9988, 1
+    );
+  }
+}
+.al-anel[data-foco] { box-shadow: inset 0 0 0 2px var(--destaque); }
+/* Onde o contorno existe, ele é o foco do link da linha: o retângulo padrão
+   sairia cortado pelos cantos. Botões dentro da linha mantêm o foco deles. */
+@media (hover: hover) {
+  .animated-list > li a:focus-visible { outline: none; }
+}
+/* Sem ponteiro que paira (toque), não há o que seguir. */
+@media not (hover: hover) {
+  .al-anel { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animated-list > li:not(.al-anel) { animation-name: al-surgir; animation-delay: 0s; }
+  .al-anel { transition: opacity 200ms ease; }
+}
+@keyframes al-surgir {
+  from { opacity: 0; }
+}

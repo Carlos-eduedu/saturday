@@ -345,19 +345,38 @@ main {
 .filtros label { width: 100%; }
 
 .inbox, .alertas, .mensagens { list-style: none; margin: 0; padding: 0; }
-.inbox { display: flex; flex-direction: column; gap: 0.5rem; }
+/* Lista no modelo AnimatedList (React Bits): 6px entre as linhas, cantos de
+   18px e a capa à esquerda. O hover é o contorno que desliza (AnimatedList.css),
+   não a linha que levanta. */
+.inbox { display: flex; flex-direction: column; gap: 6px; }
 .inbox li a {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.35rem 1.25rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.35rem 0.75rem;
   align-items: center;
   min-height: 76px;
-  padding: 0.7rem 1.1rem;
+  padding: 0.7rem 1.1rem 0.7rem 0.75rem;
+  border-radius: 18px;
   text-decoration: none;
   color: var(--texto);
-  transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
 }
-.inbox li a:hover { transform: translateY(-2px); box-shadow: var(--sombra-alta); border-color: var(--suave); }
+/* Capa: quem está com a conversa. A cor é a do estado, a mesma do selo. */
+.capa {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+.capa-ia { color: var(--ia); }
+.capa-handoff { color: var(--handoff); }
+.capa-assumida { color: var(--assumida); }
+.capa .avatar { border-radius: 0; background: none; color: inherit; }
+.inbox li a[aria-current="page"] .capa { background: color-mix(in srgb, currentColor 13%, var(--superficie)); }
+.inbox .linha-meta { margin-left: 0.5rem; }
 .inbox li.nao-lida .previa { font-weight: 600; }
 
 /* A fala é o conteúdo da linha; telefone e canal ficam em segundo plano. */
@@ -432,9 +451,7 @@ main {
 .inbox .swipe-row__clip {
   border: 1px solid var(--borda);
   box-shadow: var(--sombra);
-  transition: box-shadow 150ms ease, border-color 150ms ease;
 }
-.inbox .swipe-row__clip:hover { box-shadow: var(--sombra-alta); border-color: var(--suave); }
 /* O SwipeRow esconde o que passa da altura para poder recolher; fora disso, a
    sombra do cartão precisa aparecer. */
 .inbox .swipe-row:not([data-phase="collapsing"]) { overflow: visible; }
@@ -452,9 +469,6 @@ main {
   box-shadow: none;
   background: none;
 }
-.inbox .swipe-row a:hover { transform: none; box-shadow: none; }
-/* O hover pinta a linha inteira, botão incluído, e não só o link. */
-.inbox .swipe-row__clip:hover .swipe-row__surface { background: var(--superficie-2); }
 .inbox .swipe-row__action--commit { font-weight: 600; }
 
 /* Botão de ação na linha (desktop); no celular, o gesto é o caminho. */
@@ -514,7 +528,10 @@ body:has(.envio) .aviso-flutuante { bottom: calc(8rem + env(safe-area-inset-bott
   /* Abas com contagem não cabem numa linha: quebram em vez de cortar no meio
      da palavra sob o esmaecido. */
   .filtros [role="tablist"] { flex-wrap: wrap; gap: 0 0.9rem; overflow: visible; mask-image: none; animation: none; }
-  .inbox li a { grid-template-columns: minmax(0, 1fr); align-content: center; }
+  .inbox li a { grid-template-columns: auto minmax(0, 1fr); align-content: center; }
+  /* A capa fica ao lado das duas linhas (conteúdo e meta), no alto. */
+  .inbox .capa { grid-row: span 2; align-self: start; }
+  .inbox .linha-meta { margin-left: 0; }
   .inbox .linha-conteudo { grid-template-columns: minmax(0, 1fr); row-gap: 0.2rem; }
   .linha-identidade { flex-direction: row; flex-wrap: wrap; row-gap: 0; gap: 0.6rem; align-items: baseline; padding-right: 0; border-right: 0; }
   .linha-meta { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; }
@@ -562,6 +579,8 @@ body:has(.envio) .aviso-flutuante { bottom: calc(8rem + env(safe-area-inset-bott
   overscroll-behavior: contain;
   /* Sem barra à vista: a lista continua rolando por roda, teclado e toque. */
   scrollbar-width: none;
+  /* A borda que ainda tem linha para rolar esmaece (medidas do AnimatedList). */
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--al-topo, 0px), #000 calc(100% - var(--al-pe, 0px)), transparent);
 }
 .caixa-lista .inbox::-webkit-scrollbar { width: 0; height: 0; }
 .caixa-lista .titulo-tela { font-size: 1.25rem; margin-bottom: 0.75rem; }
@@ -611,7 +630,7 @@ body:has(.envio) .aviso-flutuante { bottom: calc(8rem + env(safe-area-inset-bott
   min-height: 76px;
   padding: 0.7rem 1.1rem;
   border: 1px solid var(--borda);
-  border-radius: var(--raio-l);
+  border-radius: 18px;
   background: var(--superficie);
 }
 .inbox.esqueleto span { display: block; height: 0.7rem; width: 40%; border-radius: 999px; background: var(--superficie-2); animation: esqueleto-pulsar 1.2s ease-in-out infinite alternate; }

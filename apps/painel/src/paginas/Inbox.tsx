@@ -16,8 +16,11 @@ import {
   Cancel01Icon,
   MoreHorizontalIcon,
   UserCheck01Icon,
+  UserQuestion01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { AnimatedList } from "../componentes/AnimatedList";
+import { Avatar } from "../componentes/Avatar";
 import { useConfirmar } from "../componentes/Confirmar";
 import { pedidoDeTomada, textoDoAviso, useAvisoDesfazer } from "../componentes/Desfazer";
 import SwipeRow, { type SwipeAction } from "../componentes/SwipeRow";
@@ -503,11 +506,13 @@ export function Inbox({
         ) : visiveis.length === 0 ? (
           <Vazio titulo={vazio.titulo} texto={vazio.texto} />
         ) : (
-          <ul className="inbox" aria-describedby={`${idBase}-atalhos`}>
-            {visiveis.map((c) => (
+          <AnimatedList className="inbox" aria-describedby={`${idBase}-atalhos`}>
+            {visiveis.map((c, i) => (
               <li
                 key={`${c.id}-${versao}`}
                 className={c.nao_lida ? "nao-lida" : undefined}
+                // A ordem na lista é o atraso da entrada (AnimatedList).
+                style={{ "--al-i": i } as CSSProperties}
                 onPointerDown={guardarInicio}
                 onClick={(e) => abrirPelaSuperficie(e, c.id)}
               >
@@ -524,6 +529,22 @@ export function Inbox({
                       onClick={ignorarSeArrastou}
                       aria-current={c.id === aberta ? "page" : undefined}
                     >
+                      {/* Quem está com a conversa, em desenho; o selo diz o mesmo em texto. */}
+                      <span className={`capa capa-${c.atendimento}`} aria-hidden="true">
+                        {c.atendimento === "assumida" ? (
+                          <Avatar
+                            nome={nomeDe(c.atendente_id)}
+                            foto={c.atendente_id === eu.id ? eu.foto : null}
+                            tamanho={36}
+                          />
+                        ) : (
+                          <HugeiconsIcon
+                            icon={c.atendimento === "ia" ? AiChat02Icon : UserQuestion01Icon}
+                            size={18}
+                            strokeWidth={1.8}
+                          />
+                        )}
+                      </span>
                       <span className="linha-conteudo">
                         <span className="linha-identidade">
                           <span className="telefone">{c.telefone ?? c.canal}</span>
@@ -614,7 +635,7 @@ export function Inbox({
                       // Duas linhas de conteúdo; no celular e na lista compacta, identidade,
                       // fala e meta ficam em linhas próprias.
                       height={compacta ? 112 : comBotao ? 76 : 96}
-                      radius={14}
+                      radius={18}
                       label={`Conversa ${c.telefone ?? c.canal}`}
                       toggleLabel={`Ações de ${c.telefone ?? c.canal}`}
                       style={CORES_SWIPE}
@@ -640,7 +661,7 @@ export function Inbox({
                 })()}
               </li>
             ))}
-          </ul>
+          </AnimatedList>
         )}
       </div>
     </section>
