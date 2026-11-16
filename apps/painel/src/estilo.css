@@ -1487,7 +1487,35 @@ main:has(.historico) { padding-bottom: 0; }
 /* Anexos no histórico. */
 .msg .anexo-imagem { display: block; width: 16rem; max-width: 100%; margin-top: 0.35rem; border-radius: var(--raio-m); }
 .msg .anexo-audio { display: block; margin-top: 0.35rem; max-width: 100%; height: 2.5rem; }
-.msg .anexo-arquivo { display: block; margin: 0.35rem 0 0.15rem; overflow-wrap: anywhere; }
+/* Arquivo que não é imagem nem áudio: cartão com ícone, nome e tipo. PDF e
+   vídeo abrem o visor; o resto só baixa. */
+.msg .anexo-cartao {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 16rem;
+  max-width: 100%;
+  min-height: 3.25rem;
+  box-sizing: border-box;
+  margin-top: 0.35rem;
+  padding: 0.4rem 0.75rem 0.4rem 0.6rem;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-m);
+  background: var(--superficie-2);
+  color: var(--texto);
+  text-decoration: none;
+  transition: border-color 150ms ease;
+}
+.msg .anexo-cartao:hover { border-color: var(--suave); }
+.msg .anexo-cartao > svg { flex: none; color: var(--suave); }
+.msg .anexo-cartao .dados-anexo { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+.msg .anexo-cartao .nome { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msg .anexo-cartao small { color: var(--suave); font-size: 0.8rem; }
+.anexo-cartao__girando { display: inline-flex; flex: none; color: var(--suave); animation: refine-frame-spin 1.1s linear infinite; }
+.msg .anexo-imagem[aria-busy] { cursor: progress; }
+@media (prefers-reduced-motion: reduce) {
+  .anexo-cartao__girando { animation: none; }
+}
 @media (max-width: 599px) {
   .chip-anexo .nome { max-width: 12rem; }
   .chip-anexo audio { max-width: 12rem; }

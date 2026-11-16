@@ -1,0 +1,85 @@
+/* Visor de mídia: escuro nos dois temas, para a mídia ser o conteúdo. */
+.visor {
+  --visor-tinta: #eef0f3;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0 0 1rem;
+  box-sizing: border-box;
+  border: 0;
+  background: none;
+  color: var(--visor-tinta);
+  flex-direction: column;
+  align-items: center;
+}
+.visor[open] { display: flex; }
+.visor::backdrop { background: rgb(11 12 14 / 82%); }
+
+/* Os controles só aparecem quando a mídia terminou de crescer. */
+.visor__barra {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.5rem 0.75rem 0.5rem 1.25rem;
+  animation: visor-surgir 100ms ease 300ms backwards;
+}
+@keyframes visor-surgir {
+  from { opacity: 0; }
+}
+.visor__nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.visor__barra a,
+.visor__fechar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  flex: none;
+  min-height: var(--alvo);
+  padding: 0 0.75rem;
+  border: 0;
+  border-radius: var(--raio-m);
+  background: none;
+  box-shadow: none;
+  color: var(--visor-tinta);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.visor__fechar { width: var(--alvo); padding: 0; border-radius: 999px; }
+.visor__barra a:hover,
+.visor__fechar:hover:not(:disabled) { background: rgb(255 255 255 / 14%); transform: none; box-shadow: none; }
+.visor__barra :focus-visible { outline-color: var(--visor-tinta); }
+
+.visor__conteudo {
+  view-transition-name: midia;
+  display: flex;
+  margin: auto;
+  min-height: 0;
+  max-width: 92vw;
+  border-radius: var(--raio-m);
+  overflow: hidden;
+}
+.visor__conteudo img,
+.visor__conteudo video { display: block; max-width: 92vw; max-height: calc(100dvh - 5.5rem); object-fit: contain; }
+.visor__conteudo iframe { width: min(92vw, 60rem); height: calc(100dvh - 5.5rem); border: 0; background: #fff; }
+.visor__aviso { margin: 0; max-width: 22rem; padding: 1.25rem 1.5rem; background: var(--superficie); color: var(--texto); }
+
+/* A miniatura vira o conteúdo: 0,3 s, como no Morphing Dialog. */
+::view-transition-group(midia) { animation-duration: 300ms; animation-timing-function: ease-in-out; }
+::view-transition-old(midia),
+::view-transition-new(midia) { width: 100%; height: 100%; object-fit: cover; }
+
+@media (max-width: 599px) {
+  /* No celular o nome cede o lugar aos controles. */
+  .visor__barra { padding-left: 0.75rem; }
+  .visor__barra a { padding: 0 0.5rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .visor__barra { animation: none; }
+}

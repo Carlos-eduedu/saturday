@@ -219,7 +219,7 @@ Ao lado das mensagens, antes da Ficha: a oferta vigente (liberado, parcelas, tax
 Sob cada fala da IA que cita reais, três estados: confere com a oferta (grafite, discreto); valor sem origem registrada ou vindo do modelo (selo âmbar, com texto); valor que difere da oferta (selo âmbar cheio, com os valores). A espera relativa da lista ("ontem", "há 12 min") é texto; datas e horas de tabela e ficha vão em mono.
 
 ### Balões da conversa
-Cliente à esquerda em branco; IA à direita em verde tingido; equipe à direita em cobalto suave; sistema centrado, sem balão, em grafite. Imagem anexada vai numa moldura fixa de 16rem em 4:3 (RefineFrame), que guarda o lugar enquanto carrega e revela a imagem do mosaico em ~0,5 s; se falha, diz "Não carregou" e oferece "Tentar de novo". O clique abre o arquivo inteiro.
+Cliente à esquerda em branco; IA à direita em verde tingido; equipe à direita em cobalto suave; sistema centrado, sem balão, em grafite. Imagem anexada vai numa moldura fixa de 16rem em 4:3 (RefineFrame), que guarda o lugar enquanto carrega e revela a imagem do mosaico em ~0,5 s; se falha, diz "Não carregou" e oferece "Tentar de novo". PDF e vídeo vão num cartão (ícone, nome, tipo); os demais arquivos, num cartão que só baixa. O clique em imagem, PDF ou vídeo abre o visor de mídia: a miniatura cresce até virar o conteúdo aberto em 0,3 s (View Transitions, no modelo do Morphing Dialog) e encolhe ao fechar por botão, Esc ou clique no fundo; Ctrl/⌘-clique abre em outra aba. O visor é escuro nos dois temas. Só imagem, áudio, vídeo e PDF são desenhados (`src/anexos.ts`): o arquivo vem do cliente, e o resto nunca abre dentro do painel.
 
 ## Do's and Don'ts
 
