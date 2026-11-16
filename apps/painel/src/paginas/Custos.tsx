@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
-import { api, type Custos as DadosCustos, mensagemDeFalha } from "../api";
+import { api, type Custos as DadosCustos, type Eu, mensagemDeFalha } from "../api";
 import { Falha } from "../componentes/Falha";
 import { Vazio } from "../componentes/Vazio";
 import { dolar, tokens } from "../rotulos";
@@ -9,15 +9,61 @@ import { useRecurso } from "../useRecurso";
 const diaCurto = (iso: string) =>
   new Date(`${iso}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 
-// Aba Operação, só para gestor: o uso da cota da Granatech e os relatórios de
-// custos operacionais (IA em US$).
-export function Operacao() {
+// Aba Operação: os produtos em operação com as regras vigentes, para todos; o
+// uso da cota da Granatech e os custos operacionais (IA em US$), só para gestor.
+export function Operacao({ eu }: { eu: Eu }) {
   return (
     <div className="custos operacao">
       <h1 className="titulo-tela">Operação</h1>
-      <CotaGranatech />
-      <Custos />
+      <Produtos />
+      {eu.perfil === "gestor" && (
+        <>
+          <CotaGranatech />
+          <Custos />
+        </>
+      )}
     </div>
+  );
+}
+
+// Um cartão por produto. Os valores chegam prontos do servidor, que os tira das
+// constantes de regra: aqui não se escreve número.
+function Produtos() {
+  const { dado: produtos, falha, carregar } = useRecurso("produtos", api.produtos);
+  const erro = falha === null ? "" : mensagemDeFalha(falha, "carregar os produtos");
+
+  if (erro) return <Falha titulo="Não deu para carregar os produtos." texto={erro} aoTentar={carregar} />;
+  if (!produtos) return <p className="centro">Carregando…</p>;
+
+  return (
+    <section className="produtos">
+      <h2>
+        Produtos <span className="contagem">· {produtos.length} em operação</span>
+      </h2>
+      {produtos.map((p) => (
+        <section key={p.id} id={p.id}>
+          <h3>
+            {p.nome} <Link to={`/bancos/${p.banco.id}`}>{p.banco.nome}</Link>
+          </h3>
+          <p className="produto-situacao">{p.situacao}</p>
+          <div className="produto-grupos">
+            {p.grupos.map((g) => (
+              <div key={g.titulo}>
+                <h4>{g.titulo}</h4>
+                <dl>
+                  {g.itens.map((i) => (
+                    <div key={i.rotulo}>
+                      <dt>{i.rotulo}</dt>
+                      <dd>{i.valor}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
+    </section>
   );
 }
 

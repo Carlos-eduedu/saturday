@@ -98,16 +98,8 @@ function Logado({
       : []),
     // Todos: o atendente vê só a seção "Você"; o gestor, também a equipe.
     { label: "Membros", ariaLabel: "Ir para os membros", link: "/membros", ativo: em("/membros") },
-    ...(eu.perfil === "gestor"
-      ? [
-          {
-            label: "Operação",
-            ariaLabel: "Ir para a operação",
-            link: "/operacao",
-            ativo: em("/operacao"),
-          },
-        ]
-      : []),
+    // Todos: o atendente vê os produtos; cota e custos, só o gestor.
+    { label: "Operação", ariaLabel: "Ir para a operação", link: "/operacao", ativo: em("/operacao") },
   ];
 
   return (
@@ -178,7 +170,7 @@ function Logado({
             path="/membros/:id"
             element={<PaginaDoMembro eu={eu} atualizarEu={atualizarEu} />}
           />
-          {eu.perfil === "gestor" && <Route path="/operacao" element={<Operacao />} />}
+          <Route path="/operacao" element={<Operacao eu={eu} />} />
           {/* Endereços antigos, de antes da barra nova: links salvos continuam valendo. */}
           <Route path="/granatech" element={<Navigate to="/bancos/granatech" replace />} />
           <Route path="/usuarios" element={<Navigate to="/membros" replace />} />

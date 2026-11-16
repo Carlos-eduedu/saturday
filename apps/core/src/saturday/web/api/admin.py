@@ -40,6 +40,7 @@ from saturday.painel import acoes, exportacao, membros, sessoes, supervisao
 from saturday.painel.auditoria import auditar
 from saturday.painel.canal import permitido
 from saturday.painel.midia import mime_base
+from saturday.painel.produtos import produtos
 from saturday.privacidade import MASCARAS
 from saturday.settings import TZ_OPERACAO
 from saturday.web.api.granatech_admin import Conta
@@ -858,6 +859,13 @@ def cota_por_dia(request: Request, _usuario: Logado, fabrica: Fabrica) -> dict[s
         "teto_mensal": settings.granatech_cota_mensal,
         "dias": [{"dia": dia.isoformat(), "usadas": usadas} for dia, usadas in linhas if usadas],
     }
+
+
+@router.get("/produtos")
+def listar_produtos(request: Request, _usuario: Logado) -> list[dict[str, Any]]:
+    """Produtos em operação e as regras vigentes de cada um (aba Operação)."""
+
+    return produtos(get_settings(request))
 
 
 # ------------------------------------------------------------------ mídia

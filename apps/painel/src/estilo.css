@@ -1094,6 +1094,15 @@ main:has(.historico) { padding-bottom: 0; }
 .operacao > section > h2 { margin: 0; }
 .operacao > section > section { padding: 1.25rem; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio-l); }
 .operacao section section h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.produtos h3 a { margin-left: 0.5rem; font-size: 0.85rem; font-weight: 400; }
+.produtos .produto-situacao { margin: -0.5rem 0 1rem; color: var(--suave); }
+.produto-grupos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr)); gap: 1.25rem 2rem; }
+.produto-grupos h4 { margin: 0 0 0.25rem; font-size: 0.8rem; font-weight: 500; color: var(--suave); }
+.produto-grupos dl { margin: 0; }
+.produto-grupos dl > div { display: flex; justify-content: space-between; gap: 1rem; padding: 0.4rem 0; border-bottom: 1px solid var(--borda); }
+.produto-grupos dl > div:last-child { border-bottom: none; }
+.produto-grupos dt { flex-shrink: 0; max-width: 50%; color: var(--suave); }
+.produto-grupos dd { margin: 0; text-align: right; }
 .cota-medidor { display: flex; flex-direction: column; gap: 0.35rem; flex: 1 1 12rem; padding: 0.85rem 1.25rem; }
 .cota-medidor__rotulo { font-size: 0.85rem; color: var(--suave); }
 .cota-medidor__valor { font-size: 1.15rem; color: var(--texto); font-variant-numeric: tabular-nums; }
@@ -1731,8 +1740,14 @@ small.dado { font-size: 0.8rem; }
 .bancos { display: flex; flex-direction: column; gap: 1.25rem; }
 .bancos-nav { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .bancos-nav a { display: flex; flex-direction: column; gap: 0.1rem; min-width: 12rem; padding: 0.6rem 0.9rem; border: 1px solid var(--borda); border-radius: var(--raio-m); background: var(--superficie); color: var(--texto); text-decoration: none; }
-.bancos-nav a span { font-size: 0.8rem; color: var(--suave); }
+.bancos-nav a span:not(.selo) { font-size: 0.8rem; color: var(--suave); }
 .bancos-nav a:hover { border-color: var(--suave); }
+.bancos-nav a .selo { align-self: flex-start; margin-top: 0.35rem; }
+.banco-leitura { display: flex; flex-direction: column; gap: 1rem; padding: 1.25rem; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio-l); }
+.banco-leitura h2, .banco-leitura p { margin: 0; }
+.banco-leitura h3 { margin: 0 0 0.5rem; font-size: 1rem; }
+.banco-leitura ul { margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: 0.35rem; }
+.banco-leitura__colunas { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr)); gap: 1.25rem 2rem; }
 .bancos-nav a[aria-current="page"] { border-color: var(--destaque); box-shadow: 0 0 0 3px var(--destaque-suave); }
 .bancos-nav a[aria-current="page"] strong { color: var(--destaque); }
 

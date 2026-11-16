@@ -136,6 +136,15 @@ export interface CotaPorDia {
   dias: { dia: string; usadas: number }[];
 }
 
+// Produto em operação e as regras vigentes dele (aba Operação).
+export interface Produto {
+  id: string;
+  nome: string;
+  banco: { id: string; nome: string };
+  situacao: string;
+  grupos: { titulo: string; itens: { rotulo: string; valor: string }[] }[];
+}
+
 export interface Usuario {
   id: string;
   nome: string;
@@ -748,6 +757,7 @@ export const api = {
   turnos: (id: string) => chamar<Trilha>("GET", `/conversas/${id}/turnos`),
   custos: () => chamar<Custos>("GET", "/custos"),
   cotaPorDia: () => chamar<CotaPorDia>("GET", "/cota/dias"),
+  produtos: () => chamar<Produto[]>("GET", "/produtos"),
   grafo: () => chamar<Grafo>("GET", "/agente/grafo"),
   // `passos` nulo: os checkpoints do turno já foram podados pela retenção.
   passos: (turno: number) =>

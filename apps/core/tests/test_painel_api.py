@@ -611,6 +611,19 @@ def test_cota_por_dia_traz_so_o_mes_corrente(client_pg, fabrica, ana):
     assert resposta["dias"] == [{"dia": hoje.isoformat(), "usadas": 3}]
 
 
+def test_produtos_trazem_as_regras_vigentes(client_pg, ana):
+    assert client_pg.get("/admin/produtos").status_code == 401
+    entrar(client_pg, "ana@exemplo.test")
+    inss, clt = client_pg.get("/admin/produtos").json()
+    itens = {i["rotulo"]: i["valor"] for p in (inss, clt) for g in p["grupos"] for i in g["itens"]}
+    assert (inss["banco"]["id"], clt["banco"]["id"]) == ("c6", "granatech")
+    assert itens["Idade"] == "21 a 73 anos"
+    assert "Nubank" not in itens["Não porta"] and "Daycoval" in itens["Não porta"]
+    assert itens["Sobra mínima"] == "R$ 50,00 por contrato"
+    assert itens["Valor liberado máximo"] == "R$ 6.999,00"
+    assert itens["Cota mensal"] == "500 consultas"
+
+
 def test_midia_passa_pela_api_com_sessao(client_pg, service_pg, fabrica, storage, ana, conversa):
     chave = storage.salvar(b"%PDF-1.4", mime_type="application/pdf")
     _cliente_escreve(service_pg, conversa, "oi")
