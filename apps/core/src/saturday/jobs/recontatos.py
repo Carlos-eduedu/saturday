@@ -14,12 +14,10 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.agent.service import AgentService
-from saturday.dados import recontatos
-from saturday.dados.modelos import Conversa
+from saturday.dados import recontatos, repositorios
 from saturday.dados.sessao import sessao as abrir_sessao
 
 logger = logging.getLogger(__name__)
@@ -40,9 +38,7 @@ def disparar(
         for motivo in (recontatos.COTA_ESGOTADA, recontatos.TEMPO_CASA):
             for recontato in recontatos.vencidos(sessao, motivo=motivo, agora=agora, limite=LOTE):
                 recontato.feito_em = agora
-                conversation_id = sessao.scalar(
-                    select(Conversa.conversation_id).where(Conversa.id == recontato.conversa_id)
-                )
+                conversation_id = repositorios.conversation_id_de(sessao, recontato.conversa_id)
                 if not conversation_id:
                     continue
                 evento = (

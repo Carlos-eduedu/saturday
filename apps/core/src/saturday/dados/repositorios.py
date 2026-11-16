@@ -24,6 +24,14 @@ def notificar(sessao: Session, tipo: str, **ids: Any) -> None:
     sessao.execute(select(func.pg_notify(CANAL_PAINEL, carga)))
 
 
+def conversation_id_de(sessao: Session, conversa_id: uuid.UUID | None) -> str | None:
+    """O ``conversation_id`` da conversa, ou ``None`` se ela não existe."""
+
+    if conversa_id is None:
+        return None
+    return sessao.scalar(select(Conversa.conversation_id).where(Conversa.id == conversa_id))
+
+
 def obter_ou_criar_conversa(
     sessao: Session,
     conversation_id: str,

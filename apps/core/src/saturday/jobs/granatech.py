@@ -25,7 +25,7 @@ from saturday.agent.service import AgentService
 from saturday.bancos.granatech import status as ordem
 from saturday.bancos.granatech.cliente import ClienteGranatech
 from saturday.dados import repositorios
-from saturday.dados.modelos import ConsultaGranatech, Conversa, PropostaGranatech
+from saturday.dados.modelos import ConsultaGranatech, PropostaGranatech
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.jobs.homologacao import eh_da_homologacao
 
@@ -83,7 +83,7 @@ def desistir(
             )
         else:
             return
-        conversation_id = _conversation_id(sessao, conversa_id)
+        conversation_id = repositorios.conversation_id_de(sessao, conversa_id)
     if conversation_id:
         servico.desistir_de_sistema(conversation_id, f"granatech:{tipo}")
 
@@ -128,7 +128,7 @@ def _consulta(
             return
         status = linha.status
         tem_detalhe = linha.detalhe is not None
-        conversation_id = _conversation_id(sessao, linha.conversa_id)
+        conversation_id = repositorios.conversation_id_de(sessao, linha.conversa_id)
 
     if status == "SUCCESS" and not tem_detalhe:
         if cliente is None:
@@ -222,7 +222,7 @@ def _proposta(
             },
         ]
         repositorios.notificar(sessao, "granatech", proposta=linha.id)
-        conversation_id = _conversation_id(sessao, linha.conversa_id)
+        conversation_id = repositorios.conversation_id_de(sessao, linha.conversa_id)
         if not novo or novo not in ordem.PROPOSTA:
             # Grava o alerta com os ids e faz handoff na conversa (abaixo).
             avisar: str | None = "proposta:desconhecida"
@@ -247,9 +247,3 @@ def _proposta(
 
     if servico is not None and conversation_id and avisar:
         servico.continuar(conversation_id, avisar)
-
-
-def _conversation_id(sessao: Session, conversa_id: Any) -> str | None:
-    if conversa_id is None:
-        return None
-    return sessao.scalar(select(Conversa.conversation_id).where(Conversa.id == conversa_id))

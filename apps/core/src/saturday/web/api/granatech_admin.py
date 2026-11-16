@@ -14,6 +14,7 @@ import io
 import json
 import uuid
 import zipfile
+from collections.abc import Callable
 from datetime import date, datetime, time
 from typing import Annotated, Any, Literal, cast
 from zoneinfo import ZoneInfo
@@ -31,7 +32,6 @@ from saturday.bancos.granatech.cliente import ClienteGranatech, ErroGranatech, E
 from saturday.dados import repositorios
 from saturday.dados.modelos import (
     ConsultaGranatech,
-    Conversa,
     HomologacaoGranatech,
     PropostaGranatech,
     UsuarioPainel,
@@ -109,12 +109,6 @@ def _iso(valor: datetime | None) -> str | None:
     return valor.isoformat() if valor else None
 
 
-def _conversation_id(sessao: Session, conversa_id: uuid.UUID | None) -> str | None:
-    if conversa_id is None:
-        return None
-    return sessao.scalar(select(Conversa.conversation_id).where(Conversa.id == conversa_id))
-
-
 def _clt(service: AgentService, conversation_id: str | None) -> dict[str, Any]:
     if conversation_id is None:
         return {}
@@ -140,6 +134,23 @@ def _auditar(
     # Commit antes de chamar o banco: ação sem rastro não acontece.
     with abrir_sessao(fabrica) as sessao:
         auditar(sessao, usuario.id, acao, alvo, detalhe)
+
+
+def _auditada[T](
+    fabrica: sessionmaker[Session],
+    usuario: UsuarioLogado,
+    acao: str,
+    alvo: str,
+    chamada: Callable[[], T],
+    detalhe: dict[str, Any] | None = None,
+) -> T:
+    """Audita e só então chama a Granatech; a falha dela vira 502."""
+
+    _auditar(fabrica, usuario, acao, alvo, detalhe)
+    try:
+        return chamada()
+    except ErroGranatech as exc:
+        raise _falha(exc) from exc
 
 
 def _avisar(fabrica: sessionmaker[Session], **ids: Any) -> None:
@@ -289,7 +300,7 @@ def ver_consulta(
         linha = sessao.get(ConsultaGranatech, consulta_id)
         if linha is None:
             raise HTTPException(status_code=404, detail="consulta não encontrada")
-        conversation_id = _conversation_id(sessao, linha.conversa_id)
+        conversation_id = repositorios.conversation_id_de(sessao, linha.conversa_id)
         propostas = sessao.scalars(
             select(PropostaGranatech.id).where(PropostaGranatech.consulta_id == linha.id)
         ).all()
@@ -320,7 +331,7 @@ def ver_proposta(
         cpf = sessao.scalar(
             select(ConsultaGranatech.cpf).where(ConsultaGranatech.id == linha.consulta_id)
         )
-        conversation_id = _conversation_id(sessao, linha.conversa_id)
+        conversation_id = repositorios.conversation_id_de(sessao, linha.conversa_id)
         clt = _clt(service, conversation_id)
         return {
             **_linha_proposta(linha, cpf or ""),
@@ -360,13 +371,18 @@ def bancos(request: Request, _usuario: Logado) -> list[dict[str, str]]:
 # ------------------------------------------------------------------ ações do gestor
 
 
-def _proposta(fabrica: sessionmaker[Session], proposta_id: int) -> tuple[PropostaGranatech, str]:
+def _proposta(
+    fabrica: sessionmaker[Session], proposta_id: int, acao: str, conta_ativa: bool = False
+) -> tuple[PropostaGranatech, str]:
+    """Carrega a proposta e confere se a ação vale: 404 ou 409."""
+
     with abrir_sessao(fabrica) as sessao:
         linha = sessao.get(PropostaGranatech, proposta_id)
         if linha is None:
             raise HTTPException(status_code=404, detail="proposta não encontrada")
+        _exigir(acoes_da_proposta(linha, conta_ativa), acao)
         sessao.expunge(linha)
-        return linha, _conversation_id(sessao, linha.conversa_id) or ""
+        return linha, repositorios.conversation_id_de(sessao, linha.conversa_id) or ""
 
 
 @router.post("/propostas/{proposta_id}/reconciliar")
@@ -380,13 +396,14 @@ def reconciliar(
     """Procura a proposta incerta na listagem; achada, a jornada segue com a IA."""
 
     cliente = _cliente(request)
-    linha, conversation_id = _proposta(fabrica, proposta_id)
-    _exigir(acoes_da_proposta(linha, False), "reconciliar")
-    _auditar(fabrica, usuario, "granatech_reconciliar", f"proposta:{proposta_id}")
-    try:
-        achada = cliente.reconciliar_proposta(proposta_id)
-    except ErroGranatech as exc:
-        raise _falha(exc) from exc
+    linha, conversation_id = _proposta(fabrica, proposta_id, "reconciliar")
+    achada = _auditada(
+        fabrica,
+        usuario,
+        "granatech_reconciliar",
+        f"proposta:{proposta_id}",
+        lambda: cliente.reconciliar_proposta(proposta_id),
+    )
     if achada is None:
         _avisar(fabrica, proposta=proposta_id)
         return {"achada": False}
@@ -409,8 +426,7 @@ def reenviar_link(
     """Manda de novo o link vigente da biometria, mesmo com a conversa com humano."""
 
     _cliente(request)
-    linha, conversation_id = _proposta(fabrica, proposta_id)
-    _exigir(acoes_da_proposta(linha, False), "reenviar_link")
+    linha, conversation_id = _proposta(fabrica, proposta_id, "reenviar_link")
     _auditar(fabrica, usuario, "granatech_reenviar_link", f"proposta:{proposta_id}")
     acao = ordem.acao_da_proposta(linha.status, linha.tipo_notificacao)
     service.continuar(conversation_id, f"proposta:{acao}", forcar=True)
@@ -428,19 +444,15 @@ def cancelar(
     """Pede o cancelamento; o cliente é avisado quando o webhook ``CANCELED`` chegar."""
 
     cliente = _cliente(request)
-    linha, _ = _proposta(fabrica, proposta_id)
-    _exigir(acoes_da_proposta(linha, False), "cancelar")
-    _auditar(
+    linha, _ = _proposta(fabrica, proposta_id, "cancelar")
+    _auditada(
         fabrica,
         usuario,
         "granatech_cancelar",
         f"proposta:{proposta_id}",
+        lambda: cliente.cancelar(str(linha.id_externo), conversa_id=linha.conversa_id),
         {"motivo": dados.motivo.strip()},
     )
-    try:
-        cliente.cancelar(str(linha.id_externo), conversa_id=linha.conversa_id)
-    except ErroGranatech as exc:
-        raise _falha(exc) from exc
     return Response(status_code=204)
 
 
@@ -457,27 +469,23 @@ def corrigir_conta(
     if not get_settings(request).granatech_dados_bancarios_ativo:
         raise HTTPException(status_code=404, detail="correção de conta desligada")
     cliente = _cliente(request)
-    linha, _ = _proposta(fabrica, proposta_id)
-    _exigir(acoes_da_proposta(linha, True), "corrigir_conta")
+    linha, _ = _proposta(fabrica, proposta_id, "corrigir_conta", conta_ativa=True)
     try:
         habilitados = {str(b.get("codigo")) for b in cliente.bancos_em_cache()}
     except ErroGranatech as exc:
         raise _falha(exc) from exc
     if dados.banco_codigo not in habilitados:
         raise HTTPException(status_code=422, detail="banco fora da lista da Granatech")
-    _auditar(
+    _auditada(
         fabrica,
         usuario,
         "granatech_corrigir_conta",
         f"proposta:{proposta_id}",
+        lambda: cliente.corrigir_dados_bancarios(
+            str(linha.id_externo), dados.model_dump(), conversa_id=linha.conversa_id
+        ),
         {"banco": dados.banco_codigo, "final_conta": dados.numero_conta[-2:]},
     )
-    try:
-        cliente.corrigir_dados_bancarios(
-            str(linha.id_externo), dados.model_dump(), conversa_id=linha.conversa_id
-        )
-    except ErroGranatech as exc:
-        raise _falha(exc) from exc
     return Response(status_code=204)
 
 
@@ -494,12 +502,14 @@ def atualizar_detalhe(
             raise HTTPException(status_code=404, detail="consulta não encontrada")
         _exigir(acoes_da_consulta(linha), "atualizar_detalhe")
         id_externo = linha.id_externo
-        conversation_id = _conversation_id(sessao, linha.conversa_id) or ""
-    _auditar(fabrica, usuario, "granatech_atualizar_detalhe", f"consulta:{consulta_id}")
-    try:
-        detalhe = cliente.gravar_detalhe(id_externo)
-    except ErroGranatech as exc:
-        raise _falha(exc) from exc
+        conversation_id = repositorios.conversation_id_de(sessao, linha.conversa_id) or ""
+    detalhe = _auditada(
+        fabrica,
+        usuario,
+        "granatech_atualizar_detalhe",
+        f"consulta:{consulta_id}",
+        lambda: cliente.gravar_detalhe(id_externo),
+    )
     if detalhe is None:
         return {"pronto": False}
 

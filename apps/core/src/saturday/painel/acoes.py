@@ -52,9 +52,7 @@ def conversa_travada(
     """Abre a transação, trava a conversa e a relê já sob a trava."""
 
     with abrir_sessao(fabrica) as sessao:
-        conversation_id = sessao.scalar(
-            select(Conversa.conversation_id).where(Conversa.id == conversa_id)
-        )
+        conversation_id = repositorios.conversation_id_de(sessao, conversa_id)
         if conversation_id is None:
             raise AcaoRecusada(404, "conversa não encontrada")
         yield sessao, travar_e_reler(sessao, conversation_id)
