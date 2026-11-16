@@ -1,5 +1,5 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
-import { api, ErroApi, type Grafo, type NoDoGrafo, type PassoDoNo, type Turno } from "../api";
+import { api, mensagemDeFalha, type Grafo, type NoDoGrafo, type PassoDoNo, type Turno } from "../api";
 import { ETAPAS, MOTIVOS_HANDOFF, NOS, rotulo } from "../rotulos";
 import { Dialogo } from "./Dialogo";
 import { Falha } from "./Falha";
@@ -398,7 +398,7 @@ export function ModalGrafo({
     api
       .passos(turno.id)
       .then((r) => setPassos(r.passos))
-      .catch((e: unknown) => setPassos(e instanceof ErroApi ? e.message : "falha ao carregar o estado"));
+      .catch((e: unknown) => setPassos(mensagemDeFalha(e, "carregar o estado")));
   }, [turno.id]);
   const [erro, setErro] = useState("");
   const [tentativa, setTentativa] = useState(0);
@@ -407,7 +407,7 @@ export function ModalGrafo({
     api
       .grafo()
       .then(setGrafo)
-      .catch((e: unknown) => setErro(e instanceof ErroApi ? e.message : "falha ao carregar"));
+      .catch((e: unknown) => setErro(mensagemDeFalha(e, "carregar o grafo")));
   }, [tentativa]);
 
   return (

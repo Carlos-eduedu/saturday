@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import {
   api,
-  ErroApi,
+  mensagemDeFalha,
   type Execucao,
   type NoDoGrafo,
   type SituacaoExecucao,
@@ -22,7 +22,6 @@ type Aba = "execucoes" | "modelos" | "conhecimento" | "versoes";
 const INICIO = "__start__";
 const FIM = "__end__";
 
-const mensagem = (e: unknown) => (e instanceof ErroApi ? e.message : "falha ao carregar");
 
 // Aba Agente: as execuções de todas as conversas, ao vivo (cada uma abre o
 // próprio caminho no grafo que roda, lido da estrutura compilada na API); os modelos de cada etapa e as
@@ -99,7 +98,7 @@ function ListaExecucoes({ nos }: { nos: NoDoGrafo[] }) {
           return [...r.execucoes.filter((e) => e.id > topo), ...(atual ?? [])];
         });
       })
-      .catch((e: unknown) => setErro(mensagem(e)));
+      .catch((e: unknown) => setErro(mensagemDeFalha(e)));
   }, [situacao, filtroNo]);
 
   useEffect(() => {
@@ -131,7 +130,7 @@ function ListaExecucoes({ nos }: { nos: NoDoGrafo[] }) {
         setLista((atual) => [...(atual ?? []), ...r.execucoes]);
         setTemMais(r.tem_mais);
       })
-      .catch((e: unknown) => setErro(mensagem(e)))
+      .catch((e: unknown) => setErro(mensagemDeFalha(e)))
       .finally(() => setCarregandoMais(false));
   }
 

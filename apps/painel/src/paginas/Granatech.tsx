@@ -16,6 +16,7 @@ import {
   type ConsultaGranatechDetalhe,
   type ContaNova,
   ErroApi,
+  mensagemDeFalha,
   type Eu,
   type EventoGranatech,
   type FiltroGranatech,
@@ -49,9 +50,6 @@ type Aba = "consultas" | "propostas";
 type Selecao = { aba: Aba; id: number } | null;
 type Agir = (acao: () => Promise<unknown>, feito: string | ((r: unknown) => string)) => void;
 
-function mensagemDe(erro: unknown): string {
-  return erro instanceof ErroApi ? erro.message : "falha inesperada";
-}
 
 // Data e hora em tabela ou ficha são dado: mono e números tabulares.
 const Quando = ({ iso }: { iso: string | null }) =>
@@ -93,7 +91,7 @@ export function Granatech({ eu }: { eu: Eu }) {
   const propostas = dado?.aba === "propostas" ? dado.linhas : null;
   // Falha de uma ação; a de carga vem do recurso.
   const [erroDaAcao, setErro] = useState("");
-  const erro = erroDaAcao || (falha === null ? "" : mensagemDe(falha));
+  const erro = erroDaAcao || (falha === null ? "" : mensagemDeFalha(falha));
 
   // Os detalhes abertos recarregam com os mesmos avisos da lista.
   useAvisos(
@@ -113,7 +111,7 @@ export function Granatech({ eu }: { eu: Eu }) {
       .then((r) => setAviso(typeof feito === "string" ? feito : feito(r)))
       .catch((e: unknown) => {
         setAviso("");
-        setErro(mensagemDe(e));
+        setErro(mensagemDeFalha(e));
       })
       .finally(() => {
         emAndamento.current = false;
@@ -215,7 +213,7 @@ function Homologacao() {
   const [versao, setVersao] = useState(0);
   // Falha de uma ação; a de carga vem do recurso.
   const [erroDaAcao, setErro] = useState("");
-  const erro = erroDaAcao || (falha === null ? "" : mensagemDe(falha));
+  const erro = erroDaAcao || (falha === null ? "" : mensagemDeFalha(falha));
 
   // A rodada aberta recarrega com os mesmos avisos da lista.
   useAvisos(
@@ -252,7 +250,7 @@ function Homologacao() {
     api
       .pedirRodada(fase)
       .then((r) => setAberta(r.id))
-      .catch((e: unknown) => setErro(mensagemDe(e)))
+      .catch((e: unknown) => setErro(mensagemDeFalha(e)))
       .finally(carregar);
   }
 
@@ -445,7 +443,7 @@ function DetalheRodada({ id, versao, aoFechar }: { id: number; versao: number; a
         setErro("");
         setRodada(r);
       })
-      .catch((e: unknown) => setErro(mensagemDe(e)));
+      .catch((e: unknown) => setErro(mensagemDeFalha(e)));
   }, [id, versao, tentativa]);
 
   return (
@@ -802,7 +800,7 @@ function Cpf({ consultaId, mascarado }: { consultaId: number; mascarado: string 
             api
               .revelarCpfGranatech(consultaId)
               .then((r) => setValor(r.valor))
-              .catch((e: unknown) => setErro(`não deu para revelar: ${mensagemDe(e)}`))
+              .catch((e: unknown) => setErro(`não deu para revelar: ${mensagemDeFalha(e)}`))
               .finally(() => setRevelando(false));
           }}
         >
@@ -872,7 +870,7 @@ function DetalheConsulta({
         setC(d);
         setErroCarga("");
       })
-      .catch((e: unknown) => setErroCarga(mensagemDe(e)));
+      .catch((e: unknown) => setErroCarga(mensagemDeFalha(e)));
   }, [id, versao, tentativa]);
   if (!c)
     return erroCarga ? (
@@ -985,7 +983,7 @@ function DetalheProposta({
         setP(d);
         setErroCarga("");
       })
-      .catch((e: unknown) => setErroCarga(mensagemDe(e)));
+      .catch((e: unknown) => setErroCarga(mensagemDeFalha(e)));
   }, [id, versao, tentativa]);
   if (!p)
     return erroCarga ? (

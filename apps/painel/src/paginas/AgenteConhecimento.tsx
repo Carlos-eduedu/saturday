@@ -2,7 +2,7 @@ import { type FormEvent, useState } from "react";
 import {
   api,
   enviarFonte,
-  ErroApi,
+  mensagemDeFalha,
   type FonteConhecimento,
 } from "../api";
 import { Dialogo } from "../componentes/Dialogo";
@@ -10,7 +10,6 @@ import { Falha } from "../componentes/Falha";
 import { Vazio } from "../componentes/Vazio";
 import { useRecurso } from "../useRecurso";
 
-const mensagem = (e: unknown) => (e instanceof ErroApi ? e.message : "falha ao carregar");
 const dataHora = (iso: string) =>
   new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 const MB = 1024 * 1024;
@@ -38,7 +37,7 @@ export function AbaConhecimento() {
     falha,
     carregar,
   } = useRecurso("conhecimento", api.conhecimento, { recarrega: (a) => a.tipo === "agente" });
-  const erro = falha === null ? "" : mensagem(falha);
+  const erro = falha === null ? "" : mensagemDeFalha(falha, "carregar a base de conhecimento");
   const [aviso, setAviso] = useState("");
   const [editando, setEditando] = useState<FonteConhecimento | null>(null);
   const [removendo, setRemovendo] = useState<FonteConhecimento | null>(null);
@@ -51,7 +50,7 @@ export function AbaConhecimento() {
         setAviso(feito);
         carregar();
       })
-      .catch((e: unknown) => setAviso(`Não deu: ${mensagem(e)}`));
+      .catch((e: unknown) => setAviso(`Não deu: ${mensagemDeFalha(e)}`));
   }
 
   if (!base)
@@ -215,7 +214,7 @@ function NovaFonte({ criada }: { criada: () => void }) {
         setArquivo(null);
         criada();
       })
-      .catch((e: unknown) => setErro(mensagem(e)))
+      .catch((e: unknown) => setErro(mensagemDeFalha(e)))
       .finally(() => setEnviando(false));
   }
 
@@ -293,7 +292,7 @@ function EditarFonte({
     api
       .editarFonte(fonte.id, dados)
       .then(salvo)
-      .catch((e: unknown) => setErro(mensagem(e)));
+      .catch((e: unknown) => setErro(mensagemDeFalha(e)));
   }
 
   return (

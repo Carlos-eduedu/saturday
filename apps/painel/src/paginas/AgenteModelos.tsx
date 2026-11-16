@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   api,
-  ErroApi,
+  mensagemDeFalha,
   type ModeloDoCatalogo,
   type ModelosAgente,
   type PapelModelo,
@@ -19,7 +19,6 @@ import { useRecurso } from "../useRecurso";
 type Rascunho = Partial<Record<PapelModelo, string>>;
 type Papel = ModelosAgente["papeis"][number];
 
-const mensagem = (e: unknown) => (e instanceof ErroApi ? e.message : "falha ao carregar");
 const dataHora = (iso: string) =>
   new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 const porMilhao = (v: number | null) => (v === null ? "—" : `${dolar(v)}/M`);
@@ -40,7 +39,7 @@ function useModelos() {
   const { dado, falha, carregar } = useRecurso("modelos", api.modelosAgente, {
     recarrega: (aviso) => aviso.tipo === "agente",
   });
-  return { dados: dado, erro: falha === null ? "" : mensagem(falha), carregar };
+  return { dados: dado, erro: falha === null ? "" : mensagemDeFalha(falha, "carregar os modelos"), carregar };
 }
 
 // Aviso antes de aplicar: a troca vale no próximo turno; os que rodam terminam como estão.
@@ -86,7 +85,7 @@ export function AbaModelos() {
         setAviso(`Catálogo atualizado: ${r.modelos} modelos.`);
         carregar();
       })
-      .catch((e: unknown) => setAviso(`Não deu para atualizar: ${mensagem(e)}`))
+      .catch((e: unknown) => setAviso(`Não deu para atualizar: ${mensagemDeFalha(e)}`))
       .finally(() => setAtualizando(false));
   }
 
@@ -477,7 +476,7 @@ function ConfirmarSalvar({
     setErro("");
     salvar(nota)
       .then(salvo)
-      .catch((e: unknown) => setErro(mensagem(e)))
+      .catch((e: unknown) => setErro(mensagemDeFalha(e)))
       .finally(() => setEnviando(false));
   }
 
@@ -535,7 +534,7 @@ function TestarModelo({ papel, modelo, fechar }: { papel: Papel; modelo: string;
     api
       .testarModelo(papel.papel, modelo, texto)
       .then(setResultado)
-      .catch((e: unknown) => setErro(mensagem(e)))
+      .catch((e: unknown) => setErro(mensagemDeFalha(e)))
       .finally(() => setEnviando(false));
   }
 
@@ -605,7 +604,7 @@ export function AbaVersoes() {
     falha,
     carregar,
   } = useRecurso("versoes", api.versoesAgente, { recarrega: (aviso) => aviso.tipo === "agente" });
-  const erro = falha === null ? "" : mensagem(falha);
+  const erro = falha === null ? "" : mensagemDeFalha(falha, "carregar as versões");
   const [restaurar, setRestaurar] = useState<VersaoAgente | null>(null);
 
 
@@ -700,7 +699,7 @@ function ConfirmarRestaurar({
     api
       .restaurarVersao(alvo.versao, dados.vigente?.versao ?? null)
       .then(feito)
-      .catch((e: unknown) => setErro(mensagem(e)))
+      .catch((e: unknown) => setErro(mensagemDeFalha(e)))
       .finally(() => setEnviando(false));
   }
   return (
