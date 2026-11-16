@@ -1,5 +1,6 @@
-import { Link, Navigate, useParams } from "react-router";
+import { Link, Navigate, useNavigate, useParams } from "react-router";
 import type { Eu } from "../api";
+import { Abas, idAba } from "../componentes/Abas";
 import { Granatech } from "./Granatech";
 
 // Os bancos do agente, cada um na sua seção: o integrado por API, o que só tem
@@ -58,26 +59,37 @@ const SELO: Record<Banco["situacao"], string> = {
 
 export function Bancos({ eu }: { eu: Eu }) {
   const { banco } = useParams();
+  const navegar = useNavigate();
   const atual = BANCOS.find((b) => b.id === banco);
   if (!atual) return <Navigate to={`/bancos/${BANCOS[0].id}`} replace />;
 
   return (
     <div className="bancos">
       <h1 className="titulo-tela">Bancos</h1>
-      <nav className="bancos-nav" aria-label="Bancos">
-        {BANCOS.map((b) => (
-          <Link
-            key={b.id}
-            to={`/bancos/${b.id}`}
-            aria-current={b.id === atual.id ? "page" : undefined}
-          >
-            <strong>{b.nome}</strong>
-            <span>{b.produto}</span>
-            <span className={`selo ${SELO[b.situacao]}`}>{b.situacao}</span>
-          </Link>
-        ))}
-      </nav>
-      {atual.id === "granatech" ? <Granatech eu={eu} /> : <Leitura banco={atual} />}
+      <Abas
+        rotulo="Bancos"
+        painel="banco-painel"
+        opcoes={BANCOS.map((b): [Banco["id"], string] => [b.id, b.nome])}
+        valor={atual.id}
+        mudar={(id) => navegar(`/bancos/${id}`)}
+      />
+      <div
+        role="tabpanel"
+        id="banco-painel"
+        aria-labelledby={idAba("banco-painel", atual.id)}
+        className="painel-aba"
+      >
+        <header className="banco-cabeca">
+          <h2>
+            {atual.nome} <span className="contagem">· {atual.produto}</span>
+          </h2>
+          <span className={`selo ${SELO[atual.situacao]}`}>{atual.situacao}</span>
+          {atual.regras && (
+            <Link to={`/operacao#${atual.regras}`}>Ver as regras vigentes na Operação</Link>
+          )}
+        </header>
+        {atual.id === "granatech" ? <Granatech eu={eu} /> : <Leitura banco={atual} />}
+      </div>
     </div>
   );
 }
@@ -86,9 +98,6 @@ export function Bancos({ eu }: { eu: Eu }) {
 function Leitura({ banco }: { banco: Banco }) {
   return (
     <section className="banco-leitura">
-      <h2>
-        {banco.nome} <span className="contagem">· {banco.produto}</span>
-      </h2>
       <div className="banco-leitura__colunas">
         <div>
           <h3>O que o agente faz hoje</h3>
@@ -107,11 +116,6 @@ function Leitura({ banco }: { banco: Banco }) {
           </ul>
         </div>
       </div>
-      {banco.regras && (
-        <p>
-          <Link to={`/operacao#${banco.regras}`}>Ver as regras vigentes na Operação</Link>
-        </p>
-      )}
     </section>
   );
 }
