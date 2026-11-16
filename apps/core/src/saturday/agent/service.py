@@ -19,7 +19,7 @@ from saturday.agent.textos import (
     COMANDO_REINICIAR,
     MENSAGEM_REINICIADA,
 )
-from saturday.agent.turno import RegistroDoTurno, RegistroMemoria, RegistroPostgres, Turnos
+from saturday.agent.turno import RegistroPostgres, Turnos
 from saturday.agent.turno import etapa_do_estado as etapa_do_estado
 from saturday.canais.base import OrigemCanal
 from saturday.dados import atendimento, repositorios
@@ -78,8 +78,8 @@ class AgentService:
         context: AgentContext,
         webhook: WebhookClient,
         settings: Settings,
+        fabrica: sessionmaker[Session],
         checkpointer: Any = None,
-        fabrica: sessionmaker[Session] | None = None,
         storage: Storage | None = None,
     ) -> None:
         self.graph = graph
@@ -87,9 +87,7 @@ class AgentService:
         self.webhook = webhook
         self.settings = settings
         self.checkpointer = checkpointer
-        # Sem `fabrica` (ambiente `pytest`) não há Postgres: o turno não grava
-        # `mensagens` nem `outbox` e a entrega volta a ser direta. Em qualquer
-        # outro ambiente `validar_para_subir` exige `SATURDAY_DATABASE_URL`.
+        # Obrigatória em todo ambiente, testes inclusive (docs/decisoes/0022).
         self.fabrica = fabrica
         self.storage = storage
 
@@ -107,17 +105,13 @@ class AgentService:
         return dict(snapshot.values or {})
 
     @contextmanager
-    def _trava(self, conversation_id: str) -> Iterator[Session | None]:
+    def _trava(self, conversation_id: str) -> Iterator[Session]:
         """Trava a conversa e mantém a transação aberta durante todo o turno.
 
         A trava é ``pg_advisory_xact_lock``: vale entre processos e some no
         commit. Devolve a sessão porque é dentro desta transação que a resposta
         vai para `mensagens` e para o `outbox`.
         """
-
-        if self.fabrica is None:
-            yield None
-            return
 
         with abrir_sessao(self.fabrica) as aberta:
             travar_conversa(aberta, conversation_id)
@@ -237,10 +231,11 @@ class AgentService:
             return None
         config = self.config(conversation_id)
         with self._trava(conversation_id) as sessao:
-            conversa = repositorios.buscar_conversa(sessao, conversation_id) if sessao else None
-            if sessao is not None and conversa is not None and conversa.atendimento != "ia":
+            conversa = repositorios.buscar_conversa(sessao, conversation_id)
+            if conversa is not None and conversa.atendimento != "ia":
                 self._devolver_sem_usuario(sessao, conversa, config)
             else:
+                # Já com a IA, ou conversa anterior à Fase 3, só com checkpoint.
                 self._liberar_handoff(config)
         return {"conversation_id": conversation_id, "status": "in_progress"}
 
@@ -254,8 +249,6 @@ class AgentService:
         `acoes.AcaoRecusada`. Devolve o `conversation_id`.
         """
 
-        if self.fabrica is None:
-            raise RuntimeError("devolver exige o banco")
         with acoes.conversa_travada(self.fabrica, conversa_id) as (sessao, conversa):
             acoes.devolver(sessao, conversa, usuario_id, gestor)
             config = self.config(conversa.conversation_id)
@@ -304,15 +297,10 @@ class AgentService:
             return False
         return agora() - desde > timedelta(hours=self.settings.handoff_auto_release_horas)
 
-    def _deve_liberar_auto(self, estado: dict[str, Any]) -> bool:
-        if estado.get("status") != "handoff":
-            return False
-        return self._expirou(self._parse_iso(estado.get("handoff_em")))
-
     def _processar_turno(
         self,
         payload: ChatRequest,
-        sessao: Session | None = None,
+        sessao: Session,
         origem: OrigemCanal | None = None,
         historico: list[dict[str, str]] | None = None,
     ) -> AgentReply:
@@ -331,17 +319,10 @@ class AgentService:
 
         self._registrar_entrada(sessao, conversa, payload, historico)
 
-        if (
-            sessao is not None
-            and conversa is not None
-            and self._pediu_reinicio(sessao, conversa, payload)
-        ):
+        if self._pediu_reinicio(sessao, conversa, payload):
             return self._reiniciar(payload, config, estado, sessao, conversa)
 
-        if sessao is not None and conversa is not None:
-            silencio, estado = self._silencio_pelo_banco(sessao, conversa, config, estado)
-        else:
-            silencio, estado = self._silencio_pelo_checkpoint(config, estado)
+        silencio, estado = self._silencio_pelo_banco(sessao, conversa, config, estado)
         if silencio:
             return self._resposta_em_handoff(payload, estado)
 
@@ -392,12 +373,10 @@ class AgentService:
 
     def _conversa(
         self,
-        sessao: Session | None,
+        sessao: Session,
         payload: ChatRequest,
         origem: OrigemCanal | None,
-    ) -> Conversa | None:
-        if sessao is None:
-            return None
+    ) -> Conversa:
         return repositorios.obter_ou_criar_conversa(
             sessao,
             payload.conversation_id,
@@ -427,13 +406,11 @@ class AgentService:
 
     def _registrar_entrada(
         self,
-        sessao: Session | None,
-        conversa: Conversa | None,
+        sessao: Session,
+        conversa: Conversa,
         payload: ChatRequest,
         historico: list[dict[str, str]] | None = None,
     ) -> None:
-        if sessao is None or conversa is None:
-            return
         repositorios.registrar_entrada(
             sessao,
             conversa,
@@ -484,24 +461,7 @@ class AgentService:
             return False, self._devolver_sem_usuario(sessao, conversa, config)
         return False, estado
 
-    def _silencio_pelo_checkpoint(
-        self,
-        config: dict[str, Any],
-        estado: dict[str, Any],
-    ) -> tuple[bool, dict[str, Any]]:
-        """Sem Postgres (`pytest`), o handoff continua só no checkpoint."""
-
-        if estado.get("status") != "handoff":
-            return False, estado
-        if not self._deve_liberar_auto(estado):
-            return True, estado
-        return False, self._liberar_handoff(config)
-
-    def _registro(self, sessao: Session | None, conversa: Conversa | None) -> RegistroDoTurno:
-        """Onde o turno grava: no Postgres ou, sem banco (`pytest`), em lugar nenhum."""
-
-        if sessao is None or conversa is None:
-            return RegistroMemoria()
+    def _registro(self, sessao: Session, conversa: Conversa) -> RegistroPostgres:
         return RegistroPostgres(sessao, conversa, self.webhook, self.fabrica)
 
     def _liberar_handoff(self, config: dict[str, Any]) -> dict[str, Any]:
@@ -513,8 +473,8 @@ class AgentService:
         payload: ChatRequest,
         config: dict[str, Any],
         estado: dict[str, Any],
-        sessao: Session | None,
-        conversa: Conversa | None,
+        sessao: Session,
+        conversa: Conversa,
         ids_recentes: list[str],
         respostas: dict[str, str],
     ) -> AgentReply:
@@ -532,11 +492,9 @@ class AgentService:
         )
 
     @staticmethod
-    def _dados_da_conversa(conversa: Conversa | None) -> dict[str, Any]:
+    def _dados_da_conversa(conversa: Conversa) -> dict[str, Any]:
         """O que o ramo CLT precisa da conversa: id (provas, cota) e telefone."""
 
-        if conversa is None:
-            return {}
         return {"conversa_ref": str(conversa.id), "telefone": conversa.telefone}
 
     def continuar(
@@ -554,17 +512,21 @@ class AgentService:
         with self._trava(conversation_id) as sessao:
             config = self.config(conversation_id)
             estado = self.estado_atual(config)
-            conversa = repositorios.buscar_conversa(sessao, conversation_id) if sessao else None
-            if sessao is not None and conversa is not None:
-                if conversa.atendimento != "ia" and not forcar:
-                    repositorios.abrir_alerta(
-                        sessao,
-                        "evento_com_humano",
-                        conversa_id=conversa.id,
-                        detalhe={"evento": evento},
-                    )
-                    return None
-            elif estado.get("status") == "handoff" and not forcar:
+            conversa = repositorios.buscar_conversa(sessao, conversation_id)
+            if conversa is None:
+                logger.warning(
+                    "turno_de_sistema_sem_conversa conversation_id=%s evento=%s",
+                    conversation_id,
+                    evento,
+                )
+                return None
+            if conversa.atendimento != "ia" and not forcar:
+                repositorios.abrir_alerta(
+                    sessao,
+                    "evento_com_humano",
+                    conversa_id=conversa.id,
+                    detalhe={"evento": evento},
+                )
                 return None
 
             entrada = turno_inicial(user_message="", attachments=[])
@@ -583,7 +545,14 @@ class AgentService:
         """A fila desistiu do evento: a conversa vai para um humano (`Turnos.desistir`)."""
 
         with self._trava(conversation_id) as sessao:
-            conversa = repositorios.buscar_conversa(sessao, conversation_id) if sessao else None
+            conversa = repositorios.buscar_conversa(sessao, conversation_id)
+            if conversa is None:
+                logger.warning(
+                    "desistencia_sem_conversa conversation_id=%s evento=%s",
+                    conversation_id,
+                    evento,
+                )
+                return
             self.turnos.desistir(self._registro(sessao, conversa), evento)
 
     def _entrada_do_grafo(
@@ -676,19 +645,13 @@ class AgentService:
         return payload.model_copy(update={"attachments": arquivados})
 
     def processar_e_enviar(self, payload: ChatRequest) -> None:
+        """Roda o turno em segundo plano; a entrega é do worker, pelo `outbox`."""
+
         try:
-            resposta = self.process_message(payload)
+            self.process_message(payload)
         except Exception as exc:
             logger.error(
                 "processamento_falhou conversation_id=%s erro=%s",
                 payload.conversation_id,
                 type(exc).__name__,
             )
-            return
-        if resposta.status in ("with_human", "duplicate"):
-            # Não envia nada: a conversa está congelada ou o evento é repetido.
-            return
-        if self.fabrica is not None:
-            # Com Postgres a entrega é do worker, pelo `outbox` gravado no turno.
-            return
-        self.webhook.enviar(resposta.model_dump(mode="json"))

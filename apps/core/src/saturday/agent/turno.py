@@ -2,7 +2,7 @@
 
 O turno de cliente e o turno de sistema passam pelo mesmo fechamento; o que os
 separa está aqui, não em quem chama. O que vai para o banco passa pelo
-`RegistroDoTurno`, que tem dois adapters: Postgres e memória (sem banco).
+`RegistroPostgres`, na transação do turno.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Protocol
+from typing import Any
 
 from langchain_core.messages import AIMessage
 from sqlalchemy.orm import Session, sessionmaker
@@ -44,94 +44,6 @@ def etapa_do_estado(estado: dict[str, Any]) -> str | None:
     return None
 
 
-class RegistroDoTurno(Protocol):
-    """O que o fechamento do turno grava fora do checkpoint."""
-
-    @property
-    def com_humano(self) -> bool: ...
-
-    def registrar_turno(
-        self,
-        estado: dict[str, Any],
-        caminho: list[str],
-        metricas: TurnMetrics | None,
-        inicio: float,
-        erro: str | None = None,
-    ) -> int | None: ...
-
-    def registrar_falha(
-        self,
-        estado: dict[str, Any],
-        caminho: list[str],
-        metricas: TurnMetrics | None,
-        inicio: float,
-        erro: str,
-    ) -> None: ...
-
-    def abrir_handoff(
-        self,
-        tipo_alerta: str,
-        motivo: str | None,
-        detalhe: dict[str, Any] | None = None,
-    ) -> None: ...
-
-    def alertar_evento_com_humano(self, detalhe: dict[str, Any]) -> None: ...
-
-    def gravar_saida(
-        self,
-        resposta: AgentReply,
-        final: dict[str, Any] | None = None,
-        *,
-        turno_id: int | None = None,
-    ) -> None: ...
-
-
-class RegistroMemoria:
-    """Sem Postgres (`pytest`): nada é gravado e a entrega volta a ser direta."""
-
-    com_humano = False
-
-    def registrar_turno(
-        self,
-        estado: dict[str, Any],
-        caminho: list[str],
-        metricas: TurnMetrics | None,
-        inicio: float,
-        erro: str | None = None,
-    ) -> int | None:
-        return None
-
-    def registrar_falha(
-        self,
-        estado: dict[str, Any],
-        caminho: list[str],
-        metricas: TurnMetrics | None,
-        inicio: float,
-        erro: str,
-    ) -> None:
-        return None
-
-    def abrir_handoff(
-        self,
-        tipo_alerta: str,
-        motivo: str | None,
-        detalhe: dict[str, Any] | None = None,
-    ) -> None:
-        return None
-
-    def alertar_evento_com_humano(self, detalhe: dict[str, Any]) -> None:
-        return None
-
-    def gravar_saida(
-        self,
-        resposta: AgentReply,
-        final: dict[str, Any] | None = None,
-        *,
-        turno_id: int | None = None,
-    ) -> None:
-        return None
-
-
 @dataclass
 class RegistroPostgres:
     """Grava na transação do turno, a mesma que segura a trava da conversa."""
@@ -139,7 +51,7 @@ class RegistroPostgres:
     sessao: Session
     conversa: Conversa
     webhook: WebhookClient
-    fabrica: sessionmaker[Session] | None = None
+    fabrica: sessionmaker[Session]
 
     @property
     def com_humano(self) -> bool:
@@ -182,8 +94,6 @@ class RegistroPostgres:
         transação do turno pode estar segurando.
         """
 
-        if self.fabrica is None:
-            return
         try:
             with abrir_sessao(self.fabrica) as propria:
                 propria.add(self._turno(estado, caminho, metricas, inicio, erro))
@@ -329,7 +239,7 @@ class Turnos:
         conversation_id: str,
         config: dict[str, Any],
         entrada: dict[str, Any],
-        registro: RegistroDoTurno,
+        registro: RegistroPostgres,
         *,
         estado: dict[str, Any],
         guardar_resposta: Callable[[str], None],
@@ -380,7 +290,7 @@ class Turnos:
         conversation_id: str,
         config: dict[str, Any],
         entrada: dict[str, Any],
-        registro: RegistroDoTurno,
+        registro: RegistroPostgres,
         *,
         estado: dict[str, Any],
         evento: str,
@@ -418,7 +328,7 @@ class Turnos:
         return resposta
 
     @staticmethod
-    def desistir(registro: RegistroDoTurno, evento: str) -> None:
+    def desistir(registro: RegistroPostgres, evento: str) -> None:
         """O turno de sistema não será mais tentado: a conversa vai para um humano.
 
         Sem aviso ao cliente, que não escreveu nada. Com a conversa já com
@@ -434,7 +344,7 @@ class Turnos:
         self,
         conversation_id: str,
         config: dict[str, Any],
-        registro: RegistroDoTurno,
+        registro: RegistroPostgres,
         caminho: list[str],
         metricas: TurnMetrics | None,
         inicio: float,

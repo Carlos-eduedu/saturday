@@ -1,4 +1,7 @@
-"""Lifespan: checkpointer montado, rotas no ar e erro claro sem Postgres."""
+"""Lifespan: checkpointer montado, rotas no ar e erro claro sem Postgres.
+
+O primeiro teste exige Postgres: o serviço não sobe sem banco (decisão 0022).
+"""
 
 from __future__ import annotations
 
@@ -11,8 +14,8 @@ from saturday.settings import Settings
 from saturday.web.application import get_app
 
 
-def test_lifespan_monta_checkpointer_e_rotas() -> None:
-    settings = Settings(environment="pytest")
+def test_lifespan_monta_checkpointer_e_rotas(pg_url: str, fabrica: object) -> None:
+    settings = Settings(environment="pytest", database_url=SecretStr(pg_url))
     app = get_app(settings)
 
     with TestClient(app) as client:

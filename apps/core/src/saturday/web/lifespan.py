@@ -30,9 +30,10 @@ def criar_lifespan(
         if not settings.api_key.get_secret_value() and settings.environment in ("dev", "pytest"):
             logger.warning("autenticacao_desligada ambiente=%s", settings.environment)
 
-        de_teste = settings.environment == "pytest"
-        engine = None if de_teste else criar_engine(settings)
-        fabrica = None if engine is None else criar_factory(engine)
+        # O banco é obrigatório em todo ambiente (docs/decisoes/0022); em
+        # `pytest` só o checkpointer e o storage ficam em memória.
+        engine = criar_engine(settings)
+        fabrica = criar_factory(engine)
         checkpointer, pool = criar_checkpointer(settings)
 
         http = httpx.Client(
@@ -53,23 +54,20 @@ def criar_lifespan(
         app.state.agent_service = service
         app.state.http = http
         app.state.checkpointer = checkpointer
-        # O webhook precisa da fábrica para enfileirar eventos; `None` em pytest.
+        # O webhook precisa da fábrica para enfileirar eventos.
         app.state.fabrica = fabrica
         app.state.storage = storage
-        difusor = None if de_teste else Difusor(settings.database_url.get_secret_value())
-        if difusor is not None:
-            difusor.iniciar()
+        difusor = Difusor(settings.database_url.get_secret_value())
+        difusor.iniciar()
         app.state.difusor = difusor
 
         try:
             yield
         finally:
-            if difusor is not None:
-                await difusor.parar()
+            await difusor.parar()
             http.close()
             if pool is not None:
                 pool.close()
-            if engine is not None:
-                engine.dispose()
+            engine.dispose()
 
     return lifespan
