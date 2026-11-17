@@ -104,6 +104,10 @@ real de cliente.
 Na ordem. Cada passo de escrita no Dokploy (criar, editar, deploy) segue a
 `decisoes/0005`. `<amb>` é `dev`, `homolog` ou `prod`.
 
+Para o primeiro deploy do homolog, `infra/homolog_roteiro.sh` conduz os passos
+que só uma pessoa faz (buckets, app da Meta, segredos, webhook e primeiro
+gestor). Rode no seu terminal: ele não grava nenhum valor em arquivo.
+
 1. **DNS.** Registros A para a API e o painel (ver "Ambientes") apontando para o
    IP do servidor do Dokploy. Confira com `dig +short <host>` antes de criar os
    domínios: sem o DNS, o certificado não sai.
