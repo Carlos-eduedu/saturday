@@ -412,7 +412,9 @@ def check_customer_data(state: AgentState, runtime: Runtime[AgentContext]) -> di
         cliente["cpf"] = cpf_extrato
 
     # Com o C6 ligado, o titular decide uma vez por conversa se autoriza a simulação.
-    if runtime.context.c6_ativo and "c6_autorizado" not in cliente:
+    # O pedido só sai se o extrato permite simular: sem isso, nada de CPF nem de SIM.
+    viavel = _pedido_c6(cliente, extrato) is not None
+    if runtime.context.c6_ativo and "c6_autorizado" not in cliente and viavel:
         cpf = cliente.get("cpf") or cpf_extrato
         if cpf is None:
             return {**_pedido(PERGUNTA_CPF, "cpf", "textos:pergunta_cpf"), "cliente": cliente}
@@ -422,7 +424,7 @@ def check_customer_data(state: AgentState, runtime: Runtime[AgentContext]) -> di
 
     # A simulação pede a renda: vem do extrato; se a leitura não achou, o cliente diz.
     simula = runtime.context.c6 is not None and cliente.get("c6_autorizado") is True
-    if simula and not state.get("c6_novo") and _pedido_c6(cliente, extrato) is not None:
+    if simula and not state.get("c6_novo") and viavel:
         if extrato.get("baseCalculo"):
             cliente["renda"] = float(extrato["baseCalculo"])
         if not cliente.get("renda"):

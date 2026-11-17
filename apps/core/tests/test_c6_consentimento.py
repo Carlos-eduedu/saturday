@@ -23,8 +23,10 @@ def c6_ligado(service: AgentService) -> None:
     service.context = replace(service.context, c6_ativo=True)
 
 
-def _extrato(client: TestClient, fakes: Fakes, conversa: str, cpf: str | None = CPF) -> str:
-    fakes.llm.extrato = {**dados_extrato(), "cpf": cpf}
+def _extrato(
+    client: TestClient, fakes: Fakes, conversa: str, cpf: str | None = CPF, **extras: object
+) -> str:
+    fakes.llm.extrato = {**dados_extrato(), "cpf": cpf, "numeroBeneficio": "1234567890", **extras}
     resposta = client.post(
         "/chat",
         json={
@@ -140,3 +142,27 @@ def test_cpf_numerico_na_leitura_nao_derruba_o_extrato(client: TestClient, fakes
 @pytest.mark.usefixtures("c6_ligado")
 def test_cpf_invalido_no_extrato_nao_vale(client: TestClient, fakes: Fakes) -> None:
     assert _extrato(client, fakes, cid(), cpf="11111111111") == PERGUNTA_CPF
+
+
+@pytest.mark.usefixtures("c6_ligado")
+@pytest.mark.parametrize("extras", [{"margemExtrapolada": 50.0}, {"numeroBeneficio": None}])
+def test_sem_condicao_de_simular_nao_recebe_o_pedido_e_segue_para_a_portabilidade(
+    client: TestClient, fakes: Fakes, fabrica: sessionmaker[Session], extras: dict
+) -> None:
+    conversa = cid()
+
+    resposta = _extrato(client, fakes, conversa, **extras)
+
+    assert "Quer seguir com a portabilidade?" in resposta
+    assert client.get(f"/conversations/{conversa}").json()["aguardando"] is None
+    assert _provas(fabrica) == []
+
+
+@pytest.mark.usefixtures("c6_ligado")
+def test_extrato_que_se_enquadra_depois_de_um_que_nao_recebe_o_pedido(
+    client: TestClient, fakes: Fakes
+) -> None:
+    conversa = cid()
+    assert _extrato(client, fakes, conversa, margemExtrapolada=50.0) != CONSENTIMENTO_C6
+
+    assert _extrato(client, fakes, conversa) == CONSENTIMENTO_C6

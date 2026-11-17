@@ -125,12 +125,8 @@ def test_recusa_segue_para_a_portabilidade(
 def test_sem_condicao_de_simular_segue_para_a_portabilidade(
     client: TestClient, fakes: Fakes, simulador_c6: ModuleType, extras: dict
 ) -> None:
-    conversa = cid()
-    _extrato(client, fakes, conversa, **extras)
-
-    corpo = _dizer(client, conversa, "sim")
-
-    assert "Quer seguir com a portabilidade?" in corpo["answer"]
+    # Sem condição de simular, o SIM nem é pedido: a portabilidade vem direto.
+    assert "Quer seguir com a portabilidade?" in _extrato(client, fakes, cid(), **extras)
     assert SIMULOU not in simulador_c6.CHAMADAS
 
 
@@ -174,10 +170,9 @@ def test_extrato_de_outro_titular_pede_o_sim_de_novo(
 
 
 def test_sem_beneficio_nem_renda_nao_pergunta_a_renda(client: TestClient, fakes: Fakes) -> None:
-    conversa = cid()
-    _extrato(client, fakes, conversa, numeroBeneficio=None, baseCalculo=None)
+    resposta = _extrato(client, fakes, cid(), numeroBeneficio=None, baseCalculo=None)
 
-    assert "Quer seguir com a portabilidade?" in _dizer(client, conversa, "sim")["answer"]
+    assert "Quer seguir com a portabilidade?" in resposta
 
 
 @pytest.mark.parametrize(
