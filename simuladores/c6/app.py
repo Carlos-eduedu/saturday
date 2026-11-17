@@ -5,11 +5,14 @@ Emula só o que o Saturday usa, com as rotas, os cabeçalhos e os campos do
 formalização. Tudo em memória. `FALHAS` programa erros (401, 500), com a opção
 de executar a operação antes de falhar: o caso "incerto" de uma proposta.
 
+Fora da API do banco: `/saude` e o admin (`/admin/estado`, `/admin/config`,
+`/admin/falha`, `/admin/limpar`), sem token, para trocar o cenário por fora.
+
 O manual não mostra o corpo das respostas de erro nem as situações da esteira:
 o que está aqui é uma forma plausível, marcada com TODO(c6).
 
 Rodar local:
-    uvicorn app:app --app-dir simuladores/c6 --port 8300
+    uvicorn app:app --app-dir simuladores/c6 --port 8500
 """
 
 from __future__ import annotations
@@ -32,7 +35,7 @@ ACCEPT_ERRO = "application/vnd.c6bank_error_data_v2+json"
 ACCEPT_CONSULTA = "application/vnd.c6bank_fgts_consult_v2+json"
 ACCEPT_LINK = "application/vnd.c6bank_url_consult_v1+json"
 
-# Parâmetros mutáveis pelos testes.
+# Parâmetros mutáveis pelos testes (ou pelo admin).
 CONFIG: dict[str, Any] = {
     "expira_s": 1199,  # o exemplo do manual
     "taxa_mensal": 1.8,
@@ -40,6 +43,8 @@ CONFIG: dict[str, Any] = {
     "formato": "unico",
     "saldo_refin": 1500.0,  # saldo devedor de cada contrato refinanciado
 }
+
+CONFIG_PADRAO = dict(CONFIG)
 
 TAXAS_DA_LISTA = [1.75, 1.8, 1.85]
 
@@ -250,3 +255,61 @@ async def link(request: Request) -> Response:
     if numero not in PROPOSTAS:
         return _erro(404, "proposta não encontrada")
     return JSONResponse({"url": f"http://web.c6consig.exemplo.test/{numero}", "status": "ACTIVE"})
+
+
+# ------------------------------------------------------------------ fora da API do banco
+
+
+@app.get("/saude")
+def saude() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.post("/admin/falha")
+async def programar_falha(request: Request) -> Response:
+    """`{rota, metodo, status, registrar}`: vale para a próxima chamada da rota.
+
+    O login (`/auth/token`) não consome falha programada.
+    """
+
+    falha = await request.json()
+    if not falha.get("rota"):
+        return _erro(400, "campo obrigatório: rota")
+    FALHAS.append(falha)
+    return JSONResponse({"programadas": len(FALHAS)})
+
+
+@app.delete("/admin/falha")
+def limpar_falhas() -> dict[str, int]:
+    FALHAS.clear()
+    return {"programadas": 0}
+
+
+@app.post("/admin/config")
+async def configurar(request: Request) -> Response:
+    pedido = await request.json()
+    desconhecidas = sorted(set(pedido) - set(CONFIG))
+    if desconhecidas:
+        return _erro(400, "chaves desconhecidas: " + ", ".join(desconhecidas))
+    CONFIG.update(pedido)
+    return JSONResponse(CONFIG)
+
+
+@app.post("/admin/limpar")
+def admin_limpar() -> dict[str, int]:
+    """Reinicia: apaga tokens, propostas e falhas e volta a `CONFIG` padrão."""
+
+    limpar()
+    CONFIG.update(CONFIG_PADRAO)
+    return {"ok": 1}
+
+
+@app.get("/admin/estado")
+def estado() -> dict[str, Any]:
+    return {
+        "config": CONFIG,
+        "falhas": FALHAS,
+        "propostas": PROPOSTAS,
+        "logins": len(LOGINS),
+        "chamadas": CHAMADAS,
+    }
