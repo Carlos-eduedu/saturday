@@ -1561,6 +1561,9 @@ small.dado { font-size: 0.8rem; }
 .canais td.dado::before { font-family: var(--fonte-texto); }
 /* Link sem o respiro de 0,25rem do button.link: alinha com o texto das outras linhas. */
 .ficha-granatech button.link { padding: 0; }
+/* O alvo de 44 px vaza para cima e para baixo, por cima das linhas vizinhas
+   (daí o position): a linha do CPF fica da altura das outras. */
+.ficha-granatech button.link.alvo { position: relative; margin-block: -0.7rem; }
 .ficha-granatech button.link.dado { font-family: var(--fonte-mono); font-size: 0.875rem; }
 .progresso-rodada small { font-variant-numeric: tabular-nums; }
 

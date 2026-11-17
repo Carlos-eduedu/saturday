@@ -777,7 +777,7 @@ function Cpf({ consultaId, mascarado }: { consultaId: number; mascarado: string 
       {valor === null && (
         <button
           type="button"
-          className="link"
+          className="link alvo"
           disabled={revelando}
           onClick={() => {
             // Cada clique grava auditoria: um pedido por vez.

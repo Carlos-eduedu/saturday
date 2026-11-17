@@ -698,7 +698,7 @@ function FichaCliente({
                   {revelados[campo] ? (
                     <button
                       type="button"
-                      className="link"
+                      className="link alvo"
                       onClick={() => ocultar(campo)}
                       aria-label={`Ocultar ${CAMPOS[campo]}`}
                     >
