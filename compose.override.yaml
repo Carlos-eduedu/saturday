@@ -2,9 +2,9 @@
 # automaticamente junto com `compose.yaml`.
 #
 # Publica as portas que o desenvolvedor usa por fora dos containers (API,
-# Postgres para rodar `pytest`, S3 local e os simuladores da Meta e da
-# Granatech) e aponta o canal do WhatsApp e o cliente da Granatech para os
-# simuladores em vez dos parceiros de verdade.
+# Postgres para rodar `pytest`, S3 local e os simuladores da Meta, da
+# Granatech, da Evolution, do iCred e do C6) e aponta o canal do WhatsApp e o
+# cliente da Granatech para os simuladores em vez dos parceiros de verdade.
 services:
   api:
     ports:
@@ -164,6 +164,38 @@ services:
       SATURDAY_HEALTH_URL: http://127.0.0.1:8400/saude
     ports:
       - "8400:8400"
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
+
+  # Simulador do C6 Consignado (decisão 0026), no mesmo molde. Nada aponta para
+  # ele sozinho: o C6 só entra com SATURDAY_C6_ATIVO=true e
+  # SATURDAY_C6_BASE_URL=http://c6:8500 no `.env` (docs/c6.md). O usuário e a
+  # senha precisam ser os mesmos do Saturday.
+  c6:
+    image: saturday-api:${SATURDAY_IMAGEM_TAG:-local}
+    healthcheck:
+      test: ["CMD", "saturday-health", "api"]
+      interval: 30s
+      timeout: 5s
+    working_dir: /app
+    volumes:
+      - ./simuladores:/simuladores:ro
+    command:
+      - uvicorn
+      - app:app
+      - --app-dir
+      - /simuladores/c6
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8500"
+    environment:
+      SIMULADOR_C6_USUARIO: ${SATURDAY_C6_USUARIO:-usuario-do-simulador}
+      SIMULADOR_C6_SENHA: ${SATURDAY_C6_SENHA:-senha-do-simulador}
+      SATURDAY_HEALTH_URL: http://127.0.0.1:8500/saude
+    ports:
+      - "8500:8500"
     restart: unless-stopped
     mem_limit: 256m
     cpus: 0.5
