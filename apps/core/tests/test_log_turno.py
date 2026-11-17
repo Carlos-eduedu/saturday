@@ -44,6 +44,22 @@ def test_access_log_nao_grava_query_string():
     assert "/admin/conversas" in registro.getMessage()
 
 
+def test_access_log_mascara_o_telefone_do_conversation_id_no_caminho():
+    from saturday.log import SemQueryString
+
+    registro = logging.LogRecord(
+        "uvicorn.access",
+        logging.INFO,
+        "",
+        0,
+        '%s - "%s %s HTTP/%s" %d',
+        ("127.0.0.1:1", "POST", "/conversations/whatsapp:11987654321/release", "1.1", 200),
+        None,
+    )
+    SemQueryString().filter(registro)
+    assert "/conversations/whatsapp:(11) *****-4321/release" in registro.getMessage()
+
+
 def test_log_do_httpx_com_a_url_da_chamada_fica_calado():
     # Em outro processo: `configurar_logging` troca os handlers do logger raiz.
     codigo = (

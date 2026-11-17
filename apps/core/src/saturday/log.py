@@ -8,6 +8,8 @@ import sys
 from datetime import UTC, datetime
 from typing import Any
 
+from saturday.privacidade import mascarar_conversation_id
+
 # Campos que o próprio ``logging`` adiciona ao registro e que não são ``extra``.
 _RESERVADOS = frozenset(logging.LogRecord("", 0, "", 0, "", (), None).__dict__) | {
     "asctime",
@@ -41,13 +43,18 @@ class JsonFormatter(logging.Formatter):
 
 
 class SemQueryString(logging.Filter):
-    """Corta a query do access log: busca por telefone e tokens viajam nela."""
+    """Corta a query do access log: busca por telefone e tokens viajam nela.
+
+    No caminho, mascara o telefone de um `conversation_id` do WhatsApp
+    (`/conversations/whatsapp:<telefone>`).
+    """
 
     def filter(self, record: logging.LogRecord) -> bool:
         # Formato do uvicorn: (cliente, método, caminho, versão, status).
         args = record.args
         if isinstance(args, tuple) and len(args) >= 3 and isinstance(args[2], str):
-            record.args = (*args[:2], args[2].split("?", 1)[0], *args[3:])
+            caminho = mascarar_conversation_id(args[2].split("?", 1)[0])
+            record.args = (*args[:2], caminho, *args[3:])
         return True
 
 

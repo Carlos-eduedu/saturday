@@ -26,7 +26,10 @@ def criar_engine(settings: Settings, *, url: str | None = None) -> Engine:
             "SATURDAY_DATABASE_URL não definida. Sem Postgres não há estado de conversa: "
             "rode com o profile `postgres` do compose ou aponte uma instância externa."
         )
-    return create_engine(destino, pool_pre_ping=True, poolclass=NullPool, future=True)
+    # `hide_parameters`: a mensagem de erro não leva os valores da consulta (regra 9).
+    return create_engine(
+        destino, pool_pre_ping=True, poolclass=NullPool, future=True, hide_parameters=True
+    )
 
 
 def criar_factory(engine: Engine) -> sessionmaker[Session]:

@@ -11,10 +11,13 @@ import uuid
 
 import httpx
 import pytest
-from sqlalchemy import select, update
+from conftest import _url_sqlalchemy
+from sqlalchemy import select, text, update
+from sqlalchemy.exc import DBAPIError
 
 from saturday.canais.base import OrigemCanal
 from saturday.dados.modelos import Conversa, UsuarioPainel
+from saturday.dados.sessao import criar_engine
 from saturday.dados.sessao import sessao as abrir
 from saturday.log import JsonFormatter
 from saturday.painel import sessoes
@@ -151,3 +154,17 @@ def test_webhook_que_falha_nao_registra_o_telefone(caplog):
 
     [linha] = _linhas(caplog, "webhook_falhou")
     assert f"conversation_id={MASCARADA} status=answered erro=ConnectError" in linha
+
+
+def test_erro_do_banco_nao_leva_os_parametros_da_consulta(settings, pg_url):
+    # O `logger.exception` grava a mensagem do erro, e a do SQLAlchemy trazia os
+    # parâmetros da consulta: `conversation_id`, telefone, CPF.
+    engine = criar_engine(settings, url=_url_sqlalchemy(pg_url))
+    try:
+        with pytest.raises(DBAPIError) as erro, engine.connect() as conexao:
+            conexao.execute(text("SELECT :id FROM tabela_que_nao_existe"), {"id": CONVERSA})
+    finally:
+        engine.dispose()
+
+    assert "tabela_que_nao_existe" in str(erro.value)
+    assert TELEFONE not in str(erro.value)
