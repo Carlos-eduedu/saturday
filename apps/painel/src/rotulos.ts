@@ -115,8 +115,12 @@ export const NOS: Record<string, string> = {
   read_statement: "Leu o extrato",
   check_customer_data: "Conferiu os dados",
   collect_customer_data: "Pediu dados",
+  simulate_c6: "Simulou no C6",
+  decline_c6: "Registrou a recusa do contrato novo",
   calculate_portability: "Calculou a portabilidade",
   present_offer: "Apresentou a oferta",
+  icred_porta: "Pediu o SIM do iCred",
+  icred: "Jornada iCred",
 };
 
 export const CHAMADAS: Record<string, string> = {
@@ -125,6 +129,10 @@ export const CHAMADAS: Record<string, string> = {
   visao: "Leitura de anexo",
   anexo: "Download de anexo",
   granatech: "Granatech",
+  granatech_teste: "Homologação",
+  c6: "C6",
+  icred: "iCred",
+  embeddings: "Embeddings",
   brasilapi: "BrasilAPI",
   webhook: "Webhook",
 };
@@ -140,6 +148,7 @@ export function reais(valor: string | number | null | undefined): string {
 export const TIPOS_DE_PROVA: Record<string, string> = {
   consulta: "Autorizou a consulta",
   proposta: "Aceitou a proposta",
+  simulacao_c6: "Autorizou a simulação no C6",
   icred_consulta: "Autorizou a consulta no iCred",
   icred_aceite: "Aceitou a proposta do iCred",
 };
