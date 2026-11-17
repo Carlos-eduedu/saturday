@@ -198,7 +198,7 @@ def test_desiste_depois_do_limite_de_tentativas(
     assert entregue_em is None
     assert falhou_em is not None
     assert tentativas == settings.outbox_max_tentativas
-    assert settings.outbox_max_tentativas == 6
+    assert settings.outbox_max_tentativas == 8
 
 
 def test_espera_nunca_passa_do_teto(

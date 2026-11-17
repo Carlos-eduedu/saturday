@@ -40,6 +40,10 @@ O reagendamento é exclusivamente do outbox:
   modelo vai sem variáveis (a Meta recusa quebra de linha em parâmetro) e sai
   uma vez por conversa, mesmo com várias respostas esperando.
 
+**Nota de 2026-11-17.** O máximo passou de 6 para 8 tentativas, por decisão do
+dono do projeto: o `.env.example` e o README do core já diziam 8, e o padrão do
+código dizia 6. Agora os quatro dizem 8.
+
 ## Alternativas descartadas
 
 - **Retry só no canal.** Simples, mas morre com o processo: a mensagem some sem

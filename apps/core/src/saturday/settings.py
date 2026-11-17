@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     s3_regiao: str = "us-east-1"
 
     # Outbox: quantas vezes reentregar antes de desistir e quanto esperar.
-    outbox_max_tentativas: int = 6
+    outbox_max_tentativas: int = 8
     outbox_backoff_base_s: float = 2.0
     outbox_lote: int = 20
 

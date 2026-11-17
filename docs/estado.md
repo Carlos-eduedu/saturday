@@ -82,7 +82,7 @@ uma entrega fora das fases.
 - Fora das fases, o repositório já tem: workspace `uv` único (um lock e um
   venv na raiz), healthcheck próprio por serviço (a API responde `/health`, o
   worker verifica banco e batimento do laço, o migrate não tem), entrega com
-  reagendamento só no outbox (6 tentativas, jitter, incerto com 1 retry) e
+  reagendamento só no outbox (8 tentativas, jitter, incerto com 1 retry) e
   `docs/` com as decisões registradas em `docs/decisoes/`.
 - Canal Evolution (fora das fases, docs/decisoes/0009): números de WhatsApp Web
   pela Evolution API v2.3.7 (Baileys), canal `evolution` ao lado de `whatsapp`,
