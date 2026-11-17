@@ -48,7 +48,8 @@ uma entrega fora das fases.
   segundo banco (docs/decisoes/0004). Detalhes e pendências em `docs/granatech.md`.
 - **C6, contrato novo e refinanciamento INSS (decisão 0026), em andamento:**
   feito o cliente em `bancos/c6/` (token, simulação, inclusão, consulta e link
-  de formalização), o simulador em `simuladores/c6/` e o SIM do cliente antes
+  de formalização), o simulador em `simuladores/c6/` (no compose local, porta
+  8500, com saúde e rotas de administração) e o SIM do cliente antes
   da simulação, com prova gravada (atrás de `SATURDAY_C6_ATIVO`). Depois do SIM, o
   agente simula e oferece o contrato novo; o aceite vai para um atendente.
   Faltam refinanciamento, digitação, acompanhamento e

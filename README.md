@@ -136,8 +136,14 @@ uv run --project simuladores uvicorn app:app --app-dir simuladores/icred --port 
 # a chave e o segredo são os do simulador (padrões no compose.override.yaml)
 ```
 
-O do C6 não está no compose e usa a mesma porta 8300 do simulador da Evolution
-(ver [`docs/c6.md`](docs/c6.md)).
+O do C6, que o compose local também sobe, na porta 8500 (rotas de administração
+em [`docs/c6.md`](docs/c6.md)):
+
+```bash
+uv run --project simuladores uvicorn app:app --app-dir simuladores/c6 --port 8500
+# SATURDAY_C6_ATIVO=true e SATURDAY_C6_BASE_URL=http://127.0.0.1:8500 no .env;
+# o usuário e a senha são os do simulador (padrões no compose.override.yaml)
+```
 
 E o da Evolution (as instâncias se criam na tela Canais):
 
