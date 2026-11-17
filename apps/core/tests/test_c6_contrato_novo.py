@@ -130,6 +130,19 @@ def test_sem_condicao_de_simular_segue_para_a_portabilidade(
     assert SIMULOU not in simulador_c6.CHAMADAS
 
 
+def test_extrato_sem_condicao_depois_do_sim_nao_simula_de_novo(
+    client: TestClient, fakes: Fakes, simulador_c6: ModuleType
+) -> None:
+    conversa = cid()
+    _extrato(client, fakes, conversa)
+    _dizer(client, conversa, "sim")
+
+    resposta = _extrato(client, fakes, conversa, numeroBeneficio=None, baseCalculo=None)
+
+    assert "Quer seguir com a portabilidade?" in resposta
+    assert simulador_c6.CHAMADAS.count(SIMULOU) == 1
+
+
 def test_valor_abaixo_do_minimo_nao_e_ofertado(client: TestClient, fakes: Fakes) -> None:
     conversa = cid()
     _extrato(client, fakes, conversa, margemDisponivel=21.0)

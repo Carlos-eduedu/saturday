@@ -145,7 +145,14 @@ def test_cpf_invalido_no_extrato_nao_vale(client: TestClient, fakes: Fakes) -> N
 
 
 @pytest.mark.usefixtures("c6_ligado")
-@pytest.mark.parametrize("extras", [{"margemExtrapolada": 50.0}, {"numeroBeneficio": None}])
+@pytest.mark.parametrize(
+    "extras",
+    [
+        {"margemExtrapolada": 50.0},
+        {"numeroBeneficio": None},
+        {"margemExtrapolada": 50.0, "cpf": None},  # nem o CPF é pedido
+    ],
+)
 def test_sem_condicao_de_simular_nao_recebe_o_pedido_e_segue_para_a_portabilidade(
     client: TestClient, fakes: Fakes, fabrica: sessionmaker[Session], extras: dict
 ) -> None:
@@ -163,6 +170,7 @@ def test_extrato_que_se_enquadra_depois_de_um_que_nao_recebe_o_pedido(
     client: TestClient, fakes: Fakes
 ) -> None:
     conversa = cid()
-    assert _extrato(client, fakes, conversa, margemExtrapolada=50.0) != CONSENTIMENTO_C6
+    primeiro = _extrato(client, fakes, conversa, margemExtrapolada=50.0)
+    assert "Quer seguir com a portabilidade?" in primeiro
 
     assert _extrato(client, fakes, conversa) == CONSENTIMENTO_C6
