@@ -11,10 +11,12 @@ status viram o mesmo
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from saturday.canais.evolution.cliente import telefone_do_jid
 from saturday.canais.whatsapp.webhook import Evento, Midia
+from saturday.privacidade import mascarar_telefone
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +47,16 @@ def _telefone_do(chave: dict[str, Any]) -> str:
     return ""
 
 
+def _jid_mascarado(jid: object) -> str:
+    """O número pela máscara de telefone dos logs, mais o sufixo (`@lid`, `@g.us`).
+
+    O sufixo diz por que o contato ficou de fora; dígito nele também some.
+    """
+
+    numero, arroba, sufixo = str(jid or "").partition("@")
+    return f"{mascarar_telefone(numero)}{arroba}{re.sub(r'\d', '*', sufixo)}"
+
+
 def _de_mensagem(dados: dict[str, Any], instancia: str) -> Evento | None:
     chave = dados.get("key")
     if not isinstance(chave, dict) or chave.get("fromMe"):
@@ -54,7 +66,7 @@ def _de_mensagem(dados: dict[str, Any], instancia: str) -> Evento | None:
         return None
     numero = _telefone_do(chave)
     if not numero:
-        logger.info("evolution_sem_telefone jid=%s", str(chave.get("remoteJid", ""))[-8:])
+        logger.info("evolution_sem_telefone jid=%s", _jid_mascarado(chave.get("remoteJid")))
         return None
 
     tipo = str(dados.get("messageType") or "")

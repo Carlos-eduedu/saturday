@@ -189,3 +189,22 @@ def test_midia_decodifica_e_respeita_o_limite() -> None:
 
     with pytest.raises(ErroPermanente):
         _cliente(grande).baixar_midia("3EB0", INSTANCIA)
+
+
+@pytest.mark.parametrize(
+    ("jid", "esperado"),
+    [
+        # Sem o sufixo de telefone o número não vira conversa e caía quase inteiro no log.
+        ("5511987654321", "(55) *****-4321"),
+        ("123456789012345@lid", "(12) *****-2345@lid"),
+        ("5511987654321-1600000000@g.us", "(55) *****-0000@g.us"),
+        ("contato@5511987654321", "***@*************"),
+    ],
+)
+def test_log_de_contato_sem_telefone_usa_a_mascara_de_telefone(
+    jid: str, esperado: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level("INFO", logger="saturday.canais.evolution.webhook"):
+        assert parser.eventos(_upsert("conversation", {"conversation": "Oi"}, remoteJid=jid)) == []
+
+    assert [r.getMessage() for r in caplog.records] == [f"evolution_sem_telefone jid={esperado}"]

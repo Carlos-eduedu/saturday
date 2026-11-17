@@ -1,4 +1,4 @@
-"""Máscaras de dado pessoal para o painel. Revelar sem máscara exige auditoria."""
+"""Máscaras de dado pessoal para o painel e os logs. Revelar sem máscara exige auditoria."""
 
 from __future__ import annotations
 
