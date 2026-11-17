@@ -110,6 +110,13 @@ uma entrega fora das fases.
   `pytest` a ausência só gera aviso no log.
 - O ramo INSS → C6 (`apps/core/src/saturday/portabilidade/` e
   `apps/core/src/saturday/agent/`) deve continuar funcionando em toda fase.
-- Pendência desta fase: `minio/minio` não está mais publicável nos registries
-  oficiais neste ambiente; o `S3Storage` está coberto por teste com cliente
-  falso, mas o caminho real contra MinIO não foi exercitado aqui.
+- S3 local: a imagem `minio/minio` saiu do Docker Hub, e o compose passou a
+  usar o `adobe/s3mock:5.2.3` (serviço e profile `s3`, decisão 0028), o mesmo do
+  `infra/painel_local.sh`. Quem tem `COMPOSE_PROFILES=postgres,minio` troca por
+  `postgres,s3` e aponta `SATURDAY_S3_ENDPOINT=http://s3:9090`. Conferido em
+  2026-11-17: o serviço sobe pelo compose, fica saudável, nasce com o bucket e
+  guarda os arquivos no volume depois de reiniciar e de recriar o container; o
+  `S3Storage` de produção grava, lê, regrava e apaga contra ele
+  (`tests/test_storage_s3_real.py`, pulado sem `SATURDAY_TEST_S3_ENDPOINT`). Não
+  conferido: a API e o worker do compose falando com ele, e um bucket externo
+  de verdade.

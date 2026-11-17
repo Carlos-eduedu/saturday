@@ -1,4 +1,4 @@
-"""Storage de anexos em S3 (MinIO interno ou bucket externo)."""
+"""Storage de anexos em S3 (o local do compose ou bucket externo)."""
 
 from __future__ import annotations
 

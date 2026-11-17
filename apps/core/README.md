@@ -21,7 +21,7 @@ Os logs saem em JSON, uma linha por registro.
 
 ```bash
 cp .env.example .env   # preencha as chaves e modelos
-docker compose --profile postgres --profile minio up --build
+docker compose --profile postgres --profile s3 up --build
 ```
 
 O serviço `migrate` roda o Alembic e termina; `api` e `worker` só sobem depois
@@ -65,7 +65,7 @@ Todas usam o prefixo `SATURDAY_`. O `.env` é lido automaticamente.
 | `SATURDAY_WEBHOOK_SECRET` | vazio | Segredo HMAC-SHA256; obrigatório se `WEBHOOK_URL` existir. |
 | `SATURDAY_ANEXO_DOMINIOS` | vazio | Domínios permitidos para anexos por URL, separados por vírgula; vazio = só base64. |
 | `SATURDAY_DATABASE_URL` | vazio | Postgres do estado das conversas, outbox e travas. Obrigatório fora de `pytest`. |
-| `SATURDAY_S3_ENDPOINT` | vazio | Endpoint do S3 (vazio = MinIO do compose). |
+| `SATURDAY_S3_ENDPOINT` | vazio | Endpoint do S3. Com o profile `s3` do compose, `http://s3:9090`; vazio = S3 da AWS. |
 | `SATURDAY_S3_BUCKET` | vazio | Bucket dos anexos. Obrigatório com Postgres. |
 | `SATURDAY_S3_ACCESS_KEY`, `SATURDAY_S3_SECRET_KEY` | vazio | Credenciais do S3. |
 | `SATURDAY_OUTBOX_MAX_TENTATIVAS` | `8` | Tentativas de entrega antes de desistir. |

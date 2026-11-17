@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     # Postgres: estado das conversas, outbox e travas. Vazio em `pytest`.
     database_url: SecretStr = SecretStr("")
 
-    # Storage S3 (MinIO interno ou externo) para os anexos dos clientes.
+    # Storage S3 (o local do compose ou um externo) para os anexos dos clientes.
     s3_endpoint: str = ""
     s3_bucket: str = ""
     s3_access_key: SecretStr = SecretStr("")
@@ -197,7 +197,7 @@ class Settings(BaseSettings):
         ):
             raise RuntimeError(
                 "SATURDAY_S3_BUCKET é obrigatório quando SATURDAY_DATABASE_URL existe. "
-                "Use o MinIO do compose (SATURDAY_S3_ENDPOINT vazio) ou um bucket externo."
+                "Use o S3 local do compose (profile `s3`) ou um bucket externo."
             )
 
         # Fora de `dev` e `pytest` a API atende dados pessoais: sem chave, não sobe.

@@ -82,7 +82,7 @@ Servidor local e compose, da raiz:
 uv run --project apps/core alembic -c apps/core/alembic.ini upgrade head
 uv run --project apps/core saturday               # API em http://localhost:8000
 uv run --project simuladores/meta uvicorn app:app --app-dir simuladores/meta --port 8100
-docker compose --profile postgres --profile minio up --build
+docker compose --profile postgres --profile s3 up --build
 ```
 
 - `pytest` roda com `filterwarnings = error`: qualquer warning novo quebra a suíte.

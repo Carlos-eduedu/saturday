@@ -1,4 +1,4 @@
-"""Storage S3 contra um S3 de verdade: o caminho que a produção usa, sem cliente falso.
+"""Storage S3 contra um servidor S3: o `S3Storage` com o cliente boto3 dele, não o falso.
 
 Pulado sem `SATURDAY_TEST_S3_ENDPOINT`. Com o S3 local do compose no ar
 (`docker compose --profile s3 up -d s3`, bucket `saturday`):
@@ -6,7 +6,7 @@ Pulado sem `SATURDAY_TEST_S3_ENDPOINT`. Com o S3 local do compose no ar
     SATURDAY_TEST_S3_ENDPOINT=http://127.0.0.1:9000 uv run pytest tests/test_storage_s3_real.py
 
 O bucket (`SATURDAY_TEST_S3_BUCKET`, padrão `saturday`) precisa existir; os
-testes apagam o que gravam.
+testes apagam o que gravam. Não roda no CI: é para conferir à mão um S3 novo.
 """
 
 from __future__ import annotations
@@ -33,9 +33,8 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-# A região entra na assinatura (s3v4): a padrão e a de um bucket em São Paulo.
-@pytest.fixture(params=["us-east-1", "sa-east-1"])
-def storage(request: pytest.FixtureRequest) -> Storage:
+@pytest.fixture
+def storage() -> Storage:
     return criar_storage(
         Settings(
             environment="dev",
@@ -43,7 +42,6 @@ def storage(request: pytest.FixtureRequest) -> Storage:
             s3_bucket=BUCKET,
             s3_access_key=SecretStr(CREDENCIAL),
             s3_secret_key=SecretStr(CREDENCIAL),
-            s3_regiao=request.param,
         )
     )
 
@@ -66,7 +64,6 @@ def test_grava_e_le_binario_com_o_tipo(storage: Storage, chave: str) -> None:
     assert storage.salvar(dados, mime_type="application/pdf", chave=chave) == chave
 
     assert storage.ler(chave) == dados
-    assert isinstance(storage, S3Storage)
     cabecalho = storage._cliente.head_object(Bucket=BUCKET, Key=chave)
     assert cabecalho["ContentType"] == "application/pdf"
     assert cabecalho["ContentLength"] == len(dados)

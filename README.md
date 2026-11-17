@@ -18,7 +18,7 @@ simuladores/            simuladores dos parceiros (projeto do workspace)
 docs/                   índice e decisões registradas (docs/decisoes/)
 pyproject.toml, uv.lock workspace `uv`: um lock e um .venv para os dois membros
 compose.yaml            deploy (Dokploy): migrate, api, worker e opcionais
-compose.override.yaml   desenvolvimento local: publica portas e console do MinIO
+compose.override.yaml   desenvolvimento local: publica portas, S3 local e simuladores
 AGENTS.md               contrato: regras, ponteiros da especificação e comandos
 ```
 
@@ -174,14 +174,17 @@ de 12 caracteres) e nunca passa por argumento.
 
 ```bash
 cp .env.example .env                  # preencha as chaves
-docker compose --profile postgres --profile minio up --build
+docker compose --profile postgres --profile s3 up --build
 curl -f localhost:8000/health
 ```
 
 O compose constrói a imagem a partir da raiz (`apps/core/Dockerfile`) e sobe, em
 ordem: `postgres` → `migrate` (roda o Alembic e termina) → `api`, `worker` e
 `painel`. O `compose.override.yaml` publica as portas `8000` (API), `5173`
-(painel), `5432` (Postgres), `9000`/`9001` (MinIO e console). Crie o primeiro
+(painel), `5432` (Postgres), `9000` (S3 local). O S3 local é o
+`adobe/s3mock` (decisão 0028): no `.env`, `SATURDAY_S3_ENDPOINT=http://s3:9090` e
+qualquer valor na chave e no segredo. O profile `minio` virou `s3`: quem tem
+`COMPOSE_PROFILES=postgres,minio` no `.env` troca por `postgres,s3`. Crie o primeiro
 gestor com `docker compose exec api saturday criar-usuario --email ... --perfil gestor`;
 os demais usuários, o gestor cadastra na aba **Usuários** do painel
 (docs/decisoes/0012).

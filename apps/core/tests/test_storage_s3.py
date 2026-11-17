@@ -1,7 +1,8 @@
 """Storage S3: contrato coberto com cliente falso, sem rede.
 
-O MinIO do compose não é obrigatório para testar a camada: `S3Storage` recebe um
-cliente, e o que interessa é o que ela manda para lá.
+O S3 do compose não é obrigatório para testar a camada: `S3Storage` recebe um
+cliente, e o que interessa é o que ela manda para lá. O caminho real, contra um
+S3 de verdade, está em `test_storage_s3_real.py`.
 """
 
 from __future__ import annotations
