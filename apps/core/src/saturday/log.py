@@ -19,7 +19,7 @@ _RESERVADOS = frozenset(logging.LogRecord("", 0, "", 0, "", (), None).__dict__) 
 # O httpx registra em INFO a URL inteira de cada chamada, e a query da consulta
 # da Granatech leva CPF, nome e telefone (regra 9). Rota, status e tempo já saem
 # no log de cada cliente.
-SO_AVISOS = ("httpx", "httpx2")
+LOGGERS_SO_AVISOS = ("httpx", "httpx2")
 
 
 class JsonFormatter(logging.Formatter):
@@ -52,7 +52,7 @@ class SemQueryString(logging.Filter):
 
 
 def configurar_logging(nivel: str) -> None:
-    """Configura o logger raiz e os loggers do uvicorn com o mesmo handler."""
+    """Configura o logger raiz e os do uvicorn com o mesmo handler e cala o httpx."""
 
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(JsonFormatter())
@@ -61,7 +61,7 @@ def configurar_logging(nivel: str) -> None:
     raiz.setLevel(nivel.upper())
     raiz.handlers.clear()
     raiz.addHandler(handler)
-    for nome in SO_AVISOS:
+    for nome in LOGGERS_SO_AVISOS:
         logging.getLogger(nome).setLevel(logging.WARNING)
 
     for nome in ("uvicorn", "uvicorn.error", "uvicorn.access"):

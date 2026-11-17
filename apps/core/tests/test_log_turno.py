@@ -47,9 +47,9 @@ def test_access_log_nao_grava_query_string():
 def test_log_do_httpx_com_a_url_da_chamada_fica_calado():
     # Em outro processo: `configurar_logging` troca os handlers do logger raiz.
     codigo = (
-        "import logging; from saturday.log import configurar_logging; "
+        "import logging; from saturday.log import LOGGERS_SO_AVISOS, configurar_logging; "
         "configurar_logging('DEBUG'); "
-        "print([logging.getLogger(n).isEnabledFor(logging.INFO) for n in ('httpx', 'httpx2')])"
+        "print([logging.getLogger(n).isEnabledFor(logging.INFO) for n in LOGGERS_SO_AVISOS])"
     )
     saida = subprocess.run(  # noqa: S603 - argumentos fixos
         [sys.executable, "-c", codigo], capture_output=True, text=True, check=True

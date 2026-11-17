@@ -35,7 +35,7 @@ from saturday.canais.whatsapp.entrada import EntradaWhatsApp, prefixo_do_canal
 from saturday.canais.whatsapp.saida import SaidaWhatsApp
 from saturday.jobs.eventos import processar
 from saturday.jobs.outbox import EntregadorPorCanal, drenar
-from saturday.log import SO_AVISOS, JsonFormatter
+from saturday.log import LOGGERS_SO_AVISOS, JsonFormatter
 from saturday.storage.memoria import MemoriaStorage
 
 pytestmark = pytest.mark.filterwarnings("ignore:You should not use the 'timeout' argument")
@@ -79,6 +79,13 @@ def _vazamentos(registros: list[logging.LogRecord]) -> list[str]:
     return sorted(achados)
 
 
+def test_a_rede_enxerga_dado_pontuado_e_campo_extra() -> None:
+    registro = logging.LogRecord("x", logging.INFO, "a.py", 1, "cpf=%s", ("001.890.049-67",), None)
+    registro.contato = EMAIL.upper()
+
+    assert _vazamentos([registro]) == ["cpf em x (a.py): cpf=%s", "e-mail em x (a.py): cpf=%s"]
+
+
 def _meta_falsa(pedido: httpx.Request) -> httpx.Response:
     return httpx.Response(200, json={"messages": [{"id": f"wamid.{uuid.uuid4().hex}"}]})
 
@@ -92,7 +99,7 @@ def test_conversa_clt_pelo_webhook_da_meta_nao_deixa_dado_pessoal_no_log(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     # Como em `configurar_logging` (conferido em `test_log_turno.py`).
-    for nome in SO_AVISOS:
+    for nome in LOGGERS_SO_AVISOS:
         caplog.set_level(logging.WARNING, logger=nome)
     # Por último: cada `set_level` também troca o nível do handler do `caplog`.
     caplog.set_level(logging.DEBUG)
