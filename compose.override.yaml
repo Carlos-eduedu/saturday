@@ -2,7 +2,7 @@
 # automaticamente junto com `compose.yaml`.
 #
 # Publica as portas que o desenvolvedor usa por fora dos containers (API,
-# Postgres para rodar `pytest`, console do MinIO e os simuladores da Meta e da
+# Postgres para rodar `pytest`, S3 local e os simuladores da Meta e da
 # Granatech) e aponta o canal do WhatsApp e o cliente da Granatech para os
 # simuladores em vez dos parceiros de verdade.
 services:
@@ -30,10 +30,10 @@ services:
     ports:
       - "5432:5432"
 
-  minio:
+  # Na 9000 do host, como antes: a 9090 é do S3 do `infra/painel_local.sh`.
+  s3:
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "9000:9090"
 
   # Simulador da WhatsApp Cloud API. Roda na mesma imagem da API (que já tem
   # fastapi e uvicorn) com o código montado do repositório: só existe em dev.

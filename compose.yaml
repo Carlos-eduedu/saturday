@@ -2,8 +2,8 @@
 # nomeados, limites de recurso e healthcheck. Os ajustes de desenvolvimento
 # local ficam em `compose.override.yaml`, carregado automaticamente.
 #
-# `postgres` e `minio` são opcionais: sobem com
-# `COMPOSE_PROFILES=postgres,minio` no `.env`. Sem eles, `SATURDAY_DATABASE_URL`
+# `postgres` e `s3` são opcionais: sobem com
+# `COMPOSE_PROFILES=postgres,s3` no `.env`. Sem eles, `SATURDAY_DATABASE_URL`
 # e `SATURDAY_S3_*` precisam apontar para serviços externos, e a aplicação
 # valida essa combinação na subida.
 name: saturday
@@ -16,7 +16,7 @@ x-app: &app
     context: .
     dockerfile: apps/core/Dockerfile
   # `.env.local` é opcional: guarda o que muda por máquina (URL do Postgres,
-  # endpoint do MinIO) sem mexer no `.env` compartilhado.
+  # endpoint do S3) sem mexer no `.env` compartilhado.
   env_file:
     - .env
     - path: .env.local
@@ -141,41 +141,30 @@ services:
     mem_limit: 512m
     cpus: 1.0
 
-  minio:
-    image: minio/minio:latest
-    profiles: ["minio"]
-    command: ["server", "/data", "--console-address", ":9001"]
+  # S3 local dos anexos (adobe/s3mock, o mesmo do `infra/painel_local.sh`): só
+  # para desenvolvimento, aceita qualquer credencial. O bucket nasce pela
+  # variável; a API fala com ele por SATURDAY_S3_ENDPOINT=http://s3:9090.
+  s3:
+    image: adobe/s3mock:5.2.3
+    profiles: ["s3"]
+    # A imagem roda como uid 1000 e não consegue escrever em volume nomeado.
+    user: "0:0"
     environment:
-      MINIO_ROOT_USER: ${SATURDAY_S3_ACCESS_KEY:-saturday}
-      MINIO_ROOT_PASSWORD: ${SATURDAY_S3_SECRET_KEY:-saturday123}
+      COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS: ${SATURDAY_S3_BUCKET:-saturday}
+      # Sem estas duas os arquivos ficam em /tmp e somem a cada reinício.
+      COM_ADOBE_TESTING_S3MOCK_STORE_ROOT: /dados
+      COM_ADOBE_TESTING_S3MOCK_STORE_RETAIN_FILES_ON_EXIT: "true"
     volumes:
-      - minio_dados:/data
+      - s3_dados:/dados
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:9090/${SATURDAY_S3_BUCKET:-saturday}"]
+      interval: 10s
+      timeout: 3s
+      start_period: 30s
+      retries: 5
     restart: unless-stopped
     mem_limit: 512m
     cpus: 0.5
-
-  # Cria o bucket uma vez e termina. O app não administra infraestrutura.
-  minio-init:
-    image: minio/mc:latest
-    profiles: ["minio"]
-    depends_on:
-      minio:
-        condition: service_started
-    entrypoint:
-      - /bin/sh
-      - -c
-      - >
-        until mc alias set local http://minio:9000
-        "$${SATURDAY_S3_ACCESS_KEY:-saturday}"
-        "$${SATURDAY_S3_SECRET_KEY:-saturday123}"; do sleep 1; done;
-        mc mb --ignore-existing local/"$${SATURDAY_S3_BUCKET:-saturday}";
-    environment:
-      SATURDAY_S3_ACCESS_KEY: ${SATURDAY_S3_ACCESS_KEY:-saturday}
-      SATURDAY_S3_SECRET_KEY: ${SATURDAY_S3_SECRET_KEY:-saturday123}
-      SATURDAY_S3_BUCKET: ${SATURDAY_S3_BUCKET:-saturday}
-    restart: "no"
-    mem_limit: 128m
-    cpus: 0.25
 
   # Evolution API (WhatsApp Web, não oficial; docs/decisoes/0009). Opcional:
   # sobe com `evolution` em COMPOSE_PROFILES. Fica só na rede interna, sem
@@ -243,7 +232,7 @@ services:
 
 volumes:
   postgres_dados:
-  minio_dados:
+  s3_dados:
   evolution_instancias:
   evolution_postgres_dados:
   evolution_redis_dados:

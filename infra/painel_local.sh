@@ -45,14 +45,14 @@ if [ "${1:-}" = "seed" ]; then
   # Só cria o container que ainda não existe: o que acabou de voltar a subir
   # demora uns segundos para responder, e a espera abaixo cobre os dois casos.
   if ! docker inspect saturday-s3-local >/dev/null 2>&1; then
-    # adobe/s3mock: aceita qualquer credencial e já nasce com o bucket. A
-    # imagem minio/minio saiu do Docker Hub.
+    # adobe/s3mock, na mesma tag do `compose.yaml`: aceita qualquer credencial
+    # e já nasce com o bucket.
     # shortcut: sem volume, os arquivos somem quando o container reinicia;
     # ganha um volume quando um banco local precisar durar mais que ele.
     docker run -d --name saturday-s3-local -p 9090:9090 \
       -e COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS="$SATURDAY_S3_BUCKET" \
       -e initialBuckets="$SATURDAY_S3_BUCKET" \
-      adobe/s3mock:latest >/dev/null
+      adobe/s3mock:5.2.3 >/dev/null
   fi
   for _ in $(seq 30); do
     curl -sf -o /dev/null "$SATURDAY_S3_ENDPOINT" && break
