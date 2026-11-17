@@ -54,7 +54,7 @@ Todas usam o prefixo `SATURDAY_`. O `.env` é lido automaticamente.
 
 | Variável | Padrão | Descrição |
 |---|---|---|
-| `SATURDAY_ENVIRONMENT` | `dev` | `dev`, `prod` ou `pytest` (pytest desliga as validações obrigatórias). |
+| `SATURDAY_ENVIRONMENT` | `dev` | `dev`, `homolog`, `prod` ou `pytest` (pytest desliga as validações obrigatórias). |
 | `SATURDAY_LOG_LEVEL` | `INFO` | Nível de log (`DEBUG`, `INFO`, `WARNING`, `ERROR`). |
 | `SATURDAY_API_KEY` | vazio | Chave esperada no header `X-API-Key`; obrigatória em `prod`. |
 | `SATURDAY_OPENROUTER_API_KEY` | vazio | Chave da API do OpenRouter; obrigatória fora de `pytest`. |
@@ -77,11 +77,27 @@ Todas usam o prefixo `SATURDAY_`. O `.env` é lido automaticamente.
 | `SATURDAY_GRANATECH_CHAVE_API` | vazio | Chave do login. Obrigatória com `GRANATECH_ATIVO=true`. |
 | `SATURDAY_GRANATECH_WEBHOOK_TOKEN` | vazio | Token do webhook. Sem ele, `/webhooks/granatech` responde 503; obrigatória em `homolog` e `prod` e com `GRANATECH_ATIVO=true`. |
 | `SATURDAY_GRANATECH_ATIVO` | `false` | Liga o cliente da Granatech no worker. O webhook fica sempre no ar. |
-| `SATURDAY_GRANATECH_PROPOSTA_ATIVA` | `false` | Libera a criação automática de proposta. |
+| `SATURDAY_GRANATECH_SIMULADOR_URL` | vazio | Simulador da Granatech só para conversas de membro testador (decisão 0020); vazio desliga. Não vale em `prod`. |
+| `SATURDAY_GRANATECH_SIMULADOR_CHAVE`, `SATURDAY_GRANATECH_SIMULADOR_WEBHOOK_TOKEN` | vazio | Chave e token próprios do simulador. Obrigatórios com `GRANATECH_SIMULADOR_URL`. |
+| `SATURDAY_GRANATECH_PROPOSTA_ATIVA` | `false` | Libera a criação automática de proposta. Exige `DOMINIO_PUBLICO`. |
+| `SATURDAY_GRANATECH_DADOS_BANCARIOS_ATIVO` | `false` | Liga a correção de conta (PATCH) depois de falha de pagamento. |
+| `SATURDAY_DOMINIO_PUBLICO` | vazio | Domínio dos links curtos da biometria (`https://{dominio}/l/{codigo}`), com ou sem `https://`. Obrigatória com `GRANATECH_PROPOSTA_ATIVA=true`. |
 | `SATURDAY_GRANATECH_TETO_LIBERADO` | `6999` | Maior liberado apresentado ou contratado. |
 | `SATURDAY_GRANATECH_COTA_MENSAL` | `500` | Teto de consultas no mês (alerta a 80%). |
 | `SATURDAY_GRANATECH_COTA_DIARIA` | `20` | Limite de consultas no dia. |
 | `SATURDAY_GRANATECH_REAPROVEITAR_DIAS` | `30` | Janela para reaproveitar consulta do mesmo CPF. |
+| `SATURDAY_EVOLUTION_ATIVO` | `false` | Liga o canal Evolution (ver [`docs/evolution.md`](../../docs/evolution.md)). |
+| `SATURDAY_EVOLUTION_URL` | `http://evolution:8080` | Endereço da Evolution API; em dev, o simulador. |
+| `SATURDAY_EVOLUTION_API_KEY`, `SATURDAY_EVOLUTION_WEBHOOK_TOKEN` | vazio | Chave da Evolution e token do webhook. Obrigatórias com `EVOLUTION_ATIVO=true`. |
+| `SATURDAY_EVOLUTION_WEBHOOK_URL` | `http://api:8000/webhooks/evolution` | Para onde a Evolution manda os eventos. |
+| `SATURDAY_C6_ATIVO` | `false` | Liga a API do C6 no ramo INSS (decisão 0026, ver [`docs/c6.md`](../../docs/c6.md)). |
+| `SATURDAY_C6_BASE_URL`, `SATURDAY_C6_USUARIO`, `SATURDAY_C6_SENHA`, `SATURDAY_C6_CODIGO_PROMOTORA` | vazio | Endereço, credencial e código de promotora. Obrigatórias com `C6_ATIVO=true`; em dev, a `BASE_URL` aponta para o simulador. |
+| `SATURDAY_ICRED_ATIVO` | `false` | Liga a consulta ao iCred no ramo INSS (decisão 0027, ver [`docs/icred.md`](../../docs/icred.md)). |
+| `SATURDAY_ICRED_BASE_URL`, `SATURDAY_ICRED_CHAVE_API`, `SATURDAY_ICRED_WEBHOOK_SEGREDO` | vazio | Endereço e chave do motor e segredo do webhook. Obrigatórias com `ICRED_ATIVO=true`; em dev, a `BASE_URL` aponta para o simulador. |
+| `SATURDAY_ICRED_ESPERA_MIN` | `5` | Minutos sem resposta até a conversa seguir sem o iCred e abrir alerta. |
+
+A lista completa, com as variáveis do WhatsApp, da transcrição, da fila de
+eventos e do compose, está no `.env.example` da raiz.
 
 > **Atenção:** todas as variáveis de ambiente agora usam o prefixo `SATURDAY_`.
 > Por exemplo, `OPENROUTER_API_KEY` virou `SATURDAY_OPENROUTER_API_KEY`,
@@ -178,15 +194,16 @@ nunca pelo `conversation_id`, que no WhatsApp carrega o telefone.
 | `POST` | `/admin/conversas/{id}/mensagens` | `{texto}` ou `{modelo}`; só o dono, só WhatsApp. Janela fechada aceita só modelo. |
 | `GET` | `/admin/conversas/{id}/ficha` | Dados mascarados, mais a oferta vigente (só valores), a última proposta na Granatech com `difere_da_oferta` e as provas de consentimento (sem o CPF). |
 | `POST` | `/admin/conversas/{id}/revelar` | `{campo: cpf\|telefone\|data_nascimento}`; grava `revelar:{campo}` na auditoria. |
-| `GET` | `/admin/alertas` | Alertas abertos (`handoff`, `erro_interno`, `atendente_desativado`, `envio_falhou`, `sem_resposta`). |
+| `GET` | `/admin/alertas` | Alertas abertos (`handoff`, `erro_interno`, `atendente_desativado`, `envio_falhou`, `sem_resposta`, `evento_com_humano`, `cota_80`, `consulta_parada`, `granatech_evento`, `icred_consulta_parada`, `instancia_desconectada`, `instancia_numero_trocado`). |
 | `POST` | `/admin/alertas/{id}/resolver` | Resolve e audita. |
 | `GET` | `/admin/cota` | Consultas Granatech no dia e no mês contra os tetos. |
 | `GET` | `/admin/midia/{mensagem_id}/{indice}` | Anexo da mensagem, servido pela API (sem URL pré-assinada). Imagem (JPG, PNG, WebP, GIF), áudio, vídeo e PDF abrem no navegador; qualquer outro tipo sai como download (`Content-Disposition: attachment`), porque o tipo é o que o cliente declarou. |
 | `GET` | `/admin/eventos` | SSE: avisos `{tipo, conversa\|alerta}` com IDs, sem dado pessoal. |
 
 O painel só envia os modelos de utilidade sem botão de link, e sem variáveis:
-o repositório ainda não sabe quantos parâmetros cada modelo tem, e os links
-`/l/{codigo}` chegam na Fase 6.
+o repositório ainda não sabe quantos parâmetros cada modelo tem, e os modelos
+com botão de link levam o código de um link curto (`/l/{codigo}`), que o
+compositor do painel não gera.
 
 ### Política de retenção do extrato
 

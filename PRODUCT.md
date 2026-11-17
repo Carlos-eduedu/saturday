@@ -15,7 +15,7 @@ web
 
 ## Product Purpose
 
-O Saturday é o agente de atendimento autônomo da MEX no WhatsApp. Ele conduz sozinho a jornada de crédito consignado: portabilidade INSS → C6 e Crédito do Trabalhador (CLT) pela Granatech, da triagem e do consentimento até a proposta, a biometria e o pagamento. O painel existe para a equipe acompanhar esse trabalho.
+O Saturday é o agente de atendimento autônomo da MEX no WhatsApp. Ele conduz sozinho a jornada de crédito consignado: portabilidade INSS → C6 e Crédito do Trabalhador (CLT) pela Granatech, da triagem e do consentimento até a proposta, a biometria e o pagamento. No ramo INSS, cada um atrás da sua flag, ele também simula e oferece o contrato novo pela API do C6 e consulta o iCred; nos dois, o aceite do cliente vai para um atendente. O painel existe para a equipe acompanhar esse trabalho.
 
 Sucesso do painel: a equipe **supervisiona a IA e intervém antes que um erro chegue ao cliente**. Responder handoffs e gerir canais são parte disso, mas o que desempata é enxergar a tempo o que a IA está fazendo e conseguir agir na hora.
 
@@ -50,8 +50,8 @@ As decisões que importam (triagem, consentimento, regras do banco, cálculos, t
 
 ## Evidence on Hand
 
-- **Painel atual:** `apps/painel/` (React + Vite + TypeScript), com Inbox, Conversa, Alertas e Canais.
-- **Dados de teste:** os simuladores da Meta, da Evolution e da Granatech em `simuladores/` geram conversas e eventos de teste.
+- **Painel atual:** `apps/painel/` (React + Vite + TypeScript), com Conversas (inbox e conversa), Alertas, Bancos, Agente, Canais (só gestor), Membros e Operação.
+- **Dados de teste:** os simuladores da Meta, da Evolution, da Granatech, do C6 e do iCred em `simuladores/` geram conversas e eventos de teste.
 - **O que não existe e não deve ser inventado:** dados reais de volume, métricas de atendimento ou depoimentos.
 
 ## Product Principles
