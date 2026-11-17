@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi.testclient import TestClient
 
 ACCEPT = "application/vnd.c6bank_error_data_v2+json"
-ACCEPT_CONSULTA = "application/vnd.c6bank_fgts_consult_v2+json"
 SIMULACAO = {
     "operation_type": "NOVA",
     "product_type_code": "0001",
@@ -31,15 +32,20 @@ PROPOSTA = {
 }
 
 
-def _token(http: TestClient) -> str:
+def _login(http: TestClient) -> dict[str, Any]:
     resposta = http.post(
         "/auth/token",
         data={"username": "usuario-do-simulador", "password": "senha-do-simulador"},
     )
-    return str(resposta.json()["access_token"])
+    corpo: dict[str, Any] = resposta.json()
+    return corpo
 
 
-def _simular(http: TestClient, token: str) -> tuple[int, dict[str, object]]:
+def _token(http: TestClient) -> str:
+    return str(_login(http)["access_token"])
+
+
+def _simular(http: TestClient, token: str) -> tuple[int, dict[str, Any]]:
     resposta = http.post(
         "/marketplace/proposal/simulation",
         json=SIMULACAO,
@@ -64,14 +70,8 @@ def test_config_troca_o_cenario_da_simulacao(http_c6: TestClient) -> None:
     assert resposta.json()["formato"] == "lista"
     status, corpo = _simular(http_c6, token)
     assert status == 200
-    assert [c["monthly_customer_rate"] for c in corpo["credit_conditions"]] == [1.75, 1.8, 1.85]  # type: ignore[attr-defined]
-    assert (
-        http_c6.post(
-            "/auth/token",
-            data={"username": "usuario-do-simulador", "password": "senha-do-simulador"},
-        ).json()["expires_in_seconds"]
-        == 60
-    )
+    assert [c["monthly_customer_rate"] for c in corpo["credit_conditions"]] == [1.75, 1.8, 1.85]
+    assert _login(http_c6)["expires_in_seconds"] == 60
 
 
 def test_config_recusa_chave_desconhecida(http_c6: TestClient) -> None:
