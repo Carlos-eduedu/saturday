@@ -19,7 +19,8 @@ from saturday.canais.whatsapp.modelos import MODELOS
 
 # Modelos que o atendente pode mandar: utilidade e sem botão de link.
 # TODO: variáveis de modelo quando os textos forem cadastrados na Meta; os
-# links `/l/{codigo}` só existem na Fase 6.
+# modelos com link levam o código de um link curto (`/l/{codigo}`), que o
+# compositor não gera.
 MODELOS_DO_PAINEL = tuple(
     nome
     for nome, modelo in MODELOS.items()

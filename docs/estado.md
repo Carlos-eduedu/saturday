@@ -59,7 +59,8 @@ uma entrega fora das fases.
   consulta, turno de sistema (`AgentService.continuar`) disparado pelos eventos
   da consulta, recontato por cota esgotada (tabela `recontatos`), até 5 novas
   simulações depois da oferta e mensagens em `conhecimento/clt/mensagens.yaml`.
-  O aceite vai para handoff (`aceite_clt`) até a Fase 6. Ver `docs/clt.md`.
+  Com `SATURDAY_GRANATECH_PROPOSTA_ATIVA` desligada, o aceite vai para handoff
+  (`aceite_clt`); ligada, segue para a proposta da Fase 6. Ver `docs/clt.md`.
 - **Fase 6 concluída:** dados da proposta antes do SIM (docs/decisoes/0008),
   aceite com prova `proposta`, criação única com reconciliação e dados do
   tomador, pós-venda por turno de sistema com o modelo certo fora da janela,
@@ -98,8 +99,10 @@ uma entrega fora das fases.
   de `SATURDAY_ICRED_ATIVO`. **Pendentes:** cadastro da aplicação do Saturday no
   motor (chave, webhook e segredo), a fase 2
   (gravação pelo agente, condicionada aos pedidos ao motor listados na 0027) e
-  os `TODO(icred)` de seguro, CET e do que o cliente faz no link. Ver
-  `docs/icred.md`.
+  duas perguntas em aberto: seguro e CET da oferta (`TODO(icred)` em
+  `agent/icred/textos.py` e na seção Pendências da 0027) e o que o cliente faz
+  no link de assinatura (seção Pendências da 0027 e "Continua sem resposta" em
+  `docs/icred.md`, sem `TODO` no código). Ver `docs/icred.md`.
 - `migrations/` fica em `apps/core/migrations/`, não na raiz: as migrações
   descrevem os modelos daquele pacote e precisam do ambiente `uv` dele para
   importar. Desvio consciente da árvore desenhada na especificação.

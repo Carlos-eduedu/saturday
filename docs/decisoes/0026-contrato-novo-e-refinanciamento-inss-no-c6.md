@@ -44,6 +44,13 @@ passa por essa API e continua como está.
 - O extrato lido hoje não guarda o número do benefício nem o número de cada
   contrato, que a simulação do refinanciamento exige.
 
+**Nota de 2026-11-17.** Duas pendências acima foram resolvidas. O cliente existe
+em `bancos/c6/`, escrito a partir do Manual API V31.5 (03/08/2026). A leitura do
+extrato (`portabilidade/hiscon.py`) guarda a renda (`baseCalculo`) e o número do
+benefício (`numeroBeneficio`). Continuam abertos a credencial própria e o número
+de cada contrato, que o extrato lido ainda não guarda. As pendências com o banco
+estão em `docs/c6.md`.
+
 ## Alternativas descartadas
 
 - **Usar o hub da MEX.** Quebra a regra 1.

@@ -430,8 +430,8 @@ class EmpresaCnpj(Base):
 class Recontato(Base):
     """Voltar a falar com o cliente numa data marcada.
 
-    ``motivo`` é ``cota_esgotada`` (o worker dispara) ou ``tempo_casa`` (só
-    gravado até a Fase 6). ``tentativas`` conta as remarcações por cota.
+    ``motivo`` é ``cota_esgotada`` ou ``tempo_casa``; o worker dispara os dois
+    (``jobs/recontatos.py``). ``tentativas`` conta as remarcações por cota.
     """
 
     __tablename__ = "recontatos"
