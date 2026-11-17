@@ -12,6 +12,7 @@ from typing import Any
 import httpx
 
 from saturday.metrics import registrar_chamada
+from saturday.privacidade import mascarar_conversation_id
 from saturday.settings import WEBHOOK_TIMEOUT_S, Settings
 
 logger = logging.getLogger(__name__)
@@ -66,7 +67,7 @@ class WebhookClient:
             # Nunca logar o conteúdo do payload: ele pode conter dados pessoais.
             logger.error(
                 "webhook_falhou conversation_id=%s status=%s erro=%s",
-                conversation_id,
+                mascarar_conversation_id(str(conversation_id)),
                 status,
                 type(exc).__name__,
             )

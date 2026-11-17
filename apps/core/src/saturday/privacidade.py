@@ -34,6 +34,30 @@ def mascarar_email(email: str) -> str:
     return f"{usuario[:1]}***@{dominio}" if arroba and usuario and dominio else "***"
 
 
+# Canais em que o `conversation_id` é `canal:telefone` (`prefixo_do_canal`).
+_CANAIS_COM_TELEFONE = ("whatsapp", "evolution")
+
+
+def mascarar_conversation_id(conversation_id: str) -> str:
+    """O `conversation_id` como vai para o log (regra 9).
+
+    `whatsapp:11987654321` → `whatsapp:(11) *****-4321`. O id do `POST /chat` é
+    de quem integra e passa como veio, a não ser que traga uma sequência com
+    cara de telefone (10 dígitos ou mais, isolados). O log leva junto o `conversa_ref`
+    (o id da linha em `conversas`) quando a conversa já existe no banco.
+    """
+
+    canal, separador, resto = conversation_id.partition(":")
+    if separador and canal in _CANAIS_COM_TELEFONE:
+        return f"{canal}:{mascarar_telefone(resto)}"
+    # Sequência isolada: dígitos no meio de um id hexadecimal não são telefone.
+    return re.sub(
+        r"(?<![A-Za-z0-9])\d{10,}(?![A-Za-z0-9])",
+        lambda achado: mascarar_telefone(achado.group()),
+        conversation_id,
+    )
+
+
 MASCARAS = {
     "cpf": mascarar_cpf,
     "email": mascarar_email,

@@ -29,6 +29,7 @@ from saturday.dados.modelos import Conversa
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.dados.trava import travar_conversa
 from saturday.painel import acoes
+from saturday.privacidade import mascarar_conversation_id
 from saturday.schemas import MIME_TYPES, AgentReply, Attachment, ChatRequest
 from saturday.services.anexos import AnexoInvalido
 from saturday.services.webhook import WebhookClient
@@ -488,7 +489,11 @@ class AgentService:
         if hasattr(self.checkpointer, "delete_thread"):
             self.checkpointer.delete_thread(thread_id)
         conversa.etapa = None
-        logger.info("conversa_reiniciada conversation_id=%s", payload.conversation_id)
+        logger.info(
+            "conversa_reiniciada conversa_ref=%s conversation_id=%s",
+            conversa.id,
+            mascarar_conversation_id(payload.conversation_id),
+        )
 
     def _ir(
         self,
@@ -687,7 +692,7 @@ class AgentService:
             if conversa is None:
                 logger.warning(
                     "turno_de_sistema_sem_conversa conversation_id=%s evento=%s",
-                    conversation_id,
+                    mascarar_conversation_id(conversation_id),
                     evento,
                 )
                 return None
@@ -720,7 +725,7 @@ class AgentService:
             if conversa is None:
                 logger.warning(
                     "desistencia_sem_conversa conversation_id=%s evento=%s",
-                    conversation_id,
+                    mascarar_conversation_id(conversation_id),
                     evento,
                 )
                 return
@@ -823,6 +828,6 @@ class AgentService:
         except Exception as exc:
             logger.error(
                 "processamento_falhou conversation_id=%s erro=%s",
-                payload.conversation_id,
+                mascarar_conversation_id(payload.conversation_id),
                 type(exc).__name__,
             )

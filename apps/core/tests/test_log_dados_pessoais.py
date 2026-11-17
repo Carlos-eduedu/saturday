@@ -59,12 +59,6 @@ PROIBIDOS = {
     "endereço": re.compile("PRACA DA SE", re.IGNORECASE),
 }
 
-# Vazamentos que este teste achou e ainda não têm correção decidida (issue #37).
-# O `conversation_id` do WhatsApp é `canal:telefone` e vai inteiro no log do
-# turno; os outros logs com `conversation_id` (em `agent/service.py`,
-# `agent/turno.py` e `services/webhook.py`) têm o mesmo problema.
-PENDENTES = {"telefone em saturday.agent.service (turno.py): turno"}
-
 
 def _vazamentos(registros: list[logging.LogRecord]) -> list[str]:
     """`dado em logger (arquivo): modelo da mensagem`, sem repetir o dado."""
@@ -153,5 +147,4 @@ def test_conversa_clt_pelo_webhook_da_meta_nao_deixa_dado_pessoal_no_log(
         "saturday.bancos.granatech.cliente",
         "saturday.jobs.outbox",
     } <= nomes
-    # Igualdade: vazamento novo reprova, e o pendente sai da lista quando for corrigido.
-    assert _vazamentos(caplog.records) == sorted(PENDENTES)
+    assert _vazamentos(caplog.records) == []

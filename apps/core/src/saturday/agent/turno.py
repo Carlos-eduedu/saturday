@@ -25,6 +25,7 @@ from saturday.dados.modelos import Conversa, Turno
 from saturday.dados.outbox import enfileirar
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.metrics import TurnMetrics, iniciar_metricas, metricas_atuais
+from saturday.privacidade import mascarar_conversation_id
 from saturday.schemas import AgentReply
 from saturday.services.webhook import WebhookClient
 
@@ -257,7 +258,11 @@ class Turnos:
         try:
             self._stream(entrada, config, caminho)
         except Exception as exc:
-            logger.exception("erro_interno conversation_id=%s", conversation_id)
+            logger.exception(
+                "erro_interno conversa_ref=%s conversation_id=%s",
+                registro.conversa.id,
+                mascarar_conversation_id(conversation_id),
+            )
             turno_id = registro.registrar_turno(
                 {**estado, "status": "handoff", "handoff_reason": "erro_interno"},
                 caminho,
@@ -267,7 +272,7 @@ class Turnos:
             )
             guardar_resposta(mensagem_handoff("erro_interno"))
             resposta = self._fallback_erro_interno(
-                conversation_id, config, inicio=inicio, caminho=caminho
+                conversation_id, config, registro, inicio=inicio, caminho=caminho
             )
             registro.abrir_handoff("erro_interno", "erro_interno")
             # O aviso vai ao cliente e ao histórico como qualquer handoff.
@@ -352,7 +357,7 @@ class Turnos:
         """O que os dois turnos fazem depois do grafo: log, trilha e resposta."""
 
         final = dict(self.graph.get_state(config).values or {})
-        self._log_turno(conversation_id, final, caminho, inicio, metricas)
+        self._log_turno(conversation_id, registro, final, caminho, inicio, metricas)
         turno_id = registro.registrar_turno(final, caminho, metricas, inicio)
         return final, self._evento(conversation_id, final), turno_id
 
@@ -381,6 +386,7 @@ class Turnos:
         self,
         conversation_id: str,
         config: dict[str, Any],
+        registro: RegistroPostgres,
         *,
         inicio: float,
         caminho: list[str],
@@ -397,15 +403,17 @@ class Turnos:
             self.graph.update_state(config, atualizacao)
         except Exception:
             logger.exception(
-                "falha_ao_gravar_erro_interno conversation_id=%s",
-                conversation_id,
+                "falha_ao_gravar_erro_interno conversa_ref=%s conversation_id=%s",
+                registro.conversa.id,
+                mascarar_conversation_id(conversation_id),
             )
-        self._log_turno(conversation_id, atualizacao, caminho, inicio, metricas_atuais())
+        self._log_turno(conversation_id, registro, atualizacao, caminho, inicio, metricas_atuais())
         return self._evento(conversation_id, atualizacao, status="handoff")
 
     @staticmethod
     def _log_turno(
         conversation_id: str,
+        registro: RegistroPostgres,
         estado: dict[str, Any],
         caminho: list[str],
         inicio: float,
@@ -420,7 +428,8 @@ class Turnos:
             }
         )
         extra: dict[str, Any] = {
-            "conversation_id": conversation_id,
+            "conversa_ref": str(registro.conversa.id),
+            "conversation_id": mascarar_conversation_id(conversation_id),
             "status": estado.get("status"),
             "handoff_reason": estado.get("handoff_reason"),
             "caminho": caminho,
