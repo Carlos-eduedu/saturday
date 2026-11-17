@@ -7,6 +7,7 @@ import logging
 import sys
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import unquote
 
 from saturday.privacidade import mascarar_conversation_id
 
@@ -53,7 +54,8 @@ class SemQueryString(logging.Filter):
         # Formato do uvicorn: (cliente, método, caminho, versão, status).
         args = record.args
         if isinstance(args, tuple) and len(args) >= 3 and isinstance(args[2], str):
-            caminho = mascarar_conversation_id(args[2].split("?", 1)[0])
+            # O uvicorn codifica o caminho: sem o `unquote`, o `:` chega como `%3A`.
+            caminho = mascarar_conversation_id(unquote(args[2].split("?", 1)[0]))
             record.args = (*args[:2], caminho, *args[3:])
         return True
 

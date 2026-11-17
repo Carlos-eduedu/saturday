@@ -102,7 +102,7 @@ class RegistroPostgres:
                 repositorios.notificar(propria, "turno", conversa=self.conversa.id)
         except Exception:
             # A falha do turno é a que importa a quem chamou; esta não a esconde.
-            logger.exception("falha_ao_registrar_turno_com_erro conversa=%s", self.conversa.id)
+            logger.exception("falha_ao_registrar_turno_com_erro conversa_ref=%s", self.conversa.id)
 
     def _turno(
         self,

@@ -53,7 +53,8 @@ def test_access_log_mascara_o_telefone_do_conversation_id_no_caminho():
         "",
         0,
         '%s - "%s %s HTTP/%s" %d',
-        ("127.0.0.1:1", "POST", "/conversations/whatsapp:11987654321/release", "1.1", 200),
+        # O uvicorn registra o caminho já codificado: o `:` chega como `%3A`.
+        ("127.0.0.1:1", "POST", "/conversations/whatsapp%3A11987654321/release", "1.1", 200),
         None,
     )
     SemQueryString().filter(registro)

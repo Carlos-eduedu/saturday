@@ -308,7 +308,7 @@ def enviar_anexo(
         )
     except Exception as exc:
         # S3 fora do ar ou mal configurado: o painel recebe o motivo, não um 500.
-        logger.exception("anexo_storage_falhou conversa=%s", conversa.id)
+        logger.exception("anexo_storage_falhou conversa_ref=%s", conversa.id)
         raise AcaoRecusada(503, "não deu para guardar o arquivo no storage") from exc
     anexo = {"chave": chave, "mime_type": mime_type, "nome": nome}
     mensagem_id = repositorios.registrar_saida(

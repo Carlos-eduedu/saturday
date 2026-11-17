@@ -12,6 +12,7 @@ import uuid
 import httpx
 import pytest
 from conftest import _url_sqlalchemy
+from fastapi.testclient import TestClient
 from sqlalchemy import select, text, update
 from sqlalchemy.exc import DBAPIError
 
@@ -154,6 +155,21 @@ def test_webhook_que_falha_nao_registra_o_telefone(caplog):
 
     [linha] = _linhas(caplog, "webhook_falhou")
     assert f"conversation_id={MASCARADA} status=answered erro=ConnectError" in linha
+
+
+def test_erro_nao_tratado_nao_registra_o_telefone_do_caminho(app, service, caplog, monkeypatch):
+    def quebra(*_args, **_kwargs):
+        raise RuntimeError("banco caiu")
+
+    monkeypatch.setattr(service, "liberar", quebra)
+
+    resposta = TestClient(app, raise_server_exceptions=False).post(
+        f"/conversations/{CONVERSA}/release"
+    )
+
+    assert resposta.status_code == 500
+    [linha] = _linhas(caplog, "erro_nao_tratado")
+    assert f"rota=/conversations/{MASCARADA}/release erro=RuntimeError" in linha
 
 
 def test_erro_do_banco_nao_leva_os_parametros_da_consulta(settings, pg_url):

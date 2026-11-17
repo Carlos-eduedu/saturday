@@ -7,6 +7,7 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from saturday.privacidade import mascarar_conversation_id
 from saturday.settings import Settings, get_settings
 from saturday.web.api import (
     admin,
@@ -76,7 +77,8 @@ def get_app(settings: Settings | None = None) -> FastAPI:
         # Sem stack trace e sem dados pessoais na resposta ao cliente.
         logger.error(
             "erro_nao_tratado rota=%s erro=%s",
-            request.url.path,
+            # As rotas de `/conversations` levam o `conversation_id` no caminho.
+            mascarar_conversation_id(request.url.path),
             type(exc).__name__,
         )
         return JSONResponse(status_code=500, content={"detail": "erro interno"})
