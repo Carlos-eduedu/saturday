@@ -11,6 +11,8 @@
 - [`../AGENTS.md`](../AGENTS.md) — regras inegociáveis, ponteiros da especificação e comandos.
 - [`granatech.md`](granatech.md) — cliente, cota, webhook e simulador da Granatech.
 - [`clt.md`](clt.md) — ramo CLT: etapas, proposta, pós-venda, turnos de sistema e recontato.
+- [`c6.md`](c6.md) — API do C6: contrato novo INSS, consentimento, cliente, simulador e pendências.
+- [`icred.md`](icred.md) — iCred pelo motor de consultas: como está hoje e a pesquisa da especificação.
 - [`evolution.md`](evolution.md) — canal Evolution: instâncias, webhook e simulador.
 - [`deploy.md`](deploy.md) — ambientes, ambiente do zero, backup e restauração no Dokploy.
 - [`granatech-homologacao/`](granatech-homologacao/README.md) — material da homologação com a Granatech.

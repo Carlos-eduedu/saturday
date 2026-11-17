@@ -2,6 +2,8 @@
 
 Agente de atendimento autônomo da MEX. Hoje atende portabilidade de empréstimo
 INSS → C6; o piloto em construção é o Crédito do Trabalhador (CLT) pela Granatech.
+No ramo INSS entraram também, cada um atrás da sua flag, o contrato novo pela
+API do C6 e a consulta ao iCred.
 
 As regras do projeto, o escopo e o critério de pronto de cada fase estão no
 [`AGENTS.md`](AGENTS.md). Leia antes de mexer no código.
@@ -80,6 +82,20 @@ tela **Canais** do painel. Simulador em `simuladores/evolution/`. Ver
 [`docs/evolution.md`](docs/evolution.md) e a
 [decisão 0009](docs/decisoes/0009-evolution-api-como-segundo-canal-whatsapp.md).
 
+Fora das fases, no ramo INSS e desligados por padrão:
+
+- **C6 pela API do banco** (`bancos/c6/`, `SATURDAY_C6_ATIVO`): depois do SIM do
+  cliente, com prova gravada, o agente simula e oferece o contrato novo; o
+  aceite vai para um atendente. Refinanciamento e digitação ainda não existem.
+  Simulador em `simuladores/c6/`. Ver [`docs/c6.md`](docs/c6.md) e a
+  [decisão 0026](docs/decisoes/0026-contrato-novo-e-refinanciamento-inss-no-c6.md).
+- **iCred pelo motor de consultas** (`bancos/icred/` e `agent/icred/`,
+  `SATURDAY_ICRED_ATIVO`): depois do extrato, o agente pede o SIM e o CPF,
+  consulta o motor, apresenta o pacote e colhe o aceite com prova; o atendente
+  grava a proposta. Webhook assinado em `/webhooks/icred` e simulador em
+  `simuladores/icred/`. Ver [`docs/icred.md`](docs/icred.md) e a
+  [decisão 0027](docs/decisoes/0027-icred-pelo-motor-da-mex.md).
+
 Desde a Fase 7: guia de deploy completo em [`docs/deploy.md`](docs/deploy.md)
 (ambiente do zero, backup e restauração), `infra/testar_restauracao.sh` e
 as evidências da homologação com a Granatech, geradas pelo gestor na aba
@@ -111,6 +127,17 @@ uv run --project simuladores uvicorn app:app --app-dir simuladores/granatech --p
 # SATURDAY_GRANATECH_BASE_URL=http://127.0.0.1:8200 e
 # SATURDAY_GRANATECH_CHAVE_API=chave-do-simulador no .env
 ```
+
+O do iCred, que o compose local também sobe, na porta 8400:
+
+```bash
+uv run --project simuladores uvicorn app:app --app-dir simuladores/icred --port 8400
+# SATURDAY_ICRED_ATIVO=true e SATURDAY_ICRED_BASE_URL=http://127.0.0.1:8400 no .env;
+# a chave e o segredo são os do simulador (padrões no compose.override.yaml)
+```
+
+O do C6 não está no compose e usa a mesma porta 8300 do simulador da Evolution
+(ver [`docs/c6.md`](docs/c6.md)).
 
 E o da Evolution (as instâncias se criam na tela Canais):
 

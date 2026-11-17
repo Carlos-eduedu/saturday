@@ -20,7 +20,8 @@ antes dele explicam o porquê de cada passo.
 | `SATURDAY_ENVIRONMENT` | `dev` | `homolog` | `prod` |
 | `SATURDAY_IMAGEM_TAG` | `development` | `homolog` | `production` |
 
-A API recebe os webhooks da Meta e da Granatech e o `POST /chat`; o painel é o
+A API recebe os webhooks da Meta, da Granatech e, com o iCred ligado, do motor
+do iCred, além do `POST /chat`; o painel é o
 nginx que serve o build do Vite e repassa `/admin` para a API na mesma origem.
 
 ## Configuração do stack
@@ -47,6 +48,17 @@ nginx que serve o build do Vite e repassa `/admin` para a API na mesma origem.
   e uma chave e um token próprios em `SATURDAY_GRANATECH_SIMULADOR_CHAVE` e
   `SATURDAY_GRANATECH_SIMULADOR_WEBHOOK_TOKEN` (nunca os da Granatech real).
   Em produção a API recusa subir com a URL do simulador.
+- C6, contrato novo INSS pela API do banco (opcional, [docs/c6.md](c6.md),
+  [decisão 0026](decisoes/0026-contrato-novo-e-refinanciamento-inss-no-c6.md)):
+  `SATURDAY_C6_ATIVO=true` exige `SATURDAY_C6_BASE_URL`, `SATURDAY_C6_USUARIO`,
+  `SATURDAY_C6_SENHA` e `SATURDAY_C6_CODIGO_PROMOTORA`. O banco não tem ambiente
+  de homologação e o simulador (`simuladores/c6/`) não está em nenhum compose.
+- iCred pelo motor de consultas (opcional, [docs/icred.md](icred.md),
+  [decisão 0027](decisoes/0027-icred-pelo-motor-da-mex.md)):
+  `SATURDAY_ICRED_ATIVO=true` exige `SATURDAY_ICRED_BASE_URL`,
+  `SATURDAY_ICRED_CHAVE_API` e `SATURDAY_ICRED_WEBHOOK_SEGREDO`. A consulta no
+  motor de verdade já cria lead no iCred; o simulador (`simuladores/icred/`) só
+  sobe no `compose.override.yaml`, que o Dokploy não carrega.
 - Domínios pela aba Domains do stack (o Dokploy injeta os labels do Traefik),
   com HTTPS e certificado Let's Encrypt.
 - Com `SATURDAY_GRANATECH_PROPOSTA_ATIVA=true`, `SATURDAY_DOMINIO_PUBLICO` é
@@ -125,7 +137,14 @@ Na ordem. Cada passo de escrita no Dokploy (criar, editar, deploy) segue a
    - `SATURDAY_WHATSAPP_ROTULOS` (opcional: `phone_number_id=Rótulo`, o nome que
      a tela Canais mostra para cada número);
    - `SATURDAY_DOMINIO_PUBLICO` = domínio da API (obrigatória com a proposta
-     ligada).
+     ligada);
+   - com o canal Evolution: `evolution` em `COMPOSE_PROFILES`,
+     `SATURDAY_EVOLUTION_ATIVO=true`, `SATURDAY_EVOLUTION_URL` e
+     `SATURDAY_EVOLUTION_WEBHOOK_URL` (os padrões servem no compose);
+   - com o C6: `SATURDAY_C6_ATIVO=true`, `SATURDAY_C6_BASE_URL`,
+     `SATURDAY_C6_USUARIO` e `SATURDAY_C6_CODIGO_PROMOTORA`;
+   - com o iCred: `SATURDAY_ICRED_ATIVO=true`, `SATURDAY_ICRED_BASE_URL` e,
+     se o padrão de 5 minutos não servir, `SATURDAY_ICRED_ESPERA_MIN`.
 
    **Segredos**, preenchidos por quem tem acesso, nunca por agente nem por
    commit: `SATURDAY_API_KEY`, `SATURDAY_SESSAO_SEGREDO`,
@@ -136,6 +155,12 @@ Na ordem. Cada passo de escrita no Dokploy (criar, editar, deploy) segue a
    `SATURDAY_S3_SECRET_KEY` e a senha dentro de `SATURDAY_DATABASE_URL`. Gere
    `API_KEY`, `SESSAO_SEGREDO`, `VERIFY_TOKEN` e `WEBHOOK_TOKEN` com
    `openssl rand -hex 32`. Em `homolog` e `prod` o serviço não sobe sem eles.
+
+   Segredos de cada opcional, obrigatórios só com ele ligado:
+   `SATURDAY_EVOLUTION_API_KEY`, `SATURDAY_EVOLUTION_WEBHOOK_TOKEN` e
+   `EVOLUTION_POSTGRES_SENHA` (Evolution); `SATURDAY_C6_SENHA` (C6);
+   `SATURDAY_ICRED_CHAVE_API` e `SATURDAY_ICRED_WEBHOOK_SEGREDO` (iCred). Com a
+   flag ligada e um deles vazio, o serviço não sobe.
 7. **Domínios** (aba Domains do stack): serviço `api`, porta 8000, no host da API
    (cobre `/webhooks/*`, `/chat` e `/l/*`); serviço `painel`, porta 80, no host
    do painel. HTTPS com Let's Encrypt.
@@ -154,7 +179,15 @@ Na ordem. Cada passo de escrita no Dokploy (criar, editar, deploy) segue a
       `SATURDAY_WHATSAPP_VERIFY_TOKEN`, assinando o campo `messages`;
     - Granatech: pedir no grupo a troca da rota para
       `https://<api>/webhooks/granatech`, autenticada pelo header
-      `x-webhook-token: <SATURDAY_GRANATECH_WEBHOOK_TOKEN>`.
+      `x-webhook-token: <SATURDAY_GRANATECH_WEBHOOK_TOKEN>`;
+    - iCred (só com `SATURDAY_ICRED_ATIVO=true`): pedir a quem opera o motor o
+      cadastro da aplicação do Saturday, com a chave
+      (`SATURDAY_ICRED_CHAVE_API`), os escopos `consultas` e
+      `consultas:gravar` (sem `operacao`, decisão 0027), `webhook_url`
+      `https://<api>/webhooks/icred` e `segredo_webhook` igual a
+      `SATURDAY_ICRED_WEBHOOK_SEGREDO`. A API confere a assinatura HMAC de cada
+      evento; sem o segredo, a rota responde 503;
+    - C6: não há webhook; o Saturday só chama a API do banco.
 11. **Backup** do Postgres e do bucket (ver "Backup") e um teste de restauração.
 
 ## Backup
