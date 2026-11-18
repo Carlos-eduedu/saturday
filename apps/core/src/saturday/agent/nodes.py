@@ -219,9 +219,13 @@ def classify_intent(state: AgentState, runtime: Runtime[AgentContext]) -> dict[s
     if pediu_humano:
         atualizacao.update({"needs_human": True, "handoff_reason": "pediu_humano"})
     elif resposta_oferta == "aceita":
-        ofertado = (state.get("c6_novo") or {}).get("situacao") == "ofertado"
+        c6_novo = state.get("c6_novo") or {}
+        ofertado = c6_novo.get("situacao") == "ofertado"
         motivo = "aceitou_contrato_novo" if ofertado else "aceitou_portabilidade"
         atualizacao.update({"needs_human": True, "handoff_reason": motivo})
+        if ofertado:
+            # O atendente lê no painel as condições que o cliente aceitou.
+            atualizacao["c6_novo"] = {**c6_novo, "situacao": "aceito"}
     return atualizacao
 
 

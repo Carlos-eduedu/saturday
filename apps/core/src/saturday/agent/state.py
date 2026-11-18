@@ -52,7 +52,8 @@ class AgentState(MessagesState, total=False):
     tentativas_resposta: int
     portability_result: dict[str, Any] | None
     oferta_pendente: bool
-    # Contrato novo no C6: `situacao` (ofertado, recusado, sem_oferta) e a condição ofertada.
+    # Contrato novo no C6: `situacao` (ofertado, aceito, recusado, sem_oferta) e a
+    # condição ofertada.
     c6_novo: dict[str, Any] | None
     # Jornada CLT: etapa, passo, dados informados e oferta (ver agent/clt).
     clt: dict[str, Any]

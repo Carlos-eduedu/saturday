@@ -1745,6 +1745,7 @@ small.dado { font-size: 0.8rem; }
 .banco-cabeca { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.75rem; }
 .banco-cabeca h2 { margin: 0; font-size: 1.25rem; text-wrap: balance; }
 .banco-cabeca a { margin-left: auto; }
+.banco-cabeca a + a { margin-left: 0; }
 .banco-leitura { padding: 1.25rem; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio-l); }
 .banco-leitura h3 { margin: 0 0 0.5rem; font-family: var(--fonte-texto); font-size: 0.85rem; font-weight: 500; color: var(--suave); }
 .banco-leitura ul { margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: 0.35rem; }

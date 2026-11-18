@@ -7,7 +7,9 @@ from saturday.agent.service import Jornada, jornada_do_estado
 
 def test_estado_completo_vira_os_campos_da_jornada() -> None:
     oferta = {"valor_parcela": "100.00", "numero_parcelas": 12}
+    contrato_novo = {"situacao": "ofertado", "valor": "4321.09"}
     estado = {
+        "c6_novo": contrato_novo,
         "publico": "clt",
         "handoff_reason": "pediu_humano",
         "portability_result": {"elegivel": True},
@@ -27,6 +29,7 @@ def test_estado_completo_vira_os_campos_da_jornada() -> None:
         etapa_clt="oferta",
         oferta=oferta,
         proposta="prop-1",
+        contrato_novo=contrato_novo,
     )
 
 
@@ -39,4 +42,5 @@ def test_conversa_sem_checkpoint_tem_jornada_vazia() -> None:
         etapa_clt=None,
         oferta=None,
         proposta=None,
+        contrato_novo=None,
     )

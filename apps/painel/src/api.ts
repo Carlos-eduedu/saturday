@@ -92,6 +92,17 @@ export interface Ficha {
     seguro_aplicado: boolean;
     limitado_ao_teto: boolean;
   } | null;
+  // O contrato novo do C6 (decisão 0026), desde a oferta. Convênio e produto
+  // são códigos do banco, sem nome.
+  contrato_novo: {
+    situacao: string;
+    valor: string;
+    valor_parcela: string;
+    numero_parcelas: number;
+    taxa_mensal: string;
+    convenio: string;
+    produto: string;
+  } | null;
   // A última consulta ao iCred (decisão 0027); o pacote vem sem comissão.
   icred: {
     estado: string;

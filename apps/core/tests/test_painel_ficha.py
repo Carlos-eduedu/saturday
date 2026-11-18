@@ -152,6 +152,40 @@ def test_ficha_mostra_a_ultima_consulta_do_icred(client_pg, service_pg, fabrica,
     assert "cpf" not in icred
 
 
+def test_ficha_mostra_o_contrato_novo_do_c6(client_pg, service_pg, fabrica, ana, conversa):
+    _cliente_escreve(service_pg, conversa, "oi")
+    rota = f"/admin/conversas/{_conversa_id(fabrica, conversa)}/ficha"
+    entrar(client_pg, "ana@exemplo.test")
+    assert client_pg.get(rota).json()["contrato_novo"] is None
+
+    condicao = {
+        "valor": "4321.09",
+        "parcela": "99.00",
+        "parcelas": 108,
+        "taxa": "1.85",
+        "convenio": "000020",
+        "produto": "0001",
+    }
+    config = service_pg.config(conversa)
+    for situacao in ("ofertado", "aceito", "recusado"):
+        # Chave a mais no estado não sai: a lista de campos é fixa.
+        guardado = {"situacao": situacao, **condicao, "outro": "x"}
+        service_pg.graph.update_state(config, {"c6_novo": guardado})
+        assert client_pg.get(rota).json()["contrato_novo"] == {
+            "situacao": situacao,
+            "valor": "4321.09",
+            "valor_parcela": "99.00",
+            "numero_parcelas": 108,
+            "taxa_mensal": "1.85",
+            "convenio": "000020",
+            "produto": "0001",
+        }
+
+    # Simulou e não achou condição: não há o que mostrar.
+    service_pg.graph.update_state(config, {"c6_novo": {"situacao": "sem_oferta"}})
+    assert client_pg.get(rota).json()["contrato_novo"] is None
+
+
 def test_cpf_e_conta_travam_depois_do_banco(client_pg, service_pg, fabrica, ana, conversa):
     alvo, csrf = _ficha_clt(client_pg, service_pg, fabrica, conversa)
     rota = f"/admin/conversas/{alvo}/ficha"

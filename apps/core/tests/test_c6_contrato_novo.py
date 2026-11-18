@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from decimal import Decimal
 from types import ModuleType
 
 import pytest
@@ -86,20 +87,31 @@ def test_sim_simula_e_oferta_com_os_numeros_do_banco(
     assert simulador_c6.CHAMADAS.count(SIMULOU) == 1
 
 
-def test_aceite_vai_para_o_atendente(client: TestClient, fakes: Fakes) -> None:
+def test_aceite_vai_para_o_atendente_com_as_condicoes(
+    client: TestClient, fakes: Fakes, service: AgentService
+) -> None:
     conversa = cid()
     _extrato(client, fakes, conversa)
     _dizer(client, conversa, "sim")
+    ofertado = service.jornada(conversa).contrato_novo
+    assert ofertado is not None and ofertado["situacao"] == "ofertado"
     fakes.jev.resultado = resultado_jev(resposta_oferta="aceita")
 
     corpo = _dizer(client, conversa, "quero")
 
     assert corpo["status"] == "handoff"
     assert corpo["handoff_reason"] == "aceitou_contrato_novo"
+    # O atendente lê as mesmas condições da oferta, agora como aceitas.
+    aceito = service.jornada(conversa).contrato_novo
+    assert aceito == {**ofertado, "situacao": "aceito"}
+    # Margem de R$ 100: parcela de R$ 99 em 108 vezes, na taxa padrão do simulador.
+    assert (Decimal(aceito["parcela"]), aceito["parcelas"]) == (Decimal("99"), 108)
+    assert Decimal(aceito["taxa"]) == Decimal("1.8")
+    assert aceito["convenio"] and aceito["produto"] and Decimal(aceito["valor"]) >= 1000
 
 
 def test_recusa_segue_para_a_portabilidade(
-    client: TestClient, fakes: Fakes, simulador_c6: ModuleType
+    client: TestClient, fakes: Fakes, simulador_c6: ModuleType, service: AgentService
 ) -> None:
     conversa = cid()
     _extrato(client, fakes, conversa)
@@ -108,6 +120,8 @@ def test_recusa_segue_para_a_portabilidade(
 
     corpo = _dizer(client, conversa, "esse não quero")
 
+    recusado = service.jornada(conversa).contrato_novo
+    assert recusado is not None and recusado["situacao"] == "recusado"
     assert "Quer seguir com a portabilidade?" in corpo["answer"]
     fakes.jev.resultado = resultado_jev(resposta_oferta="aceita")
     assert _dizer(client, conversa, "quero")["handoff_reason"] == "aceitou_portabilidade"

@@ -33,6 +33,15 @@ def prazo_e_teto(idade: int) -> tuple[int, Decimal | None] | None:
     return _FAIXAS.get(idade, (PRAZO_PADRAO, None))
 
 
+def faixas() -> list[tuple[int, int, int, Decimal | None]]:
+    """Idade de, idade até, prazo máximo e teto, em ordem: para o painel mostrar as regras."""
+
+    return [
+        (IDADE_MIN, min(_FAIXAS) - 1, PRAZO_PADRAO, None),
+        *((idade, idade, *_FAIXAS[idade]) for idade in sorted(_FAIXAS)),
+    ]
+
+
 def parcela_do_contrato_novo(margem_livre: Decimal) -> Decimal | None:
     """99% da margem livre, truncada nos centavos; ``None`` abaixo da margem mínima."""
 

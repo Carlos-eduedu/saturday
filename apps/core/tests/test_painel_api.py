@@ -614,9 +614,22 @@ def test_cota_por_dia_traz_so_o_mes_corrente(client_pg, fabrica, ana):
 def test_produtos_trazem_as_regras_vigentes(client_pg, ana):
     assert client_pg.get("/admin/produtos").status_code == 401
     entrar(client_pg, "ana@exemplo.test")
-    inss, clt = client_pg.get("/admin/produtos").json()
+    inss, novo, clt = client_pg.get("/admin/produtos").json()
     itens = {i["rotulo"]: i["valor"] for p in (inss, clt) for g in p["grupos"] for i in g["itens"]}
-    assert (inss["banco"]["id"], clt["banco"]["id"]) == ("c6", "granatech")
+    assert [p["banco"]["id"] for p in (inss, novo, clt)] == ["c6", "c6", "granatech"]
+    # O contrato que nasce da portabilidade não é o produto "contrato novo".
+    assert [g["titulo"] for g in inss["grupos"]][-1] == "Contrato no C6 após a portabilidade"
+    assert (novo["id"], novo["nome"]) == ("contrato-novo-inss", "Contrato novo INSS (C6)")
+    do_novo = {i["rotulo"]: i["valor"] for g in novo["grupos"] for i in g["itens"]}
+    assert do_novo["Idade"] == "21 a 79 anos"
+    assert do_novo["Margem livre mínima"] == "R$ 20,00"
+    assert do_novo["Parcela pedida"] == "99% da margem livre"
+    assert do_novo["Valor mínimo na conta"] == "R$ 1.000,00"
+    assert do_novo["Taxa máxima"] == "1,85% ao mês"
+    assert do_novo["Até 71 anos"] == "108 parcelas, sem teto"
+    assert do_novo["73 anos"] == "84 parcelas, sem teto"
+    assert do_novo["74 anos"] == "72 parcelas, até R$ 35.000,00"
+    assert do_novo["79 anos"] == "12 parcelas, até R$ 5.000,00"
     assert itens["Idade"] == "21 a 73 anos"
     assert "Nubank" not in itens["Não porta"] and "Daycoval" in itens["Não porta"]
     assert itens["Sobra mínima"] == "R$ 50,00 por contrato"

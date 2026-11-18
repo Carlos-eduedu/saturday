@@ -7,6 +7,9 @@ no checkpoint do grafo:
 - com humano (handoff e alerta aberto), para assumir e devolver à IA;
 - consulta da Granatech parada em PROCESSING, para o "atualizar detalhe".
 
+E uma do ramo INSS em que o cliente aceitou o contrato novo do C6: handoff, as
+condições aceitas no checkpoint e a prova do SIM da simulação.
+
 E o que a tela precisa para ser conferida de verdade:
 
 - um gestor para entrar (`gestor@exemplo.test`); a senha é sorteada a cada
@@ -25,8 +28,19 @@ import struct
 import zlib
 
 from saturday.agent.graph import build_graph
+from saturday.agent.textos import (
+    CONSENTIMENTO_C6,
+    OFERTA_CONTRATO_NOVO,
+    VERSAO_CONSENTIMENTO_C6,
+)
 from saturday.dados import atendimento, repositorios
-from saturday.dados.modelos import ConsultaGranatech, Conversa, Mensagem, UsuarioPainel
+from saturday.dados.modelos import (
+    Consentimento,
+    ConsultaGranatech,
+    Conversa,
+    Mensagem,
+    UsuarioPainel,
+)
 from saturday.dados.sessao import criar_engine, criar_factory
 from saturday.dados.sessao import sessao as abrir
 from saturday.painel.auditoria import auditar
@@ -37,6 +51,7 @@ from saturday.web.composicao import criar_checkpointer
 from sqlalchemy import select
 
 CONVERSA = "seed-painel-clt"
+CONVERSA_C6 = "seed-painel-c6-novo"
 CPF = "00189004967"  # fictício, o mesmo dos testes
 GESTOR = "gestor@exemplo.test"
 DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -164,6 +179,59 @@ build_graph(checkpointer).update_state(
         },
     },
 )
+with abrir(fabrica) as sessao:
+    conversa = repositorios.obter_ou_criar_conversa(
+        sessao,
+        CONVERSA_C6,
+        canal="whatsapp",
+        telefone="5567900000002",
+        phone_number_id="100000000000001",
+    )
+    if repositorios.registrar_entrada(
+        sessao, conversa, message_id="seed-c6-1", conteudo="sim"
+    ):
+        repositorios.registrar_saida(
+            sessao,
+            conversa,
+            conteudo=OFERTA_CONTRATO_NOVO.format(
+                valor="4.321,09", parcela="99,00", parcelas=108, taxa="1,85"
+            ),
+        )
+        repositorios.registrar_entrada(
+            sessao, conversa, message_id="seed-c6-2", conteudo="quero"
+        )
+        sessao.add(
+            Consentimento(
+                conversa_id=conversa.id,
+                tipo="simulacao_c6",
+                texto_mostrado=CONSENTIMENTO_C6,
+                versao=VERSAO_CONSENTIMENTO_C6,
+                resposta_literal="sim",
+                wamid="seed-c6-1",
+                cpf=CPF,
+            )
+        )
+    atendimento.entrar_em_handoff(sessao, conversa, "handoff")
+
+build_graph(checkpointer).update_state(
+    {"configurable": {"thread_id": CONVERSA_C6}},
+    {
+        "status": "handoff",
+        "handoff_reason": "aceitou_contrato_novo",
+        "publico": "inss",
+        "cliente": {"cpf": CPF, "uf": "MS", "c6_autorizado": True},
+        # Convênio e produto são códigos fictícios, no formato do simulador.
+        "c6_novo": {
+            "situacao": "aceito",
+            "valor": "4321.09",
+            "parcela": "99.00",
+            "parcelas": 108,
+            "taxa": "1.85",
+            "convenio": "000020",
+            "produto": "0001",
+        },
+    },
+)
 senha = os.environ.get("PAINEL_LOCAL_SENHA") or secrets.token_urlsafe(12)
 with abrir(fabrica) as sessao:
     gestor = sessao.scalar(select(UsuarioPainel).where(UsuarioPainel.email == GESTOR))
@@ -284,4 +352,8 @@ with abrir(fabrica) as sessao:
         )
         conversa_dela = f"  /conversas/{assumida}" if assumida else ""
         print(f"{pessoa.email}  /membros/{pessoa.id}{conversa_dela}")
+    c6 = sessao.scalar(
+        select(Conversa.id).where(Conversa.conversation_id == CONVERSA_C6)
+    )
+    print(f"contrato novo no C6  /conversas/{c6}")
 print(f"seed pronto: entre com {GESTOR} e a senha {senha}")

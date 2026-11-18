@@ -51,9 +51,11 @@ uma entrega fora das fases.
   de formalização), o simulador em `simuladores/c6/` (no compose local, porta
   8500, com saúde e rotas de administração) e o SIM do cliente antes
   da simulação, com prova gravada (atrás de `SATURDAY_C6_ATIVO`). Depois do SIM, o
-  agente simula e oferece o contrato novo; o aceite vai para um atendente.
-  Faltam refinanciamento, digitação, acompanhamento e
-  painel. Detalhes e pendências em `docs/c6.md`.
+  agente simula e oferece o contrato novo; o aceite vai para um atendente, que
+  vê as condições na conversa do painel (seção "Contrato novo no C6"). As
+  regras do produto estão na aba Operação e o C6 da aba Bancos descreve o
+  contrato novo. Faltam refinanciamento, digitação e acompanhamento da
+  proposta. Detalhes e pendências em `docs/c6.md`.
 - **Fase 5 concluída:** ramo CLT em `agent/clt/` até a oferta, com triagem antes
   da identificação (docs/decisoes/0007), BrasilAPI com cache em `empresas_cnpj`
   e sem `FonteCadastral` (docs/decisoes/0006), prova do SIM antes de qualquer

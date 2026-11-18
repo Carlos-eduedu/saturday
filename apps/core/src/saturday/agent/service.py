@@ -89,6 +89,8 @@ class Jornada:
     oferta: dict[str, Any] | None
     # Id da proposta na Granatech para a qual a conversa aponta.
     proposta: str | None
+    # Contrato novo no C6 (decisão 0026): a situação e a condição ofertada.
+    contrato_novo: dict[str, Any] | None
 
 
 def jornada_do_estado(estado: dict[str, Any]) -> Jornada:
@@ -101,6 +103,7 @@ def jornada_do_estado(estado: dict[str, Any]) -> Jornada:
         etapa_clt=clt.get("etapa"),
         oferta=clt.get("oferta"),
         proposta=clt.get("proposta"),
+        contrato_novo=estado.get("c6_novo"),
     )
 
 

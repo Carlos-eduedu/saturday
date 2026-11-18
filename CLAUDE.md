@@ -40,7 +40,8 @@ sai no fim do seed, ou vem de `PAINEL_LOCAL_SENHA`), conversas nas três
 situações, uma com imagem, PDF e arquivo sem prévia num S3 local, três
 atendentes (`bia@`, `caio@` e `dora@exemplo.test`, com a mesma senha; para os
 prints como outra pessoa, `PAINEL_LOCAL_EMAIL`), e a conversa
-CLT com humano, ficha preenchida e consulta parada (`infra/painel_seed.py`),
+CLT com humano, ficha preenchida e consulta parada, e uma conversa INSS em
+handoff com o contrato novo do C6 aceito (`infra/painel_seed.py`),
 mais um alerta e um turno (`infra/painel_seed.sql`).
 `infra/painel_prints.sh <pasta> <caminho>...` grava cada tela em desktop claro,
 desktop escuro e celular, para o relatório de antes e depois. A revisão de um diff

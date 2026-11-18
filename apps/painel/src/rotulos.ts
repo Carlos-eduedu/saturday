@@ -171,6 +171,13 @@ export const TIPO_ICRED: Record<string, string> = {
   novo: "Contrato novo",
 };
 
+// Situação do contrato novo no C6 (`c6_novo` no estado do agente).
+export const SITUACAO_CONTRATO_NOVO: Record<string, string> = {
+  ofertado: "Ofertado",
+  aceito: "Aceito",
+  recusado: "Recusado",
+};
+
 // US$ com 4 casas para valores pequenos (um turno custa frações de centavo).
 export function dolar(valor: number): string {
   if (valor > 0 && valor < 0.0001) return "< US$ 0,0001";

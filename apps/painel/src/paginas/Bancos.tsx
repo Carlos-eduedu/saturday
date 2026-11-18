@@ -3,8 +3,8 @@ import type { Eu } from "../api";
 import { Abas, idAba } from "../componentes/Abas";
 import { Granatech } from "./Granatech";
 
-// Os bancos do agente, cada um na sua seção: o integrado por API, o que só tem
-// cálculo e o que ainda falta integrar. Sem interface `Banco` no código até
+// Os bancos do agente, cada um na sua seção: o integrado por API e os que o
+// agente só simula, consulta e oferece. Sem interface `Banco` no código até
 // existir o segundo integrado (decisão 0004); os números das regras ficam na
 // aba Operação, que os lê do servidor.
 const BANCOS = [
@@ -15,23 +15,29 @@ const BANCOS = [
     situacao: "Integrado",
     faz: [],
     falta: [],
-    regras: "clt",
+    regras: [["clt", "Ver as regras vigentes na Operação"]],
   },
   {
     id: "c6",
     nome: "C6",
-    produto: "Portabilidade INSS",
-    situacao: "Só cálculo",
+    produto: "INSS: portabilidade e contrato novo",
+    situacao: "Simulação e oferta",
     faz: [
       "Lê o extrato de empréstimos do Meu INSS que o cliente envia.",
-      "Aplica as regras do C6 a cada contrato e calcula a sobra.",
-      "Apresenta a oferta e, no aceite, passa a conversa para um atendente.",
+      "Calcula a portabilidade: aplica as regras do C6 a cada contrato e calcula a sobra.",
+      "Com o SIM do cliente, simula o contrato novo pela API do C6 e oferece.",
+      "No aceite, passa a conversa para um atendente, com as condições.",
     ],
     falta: [
-      "Digitar a proposta no C6: hoje quem digita é o atendente.",
-      "Acompanhar a proposta depois da digitação (saldo, confirmação no Meu INSS, pagamento).",
+      "Digitar a proposta pela API do C6: hoje quem digita é o atendente.",
+      "Refinanciamento de contrato que o cliente já tem no C6.",
+      "Acompanhar a proposta depois da digitação.",
+      "Credencial própria do Saturday na API do C6.",
     ],
-    regras: "portabilidade-inss",
+    regras: [
+      ["portabilidade-inss", "Regras da portabilidade"],
+      ["contrato-novo-inss", "Regras do contrato novo"],
+    ],
   },
   {
     id: "icred",
@@ -49,7 +55,7 @@ const BANCOS = [
       "Acompanhar a proposta depois da gravação.",
       "Confirmar se a oferta do iCred tem seguro.",
     ],
-    regras: null,
+    regras: [],
   },
 ] as const;
 
@@ -57,7 +63,7 @@ type Banco = (typeof BANCOS)[number];
 
 const SELO: Record<Banco["situacao"], string> = {
   Integrado: "selo-ia",
-  "Só cálculo": "selo-assumida",
+  "Simulação e oferta": "selo-assumida",
   "Consulta e oferta": "selo-assumida",
 };
 
@@ -87,9 +93,11 @@ export function Bancos({ eu }: { eu: Eu }) {
           {/* A aba já diz o banco: o título da seção é o produto. */}
           <h2>{atual.produto}</h2>
           <span className={`selo ${SELO[atual.situacao]}`}>{atual.situacao}</span>
-          {atual.regras && (
-            <Link to={`/operacao#${atual.regras}`}>Ver as regras vigentes na Operação</Link>
-          )}
+          {atual.regras.map(([produto, texto]) => (
+            <Link key={produto} to={`/operacao#${produto}`}>
+              {texto}
+            </Link>
+          ))}
         </header>
         {atual.id === "granatech" ? <Granatech eu={eu} /> : <Leitura banco={atual} />}
       </div>

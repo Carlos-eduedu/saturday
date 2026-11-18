@@ -11,6 +11,7 @@ from typing import Any
 
 from saturday.agent.clt import regras as clt
 from saturday.agent.clt.turno import reais
+from saturday.bancos.c6 import regras as c6
 from saturday.portabilidade import regras as inss
 from saturday.settings import Settings
 
@@ -38,7 +39,7 @@ def _bancos(codigos: set[str]) -> str:
     return ", ".join(sorted({NOMES.get(c, c) for c in codigos}))
 
 
-def _pct(valor: float) -> str:
+def _pct(valor: float | Decimal) -> str:
     return f"{valor:.2f}".replace(".", ",") + "% ao mês"
 
 
@@ -85,11 +86,40 @@ def produtos(settings: Settings) -> list[dict[str, Any]]:
                     ),
                 ),
                 _grupo(
-                    "Contrato novo no C6",
+                    "Contrato no C6 após a portabilidade",
                     ("Prazo", f"{inss.PRAZO_C6} parcelas"),
                     ("Valor mínimo", _rs(inss.CONTRATO_MINIMO)),
                     ("Sobra mínima", f"{_rs(inss.TROCO_MINIMO)} por contrato"),
                     ("Taxa do C6", f"até {_pct(inss.TAXA_TETO_C6 * 100)}"),
+                ),
+            ],
+        },
+        {
+            "id": "contrato-novo-inss",
+            "nome": "Contrato novo INSS (C6)",
+            "banco": {"id": "c6", "nome": "C6"},
+            "situacao": "O agente simula pela API do C6 e oferece; o atendente digita no C6.",
+            "grupos": [
+                _grupo(
+                    "Quem pode",
+                    ("Idade", f"{c6.IDADE_MIN} a {c6.IDADE_MAX} anos"),
+                    ("Margem livre mínima", _rs(c6.MARGEM_MINIMA)),
+                ),
+                _grupo(
+                    "Oferta",
+                    ("Parcela pedida", f"{c6.FATOR_DA_MARGEM * 100:.0f}% da margem livre"),
+                    ("Valor mínimo na conta", _rs(c6.VALOR_MINIMO)),
+                    ("Taxa máxima", _pct(c6.TAXA_MAXIMA)),
+                ),
+                _grupo(
+                    "Prazo e teto por idade",
+                    *(
+                        (
+                            f"{de} anos" if de == ate else f"Até {ate} anos",
+                            f"{prazo} parcelas, " + (f"até {_rs(teto)}" if teto else "sem teto"),
+                        )
+                        for de, ate, prazo, teto in c6.faixas()
+                    ),
                 ),
             ],
         },

@@ -717,8 +717,22 @@ def _acompanhamento(sessao: Session, conversa: Conversa, jornada: Jornada) -> di
         .order_by(ConsultaIcred.id.desc())
         .limit(1)
     ).first()
+    novo = jornada.contrato_novo or {}
     return {
         "oferta": oferta,
+        # O contrato novo do C6 (decisão 0026), desde a oferta. Lista fixa de
+        # campos; convênio e produto são os códigos que o banco devolveu.
+        "contrato_novo": {
+            "situacao": novo.get("situacao"),
+            "valor": novo["valor"],
+            "valor_parcela": novo.get("parcela"),
+            "numero_parcelas": novo.get("parcelas"),
+            "taxa_mensal": novo.get("taxa"),
+            "convenio": novo.get("convenio"),
+            "produto": novo.get("produto"),
+        }
+        if novo.get("valor")
+        else None,
         # A última consulta ao iCred (decisão 0027): o pacote já vem sem comissão.
         "icred": None
         if icred is None

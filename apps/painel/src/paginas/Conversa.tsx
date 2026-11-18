@@ -34,6 +34,7 @@ import {
   porcento,
   reais,
   rotulo,
+  SITUACAO_CONTRATO_NOVO,
   SITUACAO_DA_PROPOSTA,
   SITUACAO_ICRED,
   TIPO_ICRED,
@@ -751,13 +752,48 @@ function FichaCliente({
   );
 }
 
-// O que a IA disse em valores, ao lado da fala: oferta vigente, proposta no
-// banco e as provas do SIM. Só aparece quando a jornada chegou a algum deles.
+// O que a IA disse em valores, ao lado da fala: contrato novo do C6, consulta
+// no iCred, oferta vigente, proposta no banco e as provas do SIM. Só aparece
+// quando a jornada chegou a algum deles.
 function Acompanhamento({ ficha }: { ficha: Ficha }) {
-  const { oferta, proposta, consentimentos, icred } = ficha;
-  if (!oferta && !proposta && !icred && consentimentos.length === 0) return null;
+  const { oferta, proposta, consentimentos, icred, contrato_novo: novo } = ficha;
+  if (!oferta && !proposta && !icred && !novo && consentimentos.length === 0) return null;
   return (
     <div className="ficha">
+      {novo && (
+        <>
+          <h2>Contrato novo no C6</h2>
+          <dl>
+            <div>
+              <dt>Situação</dt>
+              <dd className="texto">{rotulo(SITUACAO_CONTRATO_NOVO, novo.situacao)}</dd>
+            </div>
+            <div>
+              <dt>Valor na conta</dt>
+              <dd>{reais(novo.valor)}</dd>
+            </div>
+            <div>
+              <dt>Parcelas</dt>
+              <dd>
+                {novo.numero_parcelas} × {reais(novo.valor_parcela)}
+              </dd>
+            </div>
+            <div>
+              <dt>Taxa</dt>
+              <dd>{porcento(novo.taxa_mensal)}</dd>
+            </div>
+            {/* Códigos do banco, crus: o manual do C6 não dá nome a eles. */}
+            <div>
+              <dt>Convênio (código)</dt>
+              <dd>{novo.convenio}</dd>
+            </div>
+            <div>
+              <dt>Produto (código)</dt>
+              <dd>{novo.produto}</dd>
+            </div>
+          </dl>
+        </>
+      )}
       {icred && (
         <>
           <h2>Consulta no iCred</h2>
