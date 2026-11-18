@@ -256,8 +256,10 @@ def test_ir_e_cenario_com_a_granatech_simulada(
     from saturday.agent import comandos
     from saturday.agent.clt.mensagens import texto
     from saturday.agent.clt.turno import PROVA_DE_TESTE
+    from saturday.agent.state import ultima_mensagem_agente
     from saturday.bancos.granatech.cliente import ClienteGranatech
-    from saturday.dados.modelos import Consentimento, ConsultaGranatech
+    from saturday.dados import repositorios
+    from saturday.dados.modelos import Consentimento, ConsultaGranatech, Conversa
     from saturday.jobs import granatech as jobs_granatech
 
     _membro(fabrica, testa=True)
@@ -318,9 +320,14 @@ def test_ir_e_cenario_com_a_granatech_simulada(
     _dizer(service_pg, conversa, "/humano")
     assert _dizer(service_pg, conversa, "/ir triagem").answer == comandos.COM_HUMANO
 
-    # Devolvida, o `/ir` mostra a pergunta da etapa: a resposta seguinte é a ela,
-    # não a algo de antes do atendimento (decisão 0033).
+    # Devolvida depois de um atendente escrever (a marca só existe assim, issue
+    # 45), o `/ir` mostra a pergunta da etapa: a resposta seguinte é a ela, não
+    # a algo de antes do atendimento (decisão 0033).
+    with abrir(fabrica) as s:
+        linha = s.scalar(select(Conversa).where(Conversa.conversation_id == conversa))
+        repositorios.registrar_saida(s, linha, conteudo="Oi!", autor="atendente")
     _dizer(service_pg, conversa, "/devolver")
+    assert ultima_mensagem_agente(service_pg.estado_atual(service_pg.config(conversa))) == ""
     assert _dizer(service_pg, conversa, "/ir triagem").answer == texto("triagem_carteira")
     assert _dizer(service_pg, conversa, "sim").answer == texto("triagem_tempo_casa")
     _dizer(service_pg, conversa, "/humano")

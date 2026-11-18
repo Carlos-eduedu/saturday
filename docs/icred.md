@@ -77,17 +77,25 @@ qualquer momento.
 **Atendente no meio (issue 42).** O que o atendente escreve pelo painel não
 entra no histórico do grafo. Por isso a devolução à IA (`AgentService.devolver`,
 o prazo do handoff, a rota `/release` e o `/devolver` do membro testador, todos
-por `_liberar_handoff`) acrescenta ao histórico uma mensagem vazia do agente
-(`marca_de_atendimento_humano`, em `agent/state.py`): ela passa a ser a "última
+por `_liberar_handoff`), **quando um atendente escreveu ao cliente desde que a
+conversa saiu da IA** (issue 45; mensagem com `autor = atendente`, entregue ou
+não, de qualquer atendente), acrescenta ao histórico uma mensagem vazia do agente
+(`marca_de_atendimento_humano`, em `agent/state.py`). Sem fala de atendente
+(prazo vencido sem ninguém assumir, `/release`, devolver sem ter escrito) não
+há marca, e o "sim" vale para o pedido que o cliente viu por último. Com a
+marca, ela passa a ser a "última
 mensagem", e o pedido de SIM, o de CPF ou a oferta do iCred de antes do
 atendente deixam de valer até a IA mostrá-los de novo. O "sim" seguinte à
 devolução recebe o mesmo pedido (ou a mesma oferta) outra vez, sem prova; só o
 "sim" depois disso vale. No pedido de CPF, o SIM dado antes do atendente
 continua valendo: refaz-se só o pedido do CPF. Dúvida logo depois da devolução
-recebe só a resposta, sem o pedido de volta. A marca não vai ao modelo (o
+recebe só a resposta, sem o pedido de volta (no pedido de CPF, recebe o pedido
+do CPF), e o "sim" que vier depois dela ainda refaz o pedido ou a oferta: a
+guarda compara o texto da última fala, e a resposta à dúvida não é o pedido
+(conferido na issue 45). A marca não vai ao modelo (o
 histórico pula mensagem vazia) e a fala do atendente continua fora do grafo.
-No C6 a devolução já apagava o pedido (`aguardando`) e a oferta
-(`oferta_pendente`): o "sim" de depois não autoriza a simulação nem aceita o
+No C6 a devolução, com ou sem fala do atendente, apaga o pedido (`aguardando`)
+e a oferta (`oferta_pendente`): o "sim" de depois não autoriza a simulação nem aceita o
 contrato novo, e vai para a resposta do modelo; o C6 não mostra o pedido nem a
 oferta de novo (só com um extrato novo). O ramo CLT lê a mesma marca desde a
 issue 44 (`docs/clt.md`, "Atendente no meio").

@@ -87,15 +87,23 @@ saía o pedido de autorização da consulta). Testes em `tests/test_clt_anexo.py
 ## Atendente no meio
 
 Um SIM só vale para o último pedido que o cliente viu
-([decisão 0033](decisoes/0033-sim-so-vale-para-o-ultimo-pedido-visto.md)). A
-devolução à IA deixa no histórico a marca de atendimento humano (a mesma do
-iCred, `docs/icred.md`); enquanto ela for a última mensagem do agente, o "sim"
-não vale e a etapa mostra o pedido de novo, com a chave da mensagem e os
-valores do estado. Só o "sim" seguinte vale, com a prova do texto mostrado. A
-conferência fica num ponto só: `_refazer_pedido`, chamado pelo nó `clt` antes
-da etapa (`agent/clt/nos.py`).
+([decisão 0033](decisoes/0033-sim-so-vale-para-o-ultimo-pedido-visto.md) e a
+nota de 2026-11-18 nela, issue 45). Quando a conversa volta à IA depois de um
+atendente ter escrito ao cliente, a volta deixa no histórico a marca de
+atendimento humano (a mesma do iCred, `docs/icred.md`). Enquanto o pedido da
+etapa não aparecer de novo depois da marca, o "sim" não vale e a etapa mostra o
+pedido, com a chave da mensagem e os valores do estado. Só o "sim" seguinte
+vale, com a prova do texto mostrado. A conferência fica num ponto só, no nó
+`clt`, antes da etapa (`agent/clt/nos.py`): `falas_desde_o_atendimento`
+(`agent/state.py`) diz o que o agente falou depois da marca e
+`_refazer_pedido` monta o pedido da etapa.
 
-| Etapa e passo | "Sim" logo depois da devolução |
+Sem fala de atendente desde que a conversa saiu da IA (prazo do handoff
+vencido sem ninguém assumir, `/release`, devolver sem ter escrito), não há
+marca: o pedido ainda é a última coisa que o cliente viu, e o "sim" vale.
+Mensagem do atendente que falhou na entrega conta como escrita.
+
+| Etapa e passo | "Sim" antes de o pedido aparecer de novo |
 | --- | --- |
 | `consentimento` / `sim` | Pedido de autorização de novo; sem prova, consulta ou cota |
 | `oferta` | A oferta de novo; os dados da proposta não começam |
@@ -108,11 +116,14 @@ da etapa (`agent/clt/nos.py`).
 | `consultando`, `proposta`, `formalizacao` | Nada muda: a etapa espera o evento |
 
 "Não", pergunta, pedido de mudança e resposta não reconhecida seguem para a
-etapa como sempre. A guarda vale para a primeira resposta depois da devolução:
-se o cliente primeiro recebe outra fala da IA (pergunta, "não", resposta não
-reconhecida, anexo) e depois responde "sim", o "sim" vale. O prazo do handoff e
-a rota `/release` deixam a marca mesmo sem ninguém ter falado com o cliente
-(limites registrados na decisão 0033). Testes em `tests/test_clt_devolucao.py`.
+etapa como sempre, e nenhuma dessas respostas da IA mostra o pedido: o "sim"
+que vier depois delas ainda recebe o pedido de novo. Depois do "não" ao resumo
+a jornada volta à oferta, e o "sim" seguinte mostra a oferta de novo. Conta
+como pedido mostrado qualquer fala do agente, depois da marca, que termine com
+o texto do pedido: o pedido refeito, a pergunta do andar normal da jornada, a
+oferta nova depois de um pedido de mudança e a resposta a um anexo, que traz a
+pergunta inteira. Cliente que nunca teve atendente não passa pela conferência.
+Testes em `tests/test_clt_devolucao.py`.
 
 ## Turnos de sistema
 

@@ -99,6 +99,25 @@ def ultima_mensagem_agente(state: AgentState) -> str | None:
     return None
 
 
+def falas_desde_o_atendimento(state: AgentState) -> list[str] | None:
+    """O que o agente disse depois da última marca de atendimento humano.
+
+    ``None`` quando não há marca: a conversa nunca voltou de um atendente que
+    escreveu ao cliente. Um pedido de antes do atendente só volta a valer
+    quando aparece nesta lista, isto é, quando foi mostrado de novo.
+    """
+
+    falas: list[str] = []
+    for mensagem_atual in reversed(state.get("messages") or []):
+        if not isinstance(mensagem_atual, AIMessage):
+            continue
+        conteudo = mensagem_atual.content
+        if conteudo == "":
+            return falas
+        falas.append(conteudo if isinstance(conteudo, str) else str(conteudo))
+    return None
+
+
 CAMPOS_DO_TURNO = (
     "intent",
     "intent_confidence",

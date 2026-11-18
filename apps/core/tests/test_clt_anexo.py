@@ -8,12 +8,10 @@ o pedido da consulta.
 
 from __future__ import annotations
 
-import uuid
 from types import ModuleType
 from typing import Any
 
 import pytest
-from conftest import anexo_fake
 from sqlalchemy.orm import Session, sessionmaker
 from test_clt_devolucao import (  # noqa: F401 - fixtures
     DADOS_ATE_RESUMO,
@@ -22,33 +20,19 @@ from test_clt_devolucao import (  # noqa: F401 - fixtures
     _posts_de_proposta,
     _propostas_gravadas,
     _provas,
+    mandar_anexo,
     nova,
 )
 from test_clt_jornada import (  # noqa: F401 - fixtures
     ATE_CONSENTIMENTO,
-    TELEFONE,
-    Jornada,
     _ate_oferta,
     brasilapi,
     fakes_clt,
 )
 
 from saturday.agent.clt.mensagens import texto
-from saturday.canais.base import OrigemCanal
-from saturday.schemas import AgentReply, Attachment, ChatRequest
 
 pytestmark = pytest.mark.filterwarnings("ignore:You should not use the 'timeout' argument")
-
-
-def mandar_anexo(jornada: Jornada) -> AgentReply:
-    return jornada.servico.process_message(
-        ChatRequest(
-            conversation_id=jornada.id,
-            message_id=f"wamid.{uuid.uuid4().hex}",
-            attachments=[Attachment(**anexo_fake())],  # type: ignore[arg-type]
-        ),
-        OrigemCanal(canal="whatsapp", telefone=TELEFONE, phone_number_id="100000000000001"),
-    )
 
 
 def test_anexo_no_pedido_da_consulta_recebe_o_pedido_e_nao_consulta(

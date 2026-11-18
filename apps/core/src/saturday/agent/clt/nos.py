@@ -15,7 +15,7 @@ from __future__ import annotations
 import copy
 import logging
 from collections.abc import Callable
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Any
@@ -28,7 +28,7 @@ from saturday.agent.clt.mensagens import Fixo, chaves, texto, variaveis, versao
 from saturday.agent.clt.turno import PERGUNTAS, Turno, primeiro_nome, reais
 from saturday.agent.coleta import hoje_operacao
 from saturday.agent.context import AgentContext
-from saturday.agent.state import AgentState, ultima_mensagem_agente
+from saturday.agent.state import AgentState, falas_desde_o_atendimento
 from saturday.bancos.granatech.cliente import ErroGranatech
 from saturday.bancos.granatech.normalizacao import DetalheConsulta, Simulacao, Vinculo
 from saturday.dados import consentimentos, recontatos
@@ -583,11 +583,12 @@ SIM_OU_NAO = frozenset(
 
 
 def _refazer_pedido(t: Turno, etapa: str) -> dict[str, Any] | None:
-    """O SIM logo depois da devolução pelo atendente não vale (decisão 0033).
+    """O pedido da etapa, mostrado de novo, quando a resposta é um SIM a ele.
 
-    O cliente conversou com uma pessoa depois do pedido: a etapa mostra o
-    pedido de novo, sem prova nem consulta, e só o SIM seguinte vale. O que
-    não é SIM segue para a etapa, como sempre.
+    Depois de um atendimento humano o SIM não vale para o pedido de antes
+    (decisão 0033): quem chama devolve esta resposta, sem prova nem consulta,
+    enquanto o pedido não tiver sido mostrado de novo. ``None`` quando a
+    resposta não é um SIM: ela segue para a etapa, como sempre.
     """
 
     passo = str(t.clt.get("passo"))
@@ -655,9 +656,13 @@ def clt(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
     if manipulador is None:
         # `nao_elegivel`, `encerrada`, `pago`: a jornada acabou; só a FAQ responde.
         return t.faq()
-    if ultima_mensagem_agente(state) == "":
-        refeito = _refazer_pedido(t, etapa)
-        if refeito is not None:
+    falas = falas_desde_o_atendimento(state)
+    if falas is not None:
+        # Houve atendimento humano: o SIM só vale se o pedido da etapa foi
+        # mostrado depois dele, qualquer que tenha sido a fala no meio. A
+        # sonda roda numa cópia: se o SIM vale, a etapa recebe a jornada intacta.
+        refeito = _refazer_pedido(replace(t, clt=copy.deepcopy(t.clt)), etapa)
+        if refeito is not None and not any(f.endswith(refeito["answer"]) for f in falas):
             return refeito
     if state.get("attachments") and etapa == "aceite":
         # O passo do resumo também se chama `sim`, mas a pergunta dele é o

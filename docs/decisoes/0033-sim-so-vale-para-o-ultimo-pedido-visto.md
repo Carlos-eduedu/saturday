@@ -102,3 +102,105 @@ a IA mostra de novo o pedido ou a oferta, e só o "sim" seguinte vale.
 - `POST /admin/conversas/{id}/desfazer` passa pelo `AgentService.desfazer`,
   que escreve no checkpoint sob a trava da conversa e antes do commit do
   banco, na mesma ordem do `devolver`.
+
+## Nota de 2026-11-18 (issues 45 e 46)
+
+Duas decisões do dono do produto, do mesmo dia, mudam o que está acima. Onde
+esta nota e o texto de cima divergem, vale a nota.
+
+**1. A marca vale até o pedido ser mostrado de novo (CLT).** Depois de uma
+devolução com atendimento, nenhum "sim" vale para um pedido do CLT enquanto
+esse pedido não aparecer de novo, qualquer que seja a fala da IA no meio
+(resposta a uma dúvida, "não entendi", recusa, opt-out).
+
+- **Desenho:** continua um mecanismo só, a marca no histórico. O despachante do
+  CLT deixa de perguntar "a marca é a última mensagem do agente?" e passa a
+  perguntar "o pedido desta etapa apareceu depois da última marca?"
+  (`falas_desde_o_atendimento`, em `agent/state.py`). Havendo marca, se a
+  resposta do cliente é um "sim" ao pedido da etapa (`_refazer_pedido`, o mesmo
+  leitor de antes) e nenhuma fala do agente depois da marca termina com o texto
+  desse pedido, o pedido sai de novo, sem prova, consulta, cota nem proposta.
+  Com o pedido mostrado, o "sim" seguinte vale. Sem marca no histórico, o
+  despachante não entra na conferência: nenhum caminho de cliente sem
+  atendente mudou.
+- **Por que não um campo "falta refazer" no estado do CLT:** seria um segundo
+  registro do mesmo fato, para manter em sincronia com a marca, e teria de ser
+  desligado em todo lugar que mostra um pedido (`perguntar`, a oferta, o
+  resumo, o `/ir`). A posição da marca em relação ao pedido já diz isso.
+- **Por que não reenviar o pedido no mesmo turno, depois da resposta:** mudaria
+  o que o cliente recebe na dúvida, na recusa e no opt-out (um "não" seguido
+  do pedido de novo), exigiria passar pela FAQ e voltar ao nó do CLT, e na
+  recusa do resumo o pedido da etapa muda no meio do turno.
+- **O que conta como "mostrado de novo":** qualquer fala do agente, depois da
+  marca, que termine com o texto do pedido da etapa. Vale para o pedido refeito
+  pela guarda, para a pergunta feita pelo andar normal da jornada (a marca
+  ficou para trás), para a oferta nova depois de um pedido de mudança, para a
+  pergunta posta pelo `/ir` e para a resposta a um anexo, que traz a pergunta
+  inteira (`sem_documento`) ou o resumo (issue 46).
+- **Recusa continua recusa:** "não" ao pedido da consulta, à oferta e ao resumo
+  segue para a etapa como antes. Depois do "não" ao resumo a jornada volta à
+  oferta, que foi vista antes do atendente: o "sim" seguinte mostra a oferta de
+  novo em vez de começar os dados da proposta.
+- **iCred e C6:** conferidos, sem mudança. O iCred compara o texto da última
+  fala com o pedido, e a resposta à dúvida não é o pedido; o C6 e a
+  portabilidade perdem o pedido e a oferta em toda devolução.
+
+**2. A marca só existe se um atendente escreveu ao cliente.** Toda volta à IA
+passa por `AgentService._liberar_handoff` (devolver, prazo do handoff,
+`/release`, `/devolver` do membro testador e o "Desfazer"), e é lá, num lugar
+só, que a fala do atendente é conferida.
+
+- **"Escreveu":** existe em `mensagens` uma linha com `autor = atendente`
+  nessa conversa (texto, mídia ou modelo enviados pelo painel), entregue ou
+  não. A que falhou na entrega conta: o cliente pode ter recebido.
+- **"Desde quando":** desde que a conversa saiu do estado `ia`, por handoff ou
+  por assumir, qualquer que seja o atendente (um pode ter escrito e outro
+  assumido depois, ou a conversa assumida pode ter caído em handoff). Como o
+  painel só deixa escrever com a conversa assumida, isso é o mesmo que "fala de
+  atendente que nenhuma volta à IA contou ainda": o estado do grafo guarda o id
+  da última fala já contada (`fala_atendente`), e a liberação compara com o
+  maior id de fala de atendente da conversa
+  (`repositorios.ultima_fala_de_atendente`). Não depende de relógio.
+- **Sem fala nova:** não há marca. O pedido continua sendo a última coisa que o
+  cliente viu, e o "sim" vale (CLT e iCred).
+- **O que não mudou:** a liberação continua zerando `aguardando`,
+  `oferta_pendente` e as contagens, com ou sem fala do atendente; no C6 e na
+  portabilidade o "sim" depois de qualquer devolução continua sem ter o que
+  aceitar. O "Desfazer" sem fala continua sem tocar no checkpoint. O `/ir`
+  continua sem marca.
+
+**Limites conhecidos que deixam de existir:** o primeiro (a guarda do CLT só
+na primeira resposta), o segundo (a marca sem ninguém ter falado com o
+cliente) e, no terceiro, a ordem pela hora de gravação (`criada_em`) no
+"Desfazer".
+
+**Limites conhecidos que ficam ou aparecem:**
+
+- Conversa que já tinha fala de atendente antes desta mudança não tem
+  `fala_atendente` no estado: a primeira volta à IA depois do deploy conta a
+  fala antiga e deixa a marca, mesmo sem atendimento novo (o comportamento de
+  antes, uma última vez). O mesmo acontece depois de um `/reiniciar`, que apaga
+  o estado. Erra para o lado seguro: um pedido a mais, nunca um "sim" aceito.
+- Marca deixada antes desta mudança (inclusive por prazo ou `/release` sem
+  atendimento) continua no histórico e passa a valer até o pedido reaparecer:
+  nessas conversas, um "sim" dado depois de outra fala da IA, que antes valia,
+  recebe o pedido mais uma vez.
+- No iCred, quando a conversa saiu da IA por um handoff do próprio grafo, o
+  aviso de handoff é a última fala do agente: mesmo sem marca, o "sim" de
+  depois do prazo refaz o pedido (o cliente viu o aviso depois do pedido). Já
+  era assim; o "sim vale" sem atendente é o do assumir direto e o do CLT.
+- Turno de sistema não passa pela guarda. O recontato por cota esgotada abre a
+  consulta com a prova já gravada, mesmo que um atendente tenha escrito no
+  meio; não há "sim" novo nesse caminho. Já era assim.
+- No "Desfazer" desse mesmo caso (conversa antiga, assumir por engano e
+  desfazer sem escrever), a liberação roda uma vez e zera o pedido do C6.
+- A comparação é pelo texto. Se o texto de uma mensagem fixa mudar entre o
+  pedido e o "sim" de uma conversa que teve atendimento, o pedido sai mais uma
+  vez.
+- A resposta a um anexo conta como pedido mostrado de novo, porque traz o
+  pedido inteiro; a prova guarda o texto do pedido, não a frase que vem antes.
+- Mensagem do atendente que falhou na entrega conta como escrita.
+
+Testes: `tests/test_clt_devolucao.py` (as falas no meio, a volta sem fala, o
+segundo atendente, a fala antiga), `tests/test_consentimento_pontas.py` (iCred
+e C6) e `tests/test_clt_anexo.py` (issue 46).

@@ -143,9 +143,14 @@ uma entrega fora das fases.
   proposta; a etapa mostra o pedido de novo e só o "sim" seguinte vale
   (`_refazer_pedido`, em `agent/clt/nos.py`). O "Desfazer" do painel deixa a
   mesma marca quando o atendente escreveu ao cliente antes de desfazer.
-  **Limite conhecido:** no CLT a guarda vale só para a primeira resposta depois
-  da devolução (outra fala da IA no meio, como a resposta a uma dúvida, ainda
-  deixa o "sim" seguinte valer); falta a decisão do dono.
+  Fechado na issue 45 (nota de 2026-11-18 na decisão 0033): no CLT a guarda
+  vale até o pedido da etapa aparecer de novo depois da marca, qualquer que
+  seja a fala da IA no meio (`falas_desde_o_atendimento`, em `agent/state.py`);
+  e a marca só existe quando um atendente escreveu ao cliente desde que a
+  conversa saiu da IA (`AgentService._liberar_handoff`, com o id da última fala
+  contada em `fala_atendente`, no estado): prazo vencido, `/release` e devolver
+  sem ter escrito não refazem pedido, no CLT e no iCred. Issue 46: anexo no
+  resumo da proposta recebe o resumo, não o pedido da consulta.
 - `migrations/` fica em `apps/core/migrations/`, não na raiz: as migrações
   descrevem os modelos daquele pacote e precisam do ambiente `uv` dele para
   importar. Desvio consciente da árvore desenhada na especificação.

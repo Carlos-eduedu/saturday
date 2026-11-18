@@ -14,12 +14,13 @@ from types import ModuleType
 from typing import Any
 
 import pytest
-from conftest import _montar_app, entrar_como
+from conftest import _montar_app, anexo_fake, entrar_como
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session, sessionmaker
 from test_clt_jornada import (  # noqa: F401 - fixtures
     ATE_CONSENTIMENTO,
+    TELEFONE,
     Jornada,
     _ate_oferta,
     brasilapi,
@@ -30,6 +31,7 @@ from test_clt_jornada import nova as _nova_fase5  # noqa: F401
 from saturday.agent.clt.mensagens import texto
 from saturday.agent.service import AgentService
 from saturday.agent.state import ultima_mensagem_agente
+from saturday.canais.base import OrigemCanal
 from saturday.dados import atendimento, repositorios
 from saturday.dados.modelos import (
     Consentimento,
@@ -43,6 +45,7 @@ from saturday.dados.modelos import (
 )
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.jobs import granatech as eventos_granatech
+from saturday.schemas import AgentReply, Attachment, ChatRequest
 
 pytestmark = pytest.mark.filterwarnings("ignore:You should not use the 'timeout' argument")
 
@@ -536,3 +539,179 @@ def test_sim_depois_de_desfazer_sem_o_atendente_escrever_vale(
     # O pedido continua sendo a última coisa que o cliente viu.
     assert jornada.falar("sim").answer == texto("consultando")
     assert _provas(jornada) == [("consulta", texto("consentimento"), "sim")]
+
+
+# ------------------------- a marca vale até o pedido ser mostrado de novo (issue 45)
+#
+# Depois do atendimento, a IA pode falar outra coisa antes do "sim" (resposta a
+# uma dúvida, "não entendi", recusa, opt-out): nada disso mostra o pedido, e o
+# "sim" seguinte ainda não é resposta a ele.
+
+
+def mandar_anexo(jornada: Jornada) -> AgentReply:
+    return jornada.servico.process_message(
+        ChatRequest(
+            conversation_id=jornada.id,
+            message_id=f"wamid.{uuid.uuid4().hex}",
+            attachments=[Attachment(**anexo_fake())],  # type: ignore[arg-type]
+        ),
+        OrigemCanal(canal="whatsapp", telefone=TELEFONE, phone_number_id="100000000000001"),
+    )
+
+
+FALAS_NO_MEIO = {
+    "duvida": "como funciona isso?",
+    "texto_solto": "deixa eu pensar",
+    "nao": "não",
+    "optout": "Não quero receber",
+}
+
+
+@pytest.mark.parametrize("meio", FALAS_NO_MEIO)
+def test_sim_depois_de_outra_fala_da_ia_ainda_refaz_o_pedido_da_consulta(
+    nova: Any, fabrica: sessionmaker[Session], simulador_granatech: ModuleType, meio: str
+) -> None:
+    jornada = nova()
+    jornada.roteiro(*ATE_CONSENTIMENTO)
+    _atendente_no_meio(jornada)
+
+    resposta = jornada.falar(FALAS_NO_MEIO[meio])
+    assert resposta.status == "answered" and texto("consentimento") not in resposta.answer
+    if meio == "nao":
+        assert resposta.answer == texto("consentimento_recusado")
+
+    assert jornada.falar("sim").answer == texto("consentimento")
+    assert _provas(jornada) == []
+    assert _nada_consultado(fabrica, simulador_granatech)
+
+    assert jornada.falar("sim").answer == texto("consultando")
+    assert _provas(jornada) == [("consulta", texto("consentimento"), "sim")]
+    assert len(simulador_granatech.CONSULTAS) == 1
+
+
+def test_duas_falas_da_ia_depois_do_atendente_ainda_refazem_o_pedido_da_consulta(
+    nova: Any, fabrica: sessionmaker[Session], simulador_granatech: ModuleType
+) -> None:
+    jornada = nova()
+    jornada.roteiro(*ATE_CONSENTIMENTO)
+    _atendente_no_meio(jornada)
+
+    jornada.roteiro("como funciona isso?", "deixa eu pensar", "e o seguro?")
+
+    assert jornada.falar("sim").answer == texto("consentimento")
+    assert _provas(jornada) == []
+    assert _nada_consultado(fabrica, simulador_granatech)
+
+
+def test_anexo_depois_do_atendente_mostra_o_pedido_da_consulta_e_o_sim_vale(
+    nova: Any, fabrica: sessionmaker[Session], simulador_granatech: ModuleType
+) -> None:
+    jornada = nova()
+    jornada.roteiro(*ATE_CONSENTIMENTO)
+    _atendente_no_meio(jornada)
+
+    # A resposta ao anexo traz o pedido inteiro: ele foi mostrado de novo.
+    resposta = mandar_anexo(jornada)
+    assert resposta.answer.endswith(texto("consentimento"))
+    assert _provas(jornada) == []
+    assert _nada_consultado(fabrica, simulador_granatech)
+
+    assert jornada.falar("sim").answer == texto("consultando")
+    assert _provas(jornada) == [("consulta", texto("consentimento"), "sim")]
+    assert len(simulador_granatech.CONSULTAS) == 1
+
+
+@pytest.mark.parametrize("meio", [*FALAS_NO_MEIO, "anexo"])
+def test_sim_depois_de_outra_fala_da_ia_ainda_refaz_a_oferta(nova: Any, meio: str) -> None:
+    jornada = nova()
+    oferta = _ate_oferta(jornada).answer
+    _atendente_no_meio(jornada)
+
+    resposta = mandar_anexo(jornada) if meio == "anexo" else jornada.falar(FALAS_NO_MEIO[meio])
+    assert resposta.status == "answered" and oferta not in resposta.answer
+    if meio == "nao":
+        assert resposta.answer == texto("oferta_recusada")
+
+    assert jornada.falar("sim, quero").answer == oferta
+    assert jornada.clt()["etapa"] == "oferta"
+
+    assert jornada.falar("sim, quero").answer.startswith("Para montar a proposta")
+    assert jornada.clt()["etapa"] == "dados_proposta"
+
+
+@pytest.mark.parametrize("meio", ["duvida", "texto_solto", "optout"])
+def test_sim_depois_de_outra_fala_da_ia_ainda_refaz_o_resumo(
+    nova: Any, fabrica: sessionmaker[Session], simulador_granatech: ModuleType, meio: str
+) -> None:
+    jornada = nova()
+    _ate_oferta(jornada)
+    resumo = jornada.roteiro(*DADOS_ATE_RESUMO).answer
+    _atendente_no_meio(jornada)
+
+    resposta = jornada.falar(FALAS_NO_MEIO[meio])
+    assert resposta.status == "answered" and resumo not in resposta.answer
+
+    assert jornada.falar("SIM").answer == resumo
+    assert [tipo for tipo, _, _ in _provas(jornada)] == ["consulta"]
+    assert _propostas_gravadas(fabrica) == 0
+    assert _posts_de_proposta(simulador_granatech) == 0
+
+    assert jornada.falar("SIM").answer == texto("proposta_enviada")
+    assert _provas(jornada)[-1] == ("proposta", resumo, "SIM")
+    assert _propostas_gravadas(fabrica) == 1
+    assert _posts_de_proposta(simulador_granatech) == 1
+
+
+def test_anexo_depois_do_atendente_mostra_o_resumo_e_o_sim_vale(
+    nova: Any, fabrica: sessionmaker[Session], simulador_granatech: ModuleType
+) -> None:
+    jornada = nova()
+    _ate_oferta(jornada)
+    resumo = jornada.roteiro(*DADOS_ATE_RESUMO).answer
+    _atendente_no_meio(jornada)
+
+    assert mandar_anexo(jornada).answer == resumo
+    assert _propostas_gravadas(fabrica) == 0
+    assert _posts_de_proposta(simulador_granatech) == 0
+
+    assert jornada.falar("SIM").answer == texto("proposta_enviada")
+    assert _provas(jornada)[-1] == ("proposta", resumo, "SIM")
+    assert _posts_de_proposta(simulador_granatech) == 1
+
+
+def test_nao_ao_resumo_depois_do_atendente_e_o_sim_seguinte_refaz_a_oferta(
+    nova: Any, fabrica: sessionmaker[Session], simulador_granatech: ModuleType
+) -> None:
+    jornada = nova()
+    oferta = _ate_oferta(jornada).answer
+    jornada.roteiro(*DADOS_ATE_RESUMO)
+    _atendente_no_meio(jornada)
+
+    # A recusa continua recusa: a jornada volta à oferta, vista antes do atendente.
+    assert jornada.falar("não").answer == texto("aceite_recusado")
+    assert jornada.clt()["etapa"] == "oferta"
+
+    assert jornada.falar("sim").answer == oferta
+    assert jornada.clt()["etapa"] == "oferta"
+    assert _propostas_gravadas(fabrica) == 0
+    assert _posts_de_proposta(simulador_granatech) == 0
+
+
+def test_pedidos_mostrados_depois_do_atendimento_valem_sem_serem_refeitos(
+    nova: Any, fabrica: sessionmaker[Session], simulador_granatech: ModuleType
+) -> None:
+    jornada = nova()
+    jornada.roteiro(ATE_CONSENTIMENTO[0])
+    _atendente_no_meio(jornada)
+    assert jornada.falar("sim").answer == texto("triagem_carteira")
+
+    # A marca ficou lá atrás: cada pedido daqui em diante é mostrado depois
+    # dela, e o roteiro de um cliente sem atendente anda sem nenhuma repetição.
+    assert jornada.roteiro(*ATE_CONSENTIMENTO[1:]).answer == texto("consentimento")
+    assert jornada.falar("SIM").answer == texto("consultando")
+    jornada.evento_consulta("SUCCESS")
+    assert "Boa notícia, Cliente!" in jornada.roteiro("1").answer
+    assert jornada.roteiro(*DADOS_ATE_RESUMO).answer.startswith("Confira o resumo da proposta")
+    assert jornada.falar("SIM").answer == texto("proposta_enviada")
+    assert [tipo for tipo, _, _ in _provas(jornada)] == ["consulta", "proposta"]
+    assert _posts_de_proposta(simulador_granatech) == 1
