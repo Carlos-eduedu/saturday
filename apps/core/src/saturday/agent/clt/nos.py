@@ -28,7 +28,7 @@ from saturday.agent.clt.mensagens import Fixo, chaves, texto, variaveis, versao
 from saturday.agent.clt.turno import PERGUNTAS, Turno, primeiro_nome, reais
 from saturday.agent.coleta import hoje_operacao
 from saturday.agent.context import AgentContext
-from saturday.agent.state import AgentState
+from saturday.agent.state import AgentState, ultima_mensagem_agente
 from saturday.bancos.granatech.cliente import ErroGranatech
 from saturday.bancos.granatech.normalizacao import DetalheConsulta, Simulacao, Vinculo
 from saturday.dados import consentimentos, recontatos
@@ -573,6 +573,48 @@ def _recontato_tempo_casa_vencido(t: Turno) -> dict[str, Any]:
     return saida
 
 
+# ---------------------------------------------------------------- depois do atendente
+
+# Passos respondidos com sim ou não, fora o pedido do SIM e a oferta.
+SIM_OU_NAO = frozenset(
+    {"carteira", "contrato_especial", "granatech", "funcionarios", "optin"}
+    | {"confirmar_celular", "mae", "endereco", "titular"}
+)
+
+
+def _refazer_pedido(t: Turno, etapa: str) -> dict[str, Any] | None:
+    """O SIM logo depois da devolução pelo atendente não vale (decisão 0033).
+
+    O cliente conversou com uma pessoa depois do pedido: a etapa mostra o
+    pedido de novo, sem prova nem consulta, e só o SIM seguinte vale. O que
+    não é SIM segue para a etapa, como sempre.
+    """
+
+    passo = str(t.clt.get("passo"))
+    if etapa == "oferta":
+        if leitura.pedido_de_mudanca(t.texto) is not None or not leitura.aceitou(t.texto):
+            return None
+        return t.responder(_texto_oferta(t, proposta.simulacao(t.clt["oferta"])))
+    if passo == "sim":
+        if not (leitura.consentiu(t.texto) or t.aceite_de_teste()):
+            return None
+        return proposta.pedir_aceite(t) if etapa == "aceite" else t.perguntar(etapa, passo)
+    if passo not in SIM_OU_NAO:
+        return None
+    # O mesmo leitor da etapa: "sou efetivo" é o "não" do contrato especial.
+    ler = leitura.contrato_especial if passo == "contrato_especial" else leitura.sim_ou_nao
+    if ler(t.texto) is not True:
+        return None
+    if passo == "confirmar_celular":
+        return t.responder(texto(passo, celular=mascarar_telefone(t.dados["celular"])))
+    if passo == "optin":
+        quando = date.fromisoformat(str(t.clt["recontato_em"]))
+        return t.responder(texto("recontato_tempo_casa", data=quando.strftime("%d/%m/%Y")))
+    if passo in ("mae", "endereco"):
+        return proposta.pedir_confirmacao(t, passo)
+    return t.perguntar(etapa, passo)
+
+
 ETAPAS: dict[str, Callable[[Turno], dict[str, Any]]] = {
     "abertura": _abertura,
     "triagem": _triagem,
@@ -613,6 +655,10 @@ def clt(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
     if manipulador is None:
         # `nao_elegivel`, `encerrada`, `pago`: a jornada acabou; só a FAQ responde.
         return t.faq()
+    if ultima_mensagem_agente(state) == "":
+        refeito = _refazer_pedido(t, etapa)
+        if refeito is not None:
+            return refeito
     passo = str(t.clt.get("passo"))
     chave = PERGUNTAS.get(passo)
     if state.get("attachments") and chave and not variaveis(chaves()[chave]):

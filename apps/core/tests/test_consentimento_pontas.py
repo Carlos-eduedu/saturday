@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 from pydantic import SecretStr
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session, sessionmaker
+from test_clt_devolucao import assumir_e_desfazer
 from test_icred import CPF, RESPOSTA_DA_DUVIDA, Jornada
 from test_portabilidade_fluxo import dados_extrato
 
@@ -278,6 +279,29 @@ def test_so_icred_sim_depois_do_atendente_refaz_a_oferta(
     assert so_icred.provas()[-1] == ("icred_aceite", CPF, "sim")
 
 
+def test_so_icred_sim_depois_de_o_atendente_escrever_e_desfazer_refaz_o_pedido(
+    so_icred: Jornada, simulador_icred: ModuleType
+) -> None:
+    assert so_icred.extrato().answer == textos.PEDIR_SIM
+    assumir_e_desfazer(so_icred.servico, so_icred.fabrica, so_icred.id, escreve=True)
+
+    # O "Desfazer" depois de o atendente escrever conta como atendimento (decisão 0033).
+    assert so_icred.falar("sim").answer == textos.PEDIR_SIM
+    assert so_icred.provas() == []
+    assert simulador_icred.CHAMADAS == []
+
+    assert so_icred.falar("sim").answer == textos.PEDIR_CPF
+
+
+def test_so_icred_sim_depois_de_desfazer_sem_o_atendente_escrever_vale(
+    so_icred: Jornada,
+) -> None:
+    assert so_icred.extrato().answer == textos.PEDIR_SIM
+    assumir_e_desfazer(so_icred.servico, so_icred.fabrica, so_icred.id, escreve=False)
+
+    assert so_icred.falar("sim").answer == textos.PEDIR_CPF
+
+
 def test_duvida_depois_do_atendente_nao_traz_o_pedido_e_o_sim_seguinte_refaz(
     so_icred: Jornada,
 ) -> None:
@@ -360,6 +384,25 @@ def test_sim_depois_do_atendente_nao_aceita_o_contrato_novo_do_c6(
     assert resposta.handoff_reason != "aceitou_contrato_novo"
     assert jornada.estado()["c6_novo"]["situacao"] == "ofertado"
     assert _tipos_de_prova(jornada) == ["simulacao_c6"]
+
+
+# A portabilidade pura segue o C6: a devolução zera `oferta_pendente` (issue 44,
+# só a confirmação; nada mudou aqui).
+def test_sim_depois_do_atendente_nao_aceita_a_portabilidade(
+    so_icred: Jornada, fakes: Fakes
+) -> None:
+    so_icred.servico.context = replace(so_icred.servico.context, icred=None)
+    assert (so_icred.extrato().answer or "").startswith("Analisei o seu extrato.")
+    assert so_icred.estado()["oferta_pendente"] is True
+    _atendente_no_meio(so_icred, "devolver")
+    # Mesmo que o classificador leia um aceite.
+    fakes.jev.resultado = resultado_jev(resposta_oferta="aceita", resposta_conf=0.9)
+
+    resposta = so_icred.falar("sim")
+
+    assert (resposta.status, resposta.answer) == ("answered", RESPOSTA_DA_DUVIDA)
+    assert resposta.handoff_reason != "aceitou_portabilidade"
+    assert so_icred.provas() == []
 
 
 # ------------------------- C. etapa do CPF: afirmação curta não vai à triagem

@@ -302,6 +302,16 @@ def test_ir_e_cenario_com_a_granatech_simulada(
     _dizer(service_pg, conversa, "/humano")
     assert _dizer(service_pg, conversa, "/ir triagem").answer == comandos.COM_HUMANO
 
+    # Devolvida, o `/ir` mostra a pergunta da etapa: a resposta seguinte é a ela,
+    # não a algo de antes do atendimento (decisão 0033).
+    _dizer(service_pg, conversa, "/devolver")
+    assert _dizer(service_pg, conversa, "/ir triagem").answer == texto("triagem_carteira")
+    assert _dizer(service_pg, conversa, "sim").answer == texto("triagem_tempo_casa")
+    _dizer(service_pg, conversa, "/humano")
+    _dizer(service_pg, conversa, "/devolver")
+    assert _dizer(service_pg, conversa, "/ir consultando").answer.startswith(texto("consultando"))
+    assert clt()["etapa"] == "consultando"
+
     # Regra 12: o cliente da Granatech real nunca manda o cenário.
     real = ClienteGranatech(http_granatech, settings_granatech(), fabrica, dormir=lambda _s: None)
     aberta = real.abrir_consulta("52998224725", "Fulano de Tal", TELEFONE, cenario="erro")

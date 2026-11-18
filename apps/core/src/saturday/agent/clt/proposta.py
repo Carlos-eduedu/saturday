@@ -82,7 +82,7 @@ def _linha_endereco(pessoa: Pessoa) -> str:
     return " - ".join(p for p in partes if p and p.strip(", "))
 
 
-def _simulacao(oferta: dict[str, Any]) -> Simulacao:
+def simulacao(oferta: dict[str, Any]) -> Simulacao:
     """A oferta guardada no checkpoint (texto) de volta a ``Simulacao``."""
 
     def dec(chave: str) -> Decimal:
@@ -130,6 +130,17 @@ def iniciar(t: Turno) -> dict[str, Any]:
     if pessoa is None or not _tomador_completo(t, pessoa):
         return t.handoff("dados_divergentes")
     return t.perguntar("dados_proposta", "mae", mae=pessoa.nome_mae)
+
+
+def pedir_confirmacao(t: Turno, passo: str) -> dict[str, Any]:
+    """A confirmação da mãe ou do endereço outra vez, com o dado da Granatech."""
+
+    pessoa = _pessoa(t)
+    if pessoa is None:
+        return t.handoff("dados_divergentes")
+    if passo == "mae":
+        return t.perguntar("dados_proposta", passo, mae=pessoa.nome_mae)
+    return t.perguntar("dados_proposta", passo, endereco=_linha_endereco(pessoa))
 
 
 # ---------------------------------------------------------------- dados da proposta
@@ -223,14 +234,14 @@ def conta(t: Turno) -> dict[str, Any]:
     t.dados["conta"] = t.dados.pop("conta_nova")
     if etapa == "nova_conta":
         return _conta_corrigida(t)
-    return _pedir_aceite(t)
+    return pedir_aceite(t)
 
 
 # ---------------------------------------------------------------- aceite
 
 
-def _pedir_aceite(t: Turno) -> dict[str, Any]:
-    oferta = _simulacao(t.clt["oferta"])
+def pedir_aceite(t: Turno) -> dict[str, Any]:
+    oferta = simulacao(t.clt["oferta"])
     conta_ = t.dados["conta"]
     resumo = texto(
         "resumo_aceite",
@@ -294,7 +305,7 @@ def seguir_proposta(t: Turno) -> dict[str, Any]:
         id_consulta=str(t.clt["consulta"]),
         vinculo=vinculo,
         produto=produto,
-        simulacao=_simulacao(oferta),
+        simulacao=simulacao(oferta),
     )
     try:
         id_proposta = t.granatech.criar_proposta(
