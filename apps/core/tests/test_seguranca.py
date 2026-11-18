@@ -419,3 +419,17 @@ def test_portability_result_literais_serializam_igual() -> None:
         ],
     }
     assert PortabilityResult.model_validate(dados).model_dump(mode="json") == dados
+
+
+def test_estado_antigo_com_motivo_aposentado_ainda_vira_resposta(service: AgentService) -> None:
+    """`idade_prazo_96` saiu das regras, mas conversa antiga com humano ainda o traz."""
+
+    estado = {
+        "status": "handoff",
+        "handoff_reason": "idade_prazo_96",
+        "portability_result": {"ok": False, "motivo": "idade_prazo_96", "prazo": 96},
+    }
+
+    resposta = service.evento("conversa-antiga", estado, status="with_human", answer="")
+
+    assert resposta.handoff_reason == "idade_prazo_96"

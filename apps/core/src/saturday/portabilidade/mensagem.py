@@ -15,12 +15,6 @@ MENSAGEM_IDADE_FORA = (
     "anos. Vou te transferir para um atendente da MEX."
 )
 
-MENSAGEM_IDADE_96 = (
-    "Para clientes com 72 ou 73 anos, o prazo é de 96 parcelas, que ainda não "
-    "está disponível nesta versão do atendimento. Vou te transferir para um "
-    "atendente da MEX."
-)
-
 MENSAGEM_ESPECIE_NAO_ATENDIDA = (
     "Benefícios do BPC/LOAS (espécies 87 e 88) não são atendidos por esta "
     "portabilidade. Vou te transferir para um atendente da MEX."

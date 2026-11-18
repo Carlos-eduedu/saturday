@@ -63,6 +63,8 @@ HandoffReason = Literal[
     "hiscon_nao_conferiu",
     "extrato_ilegivel_repetido",
     "idade_fora_regra",
+    # Só leitura: nenhuma regra emite mais (108x em toda a faixa desde 07/11/2026),
+    # mas o estado de conversa antiga ainda pode trazer o motivo.
     "idade_prazo_96",
     "especie_nao_atendida",
     "sem_portabilidade",
@@ -115,6 +117,8 @@ MotivoContrato = Literal[
 
 MotivoPortabilidade = Literal[
     "idade_fora_regra",
+    # Só leitura: nenhuma regra emite mais (108x em toda a faixa desde 07/11/2026),
+    # mas o estado de conversa antiga ainda pode trazer o motivo.
     "idade_prazo_96",
     "especie_nao_atendida",
     "hiscon_nao_conferiu",

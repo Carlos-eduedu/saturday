@@ -27,10 +27,6 @@ MENSAGENS_HANDOFF = {
     "idade_fora_regra": (
         "No momento não atendemos essa faixa de idade. Vou te transferir para um atendente da MEX."
     ),
-    "idade_prazo_96": (
-        "Para a sua idade, o prazo disponível ainda não está nesta versão do "
-        "atendimento. Vou te transferir para um atendente da MEX."
-    ),
     "especie_nao_atendida": (
         "Esse tipo de benefício não é atendido por esta portabilidade. Vou te "
         "transferir para um atendente da MEX."
@@ -139,7 +135,6 @@ MENSAGEM_EXTRATO_MES_ERRADO = (
 
 MENSAGENS_FALHA_CALCULO = {
     "idade_fora_regra": mensagem.MENSAGEM_IDADE_FORA,
-    "idade_prazo_96": mensagem.MENSAGEM_IDADE_96,
     "especie_nao_atendida": mensagem.MENSAGEM_ESPECIE_NAO_ATENDIDA,
 }
 

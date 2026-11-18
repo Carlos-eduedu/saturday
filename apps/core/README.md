@@ -146,8 +146,10 @@ Respostas:
 
 `status` pode ser `answered`, `with_human` ou `duplicate`.
 `handoff_reason` pode ser `sem_resposta`, `sem_portabilidade`,
-`dados_cliente_nao_informados`, `idade_fora_regra`, `idade_prazo_96`,
+`dados_cliente_nao_informados`, `idade_fora_regra`,
 `especie_nao_atendida`, `extrato_ilegivel` ou `erro_interno`.
+Conversa anterior a 07/11/2026 ainda pode trazer `idade_prazo_96`, que nenhuma
+regra emite mais.
 
 ### Rotas de conversa
 
