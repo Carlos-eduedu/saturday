@@ -15,6 +15,10 @@ cada uma com a fala fixa da oferta e uma resposta do modelo que cita reais (a
 da portabilidade com um valor fora da oferta), para a conferência da fala. E
 uma com o contrato novo recusado seguido da oferta de portabilidade.
 
+E, para o funil da Operação, uma conversa CLT do SIM à proposta paga, mais os
+turnos e as provas que dão público e etapa às conversas acima (os números
+esperados estão na decisão 0031).
+
 E o que a tela precisa para ser conferida de verdade:
 
 - um gestor para entrar (`gestor@exemplo.test`); a senha é sorteada a cada
@@ -31,6 +35,7 @@ import os
 import secrets
 import struct
 import zlib
+from decimal import Decimal
 
 from saturday.agent.graph import build_graph
 from saturday.agent.icred import textos as textos_icred
@@ -46,6 +51,7 @@ from saturday.dados.modelos import (
     ConsultaIcred,
     Conversa,
     Mensagem,
+    PropostaGranatech,
     Turno,
     UsuarioPainel,
 )
@@ -64,6 +70,7 @@ CONVERSA_C6 = "seed-painel-c6-novo"
 CONVERSA_PORTABILIDADE = "seed-painel-portabilidade"
 CONVERSA_ICRED = "seed-painel-icred"
 CONVERSA_RECUSADO = "seed-painel-c6-recusado"
+CONVERSA_PAGA = "seed-painel-clt-paga"
 CPF = "00189004967"  # fictício, o mesmo dos testes
 FAIXA = {"min": 1234.56, "max": 1500.99}
 PORTABILIDADE = {
@@ -165,10 +172,26 @@ def pdf(linhas: list[str]) -> bytes:
     return bytes(saida + f"startxref\n{xref}\n%%EOF\n".encode())
 
 
-def fala_da_ia(sessao, conversa, texto: str, chave: str | None, *caminho: str) -> None:
+def prova(conversa, tipo: str, texto: str = "pedido do seed", versao: str = "seed"):
+    """Prova de um SIM; o funil conta a conversa pela existência dela."""
+
+    return Consentimento(
+        conversa_id=conversa.id,
+        tipo=tipo,
+        texto_mostrado=texto,
+        versao=versao,
+        resposta_literal="sim",
+        cpf=CPF,
+    )
+
+
+def fala_da_ia(
+    sessao, conversa, texto: str, chave: str | None, *caminho: str, etapa: str = "inss"
+) -> None:
     """Fala com a procedência que o turno gravaria (decisão 0018).
 
-    Sem chave, quem escreveu foi o modelo: o turno leva a chamada ao `llm`.
+    Sem chave, quem escreveu foi o modelo: o turno leva a chamada ao `llm`. A
+    etapa do turno é o que diz o público da conversa ao funil (decisão 0031).
     """
 
     chamadas = [] if chave else [{"nome": "llm", "latencia_ms": 900, "status": "ok"}]
@@ -176,6 +199,7 @@ def fala_da_ia(sessao, conversa, texto: str, chave: str | None, *caminho: str) -
         conversa_id=conversa.id,
         caminho=["__start__", *caminho],
         status="answered",
+        etapa=etapa,
         chamadas=chamadas,
     )
     sessao.add(turno)
@@ -219,6 +243,53 @@ with abrir(fabrica) as sessao:
                 cpf=CPF,
                 conversa_id=conversa.id,
                 status="PROCESSING",
+            )
+        )
+        sessao.add(prova(conversa, "consulta"))
+        sessao.add(
+            Turno(
+                conversa_id=conversa.id,
+                caminho=["__start__", "clt"],
+                etapa="consultando",
+            )
+        )
+
+    # Para o funil da Operação ter número em todas as etapas: uma conversa CLT
+    # que foi do SIM ao pagamento. A proposta não leva a marca de teste, que a
+    # tiraria do funil; por isso ela aparece também na aba Granatech.
+    conversa = repositorios.obter_ou_criar_conversa(
+        sessao,
+        CONVERSA_PAGA,
+        canal="whatsapp",
+        telefone="5511900000006",
+        phone_number_id="100000000000001",
+    )
+    if repositorios.registrar_entrada(
+        sessao, conversa, message_id="seed-paga-1", conteudo="sim"
+    ):
+        fala_da_ia(
+            sessao,
+            conversa,
+            "Boa notícia: saiu a sua oferta.",
+            "oferta_sem_seguro",
+            "clt",
+            etapa="oferta",
+        )
+        sessao.add_all([prova(conversa, "consulta"), prova(conversa, "proposta")])
+        consulta = ConsultaGranatech(
+            id_externo="seed-paga", cpf=CPF, conversa_id=conversa.id, status="SUCCESS"
+        )
+        sessao.add(consulta)
+        sessao.flush()
+        sessao.add(
+            PropostaGranatech(
+                consulta_id=consulta.id,
+                conversa_id=conversa.id,
+                id_externo="seed-paga",
+                estado_envio="criada",
+                valor_parcela=Decimal("210.50"),
+                numero_parcelas=24,
+                status="PAYED",
             )
         )
 
@@ -271,6 +342,15 @@ with abrir(fabrica) as sessao:
                 resposta_literal="sim",
                 wamid="seed-c6-1",
                 cpf=CPF,
+            )
+        )
+        sessao.add(
+            Turno(
+                conversa_id=conversa.id,
+                caminho=["__start__", "classify_intent", "handoff"],
+                status="handoff",
+                motivo="aceitou_contrato_novo",
+                etapa="inss",
             )
         )
     atendimento.entrar_em_handoff(sessao, conversa, "handoff")
@@ -360,6 +440,7 @@ with abrir(fabrica) as sessao:
             "classify_intent",
             "generate_answer",
         )
+        sessao.add(prova(conversa, "icred_consulta"))
         sessao.add(
             ConsultaIcred(
                 chave="seed-icred-oferta",
@@ -391,6 +472,9 @@ with abrir(fabrica) as sessao:
             ),
             "textos:oferta_contrato_novo",
             "simulate_c6",
+        )
+        sessao.add(
+            prova(conversa, "simulacao_c6", CONSENTIMENTO_C6, VERSAO_CONSENTIMENTO_C6)
         )
         repositorios.registrar_entrada(
             sessao, conversa, message_id="seed-recusado-2", conteudo="esse não quero"

@@ -202,6 +202,7 @@ nunca pelo `conversation_id`, que no WhatsApp carrega o telefone.
 | `GET` | `/admin/alertas` | Alertas abertos (`handoff`, `erro_interno`, `atendente_desativado`, `envio_falhou`, `sem_resposta`, `evento_com_humano`, `cota_80`, `consulta_parada`, `granatech_evento`, `icred_consulta_parada`, `instancia_desconectada`, `instancia_numero_trocado`). |
 | `POST` | `/admin/alertas/{id}/resolver` | Resolve e audita. |
 | `GET` | `/admin/cota` | Consultas Granatech no dia e no mês contra os tetos. |
+| `GET` | `/admin/funil` | Só gestor. `?periodo=hoje\|7d\|30d\|mes` (padrão `mes`): por produto, as conversas iniciadas no período que chegaram a cada etapa (`etapas`, e em `produtos[].celulas` a contagem e a `taxa` sobre a etapa anterior; célula nula é etapa que o produto não tem), mais `iniciadas` e `sem_publico`. Fontes e regra de período na decisão 0031. |
 | `GET` | `/admin/midia/{mensagem_id}/{indice}` | Anexo da mensagem, servido pela API (sem URL pré-assinada). Imagem (JPG, PNG, WebP, GIF), áudio, vídeo e PDF abrem no navegador; qualquer outro tipo sai como download (`Content-Disposition: attachment`), porque o tipo é o que o cliente declarou. |
 | `GET` | `/admin/eventos` | SSE: avisos `{tipo, conversa\|alerta}` com IDs, sem dado pessoal. |
 

@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation } from "react-router";
-import { api, type Custos as DadosCustos, type Eu, mensagemDeFalha } from "../api";
+import {
+  api,
+  type Custos as DadosCustos,
+  type Eu,
+  mensagemDeFalha,
+  type PeriodoDoFunil,
+} from "../api";
 import { Falha } from "../componentes/Falha";
 import { Vazio } from "../componentes/Vazio";
 import { dolar, tokens } from "../rotulos";
@@ -9,8 +15,16 @@ import { useRecurso } from "../useRecurso";
 const diaCurto = (iso: string) =>
   new Date(`${iso}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 
+const PERIODOS: [PeriodoDoFunil, string][] = [
+  ["hoje", "Hoje"],
+  ["7d", "7 dias"],
+  ["30d", "30 dias"],
+  ["mes", "Mês atual"],
+];
+
 // Aba Operação: os produtos em operação com as regras vigentes, para todos; o
-// uso da cota da Granatech e os custos operacionais (IA em US$), só para gestor.
+// funil, o uso da cota da Granatech e os custos operacionais (IA em US$), só
+// para gestor.
 export function Operacao({ eu }: { eu: Eu }) {
   return (
     <div className="custos operacao">
@@ -18,6 +32,7 @@ export function Operacao({ eu }: { eu: Eu }) {
       <Produtos />
       {eu.perfil === "gestor" && (
         <>
+          <Funil />
           <CotaGranatech />
           <Custos />
         </>
@@ -70,6 +85,88 @@ function Produtos() {
           </div>
         </section>
       ))}
+    </section>
+  );
+}
+
+// Funil (decisão 0031): por produto, quantas conversas iniciadas no período
+// chegaram a cada etapa. Contagem e taxa chegam prontas: aqui não se faz conta.
+function Funil() {
+  const [periodo, setPeriodo] = useState<PeriodoDoFunil>("mes");
+  const { dado: funil, falha, carregar } = useRecurso(`funil:${periodo}`, () => api.funil(periodo));
+  const erro = falha === null ? "" : mensagemDeFalha(falha, "carregar o funil");
+
+  return (
+    <section className="funil" id="funil">
+      <h2>
+        Funil{" "}
+        {funil && (
+          <span className="contagem">
+            · conversas iniciadas de {diaCurto(funil.de)} a {diaCurto(funil.ate)}
+          </span>
+        )}
+      </h2>
+      <div className="disponibilidade" role="group" aria-label="Período do funil">
+        {PERIODOS.map(([id, rotulo]) => (
+          <button key={id} type="button" aria-pressed={periodo === id} onClick={() => setPeriodo(id)}>
+            {rotulo}
+          </button>
+        ))}
+      </div>
+      {erro ? (
+        <Falha titulo="Não deu para carregar o funil." texto={erro} aoTentar={carregar} />
+      ) : !funil ? (
+        <p className="centro">Carregando…</p>
+      ) : funil.iniciadas === 0 ? (
+        <Vazio
+          titulo="Nenhuma conversa começou neste período."
+          texto="O funil conta cada conversa no período em que ela começou, com as etapas a que chegou depois. Conversas de membro testador ficam de fora."
+        />
+      ) : (
+        <section>
+          <table>
+            <thead>
+              <tr>
+                <th>Produto</th>
+                {funil.etapas.map((e) => (
+                  <th key={e.id} className="num">
+                    {e.rotulo}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {funil.produtos.map((p) => (
+                <tr key={p.id}>
+                  <th scope="row">{p.nome}</th>
+                  {funil.etapas.map((e, i) => {
+                    const c = p.celulas[i] ?? null;
+                    return (
+                      <td key={e.id} className="num" data-rotulo={e.rotulo}>
+                        {c === null ? (
+                          <span className="funil-sem">não se aplica</span>
+                        ) : (
+                          <>
+                            {c.conversas}
+                            {/* Sempre presente, para a coluna alinhar com e sem taxa. */}
+                            <span className="funil-taxa">{c.taxa !== null && `${c.taxa}%`}</span>
+                          </>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="nota">
+            Conversas iniciadas no período: {funil.iniciadas}, das quais {funil.sem_publico} ainda sem
+            público definido (fora da tabela). Cada conversa conta uma vez por etapa e produto, e as
+            três ofertas do INSS partem das mesmas conversas. A porcentagem é sobre a etapa anterior
+            que o produto tem.
+          </p>
+        </section>
+      )}
     </section>
   );
 }

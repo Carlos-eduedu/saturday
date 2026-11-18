@@ -455,6 +455,24 @@ export interface Custos {
   conversas_mais_caras: { id: string; telefone: string | null; canal: string; custo_usd: number }[];
 }
 
+// Funil da aba Operação (decisão 0031). Conta e taxa vêm do servidor; a célula
+// nula é etapa que o produto não tem ("não se aplica"), não zero.
+export type PeriodoDoFunil = "hoje" | "7d" | "30d" | "mes";
+
+export interface Funil {
+  periodo: PeriodoDoFunil;
+  de: string;
+  ate: string;
+  iniciadas: number;
+  sem_publico: number;
+  etapas: { id: string; rotulo: string }[];
+  produtos: {
+    id: string;
+    nome: string;
+    celulas: ({ conversas: number; taxa: number | null } | null)[];
+  }[];
+}
+
 // Aba Granatech (decisão 0013): consulta para todos, ações só para gestor.
 export type Acoes = Record<string, string | null>; // null = pode; texto = motivo de não poder
 
@@ -801,6 +819,7 @@ export const api = {
   reativarUsuario: (id: string) => chamar<void>("POST", `/gestao/usuarios/${id}/reativar`),
   turnos: (id: string) => chamar<Trilha>("GET", `/conversas/${id}/turnos`),
   custos: () => chamar<Custos>("GET", "/custos"),
+  funil: (periodo: PeriodoDoFunil) => chamar<Funil>("GET", `/funil?periodo=${periodo}`),
   cotaPorDia: () => chamar<CotaPorDia>("GET", "/cota/dias"),
   produtos: () => chamar<Produto[]>("GET", "/produtos"),
   grafo: () => chamar<Grafo>("GET", "/agente/grafo"),

@@ -44,6 +44,11 @@ uma entrega fora das fases.
   Aba Membros para todos: lista da equipe e página do membro
   (`/membros/:id`) com estado, carga, atividade de 7 dias, últimas ações e a
   gestão do gestor; o servidor decide o que cada um vê (docs/decisoes/0023).
+  Aba Operação com o funil para o gestor (`GET /admin/funil`): por produto,
+  as conversas iniciadas no período que chegaram a cada etapa (iniciadas, SIM,
+  oferta, aceite, proposta criada, pago), com a taxa de passagem calculada no
+  servidor e "não se aplica" na etapa que o produto não tem; fontes e regra
+  de período (coorte da conversa iniciada) em docs/decisoes/0031.
   Comandos de chat do membro testador: `/ajuda`, `/estado`, `/reiniciar`,
   `/humano`, `/devolver` e, só com a Granatech simulada, `/ir` e `/cenario`; o
   simulador manda sozinho o resultado da consulta aberta com cenário

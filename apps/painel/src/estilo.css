@@ -1113,6 +1113,27 @@ main:has(.historico) { padding-bottom: 0; }
 .cota-medidor.nivel-esgotada .cota-medidor__barra > span { background: var(--erro); }
 .cota-medidor.nivel-atencao .cota-medidor__valor, .cota-operacao tr.nivel-atencao td:last-child { color: var(--handoff); font-weight: 600; }
 .cota-medidor.nivel-esgotada .cota-medidor__valor, .cota-operacao tr.nivel-esgotada td:last-child { color: var(--erro); font-weight: 600; }
+/* Funil: produto na linha, etapa na coluna; no celular, um bloco por produto
+   com as etapas de cima para baixo. */
+.funil > .disponibilidade { align-self: flex-start; }
+.funil tbody th { font-weight: 500; color: var(--texto); font-size: inherit; }
+.funil tbody tr:last-child th { border-bottom: none; }
+.funil-taxa { display: inline-block; min-width: 3.25rem; color: var(--suave); }
+.funil-sem { font-family: var(--fonte-texto); color: var(--suave); }
+.funil table + .nota { margin: 0.75rem 0 0; }
+@media (max-width: 767px) {
+  .funil > .disponibilidade { align-self: stretch; display: flex; }
+  .funil > .disponibilidade button { flex: 1; padding: 0 0.25rem; }
+  .funil thead { display: none; }
+  .funil table, .funil tbody, .funil tr, .funil tbody th, .funil td { display: block; }
+  .funil tr { padding: 0.75rem 0; border-bottom: 1px solid var(--borda); }
+  .funil tr:first-child { padding-top: 0; }
+  .funil tbody tr:last-child { border-bottom: none; }
+  .funil tbody th { border: none; padding: 0 0 0.25rem; }
+  .funil tbody td:last-child { border-bottom: none; }
+  .funil td { display: flex; justify-content: space-between; gap: 1rem; }
+  .funil td[data-rotulo]::before { content: attr(data-rotulo); font-family: var(--fonte-texto); color: var(--suave); margin-right: auto; }
+}
 .custos table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .custos th { text-align: left; font-size: 0.8rem; font-weight: 500; color: var(--suave); padding: 0.5rem; border-bottom: 1px solid var(--borda); }
 .custos td { padding: 0.5rem; border-bottom: 1px solid var(--borda); }

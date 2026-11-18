@@ -47,11 +47,13 @@ from saturday.painel import acoes, exportacao, membros, sessoes, supervisao
 from saturday.painel import usuarios as regras_de_usuarios
 from saturday.painel.auditoria import auditar
 from saturday.painel.canal import permitido
+from saturday.painel.funil import Periodo, funil
 from saturday.painel.midia import mime_base
 from saturday.painel.produtos import produtos
 from saturday.portabilidade.mensagem import resumo_da_oferta
 from saturday.privacidade import MASCARAS
 from saturday.settings import TZ_OPERACAO
+from saturday.web.api.canais import Gestor
 from saturday.web.api.granatech_admin import Conta
 from saturday.web.dependencies import (
     COOKIE_SESSAO,
@@ -964,6 +966,16 @@ def listar_produtos(request: Request, _usuario: Logado) -> list[dict[str, Any]]:
     """Produtos em operação e as regras vigentes de cada um (aba Operação)."""
 
     return produtos(get_settings(request))
+
+
+@router.get("/funil")
+def ver_funil(
+    _usuario: Gestor, fabrica: Fabrica, periodo: Annotated[Periodo, Query()] = "mes"
+) -> dict[str, Any]:
+    """Funil da aba Operação: etapa × produto das conversas iniciadas no período."""
+
+    with abrir_sessao(fabrica) as sessao:
+        return funil(sessao, periodo)
 
 
 # ------------------------------------------------------------------ mídia
