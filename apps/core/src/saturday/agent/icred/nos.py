@@ -228,15 +228,15 @@ def _sim(state: AgentState, contexto: AgentContext, dados: dict[str, Any]) -> di
 
 
 def _cpf(state: AgentState, contexto: AgentContext, dados: dict[str, Any]) -> dict[str, Any]:
+    if ultima_mensagem_agente(state) not in (textos.PEDIR_CPF, textos.CPF_INVALIDO):
+        # O SIM guardado respondia a um pedido que não é mais o último mostrado.
+        return _pedir_sim(state)
     cpf = leitura.cpf(state.get("user_message", ""))
     if cpf is None:
         dados["tentativas"] = int(dados.get("tentativas") or 0) + 1
         if dados["tentativas"] >= 2:
             return _seguir(dados)
         return _falar(dados, textos.CPF_INVALIDO, "icred:cpf_invalido")
-    if ultima_mensagem_agente(state) not in (textos.PEDIR_CPF, textos.CPF_INVALIDO):
-        # O SIM guardado respondia a um pedido que não é mais o último mostrado.
-        return _pedir_sim(state)
     return _consultar(state, contexto, dados, cpf)
 
 

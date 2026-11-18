@@ -63,7 +63,7 @@ def aplicar(fabrica: sessionmaker[Session], payload: dict[str, Any], servico: Ag
         raise ValueError("evento do iCred sem dados")
     conversation_id = _gravar(fabrica, normalizar_consulta(dados))
     if conversation_id:
-        # Repetido não faz mal: o nó ignora o evento fora da etapa `consultando`.
+        # Repetido não faz mal: o nó ignora o evento que não é da consulta vigente.
         servico.continuar(conversation_id, EVENTO_RESULTADO)
 
 

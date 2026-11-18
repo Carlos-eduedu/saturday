@@ -498,6 +498,26 @@ def test_extrato_de_outro_titular_que_vai_para_o_atendente_tambem_descarta_a_ofe
     assert _ofertas_do_icred_enviadas(jornada) == 1
 
 
+def test_so_com_o_icred_o_extrato_de_outro_titular_descarta_a_oferta(
+    fabrica: sessionmaker[Session],
+    http_icred: TestClient,
+    fakes: Fakes,
+    simulador_icred: ModuleType,
+) -> None:
+    fakes.llm.extrato = {**dados_extrato(), "cpf": CPF}
+    jornada = Jornada(fabrica, http_icred, fakes, simulador_icred)
+    jornada.ate_a_consulta()
+    jornada.resultado("COM_OFERTA", [{**simulador_icred.PRODUTO_NOVO, "liberado": 50000.0}])
+    fakes.llm.extrato = {**fakes.llm.extrato, "cpf": OUTRO_TITULAR}
+
+    # Sem o C6 a `porta` roda no mesmo turno: sai o pedido, não a oferta antiga.
+    assert jornada.extrato().answer == PEDIDO_ORIGINAL
+
+    assert jornada.falar("sim").answer == textos.PEDIR_CPF
+    assert [tipo for tipo, _cpf, _resposta in jornada.provas()] == ["icred_consulta"]
+    assert _ofertas_do_icred_enviadas(jornada) == 1
+
+
 # ------------------------------ a última mensagem do agente não foi o pedido
 
 
@@ -563,6 +583,10 @@ def test_so_com_o_icred_o_sim_depois_de_extrato_recusado_refaz_o_pedido(
     # O CPF também só vale como resposta ao pedido dele: mensagem vazia no meio.
     assert so_icred.falar("").answer == MENSAGEM_SEM_TEXTO
     assert so_icred.falar(CPF).answer == PEDIDO_ORIGINAL
+    # Nem passando antes por um CPF inválido: o aviso dele não reabre o pedido.
+    assert so_icred.falar("sim").answer == textos.PEDIR_CPF
+    assert so_icred.falar("").answer == MENSAGEM_SEM_TEXTO
+    assert so_icred.falar("123").answer == PEDIDO_ORIGINAL
     assert _provas(so_icred) == []
     assert simulador_icred.CHAMADAS == []
 
