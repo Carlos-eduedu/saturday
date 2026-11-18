@@ -127,3 +127,14 @@ Bancos e a consulta e a proposta na ficha.
 - **Apresentar parte do pacote e gravar tudo.** Quebra a regra 3.
 - **Aplicar o teto de R$ 6.999.** No INSS o valor costuma passar disso e o motor
   não aceita valor máximo.
+
+**Nota de 2026-11-18.** Com o C6 (decisão 0026) e o iCred ligados juntos,
+decidido com o dono do produto na issue 22: são dois SIMs em momentos separados,
+um por banco, cada um pedido só quando a consulta daquele banco vai acontecer;
+os dois pedidos não viram um e a ordem do grafo não muda. Depois de o cliente
+recusar o contrato novo do C6 o iCred continua sendo consultado, e o contrato
+novo recusado não conta na comparação: o iCred é comparado só com a
+portabilidade. Mudou só o texto do pedido de SIM do iCred quando o cliente já
+respondeu ao pedido do C6: a abertura deixa de citar a chegada do extrato, com
+versão própria na prova (`icred-1-depois-c6`). Os caminhos estão em
+`docs/icred.md`.

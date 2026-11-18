@@ -105,7 +105,10 @@ uma entrega fora das fases.
   duas perguntas em aberto: seguro e CET da oferta (`TODO(icred)` em
   `agent/icred/textos.py` e na seção Pendências da 0027) e o que o cliente faz
   no link de assinatura (seção Pendências da 0027 e "Continua sem resposta" em
-  `docs/icred.md`, sem `TODO` no código). Ver `docs/icred.md`.
+  `docs/icred.md`, sem `TODO` no código). Com o C6 ligado junto, o pedido de
+  SIM do iCred vem depois do C6 com abertura própria (issue 22); fica em aberto
+  o extrato novo que faz o C6 pedir o SIM com o pedido do iCred ainda sem
+  resposta. Ver `docs/icred.md`.
 - `migrations/` fica em `apps/core/migrations/`, não na raiz: as migrações
   descrevem os modelos daquele pacote e precisam do ambiente `uv` dele para
   importar. Desvio consciente da árvore desenhada na especificação.

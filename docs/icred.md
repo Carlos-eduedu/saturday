@@ -32,6 +32,38 @@ decisões estão em `docs/decisoes/0027-icred-pelo-motor-da-mex.md`.
    id; continuando parada, a conversa segue o caminho de antes e abre o alerta
    `icred_consulta_parada`.
 
+### Com o C6 ligado junto
+
+Com `SATURDAY_C6_ATIVO` também ligada são dois SIMs, um por banco, cada um
+pedido quando a consulta daquele banco vai acontecer (issue 22, nota de
+2026-11-18 na decisão 0027). O do C6 vem primeiro e o do iCred só sai depois de
+ele ter sido respondido:
+
+| O que o C6 fez | Quando sai o pedido do iCred |
+| --- | --- |
+| Não pediu o SIM (extrato sem condição de simular) | No turno do extrato, com o texto original |
+| Ofereceu o contrato novo e o cliente recusou | Na resposta à recusa |
+| Simulou e não teve oferta (ou a renda não foi informada) | Na resposta ao SIM do C6 (ou à renda) |
+| Recebeu NÃO, ou ficou sem resposta válida duas vezes (ao pedido de SIM ou ao de CPF) | Na resposta ao NÃO, ou na segunda resposta inválida |
+
+Contrato novo aceito vai para o atendente e o iCred não é consultado.
+
+Quando o pedido do C6 já foi resolvido (`cliente.c6_autorizado` no estado,
+verdadeiro ou falso), o pedido do iCred troca só a abertura: "Antes de
+continuar," no lugar de "Recebi o seu extrato. Antes de te passar o resultado,"
+(`PEDIR_SIM_DEPOIS_C6`, versão `icred-1-depois-c6`). A versão mostrada fica em
+`icred.pedido` no estado e a prova `icred_consulta` grava esse texto e essa
+versão. Só com o iCred ligado nada muda.
+
+O contrato novo recusado não entra na comparação: o iCred é comparado só com o
+troco da portabilidade. Testes em `apps/core/tests/test_c6_icred.py`.
+
+**Em aberto.** Se o pedido do iCred está sem resposta e chega um extrato novo
+que faz o C6 pedir o SIM dele (o primeiro extrato não dava para simular, ou o
+novo é de outro titular), o SIM seguinte é lido como resposta ao iCred: grava a
+prova `icred_consulta` e abre a consulta, e o pedido do C6 é repetido depois.
+Esse caminho não foi decidido na issue 22.
+
 O agente nunca chama `/gravar`, `acao: gravar` nem `aceitar_mudanca`. A comissão
 é descartada em `bancos/icred/normalizacao.py`. A oferta não cita seguro
 (`TODO(icred)` em `agent/icred/textos.py`).
