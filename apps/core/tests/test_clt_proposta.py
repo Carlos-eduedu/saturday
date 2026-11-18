@@ -25,6 +25,7 @@ from test_clt_jornada import (  # noqa: F401 - fixtures
 from test_clt_jornada import nova as _nova_fase5  # noqa: F401
 
 from saturday.agent.clt.mensagens import texto
+from saturday.bancos.granatech.cliente import ErroGranatech
 from saturday.dados.modelos import (
     Alerta,
     Consentimento,
@@ -306,6 +307,22 @@ def test_nascimento_perdido_depois_do_resumo_nao_cria_a_proposta(
     assert resposta.status == "handoff" and resposta.handoff_reason == "dados_divergentes"
     assert _posts_de_proposta(simulador_granatech) == 0
     assert _propostas_gravadas(fabrica) == 0
+
+
+def test_envio_dos_dados_recusado_deixa_a_proposta_criada_e_vai_para_handoff(
+    nova: Any, simulador_granatech: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    jornada = nova()
+    _ate_oferta(jornada)
+    jornada.roteiro(*DADOS_ATE_RESUMO)
+
+    def recusar(*_a: Any, **_k: Any) -> None:
+        raise ErroGranatech("recusado", status=400)
+
+    monkeypatch.setattr(jornada.cliente, "enviar_dados_tomador", recusar)
+    resposta = jornada.falar("SIM")
+    assert resposta.status == "handoff" and resposta.handoff_reason == "dados_tomador_falhou"
+    assert _proposta(jornada) in simulador_granatech.PROPOSTAS
 
 
 def test_mae_divergente_vai_para_handoff(nova: Any) -> None:

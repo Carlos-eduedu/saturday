@@ -64,6 +64,8 @@ def _tomador_completo(t: Turno, pessoa: Pessoa | None) -> bool:
     nascimento que ela não devolver é o que o cliente informou na identificação.
     """
 
+    # TODO(granatech): em produção a consulta sempre traz nascimento, mãe e endereço?
+
     return (
         pessoa is not None
         and bool(pessoa.nome_mae)
@@ -259,6 +261,10 @@ def aceite(t: Turno) -> dict[str, Any]:
 
 
 def _criar_proposta(t: Turno) -> dict[str, Any]:
+    if not _tomador_completo(t, _pessoa(t)):
+        # De novo, antes da prova, da intenção e do POST: a ficha pode ter mudado
+        # desde o começo dos dados. Proposta sem os dados do tomador não nasce.
+        return t.handoff("dados_divergentes")
     fabrica = t.contexto.fabrica
     consentimentos.gravar_prova(
         fabrica,
@@ -281,10 +287,6 @@ def seguir_proposta(t: Turno) -> dict[str, Any]:
     """
 
     detalhe = _detalhe(t)
-    pessoa = detalhe.pessoa
-    if pessoa is None or not _tomador_completo(t, pessoa):
-        # Antes da intenção e do POST: proposta sem os dados do tomador não nasce.
-        return t.handoff("dados_divergentes")
     oferta = t.clt["oferta"]
     vinculo = next(v for v in detalhe.vinculos if v.id_margem == oferta["id_margem"])
     produto = next(p for p in vinculo.produtos if p.id == oferta["id_produto"])
@@ -308,8 +310,10 @@ def seguir_proposta(t: Turno) -> dict[str, Any]:
         return t.handoff("granatech_indisponivel")
 
     t.clt.update(etapa="proposta", passo=None, erros=0, proposta=id_proposta)
+    if detalhe.pessoa is None:
+        return t.handoff("dados_divergentes")
     tomador = montar_dados_tomador(
-        pessoa=pessoa,
+        pessoa=detalhe.pessoa,
         nascimento=t.dados.get("nascimento"),
         cpf=t.dados["cpf"],
         nome=t.dados["nome"],

@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
 from datetime import date
-from typing import Any
 
 import pytest
 
@@ -73,21 +71,28 @@ def test_dados_tomador() -> None:
     assert corpo["tipo_dados_bancarios"] == "dados_bancarios"
     assert corpo["banco_detalhe"]["banco_codigo"] == "341"
 
-    # O nascimento informado pelo cliente só entra quando a Granatech não devolve o dela.
-    conta = {"banco_codigo": "341", "agencia": "1", "numero_conta": "2", "digito_conta": "3"}
-    comuns: dict[str, Any] = {
-        "cpf": "00189004967",
-        "nome": "Cliente",
-        "estado_civil": "CASADO",
-        "celular": "11987654321",
-        "conta": {**conta, "tipo_conta": "conta_corrente"},
-        "nascimento": "1985-01-02",
-    }
-    assert (
-        montar_dados_tomador(pessoa=pessoa, **comuns)["data_nascimento"]
-        == "1990-05-15T00:00:00.000Z"
+
+@pytest.mark.parametrize(
+    ("da_granatech", "esperado"),
+    [(date(1990, 5, 15), "1990-05-15T00:00:00.000Z"), (None, "1985-01-02T00:00:00.000Z")],
+)
+def test_nascimento_do_cliente_so_entra_sem_o_da_granatech(
+    da_granatech: date | None, esperado: str
+) -> None:
+    pessoa = Pessoa("CLIENTE", "00189004967", da_granatech, 36, "M", "MAE", None, None, None, None)
+    corpo = montar_dados_tomador(
+        pessoa=pessoa,
+        cpf="00189004967",
+        nome="Cliente de Teste",
+        estado_civil="CASADO",
+        celular="11987654321",
+        conta={
+            "banco_codigo": "341",
+            "agencia": "1234",
+            "numero_conta": "56789",
+            "digito_conta": "0",
+            "tipo_conta": "conta_corrente",
+        },
+        nascimento="1985-01-02",
     )
-    sem = replace(pessoa, nascimento=None)
-    assert (
-        montar_dados_tomador(pessoa=sem, **comuns)["data_nascimento"] == "1985-01-02T00:00:00.000Z"
-    )
+    assert corpo["data_nascimento"] == esperado
