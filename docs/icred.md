@@ -65,9 +65,26 @@ A primeira: o SIM da consulta, o CPF e o SIM da oferta só são aceitos quando a
 última mensagem do agente foi o pedido correspondente (`ultima_mensagem_agente`,
 em `agent/state.py`, a mesma função que o C6 usa no SIM dele). Se outra fala
 entrou no meio (extrato recusado por estar ilegível ou ser de outro mês,
-mensagem vazia, dúvida respondida), o pedido é refeito e nenhuma prova é
-gravada; o SIM seguinte vale. No pedido de CPF, o que é refeito é o pedido de
-SIM, do começo. NÃO continua valendo em qualquer momento.
+mensagem vazia), o pedido é refeito e nenhuma prova é gravada; o SIM seguinte
+vale. No pedido de CPF, o CPF só é lido como resposta ao pedido dele (ou ao
+aviso de CPF inválido): fora disso sai de novo só o pedido do CPF, e o SIM já
+dado continua valendo. NÃO continua valendo em qualquer momento.
+
+Dúvida com um pedido do iCred aberto (SIM da consulta, CPF ou oferta): se o
+pedido era a última mensagem do agente, a dúvida é respondida e o mesmo pedido
+sai de novo no mesmo turno, por último (`icred_repetir` no estado do turno; o
+nó `icred` roda outra vez depois de `generate_answer`). O SIM seguinte vale, e
+a prova grava o texto e a versão do pedido reenviado. O turno tem uma saída
+só: a resposta e o pedido vão no mesmo texto, separados por uma linha em
+branco, e no histórico do grafo o pedido é a última fala. Se o pedido não era
+a última mensagem (extrato recusado antes da dúvida), sai só a resposta e o SIM
+seguinte refaz o pedido. Com o C6 também ligado, só volta o pedido do iCred que
+estava por último; o do C6 que ficou para trás não. No pedido de CPF, dúvida é
+a mensagem sem nenhum número; com número e sem CPF válido sai o aviso de CPF
+inválido, e a dúvida não conta como CPF errado. A segunda mensagem que não é
+sim nem não no pedido de SIM, e o segundo CPF inválido, continuam levando a
+conversa ao caminho de antes do iCred. Cumprimento ("oi") no meio recebe as
+boas-vindas sem o pedido; o SIM seguinte refaz o pedido.
 
 A segunda: um extrato novo desfaz o que o iCred esperava do cliente
 (`extrato_novo`, em `agent/icred/nos.py`, chamado por `read_statement`,

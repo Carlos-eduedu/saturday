@@ -145,4 +145,7 @@ SIM dado a um pedido do C6, nem o contrário. Os caminhos estão em
 descarta o que o iCred tinha do titular anterior (pedido, consulta aberta e
 oferta) e o iCred recomeça do pedido de SIM para o novo; e o SIM que não
 responde à última mensagem do agente refaz o pedido em vez de gravar a prova,
-como o C6 já fazia.
+como o C6 já fazia. Dois ajustes do dono do produto, ainda no mesmo dia: a
+dúvida feita logo depois de um pedido do iCred é respondida e o pedido sai de
+novo no mesmo turno, por último, de modo que o SIM seguinte vale; e no pedido
+de CPF refaz-se só o pedido do CPF, sem descartar o SIM já dado.
