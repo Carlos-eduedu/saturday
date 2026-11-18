@@ -69,6 +69,7 @@ CONVERSA = "seed-painel-clt"
 CONVERSA_C6 = "seed-painel-c6-novo"
 CONVERSA_PORTABILIDADE = "seed-painel-portabilidade"
 CONVERSA_ICRED = "seed-painel-icred"
+CONVERSA_OUTRO_TITULAR = "seed-painel-icred-outro-titular"
 CONVERSA_RECUSADO = "seed-painel-c6-recusado"
 CONVERSA_PAGA = "seed-painel-clt-paga"
 CPF = "00189004967"  # fictício, o mesmo dos testes
@@ -452,6 +453,39 @@ with abrir(fabrica) as sessao:
             )
         )
 
+    # Consulta aberta de um titular, e depois o extrato de outro: a consulta
+    # fica `desistida` e deixa de ser a da conversa (issue 42).
+    conversa = repositorios.obter_ou_criar_conversa(
+        sessao,
+        CONVERSA_OUTRO_TITULAR,
+        canal="whatsapp",
+        telefone="5567900000007",
+        phone_number_id="100000000000001",
+    )
+    if repositorios.registrar_entrada(
+        sessao,
+        conversa,
+        message_id="seed-outro-titular-1",
+        conteudo="agora o extrato do meu marido",
+    ):
+        fala_da_ia(
+            sessao,
+            conversa,
+            textos_icred.PEDIR_SIM,
+            "icred:pedir_sim",
+            "read_statement",
+            "icred_porta",
+        )
+        sessao.add(prova(conversa, "icred_consulta"))
+        sessao.add(
+            ConsultaIcred(
+                chave="seed-icred-outro-titular",
+                cpf=CPF,
+                conversa_id=conversa.id,
+                estado="desistida",
+            )
+        )
+
     # Contrato novo recusado e, depois, a portabilidade: a fala antiga do C6
     # é conferida contra a oferta do próprio ramo, e o cartão a marca "recusada".
     conversa = repositorios.obter_ou_criar_conversa(
@@ -526,6 +560,16 @@ grafo.update_state(
         "publico": "inss",
         "cliente": {"uf": "MS"},
         "icred": {"etapa": "oferta", "cpf": CPF, "contratos": PACOTE_ICRED},
+    },
+)
+grafo.update_state(
+    {"configurable": {"thread_id": CONVERSA_OUTRO_TITULAR}},
+    {
+        "status": "answered",
+        "publico": "inss",
+        "cliente": {"uf": "MS"},
+        # O pedido de SIM ao novo titular; a consulta do anterior saiu do estado.
+        "icred": {"etapa": "sim", "pedido": "icred-1", "cpf": "52998224725"},
     },
 )
 senha = os.environ.get("PAINEL_LOCAL_SENHA") or secrets.token_urlsafe(12)

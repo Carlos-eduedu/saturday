@@ -148,4 +148,10 @@ responde à última mensagem do agente refaz o pedido em vez de gravar a prova,
 como o C6 já fazia. Dois ajustes do dono do produto, ainda no mesmo dia: a
 dúvida feita logo depois de um pedido do iCred é respondida e o pedido sai de
 novo no mesmo turno, por último, de modo que o SIM seguinte vale; e no pedido
-de CPF refaz-se só o pedido do CPF, sem descartar o SIM já dado.
+de CPF refaz-se só o pedido do CPF, sem descartar o SIM já dado. Na issue 42,
+no mesmo dia: CPF digitado diferente do CPF do extrato não é consultado (o
+agente pede de novo e, na segunda vez, passa ao atendente), e depois de um
+atendente devolver a conversa à IA o "sim" não aceita pedido nem oferta de
+antes dele: a IA mostra de novo, e só o "sim" seguinte vale. E no pedido de
+CPF só a afirmação curta ("ok", "sim", "tá bom") recebe o pedido de novo sem
+passar pela triagem; o resto vai para o classificador, como antes.

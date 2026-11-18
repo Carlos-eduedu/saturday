@@ -30,6 +30,7 @@ from saturday.agent.service import (
     ofertas_da_conversa,
     ramo_da_fala,
 )
+from saturday.bancos.icred.cliente import DESISTIDA
 from saturday.canais.whatsapp.telefone import normalizar_telefone
 from saturday.dados import repositorios
 from saturday.dados.modelos import (
@@ -807,7 +808,11 @@ def _acompanhamento(sessao: Session, conversa: Conversa, jornada: Jornada) -> di
         if icred is None
         else {
             "estado": icred.estado,
-            "situacao": icred.situacao,
+            # Desistida que não é mais a consulta da conversa: o extrato de
+            # outro titular a descartou (a do prazo vencido continua no estado).
+            "situacao": "OUTRO_TITULAR"
+            if icred.estado == DESISTIDA and icred.id != jornada.consulta_icred
+            else icred.situacao,
             "contratos": icred.contratos or [],
             "valido_ate": icred.valido_ate,
             "atualizada_em": icred.atualizada_em,

@@ -43,6 +43,7 @@ export const MOTIVOS_HANDOFF: Record<string, string> = {
   icred_aceite: "Cliente aceitou a proposta do iCred",
   icred_bloqueio: "iCred: cadastro pede conferência",
   icred_conferir: "iCred: conferir a oferta",
+  icred_cpf_divergente: "iCred: CPF informado não é o do extrato",
   icred_taxa_alta: "iCred: taxa acima de 1,85%",
   idade_fora_regra: "Idade fora da regra",
   limite_simulacoes: "Limite de simulações",
@@ -162,6 +163,8 @@ export const SITUACAO_ICRED: Record<string, string> = {
   JA_GRAVADO: "Proposta já gravada",
   PROPOSTA_EXISTENTE: "Já tem proposta no iCred",
   TELEFONE_VINCULADO: "Telefone ligado a outro CPF",
+  // Não vem do motor: o servidor marca a consulta que a conversa descartou.
+  OUTRO_TITULAR: "Desistida: chegou o extrato de outro titular",
 };
 
 export const TIPO_ICRED: Record<string, string> = {

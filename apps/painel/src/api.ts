@@ -124,6 +124,7 @@ export interface Ficha {
   // A última consulta ao iCred (decisão 0027); o pacote vem sem comissão.
   icred: {
     estado: string;
+    // Do motor, ou `OUTRO_TITULAR` quando a conversa descartou a consulta.
     situacao: string | null;
     contratos: {
       tipo: string;

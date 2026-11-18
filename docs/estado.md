@@ -131,7 +131,12 @@ uma entrega fora das fases.
   o último pedido mostrado: extrato novo cancela o pedido do iCred sem resposta,
   extrato de outro titular descarta consulta e oferta do titular anterior, e
   o SIM que não responde à última mensagem do agente refaz o pedido, também só
-  com o iCred ligado (issue 22). Ver `docs/icred.md`.
+  com o iCred ligado (issue 22). Sobras fechadas na issue 42: CPF digitado
+  diferente do extrato não é consultado (na segunda vez, handoff
+  `icred_cpf_divergente`); depois da devolução à IA o "sim" não aceita pedido
+  nem oferta de antes do atendente; no pedido de CPF a afirmação curta ("ok")
+  recebe o pedido de novo sem ir à triagem; e a ficha mostra como desistida a consulta do titular descartado. Ver
+  `docs/icred.md`.
 - `migrations/` fica em `apps/core/migrations/`, não na raiz: as migrações
   descrevem os modelos daquele pacote e precisam do ambiente `uv` dele para
   importar. Desvio consciente da árvore desenhada na especificação.

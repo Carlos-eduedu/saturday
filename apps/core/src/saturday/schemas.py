@@ -100,6 +100,7 @@ HandoffReason = Literal[
     "icred_bloqueio",
     "icred_taxa_alta",
     "icred_conferir",
+    "icred_cpf_divergente",
 ]
 
 MotivoContrato = Literal[

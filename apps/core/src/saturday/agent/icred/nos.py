@@ -19,6 +19,7 @@ depois de um pedido é respondida e o pedido volta no mesmo turno, por último.
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -45,6 +46,14 @@ EVENTO_RESULTADO = "icred:resultado"
 EVENTO_PRAZO = "icred:prazo"
 # Motivos de handoff do cálculo que ainda deixam consultar o iCred.
 _MOTIVOS_COM_CONSULTA = frozenset({None, "sem_portabilidade"})
+# No pedido de CPF, a mensagem feita só destas palavras (sem acento) é uma
+# afirmação curta, sem conteúdo: recebe o pedido de novo, sem ir à triagem.
+_AFIRMACOES = frozenset(
+    {
+        *("sim", "s", "ss", "autorizo", "aceito"),
+        *("ok", "okay", "ta", "bom", "certo", "beleza", "blz", "claro", "isso"),
+    }
+)
 
 
 def _falar(dados: dict[str, Any], texto: str, chave: str) -> dict[str, Any]:
@@ -158,12 +167,25 @@ def _respondia_ao_pedido(state: AgentState, dados: dict[str, Any]) -> bool:
 
     aceitos = {_pedido(dados)[0]}
     if dados.get("etapa") == "cpf":
-        aceitos.add(textos.CPF_INVALIDO)
+        aceitos |= {textos.CPF_INVALIDO, textos.CPF_NAO_CONFERE}
     return ultima_mensagem_agente(state) in aceitos
 
 
+def _eh_do_titular(dados: dict[str, Any], cpf: str) -> bool:
+    """O CPF é o do extrato; sem CPF legível no extrato, qualquer um serve."""
+
+    return cpf == (dados.get("cpf") or cpf)
+
+
+def _so_afirmou(texto: str) -> bool:
+    if leitura.eh_pergunta(texto):
+        return False
+    palavras = re.findall(r"[a-z]+", leitura.normalizar(texto))
+    return bool(palavras) and all(palavra in _AFIRMACOES for palavra in palavras)
+
+
 def _refazer(dados: dict[str, Any]) -> dict[str, Any]:
-    """Outra fala entrou no meio (extrato recusado, mensagem vazia): o pedido sai de novo."""
+    """O pedido sai de novo: outra fala entrou no meio, ou veio só um "ok" no pedido de CPF."""
 
     return _falar(dados, *_pedido(dados))
 
@@ -273,8 +295,9 @@ def _sim(state: AgentState, contexto: AgentContext, dados: dict[str, Any]) -> di
     # A prova é gravada com o CPF, na etapa seguinte; aqui fica o SIM literal.
     dados.update(etapa="cpf", sim=texto, sim_wamid=state.get("message_id"), tentativas=0)
     # O CPF que a conversa já tem (pedido para o C6, decisão 0026) não é pedido de novo.
+    # Só se for o do titular do extrato; senão o cliente digita, e é conferido.
     cpf = leitura.cpf(str((state.get("cliente") or {}).get("cpf") or ""))
-    if cpf is not None:
+    if cpf is not None and _eh_do_titular(dados, cpf):
         return _consultar(state, contexto, dados, cpf)
     return _falar(dados, textos.PEDIR_CPF, "icred:pedir_cpf")
 
@@ -286,13 +309,22 @@ def _cpf(state: AgentState, contexto: AgentContext, dados: dict[str, Any]) -> di
     texto = state.get("user_message", "")
     cpf = leitura.cpf(texto)
     if cpf is None and not any(c.isdigit() for c in texto):
-        # Sem número nenhum não é tentativa de CPF: é dúvida, e não conta como erro.
-        return _duvida(state, dados)
+        # Sem número nenhum não é tentativa de CPF nem conta como erro: "ok" e
+        # parecidos recebem o pedido de novo; o resto vai à triagem (dúvida,
+        # pedido de atendente).
+        return _refazer(dados) if _so_afirmou(texto) else _duvida(state, dados)
     if cpf is None:
         dados["tentativas"] = int(dados.get("tentativas") or 0) + 1
         if dados["tentativas"] >= 2:
             return _seguir(dados)
         return _falar(dados, textos.CPF_INVALIDO, "icred:cpf_invalido")
+    if not _eh_do_titular(dados, cpf):
+        # CPF válido que não é o do extrato: nada de consulta nem de prova. A
+        # contagem é separada da de formato (`tentativas`).
+        dados["divergencias"] = int(dados.get("divergencias") or 0) + 1
+        if dados["divergencias"] >= 2:
+            return _handoff(dados, "icred_cpf_divergente", {})
+        return _falar(dados, textos.CPF_NAO_CONFERE, "icred:cpf_nao_confere")
     return _consultar(state, contexto, dados, cpf)
 
 
@@ -324,6 +356,7 @@ def _consultar(
         return _seguir(dados)
     dados.update(etapa="consultando", consulta=consulta, cpf=cpf)
     dados.pop("tentativas", None)
+    dados.pop("divergencias", None)
     return _falar(dados, textos.CONSULTANDO, "icred:consultando")
 
 

@@ -70,8 +70,23 @@ class AgentState(MessagesState, total=False):
     respostas_recentes: dict[str, str]
 
 
+def marca_de_atendimento_humano() -> AIMessage:
+    """O que a devolução à IA põe no histórico: houve conversa com um atendente.
+
+    A fala do atendente não entra no grafo. A marca, vazia, passa a ser a
+    última mensagem do agente: o pedido ou a oferta de antes deixa de ser "o
+    que o cliente viu por último" até a IA mostrá-lo de novo. O histórico que
+    vai ao modelo pula mensagem vazia.
+    """
+
+    return AIMessage(content="")
+
+
 def ultima_mensagem_agente(state: AgentState) -> str | None:
-    """O que o cliente viu por último: um SIM só vale como resposta a isso (regra 3)."""
+    """O que o cliente viu por último: um SIM só vale como resposta a isso (regra 3).
+
+    Texto vazio quando a conversa voltou de um atendente e a IA ainda não falou.
+    """
 
     for mensagem_atual in reversed(state.get("messages") or []):
         if not isinstance(mensagem_atual, AIMessage):

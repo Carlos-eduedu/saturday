@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from saturday.agent import comandos
 from saturday.agent.context import AgentContext
 from saturday.agent.icred import textos as textos_icred
-from saturday.agent.state import turno_inicial
+from saturday.agent.state import marca_de_atendimento_humano, turno_inicial
 from saturday.agent.textos import (
     COMANDO_REINICIAR,
     MENSAGEM_REINICIADA,
@@ -98,6 +98,9 @@ class Jornada:
     icred: list[dict[str, Any]] | None
     # Etapa crua do iCred: `fim` com pacote é oferta aceita ou recusada.
     etapa_icred: str | None
+    # Id local da consulta do iCred que a conversa espera ou usou; vazio antes
+    # da consulta e depois do extrato de outro titular.
+    consulta_icred: int | None
 
 
 # Parte da `chave_mensagem` da fala que apresenta a oferta → ramo dela.
@@ -216,6 +219,7 @@ def jornada_do_estado(estado: dict[str, Any]) -> Jornada:
         contrato_novo=estado.get("c6_novo"),
         icred=(estado.get("icred") or {}).get("contratos"),
         etapa_icred=(estado.get("icred") or {}).get("etapa"),
+        consulta_icred=(estado.get("icred") or {}).get("consulta"),
     )
 
 
@@ -756,7 +760,10 @@ class AgentService:
         return RegistroPostgres(sessao, conversa, self.webhook, self.fabrica)
 
     def _liberar_handoff(self, config: dict[str, Any]) -> dict[str, Any]:
-        self.graph.update_state(config, self._atualizacao_liberacao())
+        # O SIM de depois não responde a pedido nem a oferta de antes do
+        # atendente (regra 3): `ultima_mensagem_agente` passa a ver a marca.
+        liberacao = {**self._atualizacao_liberacao(), "messages": [marca_de_atendimento_humano()]}
+        self.graph.update_state(config, liberacao)
         return self.estado_atual(config)
 
     def _rodar_e_fechar(

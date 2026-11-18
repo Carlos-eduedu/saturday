@@ -156,6 +156,34 @@ def test_ficha_mostra_a_ultima_consulta_do_icred(client_pg, service_pg, fabrica,
     assert "cpf" not in icred
 
 
+def test_ficha_nao_mostra_como_vigente_a_consulta_do_titular_descartado(
+    client_pg, service_pg, fabrica, ana, conversa
+):
+    _cliente_escreve(service_pg, conversa, "oi")
+    alvo = _conversa_id(fabrica, conversa)
+    entrar(client_pg, "ana@exemplo.test")
+    rota = f"/admin/conversas/{alvo}/ficha"
+    with abrir(fabrica) as s:
+        linha = ConsultaIcred(
+            chave=uuid.uuid4().hex,
+            cpf="00189004967",
+            conversa_id=uuid.UUID(alvo),
+            estado="desistida",
+        )
+        s.add(linha)
+        s.flush()
+        consulta = linha.id
+    config = service_pg.config(conversa)
+
+    # Prazo de espera vencido: a consulta desistida ainda é a da conversa.
+    service_pg.graph.update_state(config, {"icred": {"etapa": "fim", "consulta": consulta}})
+    assert client_pg.get(rota).json()["icred"]["situacao"] is None
+
+    # Extrato de outro titular: o estado do iCred recomeçou sem ela.
+    service_pg.graph.update_state(config, {"icred": {"etapa": "sim"}})
+    assert client_pg.get(rota).json()["icred"]["situacao"] == "OUTRO_TITULAR"
+
+
 def test_ficha_mostra_o_contrato_novo_do_c6(client_pg, service_pg, fabrica, ana, conversa):
     _cliente_escreve(service_pg, conversa, "oi")
     rota = f"/admin/conversas/{_conversa_id(fabrica, conversa)}/ficha"

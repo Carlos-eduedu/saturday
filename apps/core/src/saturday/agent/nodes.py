@@ -358,8 +358,12 @@ def read_statement(state: AgentState, runtime: Runtime[AgentContext]) -> dict[st
     dados_extrato = extrato.model_dump()
     # Também quando o extrato termina em handoff aqui: o que o iCred esperava
     # do cliente era de antes dele.
-    icred = extrato_novo(state, runtime.context, dados_extrato)
-    if status == hiscon_mod.STATUS_CONFERENCIA_FALHOU:
+    falhou = status == hiscon_mod.STATUS_CONFERENCIA_FALHOU
+    # Leitura que não fechou: o CPF lido não serve para dizer que o titular
+    # mudou, e a consulta aberta do titular certo fica.
+    lido = {**dados_extrato, "cpf": None} if falhou else dados_extrato
+    icred = extrato_novo(state, runtime.context, lido)
+    if falhou:
         return {
             "icred": icred,
             "portability_result": _resultado_falha(dados_extrato, "hiscon_nao_conferiu"),

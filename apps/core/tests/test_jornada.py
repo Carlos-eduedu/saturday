@@ -34,6 +34,7 @@ def test_estado_completo_vira_os_campos_da_jornada() -> None:
         contrato_novo=contrato_novo,
         icred=pacote,
         etapa_icred="oferta",
+        consulta_icred=None,
     )
 
 
@@ -49,4 +50,5 @@ def test_conversa_sem_checkpoint_tem_jornada_vazia() -> None:
         contrato_novo=None,
         icred=None,
         etapa_icred=None,
+        consulta_icred=None,
     )

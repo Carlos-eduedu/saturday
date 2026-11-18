@@ -62,6 +62,9 @@ MENSAGENS_HANDOFF = {
         "Consultei o iCred e um atendente da MEX vai conferir as condições com você. "
         "Vou te transferir."
     ),
+    "icred_cpf_divergente": (
+        "O CPF informado não confere com o do extrato. Vou te transferir para um atendente da MEX."
+    ),
 }
 
 MENSAGEM_FORA_HORARIO = (

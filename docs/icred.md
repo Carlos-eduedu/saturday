@@ -15,13 +15,16 @@ decisões estão em `docs/decisoes/0027-icred-pelo-motor-da-mex.md`.
    `Idempotency-Key`). Só "sim", "autorizo" ou "aceito" valem como SIM, aqui e
    no aceite. NÃO, duas respostas que não são sim nem não, CPF inválido duas
    vezes, motor fora do ar ou CPF com consulta aberta em outra conversa: a
-   conversa segue o caminho de antes.
+   conversa segue o caminho de antes. CPF válido que não é o do extrato não é
+   consultado (ver "CPF digitado diferente do extrato", abaixo).
 3. O resultado chega pelo webhook `consulta.concluida` e vira um turno de
    sistema. `agent/icred/regras.py` decide:
    - `JA_GRAVADO`, `PROPOSTA_EXISTENTE`, `TELEFONE_VINCULADO`: handoff
      `icred_bloqueio`;
    - algum contrato acima de 1,85% ao mês: handoff `icred_taxa_alta`;
    - oferta que não deu para ler inteira: handoff `icred_conferir`;
+   - (antes da consulta) CPF digitado diferente do extrato pela segunda vez:
+     handoff `icred_cpf_divergente`;
    - sem oferta, ou total na conta menor ou igual ao da portabilidade C6: o
      caminho de antes;
    - senão, a oferta do pacote inteiro.
@@ -67,8 +70,45 @@ em `agent/state.py`, a mesma função que o C6 usa no SIM dele). Se outra fala
 entrou no meio (extrato recusado por estar ilegível ou ser de outro mês,
 mensagem vazia), o pedido é refeito e nenhuma prova é gravada; o SIM seguinte
 vale. No pedido de CPF, o CPF só é lido como resposta ao pedido dele (ou ao
-aviso de CPF inválido): fora disso sai de novo só o pedido do CPF, e o SIM já
-dado continua valendo. NÃO continua valendo em qualquer momento.
+aviso de CPF inválido, ou ao de CPF que não confere): fora disso sai de novo
+só o pedido do CPF, e o SIM já dado continua valendo. NÃO continua valendo em
+qualquer momento.
+
+**Atendente no meio (issue 42).** O que o atendente escreve pelo painel não
+entra no histórico do grafo. Por isso a devolução à IA (`AgentService.devolver`,
+o prazo do handoff, a rota `/release` e o `/devolver` do membro testador, todos
+por `_liberar_handoff`) acrescenta ao histórico uma mensagem vazia do agente
+(`marca_de_atendimento_humano`, em `agent/state.py`): ela passa a ser a "última
+mensagem", e o pedido de SIM, o de CPF ou a oferta do iCred de antes do
+atendente deixam de valer até a IA mostrá-los de novo. O "sim" seguinte à
+devolução recebe o mesmo pedido (ou a mesma oferta) outra vez, sem prova; só o
+"sim" depois disso vale. No pedido de CPF, o SIM dado antes do atendente
+continua valendo: refaz-se só o pedido do CPF. Dúvida logo depois da devolução
+recebe só a resposta, sem o pedido de volta. A marca não vai ao modelo (o
+histórico pula mensagem vazia) e a fala do atendente continua fora do grafo.
+No C6 a devolução já apagava o pedido (`aguardando`) e a oferta
+(`oferta_pendente`): o "sim" de depois não autoriza a simulação nem aceita o
+contrato novo, e vai para a resposta do modelo; o C6 não mostra o pedido nem a
+oferta de novo (só com um extrato novo). O ramo CLT não usa essa guarda: lá o
+SIM dado depois da devolução ainda responde ao pedido de antes do atendente.
+Limite conhecido: o "Desfazer" do painel (`painel/acoes.desfazer`, até 15
+segundos depois de assumir) devolve a conversa à IA sem passar por
+`_liberar_handoff`, portanto sem a marca.
+
+**CPF digitado diferente do extrato (issue 42).** Com CPF legível no extrato
+(`icred.cpf` no estado), um CPF válido e diferente dele não é consultado e não
+grava prova: sai o texto fixo `CPF_NAO_CONFERE` (`icred:cpf_nao_confere`, sem
+nenhum dos dois CPFs) e o agente espera outro; na segunda vez a conversa vai
+para o atendente (`icred_cpf_divergente`). A contagem (`divergencias`) é
+separada da de CPF inválido (`tentativas`): um erro de cada tipo não soma dois,
+o segundo CPF inválido continua seguindo sem o iCred e o segundo CPF que não
+confere vai para o atendente. Um extrato novo zera as duas, junto com o pedido.
+O CPF que a conversa já tem (`cliente.cpf`) só é usado sem perguntar se for o
+do extrato. Sem CPF legível no extrato vale o CPF digitado, como antes. Assim o
+titular da conversa é sempre o do extrato, e reenviar o mesmo extrato depois de
+errar o CPF não conta mais como outro titular; continua contando quando o
+primeiro extrato não tinha CPF legível e o seguinte traz um CPF diferente do
+digitado.
 
 Dúvida com um pedido do iCred aberto (SIM da consulta, CPF ou oferta): se o
 pedido era a última mensagem do agente, a dúvida é respondida e o mesmo pedido
@@ -81,10 +121,27 @@ a última mensagem (extrato recusado antes da dúvida), sai só a resposta e o S
 seguinte refaz o pedido. Com o C6 também ligado, só volta o pedido do iCred que
 estava por último; o do C6 que ficou para trás não. No pedido de CPF, dúvida é
 a mensagem sem nenhum número; com número e sem CPF válido sai o aviso de CPF
-inválido, e a dúvida não conta como CPF errado. A segunda mensagem que não é
+inválido, e a dúvida não conta como CPF errado. No pedido de CPF, a afirmação
+curta e sem conteúdo recebe o pedido do CPF de novo, sem classificador e sem
+modelo: é a mensagem feita só das palavras de `_AFIRMACOES`, em
+`agent/icred/nos.py` (sim, s, ss, autorizo, aceito, ok, okay, tá, bom, certo,
+beleza, blz, claro, isso; sem diferença de caixa, acento ou pontuação, e sem
+"?": "certo?" é pergunta). Todo o resto sem número vai
+para a triagem, com ou sem "?": a dúvida recebe a resposta e o pedido de volta,
+"não" também (nessa etapa o NÃO nunca encerrou o iCred), e quem pede um
+atendente vai para o atendente (`pediu_humano`). Nada disso conta como CPF
+errado. A segunda mensagem que não é
 sim nem não no pedido de SIM, e o segundo CPF inválido, continuam levando a
-conversa ao caminho de antes do iCred. Cumprimento ("oi") no meio recebe as
-boas-vindas sem o pedido; o SIM seguinte refaz o pedido.
+conversa ao caminho de antes do iCred; essa segunda mensagem não é respondida,
+mesmo sendo pergunta. Cumprimento ("oi") com o extrato ainda no estado é
+tratado como dúvida (resposta e o pedido de volta, e conta como a primeira
+mensagem que não é sim nem não); sem extrato no estado (depois da retenção)
+recebe as boas-vindas sem o pedido, e o SIM seguinte refaz o pedido sem gravar
+prova.
+
+Limite conhecido: a fala que junta a resposta do modelo e o pedido sai com a
+`chave_mensagem` do pedido, e o painel a mostra como texto fixo, embora a
+primeira metade venha do modelo (a decisão 0018 não prevê fala mista).
 
 A segunda: um extrato novo desfaz o que o iCred esperava do cliente
 (`extrato_novo`, em `agent/icred/nos.py`, chamado por `read_statement`,
@@ -111,7 +168,9 @@ consultado. Extrato com CPF legível e diferente desse zera o estado do iCred,
 em qualquer etapa (também depois de encerrado): a oferta do titular anterior
 não volta, nenhuma prova sai com o CPF dele e o novo titular recebe o pedido de
 SIM quando a conversa chega à `icred_porta`. Extrato sem CPF legível é tratado
-como do mesmo titular.
+como do mesmo titular, e também o extrato cuja conferência não fechou
+(`hiscon_nao_conferiu`): o CPF lido dele não é confiável e não descarta a
+consulta do titular da conversa.
 
 A consulta aberta do titular anterior deixa de ser a da conversa. A linha em
 `consultas_icred` fica, como `desistida` (o estado que o prazo de espera já
@@ -119,10 +178,13 @@ usava; sem migração): o resultado que chegar não é gravado nem vira turno
 (log `icred_resultado_de_consulta_desistida`), e o prazo de espera não a
 procura nem abre alerta. Evento de resultado ou de prazo que chegue ao nó sem
 corresponder à consulta vigente é ignorado (log `icred_evento_ignorado`, com
-`conversa_ref`). A ficha do painel mostra a última consulta da conversa: até o
-novo titular ter a dele, a seção "Consulta no iCred" mostra a do titular
-anterior ("Aguardando o resultado" se ela estava aberta, o pacote se já tinha
-terminado).
+`conversa_ref`). A ficha do painel mostra a última consulta da conversa. Até o
+novo titular ter a dele, a consulta aberta do titular anterior aparece na seção
+"Consulta no iCred" como "Desistida: chegou o extrato de outro titular": o
+servidor manda a situação `OUTRO_TITULAR` quando a linha está `desistida` e não
+é a consulta que o estado da conversa guarda (`Jornada.consulta_icred`); a do
+prazo vencido continua no estado e não ganha essa marca. A consulta do titular
+anterior que já tinha terminado continua aparecendo com o pacote dela.
 
 O agente nunca chama `/gravar`, `acao: gravar` nem `aceitar_mudanca`. A comissão
 é descartada em `bancos/icred/normalizacao.py`. A oferta não cita seguro

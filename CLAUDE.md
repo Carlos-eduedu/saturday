@@ -44,7 +44,8 @@ prints como outra pessoa, `PAINEL_LOCAL_EMAIL`), e a conversa
 CLT com humano, ficha preenchida e consulta parada, uma conversa INSS em
 handoff com o contrato novo do C6 aceito, e duas com a IA, uma com a oferta de
 portabilidade e outra com o pacote do iCred, cada uma com uma resposta do
-modelo que cita reais, uma com o contrato novo recusado seguido da oferta de
+modelo que cita reais, uma com a consulta do iCred desistida pelo extrato de
+outro titular, uma com o contrato novo recusado seguido da oferta de
 portabilidade, e uma conversa CLT do SIM à proposta paga, para o funil da
 Operação ter número em todas as etapas (os esperados estão na decisão 0031)
 (`infra/painel_seed.py`),

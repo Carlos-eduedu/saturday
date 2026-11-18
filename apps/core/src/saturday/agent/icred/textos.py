@@ -28,6 +28,11 @@ PEDIR_SIM_DEPOIS_C6 = "Antes de continuar, " + _PEDIDO
 PEDIDOS_SIM = {VERSAO: PEDIR_SIM, VERSAO_DEPOIS_C6: PEDIR_SIM_DEPOIS_C6}
 PEDIR_CPF = "Obrigado! Me envie o seu CPF, só os números, para eu fazer a consulta."
 CPF_INVALIDO = "Não consegui ler esse CPF. Envie os 11 números, por favor."
+# CPF válido, mas de outra pessoa: nenhum dos dois CPFs aparece (regra 9).
+CPF_NAO_CONFERE = (
+    "Esse CPF não confere com o do extrato que você enviou. Envie o CPF do "
+    "titular do extrato, só os números, por favor."
+)
 CONSULTANDO = (
     "Pronto, estou consultando. Isso pode levar alguns minutos; assim que tiver "
     "o resultado eu te aviso por aqui."
