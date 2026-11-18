@@ -14,7 +14,8 @@ VERSAO = "icred-1"
 VERSAO_DEPOIS_C6 = "icred-1-depois-c6"
 
 # Só a abertura muda entre os dois pedidos. Mudou o texto, mude a versão: a
-# prova guarda os dois.
+# prova guarda os dois. A versão antiga continua em `PEDIDOS_SIM` enquanto
+# houver conversa que recebeu aquele pedido e ainda não respondeu.
 _PEDIDO = (
     "posso consultar também "
     "o iCred, um banco parceiro, para ver se ele tem uma condição melhor para "

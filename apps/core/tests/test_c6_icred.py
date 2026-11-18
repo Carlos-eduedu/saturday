@@ -117,10 +117,15 @@ def test_contrato_novo_recusado_pede_o_sim_do_icred_sem_falar_do_extrato(
     assert _provas(jornada)[-1] == ("icred_consulta", "icred-1-depois-c6", PEDIDO_DEPOIS_DO_C6)
 
 
+@pytest.mark.parametrize("banco_fora_do_ar", [True, False])
 def test_c6_sem_oferta_pede_o_sim_do_icred_na_resposta_ao_sim_do_c6(
-    jornada: Jornada, simulador_c6: ModuleType
+    jornada: Jornada, fakes: Fakes, simulador_c6: ModuleType, banco_fora_do_ar: bool
 ) -> None:
-    simulador_c6.FALHAS.append({"rota": ROTA_SIMULACAO, "status": 500})
+    if banco_fora_do_ar:
+        simulador_c6.FALHAS.append({"rota": ROTA_SIMULACAO, "status": 500})
+    else:
+        # Margem de R$ 21: o banco simula, mas o valor fica abaixo do mínimo.
+        fakes.llm.extrato = {**fakes.llm.extrato, "margemDisponivel": 21.0}
     assert _um_pedido_de_sim(jornada.extrato().answer) == CONSENTIMENTO_C6
 
     # O SIM do C6 já foi respondido: o pedido do iCred vem sozinho no turno.
@@ -150,6 +155,9 @@ def test_resposta_ambigua_duas_vezes_ao_c6_tambem_usa_a_abertura_de_depois(
     assert _um_pedido_de_sim(jornada.falar("talvez").answer) == CONSENTIMENTO_C6_REPETIR
 
     assert _um_pedido_de_sim(jornada.falar("talvez").answer) == PEDIDO_DEPOIS_DO_C6
+
+    assert jornada.falar("sim").answer == textos.CONSULTANDO
+    assert _provas(jornada) == [("icred_consulta", "icred-1-depois-c6", PEDIDO_DEPOIS_DO_C6)]
 
 
 def test_extrato_que_o_c6_nao_simula_recebe_o_pedido_original(
@@ -217,6 +225,7 @@ def test_icred_que_nao_ganha_da_portabilidade_entrega_a_portabilidade(
 ) -> None:
     _ate_a_recusa_do_contrato_novo(jornada, fakes)
     troco = jornada.estado()["portability_result"]["troco_total"]
+    assert troco > 0
     jornada.falar("sim")
 
     # Empate: o C6 ganha (decisão 0027).
