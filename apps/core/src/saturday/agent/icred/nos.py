@@ -285,13 +285,13 @@ def _cpf(state: AgentState, contexto: AgentContext, dados: dict[str, Any]) -> di
         return _refazer(dados)
     texto = state.get("user_message", "")
     cpf = leitura.cpf(texto)
+    if cpf is None and not any(c.isdigit() for c in texto):
+        # Sem número nenhum não é tentativa de CPF: é dúvida, e não conta como erro.
+        return _duvida(state, dados)
     if cpf is None:
         dados["tentativas"] = int(dados.get("tentativas") or 0) + 1
         if dados["tentativas"] >= 2:
             return _seguir(dados)
-        if not any(c.isdigit() for c in texto):
-            # Sem número nenhum não é tentativa de CPF: é dúvida.
-            return _duvida(state, dados)
         return _falar(dados, textos.CPF_INVALIDO, "icred:cpf_invalido")
     return _consultar(state, contexto, dados, cpf)
 

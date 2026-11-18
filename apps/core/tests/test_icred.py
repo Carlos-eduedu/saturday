@@ -550,6 +550,8 @@ def test_so_o_sim_explicito_autoriza_e_a_duvida_nao_prende_a_rota(jornada: Jorna
     # O mesmo no pedido do CPF: o SIM já dado continua valendo.
     assert jornada.falar("para que serve?").answer == f"{RESPOSTA_DA_DUVIDA}\n\n{textos.PEDIR_CPF}"
     assert jornada.provas() == []
+    # A dúvida não conta como CPF errado: o primeiro erro ainda avisa.
+    assert jornada.falar("123").answer == textos.CPF_INVALIDO
     assert jornada.falar(CPF).answer == textos.CONSULTANDO
     assert jornada.provas() == [("icred_consulta", CPF, "sim")]
 
