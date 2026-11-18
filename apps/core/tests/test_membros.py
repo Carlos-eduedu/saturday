@@ -14,7 +14,7 @@ from saturday.dados.modelos import Auditoria, Conversa, Mensagem, UsuarioPainel
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.painel import membros, sessoes
 
-SO_DO_GESTOR = {"situacao", "bloqueado_ate", "tentativas_falhas", "observacao"}
+SO_DO_GESTOR = {"situacao", "bloqueado_ate", "tentativas_falhas", "observacao", "trocar_senha"}
 DE_QUEM_PODE = {"email", "telefone", "ultimo_acesso_em", "criado_em", "pode_editar_agente"}
 
 
@@ -114,6 +114,30 @@ def test_gestor_ve_tudo_inclusive_desativados(
     entrar(client_pg, "ana@exemplo.test")
     assert client_pg.get(f"/admin/membros/{bia}").status_code == 404
     assert {m["nome"] for m in client_pg.get("/admin/membros").json()} == {"ana", "gestora"}
+
+
+def test_troca_de_senha_pendente_aparece_so_para_o_gestor(
+    client_pg: TestClient, fabrica: sessionmaker[Session]
+) -> None:
+    bia = _usuario(fabrica, "bia@exemplo.test")
+    ana = _usuario(fabrica, "ana@exemplo.test")
+    _usuario(fabrica, "gestora@exemplo.test", "gestor")
+    with abrir_sessao(fabrica) as sessao:
+        pendente = sessao.get(UsuarioPainel, bia)
+        assert pendente is not None
+        pendente.trocar_senha = True
+
+    entrar(client_pg, "gestora@exemplo.test")
+    lista = {m["nome"]: m for m in client_pg.get("/admin/membros").json()}
+    assert lista["bia"]["trocar_senha"] is True
+    assert lista["ana"]["trocar_senha"] is False
+    assert client_pg.get(f"/admin/membros/{bia}").json()["trocar_senha"] is True
+
+    # O atendente não recebe o campo, nem como falso: nem o do colega, nem o próprio.
+    entrar(client_pg, "ana@exemplo.test")
+    assert all("trocar_senha" not in m for m in client_pg.get("/admin/membros").json())
+    assert "trocar_senha" not in client_pg.get(f"/admin/membros/{bia}").json()
+    assert "trocar_senha" not in client_pg.get(f"/admin/membros/{ana}").json()
 
 
 def test_funcao_longa_demais_e_recusada(

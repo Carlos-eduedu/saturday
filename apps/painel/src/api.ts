@@ -229,6 +229,8 @@ export interface Membro {
   bloqueado_ate?: string | null;
   tentativas_falhas?: number;
   observacao?: string | null;
+  // Senha definida pelo gestor que a pessoa ainda não trocou (decisão 0030).
+  trocar_senha?: boolean;
   // Só na página do membro (`/membros/{id}`).
   atividade?: { mensagens: number; assumidas: number; devolvidas: number; transferidas: number };
   acoes?: AcaoDoMembro[];

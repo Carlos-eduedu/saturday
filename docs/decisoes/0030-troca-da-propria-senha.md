@@ -35,6 +35,10 @@ e a troca no primeiro acesso para depois (issue 34).
   sem dono tomar a conta de um gestor. O gestor que esqueceu a senha pede a
   outro gestor para redefinir; se for o único, cria-se outro com
   `saturday criar-usuario --perfil gestor` para redefinir a dele.
+- **Nota de 2026-11-18 (issue 43):** `GET /admin/membros` e
+  `GET /admin/membros/{id}` devolvem `trocar_senha` só para o gestor (decisão
+  0023: o atendente não recebe o campo), e a aba Membros mostra "Troca de senha
+  pendente" na linha e na página da pessoa, junto de "Redefinir senha".
 
 ## Alternativas descartadas
 

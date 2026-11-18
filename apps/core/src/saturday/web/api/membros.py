@@ -2,7 +2,7 @@
 
 O servidor decide o que cada um recebe. Colega: quem é, o estado e a carga.
 A própria pessoa e o gestor: também contato, acesso e atividade. Só o gestor:
-situação, bloqueio e a observação. As ações de gestão continuam em
+situação, bloqueio, troca de senha pendente e a observação. As ações de gestão continuam em
 `/admin/gestao/usuarios`.
 """
 
@@ -66,6 +66,7 @@ def _membro(
         "bloqueado_ate": ate.isoformat() if ate else None,
         "tentativas_falhas": usuario.tentativas_falhas,
         "observacao": usuario.observacao,
+        "trocar_senha": usuario.trocar_senha,
     }
     return linha
 

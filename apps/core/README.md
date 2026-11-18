@@ -186,7 +186,7 @@ nunca pelo `conversation_id`, que no WhatsApp carrega o telefone.
 | `GET` | `/admin/eu` | Usuário, perfil, token CSRF e `trocar_senha` (troca obrigatória pendente). |
 | `POST` | `/admin/eu/senha` | `{atual, nova}`: a pessoa troca a própria senha (12 ou mais, diferente da atual). Encerra as outras sessões dela e desliga a troca obrigatória. Senha atual errada responde 422 e conta para o bloqueio do login. |
 | `GET` | `/admin/usuarios` | Destinos de transferência, com o `estado` de cada pessoa (`disponivel`, `ausente` ou `fora`). |
-| `GET` | `/admin/membros` | A equipe, para todos (decisão 0023). Os campos dependem de quem pede (`nivel`: `colega`, `proprio` ou `gestor`); desativados só para o gestor. |
+| `GET` | `/admin/membros` | A equipe, para todos (decisão 0023). Os campos dependem de quem pede (`nivel`: `colega`, `proprio` ou `gestor`); desativados e `trocar_senha` (troca obrigatória pendente) só para o gestor. |
 | `GET` | `/admin/membros/{id}` | Um membro. Para a própria pessoa e para o gestor traz também `atividade` (7 dias) e `acoes` (as 10 últimas, sem o detalhe da auditoria). |
 | `PATCH` | `/admin/eu/disponibilidade` | `{disponivel}`: a própria pessoa marca disponível ou ausente. Informa quem transfere; não bloqueia. |
 | `GET` | `/admin/conversas?fila=ia\|handoff\|assumida\|minhas&busca=` | Inbox, com `nao_lida` e o que o canal permite agora: `envia`, `janela` (`aberta`, `fechada` ou `null` no canal sem janela) e `modelos` (as 200 mais recentes). |

@@ -1374,7 +1374,7 @@ main:has(.historico) { padding-bottom: 0; }
 .usuarios tr.desativado td { color: var(--suave); }
 .situacao-usuario { font-weight: 500; }
 .situacao-ativo { color: var(--texto); }
-.situacao-bloqueado { color: var(--handoff); }
+.situacao-bloqueado, .situacao-pendente { color: var(--handoff); }
 .situacao-desativado { color: var(--suave); }
 
 /* Estado da instância: cor e texto juntos, nunca só cor. */
@@ -1705,7 +1705,7 @@ small.dado { font-size: 0.8rem; }
 .membro-linha__nome { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .membro-linha__quem > .nota { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .membro-linha__carga { align-items: flex-end; text-align: right; }
-.membro-linha .situacao-bloqueado { font-size: 0.85rem; font-weight: 500; }
+.membro-linha .situacao-bloqueado, .membro-linha .situacao-pendente { font-size: 0.85rem; font-weight: 500; }
 
 .estado-membro { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.85rem; font-weight: 500; white-space: nowrap; }
 .estado-membro__ponto { flex: none; width: 0.55rem; height: 0.55rem; border-radius: 999px; background: currentColor; }

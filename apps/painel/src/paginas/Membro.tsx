@@ -521,6 +521,11 @@ function Gestao({ membro, agir }: { membro: Membro; agir: Agir }) {
             Encerra as sessões abertas da pessoa e desfaz o bloqueio. Ela escolhe outra senha ao
             entrar.
           </p>
+          {membro.trocar_senha && (
+            <p className="nota situacao-pendente">
+              Troca de senha pendente: a pessoa ainda não trocou a senha definida pelo gestor.
+            </p>
+          )}
           <label>
             Nova senha
             <input

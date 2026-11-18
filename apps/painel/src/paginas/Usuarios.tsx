@@ -122,6 +122,9 @@ function Linha({ membro: m }: { membro: Membro }) {
             <EstadoDoMembro estado={m.estado} />
           )}
           {m.situacao === "bloqueado" && <span className="situacao-bloqueado">Bloqueado</span>}
+          {m.trocar_senha && !desativado && (
+            <span className="situacao-pendente">Troca de senha pendente</span>
+          )}
         </span>
         {!desativado && (
           <span className="membro-linha__carga">
