@@ -22,6 +22,7 @@ from saturday.dados.modelos import (
     Auditoria,
     ConsultaGranatech,
     Conversa,
+    Mensagem,
     PropostaGranatech,
     UsuarioPainel,
 )
@@ -99,12 +100,16 @@ def devolver(sessao: Session, conversa: Conversa, usuario_id: uuid.UUID, gestor:
     auditar(sessao, usuario_id, "devolver", str(conversa.id), {**antes, "alertas": alertas})
 
 
-def desfazer(sessao: Session, conversa: Conversa, usuario_id: uuid.UUID) -> None:
+def desfazer(sessao: Session, conversa: Conversa, usuario_id: uuid.UUID) -> bool:
     """Volta a conversa ao estado de antes do último assumir ou devolver de quem pede.
 
     Só vale por `PRAZO_DESFAZER` e enquanto nada mais mexeu no atendimento: a
     ação desfeita precisa ser a última da conversa e o estado, o que ela deixou.
     Os alertas que a ação resolveu voltam a ficar abertos (docs/decisoes/0018).
+
+    Devolve se a conversa voltou à IA depois de o atendente ter escrito ao
+    cliente: aí houve atendimento humano, e quem chama deixa a marca dele no
+    histórico do grafo (docs/decisoes/0033).
     """
 
     ultima = sessao.scalars(
@@ -147,6 +152,18 @@ def desfazer(sessao: Session, conversa: Conversa, usuario_id: uuid.UUID) -> None
         "desfazer",
         str(conversa.id),
         {"acao": ultima.acao, "alertas_reabertos": reabertos},
+    )
+    # Só o assumir sai da IA: desfeito depois de o atendente escrever, é uma devolução.
+    return destino_atendimento == "ia" and bool(
+        sessao.scalar(
+            select(Mensagem.id)
+            .where(
+                Mensagem.conversa_id == conversa.id,
+                Mensagem.autor == "atendente",
+                Mensagem.criada_em >= ultima.criada_em,
+            )
+            .limit(1)
+        )
     )
 
 

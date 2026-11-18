@@ -621,8 +621,11 @@ def devolver(
 
 
 @router.post("/conversas/{conversa_id}/desfazer", status_code=204)
-def desfazer(conversa_id: uuid.UUID, usuario: ComCsrf, fabrica: Fabrica) -> Response:
-    _executar(fabrica, conversa_id, acoes.desfazer, usuario.id)
+def desfazer(conversa_id: uuid.UUID, usuario: ComCsrf, service: Servico) -> Response:
+    try:
+        service.desfazer(conversa_id, usuario.id)
+    except acoes.AcaoRecusada as exc:
+        raise _recusa(exc) from exc
     return Response(status_code=204)
 
 

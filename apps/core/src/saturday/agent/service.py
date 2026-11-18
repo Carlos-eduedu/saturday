@@ -12,7 +12,7 @@ from decimal import Decimal
 from typing import Any, Literal, cast
 from zoneinfo import ZoneInfo
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.agent import comandos
@@ -414,6 +414,21 @@ class AgentService:
                 self._liberar_handoff(config)
             return conversa.conversation_id
 
+    def desfazer(self, conversa_id: uuid.UUID, usuario_id: uuid.UUID) -> None:
+        """Desfaz o último assumir ou devolver de quem pede (`acoes.desfazer`).
+
+        Se a conversa voltou à IA depois de o atendente ter escrito ao cliente,
+        é uma devolução: o checkpoint recebe a mesma liberação, com a marca do
+        atendimento, sob a trava e antes do commit, como em `devolver`.
+        """
+
+        with acoes.conversa_travada(self.fabrica, conversa_id) as (sessao, conversa):
+            if not acoes.desfazer(sessao, conversa, usuario_id):
+                return
+            config = self.config(conversa.conversation_id)
+            if self.estado_atual(config):
+                self._liberar_handoff(config)
+
     def _devolver_sem_usuario(
         self, sessao: Session, conversa: Conversa, config: dict[str, Any]
     ) -> dict[str, Any]:
@@ -638,9 +653,11 @@ class AgentService:
         )
         if destino == jornada["etapa"]:
             conversa.etapa = destino
-            return self._responder_comando(
-                payload, config, sessao, conversa, "comando", comandos.pergunta(jornada)
-            )
+            pergunta = comandos.pergunta(jornada)
+            # A pergunta entra no histórico: é o último pedido que o membro viu,
+            # mesmo logo depois de uma devolução (decisão 0033).
+            self.graph.update_state(config, {"messages": [AIMessage(content=pergunta)]})
+            return self._responder_comando(payload, config, sessao, conversa, "comando", pergunta)
         # O comando vai como texto do turno: é a resposta guardada na prova de teste.
         entrada = turno_inicial(user_message=payload.message, attachments=[])
         entrada.update(
