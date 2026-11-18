@@ -12,6 +12,7 @@ import {
   type RespostaRapida,
 } from "../api";
 import { Falha } from "../componentes/Falha";
+import { qualidadeMeta } from "../rotulos";
 import { useAcao } from "../useAcao";
 
 // Tela Canais (decisão 0010), só para gestor: um resumo dos canais ativos no
@@ -190,16 +191,32 @@ export function Canais() {
         {canais.meta.length === 0 ? (
           <p className="vazio">Nenhum número configurado.</p>
         ) : (
-          // A API devolve o phone_number_id e o nome dado na configuração (sem o
-          // número exibido nem a qualidade): o ID fica à mostra, em vez de parecer
-          // um telefone.
+          // O número exibido vem mascarado, como o telefone das instâncias. Se a
+          // Meta não respondeu, fica o ID, que não depende dela.
           <ul className="lista-numeros">
-            {canais.meta.map((m) => (
-              <li key={m.phone_number_id}>
-                <span className="rotulo-dado">{m.rotulo ?? "ID do número na Meta"}</span>
-                <span className="dado">{m.phone_number_id}</span>
-              </li>
-            ))}
+            {canais.meta.map((m) => {
+              const qualidade = qualidadeMeta(m.qualidade);
+              return (
+                <li key={m.phone_number_id}>
+                  <span className="rotulo-dado">{m.rotulo ?? "Número na Meta"}</span>
+                  {m.erro ? (
+                    <span className="aviso" role="status">
+                      Não foi possível consultar a Meta agora. Tente de novo em um minuto.
+                    </span>
+                  ) : (
+                    <>
+                      <span className="dado">{m.numero_exibido || "—"}</span>
+                      <span className={`estado-instancia qualidade-${qualidade.tom}`}>
+                        {qualidade.rotulo}
+                      </span>
+                    </>
+                  )}
+                  <span className="nota">
+                    ID <span className="dado">{m.phone_number_id}</span>
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

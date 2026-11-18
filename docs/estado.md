@@ -110,6 +110,12 @@ uma entrega fora das fases.
   do painel, só gestor, com telefone fixado e alerta de queda
   (docs/decisoes/0010); webhook conferido e configurações da instância
   ajustadas pelo painel (docs/decisoes/0011). Ver `docs/evolution.md`.
+- Meta na tela Canais (fora das fases, issue 31, docs/decisoes/0032): cada
+  número mostra o número exibido (mascarado) e a qualidade, lidos na Graph por
+  `GET /{phone_number_id}` e guardados 60 s em memória; a Meta fora do ar vira
+  um aviso na linha do número. Gerir números da Meta continua fora do painel.
+  Pendente, passo de uma pessoa: conferir legenda e nome de arquivo num envio
+  real (roteiro em `docs/meta.md`).
 - iCred, fase 1 (fora das fases, docs/decisoes/0027): no ramo INSS, depois do
   extrato, o agente pede o SIM e o CPF, consulta o motor do iCred, apresenta o
   pacote e colhe o aceite com prova; o atendente grava a proposta. Webhook

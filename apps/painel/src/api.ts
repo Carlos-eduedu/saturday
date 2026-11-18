@@ -250,7 +250,15 @@ export interface InstanciaEvolution {
 
 export interface Canais {
   // `rotulo` vem de SATURDAY_WHATSAPP_ROTULOS; nulo quando o número não tem nome.
-  meta: { phone_number_id: string; rotulo: string | null }[];
+  // `numero_exibido` (mascarado) e `qualidade` são lidos na Meta; se ela não
+  // responde, vêm vazios e `erro` diz por quê.
+  meta: {
+    phone_number_id: string;
+    rotulo: string | null;
+    numero_exibido: string;
+    qualidade: "GREEN" | "YELLOW" | "RED" | "NA" | string;
+    erro: string | null;
+  }[];
   evolution: { ativo: boolean; instancias: InstanciaEvolution[]; erro: string | null };
 }
 

@@ -25,12 +25,15 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.canais.evolution import webhook as parser
 from saturday.canais.evolution.cliente import EvolutionClient
+from saturday.canais.whatsapp.cliente import ErroPermanente, NumeroMeta, WhatsAppClient
 from saturday.dados.modelos import Alerta, Auditoria, EventoRecebido, Instancia
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.jobs import instancias as eventos_instancias
 from saturday.settings import Settings
+from saturday.web.api import canais as canais_api
 
 CAMINHO_SIMULADOR = Path(__file__).resolve().parents[3] / "simuladores" / "evolution" / "app.py"
+CAMINHO_SIMULADOR_META = Path(__file__).resolve().parents[3] / "simuladores" / "meta" / "app.py"
 SENHA = "senha-bem-comprida-1"  # noqa: S105 - senha de teste
 TELEFONE = "5511987654321"
 OUTRO = "5521912345678"
@@ -42,9 +45,8 @@ def _porta_livre() -> int:
         return int(sock.getsockname()[1])
 
 
-@pytest.fixture(scope="module")
-def simulador() -> Iterator[tuple[str, ModuleType]]:
-    spec = importlib.util.spec_from_file_location("simulador_evolution_canais", CAMINHO_SIMULADOR)
+def _subir(caminho: Path, nome: str) -> Iterator[tuple[str, ModuleType]]:
+    spec = importlib.util.spec_from_file_location(nome, caminho)
     assert spec is not None and spec.loader is not None
     modulo = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(modulo)
@@ -64,15 +66,33 @@ def simulador() -> Iterator[tuple[str, ModuleType]]:
     thread.join(timeout=5)
 
 
+@pytest.fixture(scope="module")
+def simulador() -> Iterator[tuple[str, ModuleType]]:
+    yield from _subir(CAMINHO_SIMULADOR, "simulador_evolution_canais")
+
+
+@pytest.fixture(scope="module")
+def simulador_meta() -> Iterator[tuple[str, ModuleType]]:
+    yield from _subir(CAMINHO_SIMULADOR_META, "simulador_meta_canais")
+
+
 @pytest.fixture
-def settings(settings: Settings, simulador: tuple[str, ModuleType]) -> Settings:
+def settings(
+    settings: Settings,
+    simulador: tuple[str, ModuleType],
+    simulador_meta: tuple[str, ModuleType],
+) -> Settings:
     base, _ = simulador
+    base_meta, modulo_meta = simulador_meta
+    modulo_meta.limpar()
     return settings.model_copy(
         update={
             "evolution_ativo": True,
             "evolution_url": base,
             "evolution_api_key": SecretStr("chave-do-simulador"),
             "evolution_webhook_token": SecretStr("token-do-simulador"),
+            # A tela lê os números na Graph: aqui, só o simulador (regra 11).
+            "whatsapp_graph_url": base_meta,
         }
     )
 
@@ -133,7 +153,7 @@ def test_criar_lista_e_audita(
     assert "CONNECTION_UPDATE" in webhook["events"]
 
     canais = api.get("/admin/canais").json()
-    assert canais["meta"] == [{"phone_number_id": "100000000000001", "rotulo": None}]
+    assert [m["phone_number_id"] for m in canais["meta"]] == ["100000000000001"]
     [instancia] = canais["evolution"]["instancias"]
     assert instancia["nome"] == "mex-vendas"
     assert instancia["estado"] == "connecting"
@@ -455,15 +475,83 @@ def test_webhook_de_conexao_vai_para_a_fila(
         }
 
 
-def test_numero_da_meta_sai_com_o_rotulo_configurado(
+NUMERO_META = "100000000000001"
+
+
+def test_numero_da_meta_sai_com_rotulo_qualidade_e_numero_exibido(
     api: TestClient, fabrica: sessionmaker[Session], settings: Settings
 ) -> None:
-    settings.whatsapp_rotulos = {"100000000000001": "Vendas"}
+    settings.whatsapp_rotulos = {NUMERO_META: "Vendas"}
     entrar_como(api, fabrica, "gestor")
 
     meta = api.get("/admin/canais").json()["meta"]
 
-    assert meta == [{"phone_number_id": "100000000000001", "rotulo": "Vendas"}]
+    # O simulador exibe "+55 11 98765-4321"; o painel mascara como na Evolution.
+    assert meta == [
+        {
+            "phone_number_id": NUMERO_META,
+            "rotulo": "Vendas",
+            "numero_exibido": "(11) *****-4321",
+            "qualidade": "GREEN",
+            "erro": None,
+        }
+    ]
+
+
+def test_leitura_da_meta_nao_se_repete_a_cada_abertura(
+    api: TestClient,
+    fabrica: sessionmaker[Session],
+    simulador_meta: tuple[str, ModuleType],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base, _ = simulador_meta
+    entrar_como(api, fabrica, "gestor")
+    assert api.get("/admin/canais").json()["meta"][0]["qualidade"] == "GREEN"
+
+    httpx.post(f"{base}/admin/numero", json={"quality_rating": "RED"}).raise_for_status()
+    assert api.get("/admin/canais").json()["meta"][0]["qualidade"] == "GREEN"
+
+    monkeypatch.setattr(canais_api, "VALIDADE_DA_LEITURA_S", 0)
+    assert api.get("/admin/canais").json()["meta"][0]["qualidade"] == "RED"
+
+
+def test_falha_da_meta_nao_derruba_a_tela(
+    api: TestClient, fabrica: sessionmaker[Session], settings: Settings
+) -> None:
+    # O segundo número não existe no simulador: a Graph responde 404.
+    settings.whatsapp_numeros = [NUMERO_META, "100000000000009"]
+    entrar_como(api, fabrica, "gestor")
+
+    resposta = api.get("/admin/canais")
+
+    assert resposta.status_code == 200
+    bom, ruim = resposta.json()["meta"]
+    assert bom["qualidade"] == "GREEN" and bom["erro"] is None
+    assert ruim == {
+        "phone_number_id": "100000000000009",
+        "rotulo": None,
+        "numero_exibido": "",
+        "qualidade": "",
+        "erro": "não foi possível consultar a Meta",
+    }
+
+
+def test_leitura_do_numero_nao_poe_telefone_nem_token_no_log(
+    settings: Settings,
+    simulador_meta: tuple[str, ModuleType],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level("DEBUG")
+    with httpx.Client(timeout=10.0) as http:
+        cliente_meta = WhatsAppClient(http, settings)
+        numero = cliente_meta.ler_numero(NUMERO_META)
+        with pytest.raises(ErroPermanente):
+            cliente_meta.ler_numero("100000000000009")
+
+    assert numero == NumeroMeta(numero_exibido="+55 11 98765-4321", qualidade="GREEN")
+    assert "whatsapp_numero_falhou status=404" in caplog.text
+    assert "98765" not in caplog.text
+    assert "token-de-teste" not in caplog.text
 
 
 def test_rotulos_da_meta_lidos_da_variavel() -> None:

@@ -1,6 +1,7 @@
 """Tela Canais do painel (`/admin/canais`), só para gestor (decisão 0010).
 
-Números da Meta só para leitura; instâncias da Evolution geridas aqui: a
+Números da Meta só para leitura, com a qualidade e o número exibido lidos na
+Graph (decisão 0032); instâncias da Evolution geridas aqui: a
 própria Evolution diz quais existem, e o Saturday guarda só o telefone fixado.
 Toda ação exige CSRF e, quando a Evolution aceita, grava `auditoria`.
 """
@@ -9,6 +10,7 @@ from __future__ import annotations
 
 import hmac
 import re
+import time
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
@@ -24,7 +26,8 @@ from saturday.canais.evolution.cliente import (
     EvolutionClient,
     Qr,
 )
-from saturday.canais.whatsapp.cliente import ErroPermanente, ErroWhatsApp
+from saturday.canais.whatsapp.cliente import ErroPermanente, ErroWhatsApp, WhatsAppClient
+from saturday.canais.whatsapp.telefone import normalizar_telefone
 from saturday.dados import instancias
 from saturday.dados.modelos import Conversa
 from saturday.dados.sessao import sessao as abrir_sessao
@@ -43,6 +46,9 @@ router = APIRouter(prefix="/admin/canais", tags=["painel"])
 
 NOME = re.compile(r"^[a-z0-9-]{3,32}$")
 DIAS_DE_USO = 7
+# Por quanto tempo vale a leitura de um número na Meta, com ou sem sucesso: a
+# qualidade muda devagar, e a Meta fora do ar não trava cada abertura da tela.
+VALIDADE_DA_LEITURA_S = 60.0
 
 
 def get_cliente_evolution(request: Request) -> EvolutionClient:
@@ -104,12 +110,50 @@ def _conversas_recentes(sessao: Session) -> dict[str, int]:
     return {str(nome): int(total) for nome, total in linhas}
 
 
+def _leitura_da_meta(request: Request, settings: Settings, phone_number_id: str) -> dict[str, Any]:
+    """Número exibido (mascarado, como o da Evolution) e qualidade, com validade.
+
+    Guardado na memória do processo, já mascarado: o telefone inteiro não fica
+    aqui. Falha da Meta vira `erro` e a tela continua de pé.
+    """
+
+    if not hasattr(request.app.state, "leituras_da_meta"):
+        request.app.state.leituras_da_meta = {}
+    guardadas: dict[str, tuple[float, dict[str, Any]]] = request.app.state.leituras_da_meta
+    agora = time.monotonic()
+    guardada = guardadas.get(phone_number_id)
+    if guardada and agora - guardada[0] < VALIDADE_DA_LEITURA_S:
+        return guardada[1]
+
+    leitura: dict[str, Any]
+    try:
+        numero = WhatsAppClient(request.app.state.http, settings).ler_numero(phone_number_id)
+    except ErroWhatsApp:
+        leitura = {
+            "numero_exibido": "",
+            "qualidade": "",
+            "erro": "não foi possível consultar a Meta",
+        }
+    else:
+        exibido = numero.numero_exibido
+        leitura = {
+            "numero_exibido": mascarar_telefone(normalizar_telefone(exibido)) if exibido else "",
+            "qualidade": numero.qualidade,
+            "erro": None,
+        }
+    guardadas[phone_number_id] = (agora, leitura)
+    return leitura
+
+
 @router.get("")
 def listar(request: Request, _usuario: Gestor, fabrica: Fabrica) -> dict[str, Any]:
     settings = get_settings(request)
-    # TODO(meta): qualidade e número exibido; a rota da Graph não está no contrato (regra 12).
     meta = [
-        {"phone_number_id": numero, "rotulo": settings.whatsapp_rotulos.get(numero)}
+        {
+            "phone_number_id": numero,
+            "rotulo": settings.whatsapp_rotulos.get(numero),
+            **_leitura_da_meta(request, settings, numero),
+        }
         for numero in settings.whatsapp_numeros
     ]
     resposta: dict[str, Any] = {

@@ -8,6 +8,7 @@ permanente não.
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
@@ -22,6 +23,17 @@ CODIGOS_TEMPORARIOS = frozenset({1, 2, 4, 80007, 130429, 131000, 131016, 131048,
 
 # Códigos que significam "o texto não pode": fora da janela, template inválido.
 CODIGO_JANELA_FECHADA = 131047
+
+# A leitura do número alimenta uma tela: não espera os 30 s do cliente HTTP.
+TIMEOUT_LEITURA_S = 5.0
+
+
+@dataclass(frozen=True)
+class NumeroMeta:
+    """O que a Graph diz do número (decisão 0032). Vazio quando o campo não veio."""
+
+    numero_exibido: str  # `display_phone_number`: telefone, nunca em log
+    qualidade: str  # `quality_rating`: GREEN, YELLOW, RED ou NA
 
 
 class ErroWhatsApp(Exception):
@@ -163,7 +175,7 @@ class WhatsAppClient:
 
         TODO(meta): `caption` e `filename` seguem a referência da Cloud API; a
         leitura das docs não trouxe o esquema completo. O primeiro envio real
-        no dev confirma.
+        no dev confirma (roteiro em `docs/meta.md`).
         """
 
         conteudo: dict[str, Any] = {"id": media_id}
@@ -220,6 +232,39 @@ class WhatsAppClient:
                 "type": "template",
                 "template": template,
             },
+        )
+
+    def ler_numero(self, phone_number_id: str) -> NumeroMeta:
+        """`GET /{phone_number_id}`: número exibido e qualidade (decisão 0032).
+
+        Sem `fields`: a Graph já devolve os dois por padrão. Sem retry: quem
+        chama é a tela Canais, que mostra a falha e consulta de novo depois.
+        """
+
+        try:
+            resposta = self._http.get(
+                f"{self._base}/{phone_number_id}",
+                headers=self._cabecalhos(),
+                timeout=TIMEOUT_LEITURA_S,
+            )
+        except httpx.HTTPError as exc:
+            logger.warning("whatsapp_numero_falhou rede=%s", type(exc).__name__)
+            raise ErroTemporario(f"rede: {type(exc).__name__}") from exc
+        try:
+            dados = resposta.json()
+        except ValueError:
+            dados = {}
+        if not isinstance(dados, dict):
+            dados = {}
+        if resposta.status_code >= 400:
+            erro = classificar(resposta.status_code, dados)
+            logger.warning(
+                "whatsapp_numero_falhou status=%s codigo=%s", resposta.status_code, erro.codigo
+            )
+            raise erro
+        return NumeroMeta(
+            numero_exibido=str(dados.get("display_phone_number") or ""),
+            qualidade=str(dados.get("quality_rating") or ""),
         )
 
     def marcar_lida(self, phone_number_id: str, wamid: str) -> None:

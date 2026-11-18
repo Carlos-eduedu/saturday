@@ -1,8 +1,8 @@
 """Simulador da WhatsApp Cloud API.
 
 Pequeno de propósito: emula o que o Saturday usa. Envio de texto e modelo,
-metadados e download de mídia, e um admin para injetar mensagem de cliente e
-forçar falha.
+metadados e download de mídia, leitura do número (qualidade e número exibido)
+e um admin para injetar mensagem de cliente, forçar falha e trocar a qualidade.
 
 Rodar local:
     uvicorn app:app --app-dir simuladores/meta --port 8100
@@ -35,6 +35,20 @@ SATURDAY_URL = os.environ.get("SIMULADOR_SATURDAY_URL", "http://api:8000")
 APP_SECRET = os.environ.get("SATURDAY_WHATSAPP_APP_SECRET", "segredo-do-simulador")
 NUMERO = os.environ.get("SIMULADOR_WHATSAPP_NUMERO", "11987654321")
 PHONE_NUMBER_ID = os.environ.get("SIMULADOR_PHONE_NUMBER_ID", "100000000000001")
+
+
+def _numeros_iniciais() -> dict[str, dict[str, str]]:
+    return {
+        PHONE_NUMBER_ID: {
+            "display_phone_number": f"+55 {NUMERO[:2]} {NUMERO[2:7]}-{NUMERO[7:]}",
+            "verified_name": "Simulador",
+            "quality_rating": "GREEN",
+        }
+    }
+
+
+# O que `GET /{phone_number_id}` devolve; `/admin/numero` troca.
+NUMEROS = _numeros_iniciais()
 
 
 def _proximo_wamid() -> str:
@@ -103,6 +117,8 @@ def limpar() -> dict[str, int]:
     LIDAS.clear()
     MIDIAS.clear()
     FALHAS.clear()
+    NUMEROS.clear()
+    NUMEROS.update(_numeros_iniciais())
     return {"ok": 1}
 
 
@@ -121,8 +137,26 @@ async def criar_midia(request: Request, mime: str = "application/octet-stream") 
     return {"id": identificador, "mime_type": mime}
 
 
+@app.post("/admin/numero")
+async def trocar_numero(request: Request) -> dict[str, Any]:
+    """Troca a qualidade (ou os outros campos) de um número, ou cria outro.
+
+    `{"quality_rating": "RED"}` muda o número padrão; `phone_number_id` escolhe outro.
+    """
+
+    corpo = await request.json()
+    identificador = str(corpo.pop("phone_number_id", PHONE_NUMBER_ID))
+    numero = NUMEROS.setdefault(identificador, dict(_numeros_iniciais()[PHONE_NUMBER_ID]))
+    numero.update({k: str(v) for k, v in corpo.items() if k in numero})
+    return {"id": identificador, **numero}
+
+
 @app.get("/{media_id}")
 def metadados_midia(media_id: str) -> Any:
+    """Nó da Graph pelo id: um número (campos padrão da leitura) ou uma mídia."""
+
+    if media_id in NUMEROS:
+        return {"id": media_id, **NUMEROS[media_id]}
     if media_id not in MIDIAS:
         return JSONResponse(status_code=404, content={"error": {"code": 100}})
     dados, mime = MIDIAS[media_id]

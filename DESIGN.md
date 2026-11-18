@@ -119,11 +119,11 @@ Cinza frio com um único cobalto de ação, mais três cores de estado com signi
 - **Cobalto de Ação Suave** (#e4e6fc): fundo do item de navegação ativo, balão da equipe e selo "Assumida". No escuro, #16284a.
 
 ### Secondary
-- **Verde IA** (#1e6b40): tudo que é da IA: autor "IA", balão da IA (tingido a 10%), selo "IA", instância conectada. No escuro, #6fcf97.
-- **Âmbar de Atenção** (#9a4a00): o que pede a equipe: rótulo "pede atenção", faixa do handoff, selo "Handoff", cota acima de 80%, selo de alertas. No escuro, #f2a65a.
+- **Verde IA** (#1e6b40): tudo que é da IA: autor "IA", balão da IA (tingido a 10%), selo "IA", instância conectada, número da Meta com qualidade alta. No escuro, #6fcf97.
+- **Âmbar de Atenção** (#9a4a00): o que pede a equipe: rótulo "pede atenção", faixa do handoff, selo "Handoff", cota acima de 80%, selo de alertas, número da Meta com qualidade média. No escuro, #f2a65a.
 
 ### Tertiary
-- **Vermelho de Erro** (#b3261e): erro, envio que falhou, ação destrutiva ("Apagar"), instância desconectada. No escuro, #ff8a80.
+- **Vermelho de Erro** (#b3261e): erro, envio que falhou, ação destrutiva ("Apagar"), instância desconectada, número da Meta com qualidade baixa. No escuro, #ff8a80.
 
 ### Neutral
 - **Tinta** (#0b0c0e): texto principal.

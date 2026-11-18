@@ -274,8 +274,13 @@ Autenticação de saída: `Authorization: Bearer SATURDAY_WHATSAPP_TOKEN`. Retry
 esperas de 2 s, 5 s e 10 s só em erro temporário (5xx, timeout e os códigos
 listados em `canais/whatsapp/cliente.py`); esgotado, o outbox reentrega depois.
 
-O simulador da Meta fica em `simuladores/meta/` e cobre envio, download de mídia
-e injeção de mensagem assinada:
+A tela Canais do painel lê o número exibido e a qualidade de cada número por
+`GET /{phone_number_id}` (fora da especificação: decisão 0032 e
+[`docs/meta.md`](../../docs/meta.md)), com a leitura guardada 60 s em memória.
+
+O simulador da Meta fica em `simuladores/meta/` e cobre envio, download de mídia,
+leitura do número (`POST /admin/numero` troca a qualidade) e injeção de mensagem
+assinada:
 
 ```bash
 uv run --project simuladores/meta uvicorn app:app --app-dir simuladores/meta --port 8100

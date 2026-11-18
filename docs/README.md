@@ -14,6 +14,7 @@
 - [`c6.md`](c6.md) — API do C6: contrato novo INSS, consentimento, cliente, simulador e pendências.
 - [`icred.md`](icred.md) — iCred pelo motor de consultas: como está hoje e a pesquisa da especificação.
 - [`evolution.md`](evolution.md) — canal Evolution: instâncias, webhook e simulador.
+- [`meta.md`](meta.md) — canal oficial da Meta: leitura do número e a conferência manual de mídia.
 - [`deploy.md`](deploy.md) — ambientes, ambiente do zero, backup e restauração no Dokploy.
 - [`granatech-homologacao/`](granatech-homologacao/README.md) — material da homologação com a Granatech.
 

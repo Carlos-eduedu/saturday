@@ -1,7 +1,9 @@
 # 0019 — Barra nova do painel, Membros, Operação e o último canal ativo
 
 - **Data:** 2026-11-15
-- **Status:** aceita
+- **Status:** aceita; em 2026-11-18 a seção da Meta ganhou a qualidade e o
+  número exibido pela [0032](0032-leitura-do-numero-na-graph.md) (a gestão dos
+  números continua fora do painel)
 
 ## Contexto
 

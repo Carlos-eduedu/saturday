@@ -177,6 +177,8 @@ def settings() -> Settings:
         whatsapp_app_secret=SecretStr("segredo-de-teste"),
         whatsapp_verify_token=SecretStr("verificacao-de-teste"),
         whatsapp_numeros=["100000000000001"],
+        # Nunca a Graph de verdade (regra 11): quem precisa aponta para o simulador.
+        whatsapp_graph_url="http://127.0.0.1:9",
     )
 
 

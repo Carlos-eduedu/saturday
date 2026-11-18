@@ -1380,9 +1380,10 @@ main:has(.historico) { padding-bottom: 0; }
 /* Estado da instância: cor e texto juntos, nunca só cor. */
 .estado-instancia { display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 500; }
 .estado-instancia::before { content: ""; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: currentColor; }
-.estado-open { color: var(--ia); }
-.estado-connecting { color: var(--handoff); }
-.estado-close, .estado-refused { color: var(--erro); }
+.estado-open, .qualidade-alta { color: var(--ia); }
+.estado-connecting, .qualidade-media { color: var(--handoff); }
+.estado-close, .estado-refused, .qualidade-baixa { color: var(--erro); }
+.qualidade-sem { color: var(--suave); }
 
 /* Aba Granatech */
 .granatech .filtros .form-usuario { margin-top: 0; }

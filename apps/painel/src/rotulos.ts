@@ -296,3 +296,17 @@ export const SITUACOES_DA_CONSULTA = [
   "FIDUCIARY_INSTITUTION_NO_AUTHORIZATION",
   "WORKER_MUST_CANCEL_RETURN_REQUEST",
 ] as const;
+
+// Qualidade do número na Meta (`quality_rating`, decisão 0032). O `tom` escolhe
+// a cor do ponto; o texto vai sempre junto.
+const QUALIDADES_META: Record<string, { rotulo: string; tom: string }> = {
+  GREEN: { rotulo: "Qualidade alta (verde)", tom: "alta" },
+  YELLOW: { rotulo: "Qualidade média (amarela)", tom: "media" },
+  RED: { rotulo: "Qualidade baixa (vermelha)", tom: "baixa" },
+  NA: { rotulo: "Qualidade ainda não avaliada", tom: "sem" },
+};
+
+// Valor que a tela não conhece aparece cru, sem cor.
+export function qualidadeMeta(valor: string): { rotulo: string; tom: string } {
+  return QUALIDADES_META[valor] ?? { rotulo: `Qualidade: ${valor || "não informada"}`, tom: "sem" };
+}
