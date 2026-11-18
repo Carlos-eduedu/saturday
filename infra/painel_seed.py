@@ -453,12 +453,14 @@ with abrir(fabrica) as sessao:
         gestor.senha_hash = gerar_hash(senha)
 
     # A equipe, para a aba Membros ter quem mostrar: uma atendente com carga e
-    # atividade, um ausente e uma desativada. A senha é a mesma do gestor.
+    # atividade, um ausente, uma desativada e uma com a troca de senha
+    # pendente. A senha é a mesma do gestor.
     equipe = {}
     for email, nome, cargo in [
         ("bia@exemplo.test", "Bia Souza", "Atendente CLT"),
         ("caio@exemplo.test", "Caio Lima", "Atendente INSS"),
         ("dora@exemplo.test", "Dora Reis", None),
+        ("eva@exemplo.test", "Eva Prado", None),
     ]:
         pessoa = sessao.scalar(
             select(UsuarioPainel).where(UsuarioPainel.email == email)
@@ -474,6 +476,8 @@ with abrir(fabrica) as sessao:
     bia.ultimo_acesso_em = agora()
     equipe["caio@exemplo.test"].disponivel = False
     equipe["dora@exemplo.test"].ativo = False
+    # Recém-cadastrada pelo gestor: entra e só vê a troca de senha (decisão 0030).
+    equipe["eva@exemplo.test"].trocar_senha = True
 
     for n in range(14):
         situacao = ("ia", "handoff", "assumida")[n % 3]

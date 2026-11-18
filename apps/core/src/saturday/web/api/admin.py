@@ -44,6 +44,7 @@ from saturday.dados.modelos import (
 )
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.painel import acoes, exportacao, membros, sessoes, supervisao
+from saturday.painel import usuarios as regras_de_usuarios
 from saturday.painel.auditoria import auditar
 from saturday.painel.canal import permitido
 from saturday.painel.midia import mime_base
@@ -59,6 +60,8 @@ from saturday.web.dependencies import (
     get_agent_service,
     get_fabrica,
     get_settings,
+    sessao_aberta,
+    sessao_aberta_com_csrf,
     usuario_logado,
 )
 from saturday.web.eventos import Difusor, fluxo_sse
@@ -68,6 +71,9 @@ router = APIRouter(prefix="/admin", tags=["painel"])
 Fabrica = Annotated[sessionmaker[Session], Depends(get_fabrica)]
 Logado = Annotated[UsuarioLogado, Depends(usuario_logado)]
 ComCsrf = Annotated[UsuarioLogado, Depends(exigir_csrf)]
+# Valem com a troca de senha pendente: só quem sou eu, trocar a senha e sair.
+ComSessao = Annotated[UsuarioLogado, Depends(sessao_aberta)]
+ComSessaoCsrf = Annotated[UsuarioLogado, Depends(sessao_aberta_com_csrf)]
 Servico = Annotated[AgentService, Depends(get_agent_service)]
 
 LIMITE_INBOX = 200
@@ -77,6 +83,11 @@ CampoSensivel = Literal["cpf", "telefone", "data_nascimento", "email"]
 class Login(BaseModel):
     email: str = Field(max_length=254)
     senha: str = Field(max_length=256)
+
+
+class TrocaDeSenha(BaseModel):
+    atual: str = Field(max_length=256)
+    nova: str = Field(max_length=256)
 
 
 class Envio(BaseModel):
@@ -161,6 +172,7 @@ def _eu(request: Request, usuario: UsuarioLogado) -> dict[str, Any]:
         "pode_testar_fluxos": usuario.pode_testar_fluxos,
         "cargo": usuario.cargo,
         "disponivel": usuario.disponivel,
+        "trocar_senha": usuario.trocar_senha,
         "csrf": sessoes.token_csrf(segredo, usuario.token),
     }
 
@@ -185,6 +197,7 @@ def login(dados: Login, request: Request, response: Response, fabrica: Fabrica) 
                 usuario.perfil,
                 token,
                 usuario.pode_editar_agente,
+                trocar_senha=usuario.trocar_senha,
             )
             if usuario and token
             else None
@@ -205,7 +218,7 @@ def login(dados: Login, request: Request, response: Response, fabrica: Fabrica) 
 
 
 @router.post("/logout", status_code=204)
-def logout(usuario: ComCsrf, fabrica: Fabrica) -> Response:
+def logout(usuario: ComSessaoCsrf, fabrica: Fabrica) -> Response:
     with abrir_sessao(fabrica) as sessao:
         sessoes.encerrar_sessao(sessao, usuario.token)
     resposta = Response(status_code=204)
@@ -214,8 +227,25 @@ def logout(usuario: ComCsrf, fabrica: Fabrica) -> Response:
 
 
 @router.get("/eu")
-def eu(request: Request, usuario: Logado) -> dict[str, Any]:
+def eu(request: Request, usuario: ComSessao) -> dict[str, Any]:
     return _eu(request, usuario)
+
+
+@router.post("/eu/senha", status_code=204)
+def trocar_senha(dados: TrocaDeSenha, usuario: ComSessaoCsrf, fabrica: Fabrica) -> Response:
+    """A pessoa troca a própria senha; as outras sessões dela caem (decisão 0030)."""
+
+    try:
+        with abrir_sessao(fabrica) as sessao:
+            trocou = regras_de_usuarios.trocar_propria_senha(
+                sessao, usuario.id, usuario.token, dados.atual, dados.nova
+            )
+    except acoes.AcaoRecusada as exc:
+        raise _recusa(exc) from exc
+    # Fora do `with`: a falha contada precisa do commit antes da recusa.
+    if not trocou:
+        raise HTTPException(status_code=422, detail="senha atual inválida")
+    return Response(status_code=204)
 
 
 # ------------------------------------------------------------------ perfil

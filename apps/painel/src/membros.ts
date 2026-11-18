@@ -27,6 +27,7 @@ const ACOES: Record<string, string> = {
   usuario_criar: "Adicionou um membro",
   usuario_editar: "Editou um membro",
   usuario_senha: "Redefiniu a senha de um membro",
+  usuario_senha_propria: "Trocou a própria senha",
   usuario_desbloquear: "Desbloqueou um membro",
   usuario_desativar: "Desativou um membro",
   usuario_reativar: "Reativou um membro",
@@ -54,6 +55,17 @@ export function rotuloDaAcao(acao: string): string {
     return `Revelou ${DADOS[campo] ?? campo} de um cliente`;
   }
   return ACOES[acao] ?? FAMILIAS.find(([prefixo]) => acao.startsWith(prefixo))?.[1] ?? acao;
+}
+
+// A regra da senha é do servidor (12 ou mais); aqui só o tamanho, para o campo.
+export const SENHA_MINIMA = 12;
+
+/** Por que a troca da própria senha nem sai da tela; vazio quando pode ir. */
+export function recusaDaSenhaNova(atual: string, nova: string, repete: string): string {
+  if (nova.length < SENHA_MINIMA) return `A senha nova precisa de pelo menos ${SENHA_MINIMA} caracteres.`;
+  if (nova !== repete) return "A senha nova e a repetição não conferem.";
+  if (nova === atual) return "A senha nova precisa ser diferente da atual.";
+  return "";
 }
 
 export const conversas = (n: number) => (n === 1 ? "1 conversa" : `${n} conversas`);

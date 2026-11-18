@@ -33,7 +33,10 @@ uma entrega fora das fases.
   contador de cota;
   tempo real por `pg_notify` + SSE. Depois, fora das fases: aba Usuários (só
   gestor) para cadastrar, editar, redefinir senha, desbloquear, desativar e
-  reativar; excluir é desativar (docs/decisoes/0012). Aba Granatech para
+  reativar; excluir é desativar (docs/decisoes/0012). Cada pessoa troca a
+  própria senha em "Seu perfil", e a senha definida pelo gestor exige troca
+  no primeiro acesso: até lá o servidor só deixa trocar a senha e sair
+  (docs/decisoes/0030). Aba Granatech para
   todos (consultas, propostas, linha do tempo, cota) com ações só do gestor:
   reconciliar, reenviar link, cancelar, corrigir conta e atualizar detalhe;
   abrir consulta, simular e criar proposta ficam só na conversa

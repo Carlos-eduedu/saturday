@@ -18,6 +18,8 @@ export interface Eu {
   // Função (o gestor preenche) e disponibilidade (a própria pessoa marca).
   cargo: string | null;
   disponivel: boolean;
+  // Senha definida pelo gestor: até trocar, a API só deixa trocar a senha e sair.
+  trocar_senha: boolean;
   csrf: string;
 }
 
@@ -738,6 +740,7 @@ export const api = {
   entrar: (email: string, senha: string) => chamar<Eu>("POST", "/login", { email, senha }),
   sair: () => chamar<void>("POST", "/logout"),
   eu: () => chamar<Eu>("GET", "/eu"),
+  trocarSenha: (atual: string, nova: string) => chamar<void>("POST", "/eu/senha", { atual, nova }),
   usuarios: () => chamar<Usuario[]>("GET", "/usuarios"),
   conversas: (fila: string, busca: string) => {
     const params = new URLSearchParams();

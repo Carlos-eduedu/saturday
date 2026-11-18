@@ -239,6 +239,11 @@ class UsuarioPainel(Base):
     )
     tentativas_falhas: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     bloqueado_ate: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Senha definida pelo gestor: até a pessoa trocar, o servidor só deixa
+    # trocar a senha e sair (decisão 0030).
+    trocar_senha: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=sa_false()
+    )
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
     # Troca modelos e a base de conhecimento na aba Agente; independe do perfil.
     pode_editar_agente: Mapped[bool] = mapped_column(

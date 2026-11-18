@@ -17,6 +17,9 @@ from saturday.painel import membros, sessoes
 from saturday.settings import Settings
 
 COOKIE_SESSAO = "saturday_sessao"
+# Recusa de quem tem a troca de senha pendente (decisão 0030). O painel nem
+# chega a recebê-la: lê `trocar_senha` em `GET /admin/eu` e mostra só a troca.
+TROCA_PENDENTE = "troque a senha para continuar"
 
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
@@ -69,16 +72,24 @@ class UsuarioLogado:
     pode_testar_fluxos: bool = False
     cargo: str | None = None
     disponivel: bool = True
+    # Troca de senha obrigatória pendente (decisão 0030).
+    trocar_senha: bool = False
 
     @property
     def gestor(self) -> bool:
         return self.perfil == "gestor"
 
 
-def usuario_logado(
+def sessao_aberta(
     fabrica: Annotated[sessionmaker[Session], Depends(get_fabrica)],
     token: Annotated[str | None, Cookie(alias=COOKIE_SESSAO)] = None,
 ) -> UsuarioLogado:
+    """Quem tem sessão válida, mesmo com a troca de senha pendente.
+
+    Só para o mínimo da tela de troca (quem sou eu, trocar a senha e sair);
+    todo o resto usa `usuario_logado`.
+    """
+
     if not token:
         raise HTTPException(status_code=401, detail="não autenticado")
     with abrir_sessao(fabrica) as sessao:
@@ -98,7 +109,23 @@ def usuario_logado(
             usuario.pode_testar_fluxos,
             usuario.cargo,
             usuario.disponivel,
+            usuario.trocar_senha,
         )
+
+
+def usuario_logado(usuario: Annotated[UsuarioLogado, Depends(sessao_aberta)]) -> UsuarioLogado:
+    """Sessão válida e sem troca de senha pendente: a porta de todo o `/admin`."""
+
+    if usuario.trocar_senha:
+        raise HTTPException(status_code=403, detail=TROCA_PENDENTE)
+    return usuario
+
+
+def _conferir_csrf(request: Request, usuario: UsuarioLogado, recebido: str | None) -> UsuarioLogado:
+    segredo = get_settings(request).sessao_segredo.get_secret_value()
+    if not sessoes.csrf_confere(segredo, usuario.token, recebido):
+        raise HTTPException(status_code=403, detail="CSRF inválido")
+    return usuario
 
 
 def exigir_csrf(
@@ -108,10 +135,17 @@ def exigir_csrf(
 ) -> UsuarioLogado:
     """Toda ação que muda estado confere o CSRF da sessão."""
 
-    segredo = get_settings(request).sessao_segredo.get_secret_value()
-    if not sessoes.csrf_confere(segredo, usuario.token, recebido):
-        raise HTTPException(status_code=403, detail="CSRF inválido")
-    return usuario
+    return _conferir_csrf(request, usuario, recebido)
+
+
+def sessao_aberta_com_csrf(
+    request: Request,
+    usuario: Annotated[UsuarioLogado, Depends(sessao_aberta)],
+    recebido: Annotated[str | None, Header(alias="X-CSRF-Token")] = None,
+) -> UsuarioLogado:
+    """CSRF para trocar a senha e sair, que valem com a troca pendente."""
+
+    return _conferir_csrf(request, usuario, recebido)
 
 
 def _gestor(usuario: UsuarioLogado) -> UsuarioLogado:

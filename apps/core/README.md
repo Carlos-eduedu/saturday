@@ -174,14 +174,17 @@ sendo o do grafo: uma conversa assumida no painel aparece ali como estava no
 
 Autenticada por cookie de sessão (`saturday_sessao`, 8 h). Toda rota que não é
 `GET` exige o header `X-CSRF-Token`, devolvido pelo login e por `GET /admin/eu`,
-e grava `auditoria`. As conversas são identificadas pelo `id` interno (UUID),
+e grava `auditoria`. Com a troca de senha obrigatória pendente (decisão 0030),
+todas respondem 403 "troque a senha para continuar", menos `GET /admin/eu`,
+`POST /admin/eu/senha` e `POST /admin/logout`. As conversas são identificadas pelo `id` interno (UUID),
 nunca pelo `conversation_id`, que no WhatsApp carrega o telefone.
 
 | Método | Rota | Descrição |
 |---|---|---|
 | `POST` | `/admin/login` | `{email, senha}`. 5 falhas bloqueiam por 15 min; a resposta de erro é sempre a mesma. |
 | `POST` | `/admin/logout` | Apaga a sessão. |
-| `GET` | `/admin/eu` | Usuário, perfil e token CSRF. |
+| `GET` | `/admin/eu` | Usuário, perfil, token CSRF e `trocar_senha` (troca obrigatória pendente). |
+| `POST` | `/admin/eu/senha` | `{atual, nova}`: a pessoa troca a própria senha (12 ou mais, diferente da atual). Encerra as outras sessões dela e desliga a troca obrigatória. Senha atual errada responde 422 e conta para o bloqueio do login. |
 | `GET` | `/admin/usuarios` | Destinos de transferência, com o `estado` de cada pessoa (`disponivel`, `ausente` ou `fora`). |
 | `GET` | `/admin/membros` | A equipe, para todos (decisão 0023). Os campos dependem de quem pede (`nivel`: `colega`, `proprio` ou `gestor`); desativados só para o gestor. |
 | `GET` | `/admin/membros/{id}` | Um membro. Para a própria pessoa e para o gestor traz também `atividade` (7 dias) e `acoes` (as 10 últimas, sem o detalhe da auditoria). |

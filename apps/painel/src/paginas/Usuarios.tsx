@@ -5,14 +5,13 @@ import { Dialogo } from "../componentes/Dialogo";
 import { EstadoDoMembro } from "../componentes/EstadoDoMembro";
 import { Falha } from "../componentes/Falha";
 import { api, type Eu, type Membro, type Perfil, mensagemDeFalha } from "../api";
-import { conversas, ROTULO_PERFIL } from "../membros";
+import { conversas, ROTULO_PERFIL, SENHA_MINIMA } from "../membros";
 import { relativo } from "../rotulos";
 
 // Aba Membros (decisão 0023): a equipe, para todos. Cada linha leva à página do
 // membro (`Membro.tsx`), onde ficam os dados e as ações de gestão. O servidor
 // decide o que cada um recebe; aqui a linha só desenha o que veio.
 
-const SENHA_MINIMA = 12;
 
 export function Membros({ eu }: { eu: Eu }) {
   const [membros, setMembros] = useState<Membro[] | null>(null);
@@ -183,7 +182,8 @@ function NovoUsuario({ criado, fechar }: { criado: (aviso: string) => void; fech
     >
     <form id="novo-usuario" onSubmit={criar} className="form-usuario">
       <p className="nota">
-        A pessoa entra com este e-mail e a senha inicial. Passe a senha por um canal seguro.
+        A pessoa entra com este e-mail e a senha inicial, e escolhe outra senha no primeiro
+        acesso. Passe a senha por um canal seguro.
       </p>
       <label>
         Nome

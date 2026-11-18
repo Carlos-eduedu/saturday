@@ -1608,6 +1608,9 @@ small.dado { font-size: 0.8rem; }
 .oferta-completa summary { width: fit-content; min-height: var(--alvo); display: flex; align-items: center; color: var(--suave); font-size: 0.85rem; cursor: pointer; }
 .login .erro { margin: 0; font-size: 0.9rem; }
 .login > .nota:last-child { margin: 0; font-size: 0.8rem; }
+/* Troca de senha: no perfil, o aviso ocupa a linha inteira da grade. */
+.form-usuario > .erro, .form-usuario > .confere { grid-column: 1 / -1; margin: 0; }
+.login .confere { margin: 0; font-size: 0.9rem; }
 
 /* --- conversa --- */
 /* Esqueleto: balões no lugar das mensagens enquanto a conversa chega. A

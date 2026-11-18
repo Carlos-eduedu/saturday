@@ -7,7 +7,8 @@ import { useConfirmar } from "../componentes/Confirmar";
 import { EstadoDoMembro } from "../componentes/EstadoDoMembro";
 import { Falha } from "../componentes/Falha";
 import { api, enviarFoto, type Eu, type Membro, type Perfil, mensagemDeFalha } from "../api";
-import { conversas, ROTULO_PERFIL, rotuloDaAcao } from "../membros";
+import { TrocarSenha } from "../componentes/TrocarSenha";
+import { conversas, ROTULO_PERFIL, rotuloDaAcao, SENHA_MINIMA } from "../membros";
 import { relativo } from "../rotulos";
 import { useAcao } from "../useAcao";
 
@@ -16,8 +17,6 @@ import { useAcao } from "../useAcao";
 // gestor, também contato, acesso e atividade; só para o gestor, a gestão. As
 // travas (não desativar a si mesmo, nunca ficar sem gestor) são da API; a tela
 // só esconde o que já sabe que vai ser recusado.
-
-const SENHA_MINIMA = 12;
 
 const dataHora = (iso: string) =>
   new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
@@ -365,6 +364,20 @@ function SeuPerfil({
           {aviso}
         </p>
       )}
+      <TrocarSenha
+        className="form-usuario"
+        email={eu.email}
+        cabecalho={
+          <>
+            <h3 id="senha-titulo">Trocar senha</h3>
+            <p className="nota">
+              Pelo menos {SENHA_MINIMA} caracteres. As suas outras sessões abertas são encerradas;
+              esta continua.
+            </p>
+          </>
+        }
+        aoTrocar={recarregar}
+      />
     </section>
   );
 }
@@ -412,7 +425,7 @@ function Gestao({ membro, agir }: { membro: Membro; agir: Agir }) {
     evento.preventDefault();
     const ok = await agir(
       () => api.redefinirSenha(membro.id, senha),
-      `Senha de ${membro.nome} redefinida; as sessões abertas dela foram encerradas.`,
+      `Senha de ${membro.nome} redefinida; as sessões abertas dela foram encerradas, e ela escolhe outra ao entrar.`,
     );
     if (ok) setSenha("");
   }
@@ -500,10 +513,14 @@ function Gestao({ membro, agir }: { membro: Membro; agir: Agir }) {
         </button>
       </form>
 
-      {!desativado && (
+      {/* A própria senha o gestor troca em "Seu perfil", informando a atual; a API recusa aqui. */}
+      {!desativado && !membro.voce && (
         <form onSubmit={trocarSenha} className="form-usuario">
           <h3>Redefinir senha</h3>
-          <p className="nota">Encerra as sessões abertas da pessoa e desfaz o bloqueio.</p>
+          <p className="nota">
+            Encerra as sessões abertas da pessoa e desfaz o bloqueio. Ela escolhe outra senha ao
+            entrar.
+          </p>
           <label>
             Nova senha
             <input

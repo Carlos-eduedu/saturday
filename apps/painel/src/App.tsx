@@ -12,6 +12,7 @@ import { Bancos } from "./paginas/Bancos";
 import StaggeredMenu from "./componentes/StaggeredMenu";
 import { Caixa } from "./paginas/Caixa";
 import { Login } from "./paginas/Login";
+import { TrocarSenha } from "./componentes/TrocarSenha";
 import { PaginaDoMembro } from "./paginas/Membro";
 import { Membros } from "./paginas/Usuarios";
 import { iniciarTempoReal } from "./tempoReal";
@@ -62,6 +63,31 @@ export function App() {
   if (carregando) return <p className="centro">Carregando…</p>;
   if (falha) return <Falha titulo="Não deu para abrir o painel." texto={falha} aoTentar={conferir} />;
   if (!eu) return <Login aoEntrar={entrar} />;
+  // Senha definida pelo gestor: a API recusa todo o resto até a troca, então
+  // nada do painel é montado (nem o tempo real).
+  if (eu.trocar_senha)
+    return (
+      <TrocarSenha
+        className="login"
+        email={eu.email}
+        acao="Trocar senha e entrar"
+        cabecalho={
+          <>
+            <h1>Escolha a sua senha</h1>
+            <p className="nota">
+              {eu.nome}, a senha que o gestor definiu é provisória. Troque por uma que só você
+              conhece para entrar no painel.
+            </p>
+          </>
+        }
+        rodape={
+          <button type="button" onClick={sair}>
+            Sair
+          </button>
+        }
+        aoTrocar={conferir}
+      />
+    );
   return <Logado eu={eu} aoSair={sair} atualizarEu={entrar} />;
 }
 

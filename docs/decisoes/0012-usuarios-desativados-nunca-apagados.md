@@ -48,3 +48,8 @@ que toda ação de usuário grave quem, o quê, quando e o alvo.
 - **Convite por e-mail.** O Saturday não envia e-mail; o gestor define a senha
   inicial e a repassa. Troca obrigatória no primeiro acesso e "minha conta"
   ficam para depois.
+
+> **Nota de 2026-11-18:** os dois chegaram com a decisão 0030: a pessoa troca a
+> própria senha em "Seu perfil", e a senha definida ou redefinida pelo gestor
+> exige troca no primeiro acesso. O gestor deixou de redefinir a própria senha
+> pela aba Usuários.

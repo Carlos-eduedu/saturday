@@ -37,8 +37,9 @@ Para ver telas rodando, `infra/painel_local.sh` sobe a API (banco
 `saturday_painel_dev`, segredos fictícios) e o Vite em `:5173`;
 `infra/painel_local.sh seed` cria antes o gestor `gestor@exemplo.test` (a senha
 sai no fim do seed, ou vem de `PAINEL_LOCAL_SENHA`), conversas nas três
-situações, uma com imagem, PDF e arquivo sem prévia num S3 local, três
-atendentes (`bia@`, `caio@` e `dora@exemplo.test`, com a mesma senha; para os
+situações, uma com imagem, PDF e arquivo sem prévia num S3 local, quatro
+atendentes (`bia@`, `caio@`, `dora@` e `eva@exemplo.test`, com a mesma senha; a
+Eva com a troca de senha obrigatória pendente; para os
 prints como outra pessoa, `PAINEL_LOCAL_EMAIL`), e a conversa
 CLT com humano, ficha preenchida e consulta parada, uma conversa INSS em
 handoff com o contrato novo do C6 aceito, e duas com a IA, uma com a oferta de

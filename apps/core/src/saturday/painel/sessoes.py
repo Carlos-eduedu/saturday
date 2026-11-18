@@ -62,8 +62,16 @@ def nome_padrao(email: str) -> str:
 
 
 def criar_usuario(
-    sessao: Session, email: str, senha: str, perfil: str, nome: str | None = None
+    sessao: Session,
+    email: str,
+    senha: str,
+    perfil: str,
+    nome: str | None = None,
+    *,
+    trocar_senha: bool = False,
 ) -> UsuarioPainel:
+    """`trocar_senha` liga a troca obrigatória: senha escolhida por outra pessoa."""
+
     if perfil not in PERFIS:
         raise ValueError(f"perfil inválido: {perfil}")
     usuario = UsuarioPainel(
@@ -71,6 +79,7 @@ def criar_usuario(
         nome=(nome or "").strip() or nome_padrao(email),
         senha_hash=gerar_hash(senha),
         perfil=perfil,
+        trocar_senha=trocar_senha,
     )
     sessao.add(usuario)
     sessao.flush()
@@ -93,11 +102,25 @@ def autenticar(sessao: Session, email: str, senha: str) -> UsuarioPainel | None:
     if usuario is None or not usuario.ativo:
         _senha_confere(_HASH_FALSO, senha)
         return None
+    if not conferir_senha(sessao, usuario, senha):
+        return None
+    if _hasher.check_needs_rehash(usuario.senha_hash):
+        usuario.senha_hash = gerar_hash(senha)
+    sessao.flush()
+    return usuario
+
+
+def conferir_senha(sessao: Session, usuario: UsuarioPainel, senha: str) -> bool:
+    """Confere a senha de uma linha já travada, contando a falha e o bloqueio.
+
+    É a mesma contagem para o login e para a troca da própria senha: a 5ª falha
+    bloqueia por 15 min e derruba todas as sessões, inclusive a de quem errou.
+    """
 
     momento = agora()
     if usuario.bloqueado_ate is not None:
         if usuario.bloqueado_ate > momento:
-            return None
+            return False
         usuario.bloqueado_ate = None
         usuario.tentativas_falhas = 0
 
@@ -107,13 +130,11 @@ def autenticar(sessao: Session, email: str, senha: str) -> UsuarioPainel | None:
             usuario.bloqueado_ate = momento + BLOQUEIO
             encerrar_sessoes(sessao, usuario)
         sessao.flush()
-        return None
+        return False
 
     usuario.tentativas_falhas = 0
-    if _hasher.check_needs_rehash(usuario.senha_hash):
-        usuario.senha_hash = gerar_hash(senha)
     sessao.flush()
-    return usuario
+    return True
 
 
 def abrir_sessao(sessao: Session, usuario: UsuarioPainel) -> str:
@@ -149,6 +170,17 @@ def encerrar_sessao(sessao: Session, token: str) -> None:
 
 def encerrar_sessoes(sessao: Session, usuario: UsuarioPainel) -> None:
     sessao.execute(delete(SessaoPainel).where(SessaoPainel.usuario_id == usuario.id))
+
+
+def encerrar_outras_sessoes(sessao: Session, usuario: UsuarioPainel, token: str) -> None:
+    """Derruba as sessões da pessoa, menos a do `token`."""
+
+    sessao.execute(
+        delete(SessaoPainel).where(
+            SessaoPainel.usuario_id == usuario.id,
+            SessaoPainel.token_hash != _hash_token(token),
+        )
+    )
 
 
 def token_csrf(segredo: str, token: str) -> str:

@@ -7,7 +7,7 @@ from datetime import timedelta
 import pytest
 from sqlalchemy import func, select, update
 
-from saturday.dados.modelos import SessaoPainel
+from saturday.dados.modelos import SessaoPainel, UsuarioPainel
 from saturday.dados.sessao import sessao as abrir
 from saturday.painel import sessoes
 from saturday.painel.cli import criar_usuario_cli
@@ -104,3 +104,6 @@ def test_cli_cria_usuario(fabrica, pg_url, monkeypatch):
     finally:
         get_settings.cache_clear()
     assert _login(fabrica, email="gestor@exemplo.test") is not None
+    # Quem roda o comando escolheu a própria senha: sem troca obrigatória.
+    with abrir(fabrica) as s:
+        assert s.scalars(select(UsuarioPainel.trocar_senha)).all() == [False]

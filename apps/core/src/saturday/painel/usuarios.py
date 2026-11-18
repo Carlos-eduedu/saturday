@@ -1,6 +1,7 @@
 """Gestão de usuários do painel pela aba Usuários (decisão 0012).
 
-Só gestor chega aqui. Excluir é desativar: a linha fica para a auditoria e as
+Só gestor chega aqui, menos em `trocar_propria_senha`, que é de cada pessoa
+(decisão 0030). Excluir é desativar: a linha fica para a auditoria e as
 mensagens continuarem dizendo quem fez o quê. Cada função roda dentro da
 transação de quem chama e grava `auditoria` nela; a senha nunca entra no
 detalhe.
@@ -23,7 +24,9 @@ from saturday.painel.auditoria import auditar
 from saturday.painel.sessoes import (
     PERFIS,
     TAMANHO_MINIMO_SENHA,
+    conferir_senha,
     criar_usuario,
+    encerrar_outras_sessoes,
     encerrar_sessoes,
     gerar_hash,
     normalizar_email,
@@ -121,7 +124,8 @@ def criar(
     _email_em_uso(sessao, email)
     try:
         with sessao.begin_nested():
-            usuario = criar_usuario(sessao, email, senha, perfil, nome)
+            # A senha inicial é do gestor: a pessoa troca no primeiro acesso.
+            usuario = criar_usuario(sessao, email, senha, perfil, nome, trocar_senha=True)
     except IntegrityError as exc:
         # Outro gestor cadastrou o mesmo e-mail entre a conferência e o insert.
         raise AcaoRecusada(409, "já existe um usuário com esse e-mail") from exc
@@ -193,16 +197,51 @@ def editar(
 def redefinir_senha(
     sessao: Session, autor_id: uuid.UUID, usuario_id: uuid.UUID, senha: str
 ) -> None:
-    """Troca a senha, derruba as sessões da pessoa e zera o bloqueio."""
+    """Troca a senha, derruba as sessões da pessoa e zera o bloqueio.
 
+    Liga a troca obrigatória: quem conhece a senha nova é o gestor que a
+    digitou aqui. A própria senha o gestor troca em "Seu perfil", informando a
+    atual (decisão 0030).
+    """
+
+    if usuario_id == autor_id:
+        raise AcaoRecusada(
+            409, "você não pode redefinir a sua própria senha: troque-a em Seu perfil"
+        )
     _validar_senha(senha)
     usuario = _buscar(sessao, usuario_id)
     usuario.senha_hash = gerar_hash(senha)
+    usuario.trocar_senha = True
     usuario.tentativas_falhas = 0
     usuario.bloqueado_ate = None
     encerrar_sessoes(sessao, usuario)
     sessao.flush()
     auditar(sessao, autor_id, "usuario_senha", str(usuario.id))
+
+
+def trocar_propria_senha(
+    sessao: Session, usuario_id: uuid.UUID, token: str, atual: str, nova: str
+) -> bool:
+    """A pessoa troca a própria senha; as outras sessões dela caem, a do `token` fica.
+
+    Devolve False quando a senha atual não confere: a falha contada (a mesma do
+    login) precisa do commit, então quem chama recusa depois de fechar a
+    transação.
+    """
+
+    _validar_senha(nova)
+    if nova == atual:
+        raise AcaoRecusada(422, "a senha nova precisa ser diferente da atual")
+    usuario = _buscar(sessao, usuario_id)
+    # Relido sob a trava: quem foi desativado no meio do pedido não troca.
+    if not usuario.ativo or not conferir_senha(sessao, usuario, atual):
+        return False
+    usuario.senha_hash = gerar_hash(nova)
+    usuario.trocar_senha = False
+    encerrar_outras_sessoes(sessao, usuario, token)
+    sessao.flush()
+    auditar(sessao, usuario.id, "usuario_senha_propria", str(usuario.id))
+    return True
 
 
 def desbloquear(sessao: Session, autor_id: uuid.UUID, usuario_id: uuid.UUID) -> None:
