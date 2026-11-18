@@ -25,7 +25,7 @@ Comando é a mensagem que começa com `/`, vinda do telefone de um membro com
 | `/humano` | Handoff com o motivo `pediu_humano` e o alerta de sempre. |
 | `/devolver` | Devolve à IA, sem usuário e sem auditoria, como a liberação por prazo. Vale também quando um atendente assumiu a conversa de teste. |
 | `/ir <etapa>` | Jornada CLT parada em `triagem`, `empresa`, `identificacao`, `consentimento`, `consultando` ou `oferta`, com dados fictícios. |
-| `/cenario <resultado>` | Resultado da próxima consulta: `sucesso`, `sem_margem`, `erro` ou `termo_pendente`; e, com a consulta dando certo mas a pessoa sem o dado, `sem_nascimento`, `sem_mae` ou `sem_endereco` (issue 25). |
+| `/cenario <resultado>` | Resultado da próxima consulta: `sucesso`, `sem_margem`, `erro` ou `termo_pendente`. |
 
 - **Antes do silêncio:** o comando responde mesmo com a conversa em handoff ou
   assumida. Só o `/ir` é recusado nesse estado.
@@ -59,3 +59,8 @@ Comando é a mensagem que começa com `/`, vinda do telefone de um membro com
 - `/ir` não chega a escolha de vínculo, proposta nem pós-venda, nem ao ramo INSS.
 - O `/devolver` do membro tira a conversa de um atendente que a assumiu, sem
   registro de quem devolveu.
+
+**Nota de 2026-11-18.** O `/cenario` ganhou três resultados em que a consulta dá
+certo mas a pessoa vem sem um dado: `sem_nascimento`, `sem_mae` e
+`sem_endereco` (issue 25, decisão 0029). Pedem `/ir consultando`, porque
+`/ir oferta` força o cenário `sucesso`.

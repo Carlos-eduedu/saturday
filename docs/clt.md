@@ -125,8 +125,7 @@ produto tem seguro, então esse corpo só roda em produção).
   o banco exige: nascimento, nome da mãe e endereço. O nascimento é o da
   Granatech; se ela não devolver, vale o que o cliente informou na
   identificação. Mãe e endereço só vêm da Granatech: o agente não pede ao
-  cliente (decisão do dono do produto em 2026-11-18, issue 25; rever com números
-  reais depois do lançamento). Faltando qualquer um, handoff
+  cliente ([decisão 0029](decisoes/0029-dados-do-tomador-conferidos-antes-da-proposta.md)). Faltando qualquer um, handoff
   `dados_divergentes` antes de criar a proposta; a mesma conferência roda de
   novo no SIM do resumo, antes da prova, da intenção e do POST. Depois confirma
   o nome da mãe e o endereço da Granatech (se divergirem, handoff), pede o
