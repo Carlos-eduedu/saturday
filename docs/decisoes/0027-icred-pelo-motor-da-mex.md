@@ -136,5 +136,9 @@ recusar o contrato novo do C6 o iCred continua sendo consultado, e o contrato
 novo recusado não conta na comparação: o iCred é comparado só com a
 portabilidade. Mudou só o texto do pedido de SIM do iCred quando o cliente já
 respondeu ao pedido do C6: a abertura deixa de citar a chegada do extrato, com
-versão própria na prova (`icred-1-depois-c6`). Os caminhos estão em
+versão própria na prova (`icred-1-depois-c6`). Regra decidida no mesmo dia: o
+SIM vale só para o último pedido mostrado. Extrato novo, inclusive de outro
+titular, cancela o pedido de SIM do iCred ainda sem resposta, e o iCred
+pergunta de novo na vez dele; nenhuma prova `icred_consulta` é gravada por um
+SIM dado a um pedido do C6, nem o contrário. Os caminhos estão em
 `docs/icred.md`.

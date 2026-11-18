@@ -58,11 +58,27 @@ versão. Só com o iCred ligado nada muda.
 O contrato novo recusado não entra na comparação: o iCred é comparado só com o
 troco da portabilidade. Testes em `apps/core/tests/test_c6_icred.py`.
 
-**Em aberto.** Se o pedido do iCred está sem resposta e chega um extrato novo
-que faz o C6 pedir o SIM dele (o primeiro extrato não dava para simular, ou o
-novo é de outro titular), o SIM seguinte é lido como resposta ao iCred: grava a
-prova `icred_consulta` e abre a consulta, e o pedido do C6 é repetido depois.
-Esse caminho não foi decidido na issue 22.
+**O SIM vale só para o último pedido mostrado.** Um extrato novo aceito
+(inclusive de outro titular) desfaz o que o iCred esperava do cliente
+(`extrato_novo`, em `agent/icred/nos.py`, chamado por `read_statement`):
+
+- pedido de SIM ou de CPF sem resposta: cancelado. Se o extrato faz o C6 pedir
+  o SIM dele, o SIM seguinte é do C6 e só grava a prova do C6. O iCred pergunta
+  de novo quando a conversa chega à `icred_porta`, com a abertura que couber;
+- oferta do iCred sem resposta: fica em `oferta_suspensa` e não pode ser
+  aceita até a `icred_porta` mostrá-la de novo;
+- consulta aberta (`consultando`): nada muda. Se o extrato não gera outra
+  pergunta, o cliente recebe de novo o aviso de que a consulta está em
+  andamento; se gera (o SIM do C6 para outro titular), essa pergunta sai e o
+  resultado da consulta chega depois, como oferta do iCred. Se a oferta do
+  iCred chega com o pedido do C6 ainda aberto, o SIM seguinte é o aceite dela
+  e não grava prova do C6; uma dúvida nesse meio é respondida sem refazer o
+  pedido do C6 nem aceitar oferta mais antiga (`after_classify`, em
+  `agent/routing.py`).
+
+Extrato recusado (ilegível, de outro mês) não cancela nada. A oferta do iCred
+suspensa por um extrato de outro titular continua sendo a da consulta do
+titular anterior quando volta a ser mostrada: isso não foi decidido.
 
 O agente nunca chama `/gravar`, `acao: gravar` nem `aceitar_mudanca`. A comissão
 é descartada em `bancos/icred/normalizacao.py`. A oferta não cita seguro
