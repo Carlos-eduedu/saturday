@@ -108,6 +108,7 @@ def build_graph(checkpointer: Any = None) -> Any:
         {
             END: END,
             "handoff": "handoff",
+            "icred": "icred",
         },
     )
     builder.add_conditional_edges(

@@ -19,7 +19,7 @@ from fastapi.testclient import TestClient
 from pydantic import SecretStr
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
-from test_icred import CPF, Jornada
+from test_icred import CPF, RESPOSTA_DA_DUVIDA, Jornada
 from test_portabilidade_fluxo import dados_extrato
 
 from saturday.agent.icred import textos
@@ -357,16 +357,61 @@ def test_duvida_na_oferta_do_icred_nao_refaz_o_pedido_do_c6_que_ficou_aberto(
     jornada.resultado("COM_OFERTA", [{**simulador_icred.PRODUTO_NOVO, "liberado": 50000.0}])
     oferta_icred = jornada.ultima_saida()
 
-    # A dúvida é respondida; o pedido do C6 não volta a ser o último mostrado.
-    duvida = jornada.falar("tem seguro?").answer or ""
-    assert not any(pedido in duvida for pedido in PEDIDOS_DE_SIM)
+    # A dúvida é respondida e só a oferta do iCred, a última mostrada, volta
+    # no mesmo turno; o pedido do C6 que ficou para trás não.
+    assert jornada.falar("tem seguro?").answer == f"{RESPOSTA_DA_DUVIDA}\n\n{oferta_icred}"
 
-    # A última mensagem foi a resposta da dúvida: o SIM refaz a oferta, sem prova.
-    assert jornada.falar("sim").answer == oferta_icred
-    assert [tipo for tipo, _versao, _texto in _provas(jornada)] == ["icred_consulta"]
     aceite = jornada.falar("sim")
     assert (aceite.status, aceite.handoff_reason) == ("handoff", "icred_aceite")
-    assert "simulacao_c6" not in [tipo for tipo, _versao, _texto in _provas(jornada)]
+    assert [tipo for tipo, _versao, _texto in _provas(jornada)] == [
+        "icred_consulta",
+        "icred_aceite",
+    ]
+
+
+def test_duvida_no_pedido_do_icred_depois_do_c6_traz_o_pedido_de_volta(
+    jornada: Jornada, simulador_icred: ModuleType
+) -> None:
+    jornada.extrato()
+    assert _um_pedido_de_sim(jornada.falar("não").answer) == PEDIDO_DEPOIS_DO_C6
+
+    # A versão reenviada é a que foi mostrada, e é ela que vai para a prova.
+    resposta = jornada.falar("tem seguro?").answer
+    assert resposta == f"{RESPOSTA_DA_DUVIDA}\n\n{PEDIDO_DEPOIS_DO_C6}"
+    assert simulador_icred.CHAMADAS == []
+
+    assert jornada.falar("sim").answer == textos.CONSULTANDO
+    assert _provas(jornada) == [PROVA_ICRED_DEPOIS]
+
+
+def test_duvida_no_pedido_de_cpf_do_icred_com_o_c6_ligado_traz_o_pedido_de_volta(
+    jornada: Jornada, fakes: Fakes
+) -> None:
+    # Sem número do benefício o C6 não pede o SIM nem o CPF: o iCred pede.
+    fakes.llm.extrato = {**fakes.llm.extrato, "numeroBeneficio": None, "baseCalculo": None}
+    assert _um_pedido_de_sim(jornada.extrato().answer) == PEDIDO_ORIGINAL
+    assert jornada.falar("sim").answer == textos.PEDIR_CPF
+
+    resposta = jornada.falar("para que serve?").answer
+    assert resposta == f"{RESPOSTA_DA_DUVIDA}\n\n{textos.PEDIR_CPF}"
+    assert _provas(jornada) == []
+
+    assert jornada.falar(CPF).answer == textos.CONSULTANDO
+    assert _provas(jornada) == [("icred_consulta", "icred-1", PEDIDO_ORIGINAL)]
+
+
+def test_duvida_depois_de_extrato_recusado_nao_traz_o_pedido_de_volta(
+    jornada: Jornada, fakes: Fakes
+) -> None:
+    jornada.extrato()
+    assert _um_pedido_de_sim(jornada.falar("não").answer) == PEDIDO_DEPOIS_DO_C6
+    _extrato_recusado(jornada, fakes)
+
+    # O pedido não era a última mensagem antes da dúvida: só a resposta sai, e
+    # o SIM seguinte refaz o pedido.
+    assert jornada.falar("tem seguro?").answer == RESPOSTA_DA_DUVIDA
+    assert _um_pedido_de_sim(jornada.falar("sim").answer) == PEDIDO_DEPOIS_DO_C6
+    assert _provas(jornada) == []
 
 
 def test_so_com_o_icred_o_extrato_reenviado_refaz_a_pergunta_e_o_sim_seguinte_vale(
@@ -580,17 +625,16 @@ def test_so_com_o_icred_o_sim_depois_de_extrato_recusado_refaz_o_pedido(
 
     assert so_icred.falar("sim").answer == PEDIDO_ORIGINAL
     assert so_icred.falar("sim").answer == textos.PEDIR_CPF
-    # O CPF também só vale como resposta ao pedido dele: mensagem vazia no meio.
+    # O CPF só é lido como resposta ao pedido dele: com uma mensagem vazia no
+    # meio, o pedido do CPF é refeito e o SIM já dado continua valendo.
     assert so_icred.falar("").answer == MENSAGEM_SEM_TEXTO
-    assert so_icred.falar(CPF).answer == PEDIDO_ORIGINAL
-    # Nem passando antes por um CPF inválido: o aviso dele não reabre o pedido.
-    assert so_icred.falar("sim").answer == textos.PEDIR_CPF
+    assert so_icred.falar(CPF).answer == textos.PEDIR_CPF
+    # Nem um CPF inválido é lido: sai o pedido, não o aviso de CPF inválido.
     assert so_icred.falar("").answer == MENSAGEM_SEM_TEXTO
-    assert so_icred.falar("123").answer == PEDIDO_ORIGINAL
+    assert so_icred.falar("123").answer == textos.PEDIR_CPF
     assert _provas(so_icred) == []
     assert simulador_icred.CHAMADAS == []
 
-    assert so_icred.falar("sim").answer == textos.PEDIR_CPF
     assert so_icred.falar(CPF).answer == textos.CONSULTANDO
     assert _provas(so_icred) == [("icred_consulta", "icred-1", PEDIDO_ORIGINAL)]
 

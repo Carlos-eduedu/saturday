@@ -32,6 +32,9 @@ class AgentState(MessagesState, total=False):
     # Para onde o nó do iCred manda o turno: de volta ao classificador ou ao
     # cálculo da portabilidade (o caminho de antes do iCred).
     icred_rota: str | None
+    # A dúvida veio logo depois de um pedido do iCred: respondida, o pedido
+    # sai de novo no mesmo turno, por último.
+    icred_repetir: bool
     # Saída do turno além do texto: modelo para a janela fechada (com o código do
     # link curto), modelo enviado sempre (marketing) e detalhe do alerta de handoff.
     modelo_aviso: str | None
@@ -92,6 +95,7 @@ CAMPOS_DO_TURNO = (
     "telefone",
     "clt_faq",
     "icred_rota",
+    "icred_repetir",
     "modelo_aviso",
     "link_aviso",
     "modelo_envio",
@@ -125,6 +129,7 @@ def turno_inicial(
         "telefone": None,
         "clt_faq": False,
         "icred_rota": None,
+        "icred_repetir": False,
         "modelo_aviso": None,
         "link_aviso": None,
         "modelo_envio": None,

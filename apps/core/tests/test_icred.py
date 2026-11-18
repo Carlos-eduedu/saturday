@@ -46,6 +46,8 @@ from saturday.schemas import AgentReply, ChatRequest
 pytestmark = pytest.mark.filterwarnings("ignore:You should not use the 'timeout' argument")
 
 CPF = "00189004967"
+# O que o LLM falso responde a qualquer dúvida (`resposta_llm` no conftest).
+RESPOSTA_DA_DUVIDA = "Sim, atendemos INSS."
 TELEFONE = "5511987654321"
 
 
@@ -537,15 +539,19 @@ def _atendimento(jornada: Jornada) -> str:
 def test_so_o_sim_explicito_autoriza_e_a_duvida_nao_prende_a_rota(jornada: Jornada) -> None:
     jornada.extrato()
 
-    # "tenho" é sim na triagem do CLT, mas não é consentimento (regra 3).
-    assert jornada.falar("tenho uma dúvida").answer != textos.PEDIR_CPF
+    # "tenho" é sim na triagem do CLT, mas não é consentimento (regra 3). A
+    # dúvida é respondida e o pedido volta no mesmo turno, por último.
+    assert jornada.falar("tenho uma dúvida").answer == f"{RESPOSTA_DA_DUVIDA}\n\n{textos.PEDIR_SIM}"
     assert jornada.estado()["icred"]["etapa"] == "sim"
     assert jornada.provas() == []
-    # A última mensagem foi a resposta da dúvida: o SIM refaz o pedido (vale só
-    # para o último pedido mostrado) e só o seguinte pede o CPF.
-    assert jornada.falar("sim").answer == textos.PEDIR_SIM
-    assert jornada.provas() == []
+    # O pedido foi a última mensagem: o SIM seguinte vale.
     assert jornada.falar("sim").answer == textos.PEDIR_CPF
+
+    # O mesmo no pedido do CPF: o SIM já dado continua valendo.
+    assert jornada.falar("para que serve?").answer == f"{RESPOSTA_DA_DUVIDA}\n\n{textos.PEDIR_CPF}"
+    assert jornada.provas() == []
+    assert jornada.falar(CPF).answer == textos.CONSULTANDO
+    assert jornada.provas() == [("icred_consulta", CPF, "sim")]
 
 
 def test_segunda_resposta_sem_sim_nem_nao_entrega_o_resultado_do_extrato(
@@ -562,10 +568,16 @@ def test_pergunta_na_oferta_nao_e_aceite(jornada: Jornada, simulador_icred: Modu
     jornada.ate_a_consulta()
     jornada.resultado("COM_OFERTA", [_produto(simulador_icred, liberado=50000.0)])
 
-    jornada.falar("tem seguro?")
+    oferta = jornada.ultima_saida()
+
+    # A dúvida é respondida e a oferta volta no mesmo turno, por último.
+    assert jornada.falar("tem seguro?").answer == f"{RESPOSTA_DA_DUVIDA}\n\n{oferta}"
 
     assert _atendimento(jornada) != "handoff"
     assert [tipo for tipo, _cpf, _resposta in jornada.provas()] == ["icred_consulta"]
+    aceite = jornada.falar("sim")
+    assert (aceite.status, aceite.handoff_reason) == ("handoff", "icred_aceite")
+    assert jornada.provas()[-1] == ("icred_aceite", CPF, "sim")
 
 
 def test_cpf_que_a_conversa_ja_tem_nao_e_pedido_de_novo(

@@ -58,9 +58,10 @@ def after_classify(state: AgentState) -> str:
 
 
 def after_generate(state: AgentState) -> str:
-    if state.get("status") == "answered":
-        return END
-    return "handoff"
+    if state.get("status") != "answered":
+        return "handoff"
+    # Dúvida respondida logo depois de um pedido do iCred: ele sai de novo.
+    return "icred" if state.get("icred_repetir") else END
 
 
 def after_read(state: AgentState) -> str:

@@ -12,6 +12,8 @@ Um SIM só vale para o último pedido mostrado (nota de 2026-11-18 na decisão
 0027): extrato novo cancela o pedido de SIM ou de CPF sem resposta e põe a
 oferta em ``oferta_suspensa``, até a `porta` perguntar de novo na vez do iCred.
 Extrato de outro titular descarta tudo e o iCred recomeça do pedido de SIM.
+O SIM (ou o CPF) dado depois de outra fala refaz o pedido; a dúvida feita logo
+depois de um pedido é respondida e o pedido volta no mesmo turno, por último.
 """
 
 from __future__ import annotations
@@ -140,6 +142,56 @@ def _versao_do_pedido(dados: dict[str, Any]) -> str:
     return str(dados.get("pedido") or textos.VERSAO)
 
 
+def _pedido(dados: dict[str, Any]) -> tuple[str, str]:
+    """Texto e chave do pedido que a etapa espera ver respondido."""
+
+    etapa = dados.get("etapa")
+    if etapa == "sim":
+        return textos.PEDIDOS_SIM[_versao_do_pedido(dados)], "icred:pedir_sim"
+    if etapa == "cpf":
+        return textos.PEDIR_CPF, "icred:pedir_cpf"
+    return textos.oferta(list(dados.get("contratos") or [])), "icred:oferta"
+
+
+def _respondia_ao_pedido(state: AgentState, dados: dict[str, Any]) -> bool:
+    """A última mensagem do agente foi o pedido da etapa (regra 3)."""
+
+    aceitos = {_pedido(dados)[0]}
+    if dados.get("etapa") == "cpf":
+        aceitos.add(textos.CPF_INVALIDO)
+    return ultima_mensagem_agente(state) in aceitos
+
+
+def _refazer(dados: dict[str, Any]) -> dict[str, Any]:
+    """Outra fala entrou no meio (extrato recusado, mensagem vazia): o pedido sai de novo."""
+
+    return _falar(dados, *_pedido(dados))
+
+
+def _duvida(state: AgentState, dados: dict[str, Any]) -> dict[str, Any]:
+    """Manda a dúvida ao classificador; o pedido que era o último volta depois dela."""
+
+    return {
+        "icred": dados,
+        "icred_rota": "classify_intent",
+        "icred_repetir": _respondia_ao_pedido(state, dados),
+    }
+
+
+def _repetir(state: AgentState, dados: dict[str, Any]) -> dict[str, Any]:
+    """Depois da resposta à dúvida: o pedido volta a ser a última mensagem."""
+
+    texto, chave = _pedido(dados)
+    return {
+        # Um turno tem uma saída só: a resposta e o pedido vão no mesmo texto.
+        "answer": f"{state.get('answer')}\n\n{texto}",
+        "chave_mensagem": chave,
+        "icred_rota": None,
+        "icred_repetir": False,
+        "messages": [AIMessage(content=texto)],
+    }
+
+
 def _pedir_sim(state: AgentState) -> dict[str, Any]:
     """Pede o SIM da consulta; a versão do texto fica no estado, para a prova."""
 
@@ -189,6 +241,8 @@ def icred(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
     """Conduz a consulta ao iCred: SIM, CPF, resultado, oferta do pacote e aceite."""
 
     dados = dict(state.get("icred") or {})
+    if state.get("icred_repetir"):
+        return _repetir(state, dados)
     evento = state.get("evento_sistema")
     if evento:
         return _evento(state, runtime.context, dados, evento)
@@ -211,13 +265,11 @@ def _sim(state: AgentState, contexto: AgentContext, dados: dict[str, Any]) -> di
         dados["tentativas"] = int(dados.get("tentativas") or 0) + 1
         if dados["tentativas"] >= 2:
             return _seguir(dados)
-        return {"icred": dados, "icred_rota": "classify_intent"}
+        return _duvida(state, dados)
     if not resposta:
         return _seguir(dados)
-    if ultima_mensagem_agente(state) != textos.PEDIDOS_SIM[_versao_do_pedido(dados)]:
-        # Outra fala entrou no meio (extrato recusado, dúvida respondida): o
-        # SIM não é resposta ao pedido, que é refeito.
-        return _pedir_sim(state)
+    if not _respondia_ao_pedido(state, dados):
+        return _refazer(dados)
     # A prova é gravada com o CPF, na etapa seguinte; aqui fica o SIM literal.
     dados.update(etapa="cpf", sim=texto, sim_wamid=state.get("message_id"), tentativas=0)
     # O CPF que a conversa já tem (pedido para o C6, decisão 0026) não é pedido de novo.
@@ -228,14 +280,18 @@ def _sim(state: AgentState, contexto: AgentContext, dados: dict[str, Any]) -> di
 
 
 def _cpf(state: AgentState, contexto: AgentContext, dados: dict[str, Any]) -> dict[str, Any]:
-    if ultima_mensagem_agente(state) not in (textos.PEDIR_CPF, textos.CPF_INVALIDO):
-        # O SIM guardado respondia a um pedido que não é mais o último mostrado.
-        return _pedir_sim(state)
-    cpf = leitura.cpf(state.get("user_message", ""))
+    # O CPF só é lido como resposta ao pedido dele; o SIM já dado continua valendo.
+    if not _respondia_ao_pedido(state, dados):
+        return _refazer(dados)
+    texto = state.get("user_message", "")
+    cpf = leitura.cpf(texto)
     if cpf is None:
         dados["tentativas"] = int(dados.get("tentativas") or 0) + 1
         if dados["tentativas"] >= 2:
             return _seguir(dados)
+        if not any(c.isdigit() for c in texto):
+            # Sem número nenhum não é tentativa de CPF: é dúvida.
+            return _duvida(state, dados)
         return _falar(dados, textos.CPF_INVALIDO, "icred:cpf_invalido")
     return _consultar(state, contexto, dados, cpf)
 
@@ -312,15 +368,15 @@ def _aceite(state: AgentState, contexto: AgentContext, dados: dict[str, Any]) ->
     texto = state.get("user_message", "")
     resposta = _resposta(texto)
     if resposta is None:
-        return {"icred_rota": "classify_intent"}
+        return _duvida(state, dados)
     if not resposta:
         return _seguir(dados)
+    # O SIM só aceita a oferta que acabou de ser mostrada.
+    if not _respondia_ao_pedido(state, dados):
+        return _refazer(dados)
 
     contratos = list(dados.get("contratos") or [])
     oferta = textos.oferta(contratos)
-    if ultima_mensagem_agente(state) != oferta:
-        # O SIM só aceita a oferta que acabou de ser mostrada: ela é refeita.
-        return _falar(dados, oferta, "icred:oferta")
     with abrir_sessao(contexto.fabrica) as sessao:
         linha = sessao.get(ConsultaIcred, dados.get("consulta"))
         cpf = linha.cpf if linha is not None else ""
