@@ -37,3 +37,17 @@ apps/painel/.impeccable/
 
 # Worktrees do Claude Code
 .claude/worktrees/
+
+# Arquivos locais das ferramentas de agente (o repositório é público; issue 39)
+.agents/skills/impeccable/
+.claude/agents/
+.codex/
+.github/agents/
+.github/hooks/
+.github/skills/
+.impeccable/critique/
+.mcp.json
+# Só os da raiz: os do painel (apps/painel/) são versionados
+/package.json
+/package-lock.json
+/node_modules/
