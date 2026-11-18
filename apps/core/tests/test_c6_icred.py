@@ -17,7 +17,7 @@ import pytest
 from conftest import Fakes, resultado_jev
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 from test_icred import CPF, Jornada
 from test_portabilidade_fluxo import dados_extrato
@@ -30,8 +30,9 @@ from saturday.agent.textos import (
     MENSAGEM_SEM_TEXTO,
 )
 from saturday.bancos.c6.cliente import ROTA_SIMULACAO, ClienteC6
-from saturday.dados.modelos import Consentimento
+from saturday.dados.modelos import Consentimento, ConsultaIcred, Mensagem
 from saturday.dados.sessao import sessao as abrir_sessao
+from saturday.jobs import icred as job
 from saturday.settings import Settings
 
 pytestmark = pytest.mark.filterwarnings("ignore:You should not use the 'timeout' argument")
@@ -386,6 +387,115 @@ def test_so_com_o_icred_o_extrato_reenviado_refaz_a_pergunta_e_o_sim_seguinte_va
     assert jornada.falar("sim, autorizo").answer == textos.PEDIR_CPF
     assert jornada.falar(CPF).answer == textos.CONSULTANDO
     assert _provas(jornada) == [("icred_consulta", "icred-1", PEDIDO_ORIGINAL)]
+
+
+# ------------------------------------------- extrato de outro titular: descarta
+
+
+def _ofertas_do_icred_enviadas(jornada: Jornada) -> int:
+    with abrir_sessao(jornada.fabrica) as sessao:
+        return int(
+            sessao.scalar(
+                select(func.count())
+                .select_from(Mensagem)
+                .where(Mensagem.direcao == "saida", Mensagem.conteudo.like("Consultei o iCred%"))
+            )
+            or 0
+        )
+
+
+def _c6_recusado_ate_o_pedido_do_icred(jornada: Jornada, fakes: Fakes) -> None:
+    """SIM ao C6, contrato novo recusado e o pedido do iCred na vez dele."""
+
+    assert OFERTA_C6 in (jornada.falar("sim").answer or "")
+    fakes.jev.resultado = resultado_jev(resposta_oferta="recusa")
+    assert _um_pedido_de_sim(jornada.falar("esse não quero").answer) == PEDIDO_DEPOIS_DO_C6
+
+
+def test_extrato_de_outro_titular_descarta_a_oferta_do_icred(
+    jornada: Jornada, fakes: Fakes, simulador_icred: ModuleType
+) -> None:
+    jornada.extrato()
+    jornada.falar("não")
+    assert jornada.falar("sim").answer == textos.CONSULTANDO
+    jornada.resultado("COM_OFERTA", [{**simulador_icred.PRODUTO_NOVO, "liberado": 50000.0}])
+    assert jornada.ultima_saida().startswith("Consultei o iCred")
+    fakes.llm.extrato = {**fakes.llm.extrato, "cpf": OUTRO_TITULAR}
+    assert _um_pedido_de_sim(jornada.extrato().answer) == CONSENTIMENTO_C6
+
+    # A oferta era do titular anterior: não volta; o iCred pergunta de novo.
+    _c6_recusado_ate_o_pedido_do_icred(jornada, fakes)
+    assert jornada.falar("sim").answer == textos.CONSULTANDO
+
+    assert _ofertas_do_icred_enviadas(jornada) == 1
+    assert jornada.provas() == [
+        ("icred_consulta", CPF, "sim"),
+        ("simulacao_c6", OUTRO_TITULAR, "sim"),
+        ("icred_consulta", OUTRO_TITULAR, "sim"),
+    ]
+    assert [c["cpf"] for c in simulador_icred.CONSULTAS.values()] == [CPF, OUTRO_TITULAR]
+
+
+def test_resultado_da_consulta_do_titular_anterior_nao_chega_ao_cliente(
+    jornada: Jornada, fakes: Fakes, simulador_icred: ModuleType
+) -> None:
+    jornada.extrato()
+    jornada.falar("não")
+    assert jornada.falar("sim").answer == textos.CONSULTANDO
+    (antiga,) = simulador_icred.CONSULTAS
+    fakes.llm.extrato = {**fakes.llm.extrato, "cpf": OUTRO_TITULAR}
+    assert _um_pedido_de_sim(jornada.extrato().answer) == CONSENTIMENTO_C6
+    produtos = [{**simulador_icred.PRODUTO_NOVO, "liberado": 50000.0}]
+
+    # O resultado da consulta do titular anterior chega: ninguém recebe nada.
+    orfao = simulador_icred.concluir(antiga, "COM_OFERTA", produtos)
+    job.aplicar(jornada.fabrica, orfao, jornada.servico)
+
+    assert jornada.ultima_saida() == CONSENTIMENTO_C6
+    assert _ofertas_do_icred_enviadas(jornada) == 0
+    # A linha fica como histórico, fora das consultas abertas.
+    with abrir_sessao(jornada.fabrica) as sessao:
+        assert sessao.scalars(select(ConsultaIcred.estado)).all() == ["desistida"]
+
+    # O novo titular tem o pedido e a consulta dele; o resultado antigo repetido
+    # com a consulta nova aberta também não vira oferta, e o prazo atrasado da
+    # consulta antiga não faz a conversa desistir da nova.
+    _c6_recusado_ate_o_pedido_do_icred(jornada, fakes)
+    assert jornada.falar("sim").answer == textos.CONSULTANDO
+    job.aplicar(jornada.fabrica, orfao, jornada.servico)
+    jornada.servico.continuar(jornada.id, job.EVENTO_PRAZO)
+    assert _ofertas_do_icred_enviadas(jornada) == 0
+    assert jornada.ultima_saida() == textos.CONSULTANDO
+    assert jornada.estado()["icred"]["etapa"] == "consultando"
+
+    nova = next(c for c in simulador_icred.CONSULTAS if c != antiga)
+    job.aplicar(
+        jornada.fabrica, simulador_icred.concluir(nova, "COM_OFERTA", produtos), jornada.servico
+    )
+    assert jornada.ultima_saida().startswith("Consultei o iCred")
+    aceite = jornada.falar("sim")
+    assert (aceite.status, aceite.handoff_reason) == ("handoff", "icred_aceite")
+    assert jornada.provas()[-1] == ("icred_aceite", OUTRO_TITULAR, "sim")
+
+
+def test_extrato_de_outro_titular_que_vai_para_o_atendente_tambem_descarta_a_oferta(
+    jornada: Jornada, fakes: Fakes, simulador_icred: ModuleType
+) -> None:
+    jornada.extrato()
+    jornada.falar("não")
+    jornada.falar("sim")
+    jornada.resultado("COM_OFERTA", [{**simulador_icred.PRODUTO_NOVO, "liberado": 50000.0}])
+    # Espécie que o C6 não atende: o extrato termina em handoff dentro da leitura.
+    fakes.llm.extrato = {**fakes.llm.extrato, "cpf": OUTRO_TITULAR, "especie": "87"}
+    assert jornada.extrato().status == "handoff"
+
+    # Devolvida à IA, a conversa não tem mais oferta do iCred para aceitar.
+    jornada.servico.liberar(jornada.id)
+    resposta = jornada.falar("sim")
+
+    assert resposta.handoff_reason != "icred_aceite"
+    assert [tipo for tipo, _cpf, _resposta in jornada.provas()] == ["icred_consulta"]
+    assert _ofertas_do_icred_enviadas(jornada) == 1
 
 
 # ------------------------------ a última mensagem do agente não foi o pedido

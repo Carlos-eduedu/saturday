@@ -45,6 +45,9 @@ def _gravar(fabrica: sessionmaker[Session], resultado: Resultado) -> str | None:
             # O resultado pode chegar antes de `abrir_consulta` gravar o id do
             # motor: falhar faz a fila tentar de novo.
             raise ValueError("consulta do iCred desconhecida")
+        if linha.estado == DESISTIDA:
+            # A conversa desistiu da consulta (prazo ou extrato de outro titular).
+            logger.info("icred_resultado_de_consulta_desistida consulta=%s", linha.id)
         if linha.estado != resultado.estado or not resultado.final:
             return None
         return repositorios.conversation_id_de(sessao, linha.conversa_id)

@@ -352,7 +352,8 @@ class ConsultaIcred(Base):
     A linha nasce como ``intencao`` antes do POST, com a ``chave`` que vai no
     ``Idempotency-Key``. ``estado`` segue o do motor (``na_fila``,
     ``processando``, ``concluida``, ``cancelada``), mais ``falhou`` (o POST não
-    passou) e ``desistida`` (o prazo de espera venceu). ``contratos`` é o
+    passou) e ``desistida`` (o prazo de espera venceu, ou chegou o extrato de
+    outro titular e a conversa descartou a consulta). ``contratos`` é o
     pacote já normalizado, sem comissão.
     """
 

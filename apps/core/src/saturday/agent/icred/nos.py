@@ -11,6 +11,7 @@ roda de novo e a conversa recebe a oferta de portabilidade ou o handoff dele.
 Um SIM só vale para o último pedido mostrado (nota de 2026-11-18 na decisão
 0027): extrato novo cancela o pedido de SIM ou de CPF sem resposta e põe a
 oferta em ``oferta_suspensa``, até a `porta` perguntar de novo na vez do iCred.
+Extrato de outro titular descarta tudo e o iCred recomeça do pedido de SIM.
 """
 
 from __future__ import annotations
@@ -28,7 +29,7 @@ from saturday.agent.clt import leitura
 from saturday.agent.context import AgentContext
 from saturday.agent.icred import regras, textos
 from saturday.agent.state import AgentState, ultima_mensagem_agente
-from saturday.bancos.icred.cliente import ErroIcred
+from saturday.bancos.icred.cliente import ABERTAS, DESISTIDA, ErroIcred
 from saturday.bancos.icred.normalizacao import ESTADOS_FINAIS
 from saturday.dados import consentimentos
 from saturday.dados.modelos import ConsultaIcred
@@ -88,20 +89,50 @@ def _valor_c6(state: AgentState) -> Decimal:
     return Decimal(str(resultado.get("troco_total") or 0))
 
 
-def extrato_novo(dados: dict[str, Any] | None) -> dict[str, Any] | None:
+def extrato_novo(
+    state: AgentState, contexto: AgentContext, extrato: dict[str, Any]
+) -> dict[str, Any] | None:
     """O estado do iCred depois de um extrato novo aceito.
 
     O que o iCred perguntou deixa de esperar resposta: outra pergunta (o SIM do
     C6, por exemplo) pode sair antes de a `porta` rodar, e o SIM seguinte é
-    dela. Consulta aberta e jornada encerrada ficam como estão.
+    dela. Do mesmo titular, consulta aberta e jornada encerrada ficam como
+    estão. De outro titular, tudo é descartado: o iCred recomeça do pedido de
+    SIM e a consulta aberta deixa de ser esperada.
     """
 
+    dados = state.get("icred")
     etapa = (dados or {}).get("etapa")
     if etapa in ("sim", "cpf"):
+        return {}
+    titular = (dados or {}).get("cpf")
+    cpf = leitura.cpf(str(extrato.get("cpf") or ""))
+    # Sem CPF legível no extrato não há como dizer que o titular mudou.
+    if titular and cpf and cpf != titular:
+        if etapa == "consultando":
+            _desistir_da_consulta(contexto, (dados or {}).get("consulta"))
+        logger.info(
+            "icred_descartado_outro_titular conversa_ref=%s etapa=%s",
+            state.get("conversa_ref"),
+            etapa,
+        )
         return {}
     if etapa == "oferta":
         return {**(dados or {}), "etapa": "oferta_suspensa"}
     return dados
+
+
+def _desistir_da_consulta(contexto: AgentContext, consulta: Any) -> None:
+    """A conversa não espera mais o resultado: a linha fica como histórico.
+
+    Fora de `ABERTAS`, o resultado que chegar não é gravado nem vira turno
+    (`gravar_resultado`) e o prazo de espera não a procura.
+    """
+
+    with abrir_sessao(contexto.fabrica) as sessao:
+        linha = sessao.get(ConsultaIcred, consulta, with_for_update=True)
+        if linha is not None and linha.estado in ABERTAS:
+            linha.estado = DESISTIDA
 
 
 def _versao_do_pedido(dados: dict[str, Any]) -> str:
@@ -116,7 +147,10 @@ def _pedir_sim(state: AgentState) -> dict[str, Any]:
     # (SIM ou NÃO): aí o pedido do iCred não abre com a chegada do extrato.
     c6_falou = (state.get("cliente") or {}).get("c6_autorizado") is not None
     versao = textos.VERSAO_DEPOIS_C6 if c6_falou else textos.VERSAO
-    return _falar({"etapa": "sim", "pedido": versao}, textos.PEDIDOS_SIM[versao], "icred:pedir_sim")
+    # O titular a quem o pedido foi feito: o do extrato, até o CPF da consulta.
+    titular = leitura.cpf(str((state.get("hiscon") or {}).get("cpf") or ""))
+    dados = {"etapa": "sim", "pedido": versao, "cpf": titular}
+    return _falar(dados, textos.PEDIDOS_SIM[versao], "icred:pedir_sim")
 
 
 def porta(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
@@ -232,7 +266,7 @@ def _consultar(
     except ErroIcred:
         logger.warning("icred_consulta_falhou")
         return _seguir(dados)
-    dados.update(etapa="consultando", consulta=consulta)
+    dados.update(etapa="consultando", consulta=consulta, cpf=cpf)
     dados.pop("tentativas", None)
     return _falar(dados, textos.CONSULTANDO, "icred:consultando")
 
@@ -240,17 +274,26 @@ def _consultar(
 def _evento(
     state: AgentState, contexto: AgentContext, dados: dict[str, Any], evento: str
 ) -> dict[str, Any]:
-    # Evento repetido, atrasado ou de uma consulta de que a conversa já desistiu.
-    if dados.get("etapa") != "consultando":
+    # Evento repetido, atrasado ou de uma consulta de que a conversa já desistiu
+    # (a do titular anterior, por exemplo): vale o estado da consulta vigente.
+    estado = situacao = contratos = valido_ate = None
+    if dados.get("etapa") == "consultando":
+        with abrir_sessao(contexto.fabrica) as sessao:
+            linha = sessao.get(ConsultaIcred, dados.get("consulta"))
+            if linha is not None:
+                estado, situacao = linha.estado, linha.situacao
+                contratos, valido_ate = linha.contratos, linha.valido_ate
+    esperado = (DESISTIDA,) if evento == EVENTO_PRAZO else ESTADOS_FINAIS
+    if estado not in esperado:
+        logger.info(
+            "icred_evento_ignorado evento=%s etapa=%s conversa_ref=%s",
+            evento,
+            dados.get("etapa"),
+            state.get("conversa_ref"),
+        )
         return {}
     if evento == EVENTO_PRAZO:
         return _seguir(dados)
-    with abrir_sessao(contexto.fabrica) as sessao:
-        linha = sessao.get(ConsultaIcred, dados.get("consulta"))
-        if linha is None or linha.estado not in ESTADOS_FINAIS:
-            return {}
-        situacao, contratos = linha.situacao, linha.contratos
-        valido_ate = linha.valido_ate
 
     decisao, motivo = regras.decidir(situacao, contratos, _valor_c6(state))
     if decisao == regras.HANDOFF and motivo:

@@ -356,14 +356,19 @@ def read_statement(state: AgentState, runtime: Runtime[AgentContext]) -> dict[st
         return _perguntar_extrato(state, MENSAGEM_EXTRATO_MES_ERRADO, "textos:extrato_mes_errado")
 
     dados_extrato = extrato.model_dump()
+    # Também quando o extrato termina em handoff aqui: o que o iCred esperava
+    # do cliente era de antes dele.
+    icred = extrato_novo(state, runtime.context, dados_extrato)
     if status == hiscon_mod.STATUS_CONFERENCIA_FALHOU:
         return {
+            "icred": icred,
             "portability_result": _resultado_falha(dados_extrato, "hiscon_nao_conferiu"),
             "needs_human": True,
             "handoff_reason": "hiscon_nao_conferiu",
         }
     if status == hiscon_mod.STATUS_ESPECIE_NAO_ATENDIDA:
         return {
+            "icred": icred,
             "portability_result": _resultado_falha(dados_extrato, "especie_nao_atendida"),
             "answer": mensagem.MENSAGEM_ESPECIE_NAO_ATENDIDA,
             "chave_mensagem": "inss:especie_nao_atendida",
@@ -379,7 +384,7 @@ def read_statement(state: AgentState, runtime: Runtime[AgentContext]) -> dict[st
         "c6_novo": None,
         "oferta_pendente": False,
         "resposta_oferta": None,
-        "icred": extrato_novo(state.get("icred")),
+        "icred": icred,
     }
 
 
