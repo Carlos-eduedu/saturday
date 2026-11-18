@@ -27,7 +27,7 @@ from langgraph.runtime import Runtime
 from saturday.agent.clt import leitura
 from saturday.agent.context import AgentContext
 from saturday.agent.icred import regras, textos
-from saturday.agent.state import AgentState
+from saturday.agent.state import AgentState, ultima_mensagem_agente
 from saturday.bancos.icred.cliente import ErroIcred
 from saturday.bancos.icred.normalizacao import ESTADOS_FINAIS
 from saturday.dados import consentimentos
@@ -104,6 +104,11 @@ def extrato_novo(dados: dict[str, Any] | None) -> dict[str, Any] | None:
     return dados
 
 
+def _versao_do_pedido(dados: dict[str, Any]) -> str:
+    # Conversa que recebeu o pedido antes de a versão ir para o estado viu o original.
+    return str(dados.get("pedido") or textos.VERSAO)
+
+
 def _pedir_sim(state: AgentState) -> dict[str, Any]:
     """Pede o SIM da consulta; a versão do texto fica no estado, para a prova."""
 
@@ -175,6 +180,10 @@ def _sim(state: AgentState, contexto: AgentContext, dados: dict[str, Any]) -> di
         return {"icred": dados, "icred_rota": "classify_intent"}
     if not resposta:
         return _seguir(dados)
+    if ultima_mensagem_agente(state) != textos.PEDIDOS_SIM[_versao_do_pedido(dados)]:
+        # Outra fala entrou no meio (extrato recusado, dúvida respondida): o
+        # SIM não é resposta ao pedido, que é refeito.
+        return _pedir_sim(state)
     # A prova é gravada com o CPF, na etapa seguinte; aqui fica o SIM literal.
     dados.update(etapa="cpf", sim=texto, sim_wamid=state.get("message_id"), tentativas=0)
     # O CPF que a conversa já tem (pedido para o C6, decisão 0026) não é pedido de novo.
@@ -191,6 +200,9 @@ def _cpf(state: AgentState, contexto: AgentContext, dados: dict[str, Any]) -> di
         if dados["tentativas"] >= 2:
             return _seguir(dados)
         return _falar(dados, textos.CPF_INVALIDO, "icred:cpf_invalido")
+    if ultima_mensagem_agente(state) not in (textos.PEDIR_CPF, textos.CPF_INVALIDO):
+        # O SIM guardado respondia a um pedido que não é mais o último mostrado.
+        return _pedir_sim(state)
     return _consultar(state, contexto, dados, cpf)
 
 
@@ -202,8 +214,7 @@ def _consultar(
     if cliente is None or not telefone:
         return _seguir(dados)
     conversa_id = _conversa_id(state)
-    # Conversa que recebeu o pedido antes de a versão ir para o estado viu o original.
-    versao = str(dados.get("pedido") or textos.VERSAO)
+    versao = _versao_do_pedido(dados)
     consentimentos.gravar_prova(
         contexto.fabrica,
         conversa_id=conversa_id,
@@ -263,6 +274,10 @@ def _aceite(state: AgentState, contexto: AgentContext, dados: dict[str, Any]) ->
         return _seguir(dados)
 
     contratos = list(dados.get("contratos") or [])
+    oferta = textos.oferta(contratos)
+    if ultima_mensagem_agente(state) != oferta:
+        # O SIM só aceita a oferta que acabou de ser mostrada: ela é refeita.
+        return _falar(dados, oferta, "icred:oferta")
     with abrir_sessao(contexto.fabrica) as sessao:
         linha = sessao.get(ConsultaIcred, dados.get("consulta"))
         cpf = linha.cpf if linha is not None else ""
@@ -271,7 +286,7 @@ def _aceite(state: AgentState, contexto: AgentContext, dados: dict[str, Any]) ->
         contexto.fabrica,
         conversa_id=_conversa_id(state),
         tipo="icred_aceite",
-        texto_mostrado=textos.oferta(contratos),
+        texto_mostrado=oferta,
         versao=textos.VERSAO,
         resposta_literal=texto,
         wamid=state.get("message_id"),

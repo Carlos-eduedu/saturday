@@ -23,7 +23,12 @@ from test_icred import CPF, Jornada
 from test_portabilidade_fluxo import dados_extrato
 
 from saturday.agent.icred import textos
-from saturday.agent.textos import CONSENTIMENTO_C6, CONSENTIMENTO_C6_REPETIR
+from saturday.agent.textos import (
+    CONSENTIMENTO_C6,
+    CONSENTIMENTO_C6_REPETIR,
+    MENSAGEM_EXTRATO_ILEGIVEL,
+    MENSAGEM_SEM_TEXTO,
+)
 from saturday.bancos.c6.cliente import ROTA_SIMULACAO, ClienteC6
 from saturday.dados.modelos import Consentimento
 from saturday.dados.sessao import sessao as abrir_sessao
@@ -284,16 +289,28 @@ def test_extrato_de_outro_titular_cancela_o_pedido_do_icred(
     assert remota["cpf"] == OUTRO_TITULAR
 
 
+def _icred_consultando_e_o_c6_sem_pedir(jornada: Jornada, fakes: Fakes) -> None:
+    """O iCred consulta sem o C6 ter pedido o SIM; o extrato completo fica pronto.
+
+    O extrato completo do mesmo titular, mandado depois, faz o C6 pedir o SIM.
+    """
+
+    completo = dict(fakes.llm.extrato)
+    fakes.llm.extrato = {**completo, "numeroBeneficio": None, "baseCalculo": None}
+    assert _um_pedido_de_sim(jornada.extrato().answer) == PEDIDO_ORIGINAL
+    assert jornada.falar("sim").answer == textos.PEDIR_CPF
+    assert jornada.falar(CPF).answer == textos.CONSULTANDO
+    fakes.llm.extrato = completo
+
+
 def test_extrato_novo_suspende_a_oferta_do_icred_ate_ela_ser_mostrada_de_novo(
     jornada: Jornada, fakes: Fakes, simulador_icred: ModuleType
 ) -> None:
-    jornada.extrato()
-    jornada.falar("não")
-    assert jornada.falar("sim").answer == textos.CONSULTANDO
+    _icred_consultando_e_o_c6_sem_pedir(jornada, fakes)
     jornada.resultado("COM_OFERTA", [{**simulador_icred.PRODUTO_NOVO, "liberado": 50000.0}])
     oferta_icred = jornada.ultima_saida()
     assert oferta_icred.startswith("Consultei o iCred")
-    fakes.llm.extrato = {**fakes.llm.extrato, "cpf": OUTRO_TITULAR}
+    # O mesmo titular manda o extrato completo: agora o C6 pede o SIM dele.
     assert _um_pedido_de_sim(jornada.extrato().answer) == CONSENTIMENTO_C6
 
     # O SIM responde ao C6, não à oferta do iCred que ficou para trás.
@@ -309,16 +326,13 @@ def test_extrato_novo_suspende_a_oferta_do_icred_ate_ela_ser_mostrada_de_novo(
     assert jornada.falar("esse não quero").answer == oferta_icred
     aceite = jornada.falar("sim")
     assert (aceite.status, aceite.handoff_reason) == ("handoff", "icred_aceite")
+    assert jornada.provas()[-1] == ("icred_aceite", CPF, "sim")
 
 
 def test_pedido_do_c6_aberto_nao_ganha_prova_pelo_sim_dado_a_oferta_do_icred(
     jornada: Jornada, fakes: Fakes, simulador_icred: ModuleType, simulador_c6: ModuleType
 ) -> None:
-    jornada.extrato()
-    jornada.falar("não")
-    assert jornada.falar("sim").answer == textos.CONSULTANDO
-    # Consulta aberta: o extrato de outro titular faz o C6 pedir o SIM dele.
-    fakes.llm.extrato = {**fakes.llm.extrato, "cpf": OUTRO_TITULAR}
+    _icred_consultando_e_o_c6_sem_pedir(jornada, fakes)
     assert _um_pedido_de_sim(jornada.extrato().answer) == CONSENTIMENTO_C6
     jornada.resultado("COM_OFERTA", [{**simulador_icred.PRODUTO_NOVO, "liberado": 50000.0}])
     assert jornada.ultima_saida().startswith("Consultei o iCred")
@@ -337,17 +351,18 @@ def test_pedido_do_c6_aberto_nao_ganha_prova_pelo_sim_dado_a_oferta_do_icred(
 def test_duvida_na_oferta_do_icred_nao_refaz_o_pedido_do_c6_que_ficou_aberto(
     jornada: Jornada, fakes: Fakes, simulador_icred: ModuleType
 ) -> None:
-    jornada.extrato()
-    jornada.falar("não")
-    assert jornada.falar("sim").answer == textos.CONSULTANDO
-    fakes.llm.extrato = {**fakes.llm.extrato, "cpf": OUTRO_TITULAR}
+    _icred_consultando_e_o_c6_sem_pedir(jornada, fakes)
     assert _um_pedido_de_sim(jornada.extrato().answer) == CONSENTIMENTO_C6
     jornada.resultado("COM_OFERTA", [{**simulador_icred.PRODUTO_NOVO, "liberado": 50000.0}])
+    oferta_icred = jornada.ultima_saida()
 
     # A dúvida é respondida; o pedido do C6 não volta a ser o último mostrado.
     duvida = jornada.falar("tem seguro?").answer or ""
     assert not any(pedido in duvida for pedido in PEDIDOS_DE_SIM)
 
+    # A última mensagem foi a resposta da dúvida: o SIM refaz a oferta, sem prova.
+    assert jornada.falar("sim").answer == oferta_icred
+    assert [tipo for tipo, _versao, _texto in _provas(jornada)] == ["icred_consulta"]
     aceite = jornada.falar("sim")
     assert (aceite.status, aceite.handoff_reason) == ("handoff", "icred_aceite")
     assert "simulacao_c6" not in [tipo for tipo, _versao, _texto in _provas(jornada)]
@@ -371,3 +386,91 @@ def test_so_com_o_icred_o_extrato_reenviado_refaz_a_pergunta_e_o_sim_seguinte_va
     assert jornada.falar("sim, autorizo").answer == textos.PEDIR_CPF
     assert jornada.falar(CPF).answer == textos.CONSULTANDO
     assert _provas(jornada) == [("icred_consulta", "icred-1", PEDIDO_ORIGINAL)]
+
+
+# ------------------------------ a última mensagem do agente não foi o pedido
+
+
+@pytest.fixture
+def so_icred(
+    fabrica: sessionmaker[Session],
+    http_icred: TestClient,
+    fakes: Fakes,
+    simulador_icred: ModuleType,
+) -> Jornada:
+    fakes.llm.extrato = dados_extrato()
+    return Jornada(fabrica, http_icred, fakes, simulador_icred)
+
+
+def _extrato_recusado(jornada: Jornada, fakes: Fakes) -> None:
+    fakes.llm.erro = RuntimeError("ilegível")
+    assert jornada.extrato().answer == MENSAGEM_EXTRATO_ILEGIVEL
+    fakes.llm.erro = None
+
+
+def test_sim_depois_de_extrato_recusado_refaz_o_pedido_do_icred(
+    jornada: Jornada, fakes: Fakes, simulador_icred: ModuleType
+) -> None:
+    jornada.extrato()
+    assert _um_pedido_de_sim(jornada.falar("não").answer) == PEDIDO_DEPOIS_DO_C6
+    _extrato_recusado(jornada, fakes)
+
+    # A última mensagem foi a recusa do extrato: o SIM não é resposta ao pedido.
+    assert _um_pedido_de_sim(jornada.falar("sim").answer) == PEDIDO_DEPOIS_DO_C6
+    assert _provas(jornada) == []
+    assert simulador_icred.CHAMADAS == []
+
+    assert jornada.falar("sim").answer == textos.CONSULTANDO
+    assert _provas(jornada) == [PROVA_ICRED_DEPOIS]
+
+
+def test_sim_depois_de_extrato_recusado_refaz_a_oferta_do_icred(
+    jornada: Jornada, fakes: Fakes, simulador_icred: ModuleType
+) -> None:
+    jornada.extrato()
+    jornada.falar("não")
+    jornada.falar("sim")
+    jornada.resultado("COM_OFERTA", [{**simulador_icred.PRODUTO_NOVO, "liberado": 50000.0}])
+    oferta_icred = jornada.ultima_saida()
+    _extrato_recusado(jornada, fakes)
+
+    assert jornada.falar("sim").answer == oferta_icred
+    assert [tipo for tipo, _cpf, _resposta in jornada.provas()] == ["icred_consulta"]
+
+    aceite = jornada.falar("sim")
+    assert (aceite.status, aceite.handoff_reason) == ("handoff", "icred_aceite")
+    assert jornada.provas()[-1] == ("icred_aceite", CPF, "sim")
+
+
+def test_so_com_o_icred_o_sim_depois_de_extrato_recusado_refaz_o_pedido(
+    so_icred: Jornada, fakes: Fakes, simulador_icred: ModuleType
+) -> None:
+    assert so_icred.extrato().answer == PEDIDO_ORIGINAL
+    _extrato_recusado(so_icred, fakes)
+
+    assert so_icred.falar("sim").answer == PEDIDO_ORIGINAL
+    assert so_icred.falar("sim").answer == textos.PEDIR_CPF
+    # O CPF também só vale como resposta ao pedido dele: mensagem vazia no meio.
+    assert so_icred.falar("").answer == MENSAGEM_SEM_TEXTO
+    assert so_icred.falar(CPF).answer == PEDIDO_ORIGINAL
+    assert _provas(so_icred) == []
+    assert simulador_icred.CHAMADAS == []
+
+    assert so_icred.falar("sim").answer == textos.PEDIR_CPF
+    assert so_icred.falar(CPF).answer == textos.CONSULTANDO
+    assert _provas(so_icred) == [("icred_consulta", "icred-1", PEDIDO_ORIGINAL)]
+
+
+def test_so_com_o_icred_o_sim_depois_de_extrato_recusado_refaz_a_oferta(
+    so_icred: Jornada, fakes: Fakes, simulador_icred: ModuleType
+) -> None:
+    so_icred.ate_a_consulta()
+    so_icred.resultado("COM_OFERTA", [{**simulador_icred.PRODUTO_NOVO, "liberado": 50000.0}])
+    oferta_icred = so_icred.ultima_saida()
+    _extrato_recusado(so_icred, fakes)
+
+    assert so_icred.falar("sim").answer == oferta_icred
+    assert [tipo for tipo, _cpf, _resposta in so_icred.provas()] == ["icred_consulta"]
+
+    aceite = so_icred.falar("sim")
+    assert (aceite.status, aceite.handoff_reason) == ("handoff", "icred_aceite")

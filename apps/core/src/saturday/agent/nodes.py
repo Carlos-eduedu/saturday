@@ -22,7 +22,7 @@ from saturday.agent.coleta import (
 )
 from saturday.agent.context import AgentContext
 from saturday.agent.icred.nos import extrato_novo
-from saturday.agent.state import AgentState
+from saturday.agent.state import AgentState, ultima_mensagem_agente
 from saturday.agent.textos import (
     CONSENTIMENTO_C6,
     CONSENTIMENTO_C6_REPETIR,
@@ -74,15 +74,6 @@ def _historico(state: AgentState) -> list[dict[str, str]]:
         if conteudo.strip():
             historico.append({"role": role, "content": conteudo})
     return historico
-
-
-def _ultima_mensagem_agente(state: AgentState) -> str | None:
-    for mensagem_atual in reversed(state.get("messages") or []):
-        if not isinstance(mensagem_atual, AIMessage):
-            continue
-        conteudo = mensagem_atual.content
-        return conteudo if isinstance(conteudo, str) else str(conteudo)
-    return None
 
 
 def _resumo_portabilidade(state: AgentState) -> str | None:
@@ -171,7 +162,7 @@ def classify_intent(state: AgentState, runtime: Runtime[AgentContext]) -> dict[s
         resultado = runtime.context.jev.classify(
             state.get("user_message", ""),
             bool(state.get("oferta_pendente")),
-            oferta=_ultima_mensagem_agente(state),
+            oferta=ultima_mensagem_agente(state),
         )
     except Exception:
         # Erro do Jev não interrompe o atendimento: segue para o LLM.
@@ -527,7 +518,7 @@ def collect_customer_data(state: AgentState, runtime: Runtime[AgentContext]) -> 
     if aguardando == "consentimento_c6":
         # Regra 3: o SIM só vale como resposta ao pedido. Se outra fala entrou
         # no meio (extrato recusado, mensagem vazia), o pedido é refeito.
-        mostrado = _ultima_mensagem_agente(state)
+        mostrado = ultima_mensagem_agente(state)
         if mostrado not in (CONSENTIMENTO_C6, CONSENTIMENTO_C6_REPETIR):
             return _pedido(CONSENTIMENTO_C6, "consentimento_c6", "textos:consentimento_c6")
         if leitura.consentiu(texto):

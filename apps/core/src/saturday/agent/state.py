@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
+from langchain_core.messages import AIMessage
 from langgraph.graph import MessagesState
 
 
@@ -64,6 +65,17 @@ class AgentState(MessagesState, total=False):
     message_ids_recentes: list[str]
     # Resposta já dada por `message_id`, para o repetido devolver o mesmo texto.
     respostas_recentes: dict[str, str]
+
+
+def ultima_mensagem_agente(state: AgentState) -> str | None:
+    """O que o cliente viu por último: um SIM só vale como resposta a isso (regra 3)."""
+
+    for mensagem_atual in reversed(state.get("messages") or []):
+        if not isinstance(mensagem_atual, AIMessage):
+            continue
+        conteudo = mensagem_atual.content
+        return conteudo if isinstance(conteudo, str) else str(conteudo)
+    return None
 
 
 CAMPOS_DO_TURNO = (

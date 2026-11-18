@@ -541,7 +541,10 @@ def test_so_o_sim_explicito_autoriza_e_a_duvida_nao_prende_a_rota(jornada: Jorna
     assert jornada.falar("tenho uma dúvida").answer != textos.PEDIR_CPF
     assert jornada.estado()["icred"]["etapa"] == "sim"
     assert jornada.provas() == []
-    # A rota da dúvida não fica no checkpoint: o SIM seguinte pede o CPF.
+    # A última mensagem foi a resposta da dúvida: o SIM refaz o pedido (vale só
+    # para o último pedido mostrado) e só o seguinte pede o CPF.
+    assert jornada.falar("sim").answer == textos.PEDIR_SIM
+    assert jornada.provas() == []
     assert jornada.falar("sim").answer == textos.PEDIR_CPF
 
 
