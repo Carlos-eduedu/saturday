@@ -194,7 +194,7 @@ nunca pelo `conversation_id`, que no WhatsApp carrega o telefone.
 | `POST` | `/admin/conversas/{id}/devolver` | Devolve para a IA (só o dono, ou o gestor). Resolve os alertas `handoff`, `erro_interno`, `atendente_desativado` e `sem_resposta` da conversa. |
 | `POST` | `/admin/conversas/{id}/transferir` | `{usuario_id}`; só conversa assumida. |
 | `POST` | `/admin/conversas/{id}/mensagens` | `{texto}` ou `{modelo}`; só o dono, só WhatsApp. Janela fechada aceita só modelo. |
-| `GET` | `/admin/conversas/{id}/ficha` | Dados mascarados, mais a oferta vigente (só valores), a última proposta na Granatech com `difere_da_oferta` e as provas de consentimento (sem o CPF). |
+| `GET` | `/admin/conversas/{id}/ficha` | Dados mascarados, mais a oferta do CLT (só valores), a última oferta mostrada ao cliente em qualquer ramo (`oferta_vigente`: `ramo`, `situacao` `vigente` ou `recusada` e os `valores` em reais que a fala cita), a oferta que o estado guarda de cada ramo (`ofertas`, com a mesma `situacao`, nula na oferta anterior; a mensagem da conversa leva `ramo_da_oferta` quando é a fala fixa de uma oferta), a faixa da portabilidade enquanto ela for a vigente (`portabilidade_oferta`), a última proposta na Granatech com `difere_da_oferta` e as provas de consentimento (sem o CPF). |
 | `POST` | `/admin/conversas/{id}/revelar` | `{campo: cpf\|telefone\|data_nascimento}`; grava `revelar:{campo}` na auditoria. |
 | `GET` | `/admin/alertas` | Alertas abertos (`handoff`, `erro_interno`, `atendente_desativado`, `envio_falhou`, `sem_resposta`, `evento_com_humano`, `cota_80`, `consulta_parada`, `granatech_evento`, `icred_consulta_parada`, `instancia_desconectada`, `instancia_numero_trocado`). |
 | `POST` | `/admin/alertas/{id}/resolver` | Resolve e audita. |

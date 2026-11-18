@@ -23,6 +23,13 @@ uma entrega fora das fases.
   devolver é uma operação só (`AgentService.devolver`): banco, alertas,
   auditoria e checkpoint sob a trava, com o checkpoint zerado antes do commit;
   cada fala da IA guarda o turno e a chave da mensagem fixa (0018);
+  a fala com reais é conferida contra a oferta vigente da conversa, de
+  qualquer ramo (CLT, contrato novo no C6, portabilidade ou iCred): a última
+  oferta mostrada ao cliente, achada pela chave da fala
+  (`ofertas_da_conversa`, em `agent/service.py`), que a ficha entrega com os
+  valores prontos; a fala fixa de oferta é conferida contra a oferta do
+  próprio ramo, e a oferta recusada segue na conferência, marcada "recusada"
+  no cartão (docs/c6.md, "O que o atendente vê");
   contador de cota;
   tempo real por `pg_notify` + SSE. Depois, fora das fases: aba Usuários (só
   gestor) para cadastrar, editar, redefinir senha, desbloquear, desativar e

@@ -56,6 +56,16 @@ def _linha(contrato: dict[str, Any]) -> str:
     )
 
 
+def valores_da_oferta(contratos: list[dict[str, Any]]) -> list[Decimal]:
+    """Os reais que `oferta` mostra: liberado e parcela de cada contrato e o total."""
+
+    valores = [Decimal(str(c[campo])) for c in contratos for campo in ("liberado", "parcela")]
+    if len(contratos) > 1:
+        valores.append(total_na_conta(contratos))
+    # Os mesmos centavos que `reais` escreve na fala.
+    return [valor.quantize(Decimal("0.01")) for valor in valores]
+
+
 def oferta(contratos: list[dict[str, Any]]) -> str:
     """O pacote inteiro: o iCred contrata todos os contratos juntos."""
 

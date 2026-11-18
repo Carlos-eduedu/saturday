@@ -3,9 +3,9 @@
 --
 --   docker exec -i saturday-postgres-1 psql -U saturday -d saturday_painel_dev < infra/painel_seed.sql
 --
--- shortcut: usa a primeira conversa que já tem fala da IA; a oferta vigente
--- mora no checkpoint do grafo, então "Difere da oferta" só aparece depois de
--- uma jornada CLT pelo simulador. Vira script Python quando isso for preciso.
+-- shortcut: usa a primeira conversa que já tem fala da IA. A oferta vigente
+-- mora no checkpoint do grafo: as conversas com "confere" e "Difere da oferta"
+-- (portabilidade e iCred) são do `painel_seed.py`.
 
 insert into alertas (tipo, conversa_id, detalhe)
 select 'envio_falhou', m.conversa_id, '{}'::jsonb
@@ -23,14 +23,14 @@ select 'seed-icred', '00189004967', m.conversa_id, 'concluida', 'COM_OFERTA',
   now() + interval '15 minutes'
 from mensagens m
 where m.autor = 'ia'
-  and not exists (select 1 from consultas_icred)
+  and not exists (select 1 from consultas_icred where chave = 'seed-icred')
 order by m.id
 limit 1;
 
 with fala as (
   select id, conversa_id from mensagens
   where autor = 'ia' and turno_id is null
-    and not exists (select 1 from mensagens where turno_id is not null)
+    and not exists (select 1 from mensagens where chave_mensagem = 'oferta')
   order by id
   limit 1
 ), turno as (

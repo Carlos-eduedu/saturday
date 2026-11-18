@@ -11,6 +11,8 @@ import ast
 import re
 from pathlib import Path
 
+from saturday.agent.service import RAMO_DA_OFERTA
+
 RAIZ = Path(__file__).resolve().parents[3]
 FONTES = RAIZ / "apps/core/src/saturday"
 MEMBROS = RAIZ / "apps/painel/src/membros.ts"
@@ -145,3 +147,7 @@ def test_todo_no_do_grafo_tem_rotulo_no_painel() -> None:
 
 def test_todo_tipo_de_chamada_externa_tem_rotulo_no_painel() -> None:
     _confere("CHAMADAS", *_gravados(CHAMAM, "nome"))
+
+
+def test_todo_ramo_da_oferta_vigente_tem_rotulo_no_painel() -> None:
+    _confere("OFERTA_DO_RAMO", set(RAMO_DA_OFERTA.values()), [])

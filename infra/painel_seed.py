@@ -10,6 +10,11 @@ no checkpoint do grafo:
 E uma do ramo INSS em que o cliente aceitou o contrato novo do C6: handoff, as
 condições aceitas no checkpoint e a prova do SIM da simulação.
 
+E uma do ramo INSS com a oferta de portabilidade e outra com o pacote do iCred,
+cada uma com a fala fixa da oferta e uma resposta do modelo que cita reais (a
+da portabilidade com um valor fora da oferta), para a conferência da fala. E
+uma com o contrato novo recusado seguido da oferta de portabilidade.
+
 E o que a tela precisa para ser conferida de verdade:
 
 - um gestor para entrar (`gestor@exemplo.test`); a senha é sorteada a cada
@@ -28,6 +33,7 @@ import struct
 import zlib
 
 from saturday.agent.graph import build_graph
+from saturday.agent.icred import textos as textos_icred
 from saturday.agent.textos import (
     CONSENTIMENTO_C6,
     OFERTA_CONTRATO_NOVO,
@@ -37,14 +43,17 @@ from saturday.dados import atendimento, repositorios
 from saturday.dados.modelos import (
     Consentimento,
     ConsultaGranatech,
+    ConsultaIcred,
     Conversa,
     Mensagem,
+    Turno,
     UsuarioPainel,
 )
 from saturday.dados.sessao import criar_engine, criar_factory
 from saturday.dados.sessao import sessao as abrir
 from saturday.painel.auditoria import auditar
 from saturday.painel.sessoes import agora, criar_usuario, gerar_hash
+from saturday.portabilidade.mensagem import mensagem_oferta
 from saturday.settings import get_settings
 from saturday.storage.base import criar_storage
 from saturday.web.composicao import criar_checkpointer
@@ -52,7 +61,38 @@ from sqlalchemy import select
 
 CONVERSA = "seed-painel-clt"
 CONVERSA_C6 = "seed-painel-c6-novo"
+CONVERSA_PORTABILIDADE = "seed-painel-portabilidade"
+CONVERSA_ICRED = "seed-painel-icred"
+CONVERSA_RECUSADO = "seed-painel-c6-recusado"
 CPF = "00189004967"  # fictício, o mesmo dos testes
+FAIXA = {"min": 1234.56, "max": 1500.99}
+PORTABILIDADE = {
+    "ok": True,
+    "troco_total": 2743.47,
+    "troco_faixa": {"min": 2469.12, "max": 3001.98},
+    "contratos": [
+        {"banco": "BMG", "elegivel": True, "troco_faixa": FAIXA},
+        {"banco": "PAN", "elegivel": True, "troco_faixa": FAIXA},
+    ],
+}
+PACOTE_ICRED = [
+    {
+        "tipo": "port_refin",
+        "banco": "BMG",
+        "taxa": "1.66",
+        "prazo": 96,
+        "parcela": "210.50",
+        "liberado": "3200.00",
+    },
+    {
+        "tipo": "novo",
+        "banco": "iCred",
+        "taxa": "1.80",
+        "prazo": 84,
+        "parcela": "98.40",
+        "liberado": "4100.00",
+    },
+]
 GESTOR = "gestor@exemplo.test"
 DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 FALAS = [
@@ -125,6 +165,26 @@ def pdf(linhas: list[str]) -> bytes:
     return bytes(saida + f"startxref\n{xref}\n%%EOF\n".encode())
 
 
+def fala_da_ia(sessao, conversa, texto: str, chave: str | None, *caminho: str) -> None:
+    """Fala com a procedência que o turno gravaria (decisão 0018).
+
+    Sem chave, quem escreveu foi o modelo: o turno leva a chamada ao `llm`.
+    """
+
+    chamadas = [] if chave else [{"nome": "llm", "latencia_ms": 900, "status": "ok"}]
+    turno = Turno(
+        conversa_id=conversa.id,
+        caminho=["__start__", *caminho],
+        status="answered",
+        chamadas=chamadas,
+    )
+    sessao.add(turno)
+    sessao.flush()
+    repositorios.registrar_saida(
+        sessao, conversa, conteudo=texto, turno_id=turno.id, chave_mensagem=chave
+    )
+
+
 settings = get_settings()
 fabrica = criar_factory(criar_engine(settings))
 checkpointer, pool = criar_checkpointer(settings)
@@ -190,12 +250,14 @@ with abrir(fabrica) as sessao:
     if repositorios.registrar_entrada(
         sessao, conversa, message_id="seed-c6-1", conteudo="sim"
     ):
-        repositorios.registrar_saida(
+        fala_da_ia(
             sessao,
             conversa,
-            conteudo=OFERTA_CONTRATO_NOVO.format(
+            OFERTA_CONTRATO_NOVO.format(
                 valor="4.321,09", parcela="99,00", parcelas=108, taxa="1,85"
             ),
+            "textos:oferta_contrato_novo",
+            "simulate_c6",
         )
         repositorios.registrar_entrada(
             sessao, conversa, message_id="seed-c6-2", conteudo="quero"
@@ -230,6 +292,156 @@ build_graph(checkpointer).update_state(
             "convenio": "000020",
             "produto": "0001",
         },
+    },
+)
+with abrir(fabrica) as sessao:
+    conversa = repositorios.obter_ou_criar_conversa(
+        sessao,
+        CONVERSA_PORTABILIDADE,
+        canal="whatsapp",
+        telefone="5567900000003",
+        phone_number_id="100000000000001",
+    )
+    if repositorios.registrar_entrada(
+        sessao, conversa, message_id="seed-port-1", conteudo="segue o meu extrato"
+    ):
+        fala_da_ia(
+            sessao,
+            conversa,
+            mensagem_oferta(PORTABILIDADE, "MS"),
+            "inss:oferta",
+            "calculate_portability",
+            "present_offer",
+        )
+        repositorios.registrar_entrada(
+            sessao,
+            conversa,
+            message_id="seed-port-2",
+            conteudo="quanto sobra no total?",
+        )
+        # O modelo não deveria citar valor; este está fora da oferta, de propósito.
+        fala_da_ia(
+            sessao,
+            conversa,
+            "A sobra fica em torno de R$ 3.500,00, somando os dois contratos.",
+            None,
+            "classify_intent",
+            "generate_answer",
+        )
+
+    conversa = repositorios.obter_ou_criar_conversa(
+        sessao,
+        CONVERSA_ICRED,
+        canal="whatsapp",
+        telefone="5567900000004",
+        phone_number_id="100000000000001",
+    )
+    if repositorios.registrar_entrada(
+        sessao, conversa, message_id="seed-icred-1", conteudo="sim"
+    ):
+        fala_da_ia(
+            sessao,
+            conversa,
+            textos_icred.oferta(PACOTE_ICRED),
+            "icred:oferta",
+            "icred",
+        )
+        repositorios.registrar_entrada(
+            sessao,
+            conversa,
+            message_id="seed-icred-2",
+            conteudo="esse valor cai na conta mesmo?",
+        )
+        fala_da_ia(
+            sessao,
+            conversa,
+            "Sim: os R$ 7.300,00 caem na sua conta depois da assinatura.",
+            None,
+            "classify_intent",
+            "generate_answer",
+        )
+        sessao.add(
+            ConsultaIcred(
+                chave="seed-icred-oferta",
+                cpf=CPF,
+                conversa_id=conversa.id,
+                estado="concluida",
+                situacao="COM_OFERTA",
+                contratos=PACOTE_ICRED,
+            )
+        )
+
+    # Contrato novo recusado e, depois, a portabilidade: a fala antiga do C6
+    # é conferida contra a oferta do próprio ramo, e o cartão a marca "recusada".
+    conversa = repositorios.obter_ou_criar_conversa(
+        sessao,
+        CONVERSA_RECUSADO,
+        canal="whatsapp",
+        telefone="5567900000005",
+        phone_number_id="100000000000001",
+    )
+    if repositorios.registrar_entrada(
+        sessao, conversa, message_id="seed-recusado-1", conteudo="sim"
+    ):
+        fala_da_ia(
+            sessao,
+            conversa,
+            OFERTA_CONTRATO_NOVO.format(
+                valor="4.321,09", parcela="99,00", parcelas=108, taxa="1,85"
+            ),
+            "textos:oferta_contrato_novo",
+            "simulate_c6",
+        )
+        repositorios.registrar_entrada(
+            sessao, conversa, message_id="seed-recusado-2", conteudo="esse não quero"
+        )
+        fala_da_ia(
+            sessao,
+            conversa,
+            mensagem_oferta(PORTABILIDADE, "MS"),
+            "inss:oferta",
+            "decline_c6",
+            "calculate_portability",
+            "present_offer",
+        )
+
+grafo = build_graph(checkpointer)
+grafo.update_state(
+    {"configurable": {"thread_id": CONVERSA_RECUSADO}},
+    {
+        "status": "answered",
+        "publico": "inss",
+        "cliente": {"cpf": CPF, "uf": "MS", "c6_autorizado": True},
+        "c6_novo": {
+            "situacao": "recusado",
+            "valor": "4321.09",
+            "parcela": "99.00",
+            "parcelas": 108,
+            "taxa": "1.85",
+            "convenio": "000020",
+            "produto": "0001",
+        },
+        "portability_result": PORTABILIDADE,
+        "oferta_pendente": True,
+    },
+)
+grafo.update_state(
+    {"configurable": {"thread_id": CONVERSA_PORTABILIDADE}},
+    {
+        "status": "answered",
+        "publico": "inss",
+        "cliente": {"uf": "MS"},
+        "portability_result": PORTABILIDADE,
+        "oferta_pendente": True,
+    },
+)
+grafo.update_state(
+    {"configurable": {"thread_id": CONVERSA_ICRED}},
+    {
+        "status": "answered",
+        "publico": "inss",
+        "cliente": {"uf": "MS"},
+        "icred": {"etapa": "oferta", "cpf": CPF, "contratos": PACOTE_ICRED},
     },
 )
 senha = os.environ.get("PAINEL_LOCAL_SENHA") or secrets.token_urlsafe(12)
@@ -352,8 +564,12 @@ with abrir(fabrica) as sessao:
         )
         conversa_dela = f"  /conversas/{assumida}" if assumida else ""
         print(f"{pessoa.email}  /membros/{pessoa.id}{conversa_dela}")
-    c6 = sessao.scalar(
-        select(Conversa.id).where(Conversa.conversation_id == CONVERSA_C6)
-    )
-    print(f"contrato novo no C6  /conversas/{c6}")
+    for nome, ref in [
+        ("contrato novo no C6", CONVERSA_C6),
+        ("portabilidade", CONVERSA_PORTABILIDADE),
+        ("iCred", CONVERSA_ICRED),
+        ("C6 recusado e portabilidade", CONVERSA_RECUSADO),
+    ]:
+        alvo = sessao.scalar(select(Conversa.id).where(Conversa.conversation_id == ref))
+        print(f"{nome}  /conversas/{alvo}")
 print(f"seed pronto: entre com {GESTOR} e a senha {senha}")

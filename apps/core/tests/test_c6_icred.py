@@ -8,6 +8,7 @@ simuladores em processo; nenhum estado é injetado.
 
 from __future__ import annotations
 
+import re
 from dataclasses import replace
 from decimal import Decimal
 from types import ModuleType
@@ -23,6 +24,7 @@ from test_icred import CPF, RESPOSTA_DA_DUVIDA, Jornada
 from test_portabilidade_fluxo import dados_extrato
 
 from saturday.agent.icred import textos
+from saturday.agent.service import Oferta, ofertas_da_conversa
 from saturday.agent.textos import (
     CONSENTIMENTO_C6,
     CONSENTIMENTO_C6_REPETIR,
@@ -239,6 +241,112 @@ def test_icred_que_nao_ganha_da_portabilidade_entrega_a_portabilidade(
 
     assert PORTABILIDADE in jornada.ultima_saida()
     assert OFERTA_C6 not in jornada.ultima_saida()
+
+
+# ------------------------------- a oferta vigente que o painel confere (issue 32)
+
+REAIS = re.compile(r"R\$ ([\d.]+)(?:,(\d{2}))?")
+
+
+def _reais_da_ultima_fala(jornada: Jornada) -> set[Decimal]:
+    achados = REAIS.findall(jornada.ultima_saida())
+    return {
+        Decimal(f"{inteiro.replace('.', '')}.{centavos or '00'}") for inteiro, centavos in achados
+    }
+
+
+def _vigente(jornada: Jornada) -> Oferta | None:
+    with abrir_sessao(jornada.fabrica) as sessao:
+        chaves = sessao.scalars(
+            select(Mensagem.chave_mensagem)
+            .where(Mensagem.direcao == "saida", Mensagem.chave_mensagem.is_not(None))
+            .order_by(Mensagem.id.desc())
+        ).all()
+        aceito = bool(
+            sessao.scalar(select(Consentimento.id).where(Consentimento.tipo == "icred_aceite"))
+        )
+    ofertas = ofertas_da_conversa(
+        jornada.servico.jornada(jornada.id), [c for c in chaves if c], aceito
+    )
+    return next((o for o in ofertas if o.vigente), None)
+
+
+def test_oferta_vigente_sai_do_contrato_novo_para_o_icred_quando_ele_e_mostrado(
+    jornada: Jornada, fakes: Fakes, simulador_icred: ModuleType
+) -> None:
+    jornada.extrato()
+    assert _vigente(jornada) is None
+
+    assert OFERTA_C6 in (jornada.falar("sim").answer or "")
+    vigente = _vigente(jornada)
+    assert vigente is not None and vigente.ramo == "contrato_novo"
+    # Os valores conferidos são os reais que o cliente leu na oferta.
+    assert set(vigente.valores) == _reais_da_ultima_fala(jornada)
+
+    fakes.jev.resultado = resultado_jev(resposta_oferta="recusa")
+    jornada.falar("esse não quero")
+    jornada.falar("sim")
+    # Pedido de SIM e aviso de consulta não são oferta: a recusada segue a última mostrada.
+    vigente = _vigente(jornada)
+    assert vigente is not None and vigente.ramo == "contrato_novo"
+
+    jornada.resultado("COM_OFERTA", [{**simulador_icred.PRODUTO_NOVO, "liberado": 50000.0}])
+    vigente = _vigente(jornada)
+    assert vigente is not None and vigente.ramo == "icred"
+    assert set(vigente.valores) == _reais_da_ultima_fala(jornada)
+
+
+def test_oferta_vigente_e_a_portabilidade_quando_o_icred_nao_ganha(
+    jornada: Jornada, fakes: Fakes, simulador_icred: ModuleType
+) -> None:
+    _ate_a_recusa_do_contrato_novo(jornada, fakes)
+    troco = jornada.estado()["portability_result"]["troco_total"]
+    jornada.falar("sim")
+
+    jornada.resultado("COM_OFERTA", [{**simulador_icred.PRODUTO_NOVO, "liberado": float(troco)}])
+
+    assert PORTABILIDADE in jornada.ultima_saida()
+    vigente = _vigente(jornada)
+    assert vigente is not None and vigente.ramo == "portabilidade"
+    assert set(vigente.valores) == _reais_da_ultima_fala(jornada)
+    assert not vigente.recusada
+
+    fakes.jev.resultado = resultado_jev(resposta_oferta="recusa")
+    jornada.falar("não quero")
+    vigente = _vigente(jornada)
+    assert vigente is not None and (vigente.ramo, vigente.recusada) == ("portabilidade", True)
+
+
+def test_oferta_recusada_segue_vigente_e_marcada_ate_a_proxima_oferta(
+    jornada: Jornada, fakes: Fakes, simulador_icred: ModuleType
+) -> None:
+    _ate_a_recusa_do_contrato_novo(jornada, fakes)
+    vigente = _vigente(jornada)
+    assert vigente is not None and (vigente.ramo, vigente.recusada) == ("contrato_novo", True)
+
+    jornada.falar("sim")
+    jornada.resultado("COM_OFERTA", [{**simulador_icred.PRODUTO_NOVO, "liberado": 50000.0}])
+    vigente = _vigente(jornada)
+    assert vigente is not None and (vigente.ramo, vigente.recusada) == ("icred", False)
+
+    jornada.falar("não")
+    # O NÃO ao iCred devolve a conversa à portabilidade, que passa a ser a vigente.
+    vigente = _vigente(jornada)
+    assert vigente is not None and (vigente.ramo, vigente.recusada) == ("portabilidade", False)
+
+
+def test_pacote_do_icred_aceito_nao_sai_como_recusado(
+    jornada: Jornada, fakes: Fakes, simulador_icred: ModuleType
+) -> None:
+    _ate_a_recusa_do_contrato_novo(jornada, fakes)
+    jornada.falar("sim")
+    jornada.resultado("COM_OFERTA", [{**simulador_icred.PRODUTO_NOVO, "liberado": 50000.0}])
+
+    assert jornada.falar("sim").handoff_reason == "icred_aceite"
+
+    assert jornada.estado()["icred"]["etapa"] == "fim"
+    vigente = _vigente(jornada)
+    assert vigente is not None and (vigente.ramo, vigente.recusada) == ("icred", False)
 
 
 # ------------------------------- o SIM vale só para o último pedido mostrado

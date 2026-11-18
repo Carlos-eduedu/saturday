@@ -178,6 +178,21 @@ export const SITUACAO_CONTRATO_NOVO: Record<string, string> = {
   recusado: "Recusado",
 };
 
+// Ramo da oferta vigente (`RAMO_DA_OFERTA` em agent/service.py), como a
+// conferência da fala o nomeia: "confere com a oferta do iCred".
+export const OFERTA_DO_RAMO: Record<string, string> = {
+  clt: "oferta do Crédito do Trabalhador",
+  contrato_novo: "oferta do contrato novo no C6",
+  portabilidade: "oferta de portabilidade",
+  icred: "oferta do iCred",
+};
+
+// Marca da seção do cartão de acompanhamento, pela situação da oferta do ramo.
+export const SITUACAO_DA_OFERTA: Record<string, string> = {
+  vigente: "oferta vigente",
+  recusada: "recusada",
+};
+
 // US$ com 4 casas para valores pequenos (um turno custa frações de centavo).
 export function dolar(valor: number): string {
   if (valor > 0 && valor < 0.0001) return "< US$ 0,0001";

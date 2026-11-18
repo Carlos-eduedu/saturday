@@ -24,10 +24,11 @@ MENSAGEM_ESPECIE_NAO_ATENDIDA = (
 def formatar_valor(valor: float | int | None) -> str:
     """Reais inteiros, truncados para baixo, com ponto de milhar."""
 
-    if valor is None:
-        valor = 0
-    inteiro = math.floor(float(valor))
-    return f"{inteiro:,}".replace(",", ".")
+    return f"{_inteiro(valor):,}".replace(",", ".")
+
+
+def _inteiro(valor: float | int | None) -> int:
+    return math.floor(float(valor or 0))
 
 
 def nome_banco_curto(banco: str | None) -> str:
@@ -53,6 +54,27 @@ def nome_banco_curto(banco: str | None) -> str:
 def _faixa(contrato: dict[str, Any]) -> tuple[float, float]:
     faixa = contrato.get("troco_faixa") or {}
     return faixa.get("min", 0.0), faixa.get("max", 0.0)
+
+
+def resumo_da_oferta(resultado: dict[str, Any]) -> dict[str, Any] | None:
+    """As faixas que `mensagem_oferta` mostra, nos mesmos reais inteiros.
+
+    A do total e a de cada contrato elegível; ``None`` sem contrato elegível.
+    """
+
+    contratos = [c for c in resultado.get("contratos", []) if c.get("elegivel")]
+    if not contratos:
+        return None
+    total = resultado.get("troco_faixa") or {}
+    return {
+        "minimo": _inteiro(total.get("min")),
+        "maximo": _inteiro(total.get("max")),
+        "contratos": [
+            {"banco": c.get("banco"), "minimo": _inteiro(minimo), "maximo": _inteiro(maximo)}
+            for c in contratos
+            for minimo, maximo in [_faixa(c)]
+        ],
+    }
 
 
 def mensagem_oferta(resultado: dict[str, Any], uf: str | None = None) -> str:

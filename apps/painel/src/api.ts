@@ -67,6 +67,8 @@ export interface Mensagem {
   // escreveu; os dois nulos = linha anterior à decisão.
   turno_id: number | null;
   chave_mensagem: string | null;
+  // Ramo da oferta que a fala fixa apresenta; nulo nas outras falas.
+  ramo_da_oferta: string | null;
   anexos: { mime_type: string; nome?: string | null }[];
 }
 
@@ -91,6 +93,20 @@ export interface Ficha {
     valor_seguro: string;
     seguro_aplicado: boolean;
     limitado_ao_teto: boolean;
+  } | null;
+  // A última oferta mostrada ao cliente, de qualquer ramo (clt, contrato_novo,
+  // portabilidade ou icred), com os reais que a fala dela cita, como texto.
+  // `situacao`: "vigente" ou "recusada" (recusada, segue valendo para conferir).
+  oferta_vigente: { ramo: string; situacao: string; valores: string[] } | null;
+  // A oferta que o estado guarda de cada ramo: a fala fixa de oferta é
+  // conferida contra a do próprio ramo. `situacao` nula = oferta anterior.
+  ofertas: Record<string, { situacao: string | null; valores: string[] }>;
+  // A faixa da sobra na portabilidade, em reais inteiros como na fala; só
+  // enquanto ela for a oferta vigente.
+  portabilidade_oferta: {
+    minimo: number;
+    maximo: number;
+    contratos: { banco: string | null; minimo: number; maximo: number }[];
   } | null;
   // O contrato novo do C6 (decisão 0026), desde a oferta. Convênio e produto
   // são códigos do banco, sem nome.

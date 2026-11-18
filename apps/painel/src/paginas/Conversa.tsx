@@ -31,10 +31,12 @@ import {
   ETAPAS,
   MOTIVOS_HANDOFF,
   NOS,
+  OFERTA_DO_RAMO,
   porcento,
   reais,
   rotulo,
   SITUACAO_CONTRATO_NOVO,
+  SITUACAO_DA_OFERTA,
   SITUACAO_DA_PROPOSTA,
   SITUACAO_ICRED,
   TIPO_ICRED,
@@ -44,7 +46,13 @@ import {
 import { ROTULO_ESTADO } from "../membros";
 import { permissoesDa } from "../permissoes";
 import { useRecurso } from "../useRecurso";
-import { centavosCitados, foraDaOferta, origemDaMensagem, reaisDeCentavos } from "./conferencia";
+import {
+  centavosCitados,
+  foraDaOferta,
+  ofertaDaFala,
+  origemDaMensagem,
+  reaisDeCentavos,
+} from "./conferencia";
 import { formatarHora, ROTULO_ATENDIMENTO, textoDaEspera } from "./Inbox";
 
 const AUTOR = { cliente: "Cliente", ia: "IA", atendente: "Equipe", sistema: "Sistema" };
@@ -408,7 +416,8 @@ function EsqueletoBlocos({ rotulo: texto }: { rotulo: string }) {
 // vigente. Valores são do código (AGENTS.md, regra 2): fala do modelo com
 // reais, ou valor fora da oferta, pede conferência.
 function Conferencia({ m, turnos, ficha }: { m: Mensagem; turnos: Turno[]; ficha: Ficha | null }) {
-  const oferta = ficha?.oferta ?? null;
+  const oferta = ofertaDaFala(m, ficha);
+  const qual = oferta ? rotulo(OFERTA_DO_RAMO, oferta.ramo) : "";
   const proposta = ficha?.proposta;
   const citados = centavosCitados(m.conteudo);
   if (citados.length === 0) return null;
@@ -439,10 +448,10 @@ function Conferencia({ m, turnos, ficha }: { m: Mensagem; turnos: Turno[]; ficha
         </span>
       ) : fora.length > 0 ? (
         <strong className="atencao difere">
-          Difere da oferta: {fora.map(reaisDeCentavos).join(", ")}
+          Difere da {qual}: {fora.map(reaisDeCentavos).join(", ")}
         </strong>
       ) : (
-        <span>confere com a oferta</span>
+        <span>confere com a {qual}</span>
       )}
     </p>
   );
@@ -753,16 +762,24 @@ function FichaCliente({
 }
 
 // O que a IA disse em valores, ao lado da fala: contrato novo do C6, consulta
-// no iCred, oferta vigente, proposta no banco e as provas do SIM. Só aparece
-// quando a jornada chegou a algum deles.
+// no iCred, portabilidade, oferta do CLT, proposta no banco e as provas do
+// SIM. Só aparece quando a jornada chegou a algum deles. A seção da última
+// oferta mostrada ao cliente leva a marca "oferta vigente"; a da oferta que o
+// cliente recusou, "recusada". Quem decide a situação é o servidor.
 function Acompanhamento({ ficha }: { ficha: Ficha }) {
   const { oferta, proposta, consentimentos, icred, contrato_novo: novo } = ficha;
-  if (!oferta && !proposta && !icred && !novo && consentimentos.length === 0) return null;
+  const { portabilidade_oferta: portabilidade, ofertas } = ficha;
+  if (!oferta && !proposta && !icred && !novo && !portabilidade && consentimentos.length === 0)
+    return null;
+  const marca = (ramo: string) => {
+    const situacao = ofertas[ramo]?.situacao;
+    return situacao && <span className="nota"> · {rotulo(SITUACAO_DA_OFERTA, situacao)}</span>;
+  };
   return (
     <div className="ficha">
       {novo && (
         <>
-          <h2>Contrato novo no C6</h2>
+          <h2>Contrato novo no C6{marca("contrato_novo")}</h2>
           <dl>
             <div>
               <dt>Situação</dt>
@@ -796,7 +813,7 @@ function Acompanhamento({ ficha }: { ficha: Ficha }) {
       )}
       {icred && (
         <>
-          <h2>Consulta no iCred</h2>
+          <h2>Consulta no iCred{marca("icred")}</h2>
           <dl>
             <div>
               <dt>Situação</dt>
@@ -824,6 +841,27 @@ function Acompanhamento({ ficha }: { ficha: Ficha }) {
               <strong>Consulta vencida.</strong> Consulte de novo no iCred antes de gravar a proposta.
             </p>
           )}
+        </>
+      )}
+      {portabilidade && (
+        <>
+          <h2>Portabilidade no C6{marca("portabilidade")}</h2>
+          <dl>
+            <div>
+              <dt>Sobra aproximada</dt>
+              <dd>
+                {reais(portabilidade.minimo)} a {reais(portabilidade.maximo)}
+              </dd>
+            </div>
+            {portabilidade.contratos.map((c, i) => (
+              <div key={i}>
+                <dt>{c.banco ?? "Contrato"}</dt>
+                <dd>
+                  {reais(c.minimo)} a {reais(c.maximo)}
+                </dd>
+              </div>
+            ))}
+          </dl>
         </>
       )}
       {oferta && (

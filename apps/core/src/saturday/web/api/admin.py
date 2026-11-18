@@ -23,7 +23,13 @@ from sqlalchemy.orm import Session, sessionmaker
 from starlette.concurrency import run_in_threadpool
 
 from saturday.agent.clt import leitura
-from saturday.agent.service import AgentService, Jornada
+from saturday.agent.service import (
+    AgentService,
+    Jornada,
+    Oferta,
+    ofertas_da_conversa,
+    ramo_da_fala,
+)
 from saturday.canais.whatsapp.telefone import normalizar_telefone
 from saturday.dados import repositorios
 from saturday.dados.modelos import (
@@ -42,6 +48,7 @@ from saturday.painel.auditoria import auditar
 from saturday.painel.canal import permitido
 from saturday.painel.midia import mime_base
 from saturday.painel.produtos import produtos
+from saturday.portabilidade.mensagem import resumo_da_oferta
 from saturday.privacidade import MASCARAS
 from saturday.settings import TZ_OPERACAO
 from saturday.web.api.granatech_admin import Conta
@@ -504,6 +511,8 @@ def ver_conversa(conversa_id: uuid.UUID, _usuario: Logado, fabrica: Fabrica) -> 
                 "criada_em": m.criada_em,
                 "turno_id": m.turno_id,
                 "chave_mensagem": m.chave_mensagem,
+                # Ramo da oferta que a fala fixa apresenta, para a conferência.
+                "ramo_da_oferta": ramo_da_fala(m.chave_mensagem),
                 "anexos": [
                     {"mime_type": a.get("mime_type"), "nome": a.get("nome")} for a in m.anexos or []
                 ],
@@ -710,7 +719,7 @@ def _acompanhamento(sessao: Session, conversa: Conversa, jornada: Jornada) -> di
         select(Consentimento)
         .where(Consentimento.conversa_id == conversa.id)
         .order_by(Consentimento.id)
-    )
+    ).all()
     icred = sessao.scalars(
         select(ConsultaIcred)
         .where(ConsultaIcred.conversa_id == conversa.id)
@@ -718,8 +727,36 @@ def _acompanhamento(sessao: Session, conversa: Conversa, jornada: Jornada) -> di
         .limit(1)
     ).first()
     novo = jornada.contrato_novo or {}
+    falas_fixas = sessao.scalars(
+        select(Mensagem.chave_mensagem)
+        .where(
+            Mensagem.conversa_id == conversa.id,
+            Mensagem.direcao == "saida",
+            Mensagem.chave_mensagem.is_not(None),
+        )
+        .order_by(Mensagem.id.desc())
+    )
+    icred_aceito = any(p.tipo == "icred_aceite" for p in provas)
+    ofertas = ofertas_da_conversa(jornada, (c for c in falas_fixas if c), icred_aceito)
+    vigente = next((o for o in ofertas if o.vigente), None)
+
+    def para_a_tela(o: Oferta) -> dict[str, Any]:
+        # A marca do cartão: `recusada`, `vigente` ou nenhuma (oferta anterior).
+        situacao = "recusada" if o.recusada else "vigente" if o.vigente else None
+        return {"situacao": situacao, "valores": [str(valor) for valor in o.valores]}
+
     return {
         "oferta": oferta,
+        # A última oferta mostrada ao cliente, de qualquer ramo: é contra ela
+        # que a resposta do modelo é conferida, mesmo depois de recusada.
+        "oferta_vigente": vigente and {"ramo": vigente.ramo, **para_a_tela(vigente)},
+        # A de cada ramo que o estado guarda: a fala fixa de oferta é conferida
+        # contra a do próprio ramo (`ramo_da_oferta` na mensagem).
+        "ofertas": {o.ramo: para_a_tela(o) for o in ofertas},
+        # A faixa da portabilidade só enquanto ela for a oferta vigente.
+        "portabilidade_oferta": resumo_da_oferta(jornada.portabilidade or {})
+        if vigente is not None and vigente.ramo == "portabilidade"
+        else None,
         # O contrato novo do C6 (decisão 0026), desde a oferta. Lista fixa de
         # campos; convênio e produto são os códigos que o banco devolveu.
         "contrato_novo": {

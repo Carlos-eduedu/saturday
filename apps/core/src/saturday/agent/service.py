@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from decimal import Decimal
 from typing import Any, Literal, cast
 from zoneinfo import ZoneInfo
 
@@ -16,6 +17,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.agent import comandos
 from saturday.agent.context import AgentContext
+from saturday.agent.icred import textos as textos_icred
 from saturday.agent.state import turno_inicial
 from saturday.agent.textos import (
     COMANDO_REINICIAR,
@@ -29,6 +31,7 @@ from saturday.dados.modelos import Conversa
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.dados.trava import travar_conversa
 from saturday.painel import acoes
+from saturday.portabilidade.mensagem import resumo_da_oferta
 from saturday.privacidade import mascarar_conversation_id
 from saturday.schemas import MIME_TYPES, AgentReply, Attachment, ChatRequest
 from saturday.services.anexos import AnexoInvalido
@@ -91,6 +94,113 @@ class Jornada:
     proposta: str | None
     # Contrato novo no C6 (decisão 0026): a situação e a condição ofertada.
     contrato_novo: dict[str, Any] | None
+    # Pacote do iCred apresentado ao cliente (decisão 0027); vazio antes da oferta.
+    icred: list[dict[str, Any]] | None
+    # Etapa crua do iCred: `fim` com pacote é oferta aceita ou recusada.
+    etapa_icred: str | None
+
+
+# Parte da `chave_mensagem` da fala que apresenta a oferta → ramo dela.
+RAMO_DA_OFERTA = {
+    "oferta": "clt",
+    "oferta_sem_seguro": "clt",
+    "textos:oferta_contrato_novo": "contrato_novo",
+    "inss:oferta": "portabilidade",
+    "icred:oferta": "icred",
+}
+# Fala fixa do NÃO à portabilidade (`decline_offer`): o estado não guarda a recusa.
+_RECUSA_DA_PORTABILIDADE = "textos:recusa"
+
+
+def ramo_da_fala(chave: str | None) -> str | None:
+    """O ramo da oferta que a fala apresenta; ``None`` se ela não apresenta oferta."""
+
+    partes = (chave or "").split("+")
+    return next((RAMO_DA_OFERTA[p] for p in partes if p in RAMO_DA_OFERTA), None)
+
+
+@dataclass(frozen=True)
+class Oferta:
+    """A oferta de um ramo que o estado guarda, com os reais que a fala dela cita."""
+
+    ramo: str
+    valores: list[Decimal]
+    # A última mostrada ao cliente: as respostas do modelo são conferidas contra
+    # ela, mesmo depois de recusada.
+    vigente: bool
+    recusada: bool
+
+
+def _valores_das_ofertas(jornada: Jornada) -> dict[str, list[Decimal]]:
+    """Por ramo com oferta no estado, os valores em reais da fala de oferta."""
+
+    ofertas: dict[str, list[Decimal]] = {}
+    if jornada.oferta:
+        campos = ("liberado", "valor_parcela", "valor_seguro")
+        ofertas["clt"] = [
+            Decimal(str(valor)) for c in campos if (valor := jornada.oferta.get(c)) is not None
+        ]
+    novo = jornada.contrato_novo or {}
+    if novo.get("valor"):
+        ofertas["contrato_novo"] = [
+            Decimal(str(valor)) for c in ("valor", "parcela") if (valor := novo.get(c)) is not None
+        ]
+    resumo = resumo_da_oferta(jornada.portabilidade or {})
+    if resumo:
+        faixas = [resumo, *resumo["contratos"]]
+        ofertas["portabilidade"] = [
+            Decimal(f[lado]) for f in faixas for lado in ("minimo", "maximo")
+        ]
+    if jornada.icred:
+        ofertas["icred"] = textos_icred.valores_da_oferta(jornada.icred)
+    return ofertas
+
+
+def ofertas_da_conversa(
+    jornada: Jornada, chaves: Iterable[str], icred_aceito: bool = False
+) -> list[Oferta]:
+    """As ofertas que o estado guarda, de qualquer ramo, para conferir a fala da IA.
+
+    ``chaves`` são as `chave_mensagem` das falas da conversa, da mais nova para
+    a mais antiga: a vigente é a da última fala de oferta, se o estado ainda a
+    guarda. Sem fala de oferta com chave (linha anterior à decisão 0018), só
+    há vigente quando um único ramo tem oferta; a portabilidade fica de fora,
+    porque o resultado vai para o estado antes de ser mostrado (o iCred
+    pergunta primeiro).
+
+    shortcut: a chave diz que o ramo foi mostrado, não qual cálculo; um extrato
+    novo que recalcula a portabilidade sem mostrá-la herda a marca da fala
+    antiga. Trocar quando o estado guardar qual oferta foi mostrada.
+
+    A recusa do cliente não tira a oferta da conferência, só a marca: no
+    contrato novo, pela situação no estado; na portabilidade, pela fala fixa da
+    recusa depois da oferta; no iCred, pela jornada encerrada com o pacote e
+    sem prova de aceite na conversa (``icred_aceito``: existe uma prova
+    `icred_aceite`). O CLT não marca recusa.
+    """
+
+    valores = _valores_das_ofertas(jornada)
+    recusadas = set()
+    if (jornada.contrato_novo or {}).get("situacao") == "recusado":
+        recusadas.add("contrato_novo")
+    if jornada.etapa_icred == "fim" and jornada.icred and not icred_aceito:
+        recusadas.add("icred")
+    ultima = None
+    portabilidade_vista = False
+    for chave in chaves:
+        ramo = ramo_da_fala(chave)
+        ultima = ultima or ramo
+        if ramo == "portabilidade":
+            portabilidade_vista = True
+        elif _RECUSA_DA_PORTABILIDADE in chave.split("+") and not portabilidade_vista:
+            recusadas.add("portabilidade")
+    if ultima is None:
+        mostradas = [ramo for ramo in valores if ramo != "portabilidade"]
+        ultima = mostradas[0] if len(mostradas) == 1 else None
+    return [
+        Oferta(ramo, valores[ramo], vigente=ramo == ultima, recusada=ramo in recusadas)
+        for ramo in valores
+    ]
 
 
 def jornada_do_estado(estado: dict[str, Any]) -> Jornada:
@@ -104,6 +214,8 @@ def jornada_do_estado(estado: dict[str, Any]) -> Jornada:
         oferta=clt.get("oferta"),
         proposta=clt.get("proposta"),
         contrato_novo=estado.get("c6_novo"),
+        icred=(estado.get("icred") or {}).get("contratos"),
+        etapa_icred=(estado.get("icred") or {}).get("etapa"),
     )
 
 

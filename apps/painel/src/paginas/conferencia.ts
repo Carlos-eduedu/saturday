@@ -56,11 +56,27 @@ export function origemDaMensagem(mensagem: Mensagem, turnos: Turno[]): Origem {
     : { tipo: "codigo", turno };
 }
 
-// Valores citados que não aparecem na oferta vigente (liberado, parcela ou
-// seguro). `null` quando não há oferta para conferir.
-export function foraDaOferta(citados: number[], oferta: Ficha["oferta"]): number[] | null {
+export type OfertaConferida = { ramo: string; valores: string[] };
+
+// Contra qual oferta a fala é conferida: a fala fixa de oferta, contra a do
+// próprio ramo (o servidor diz o ramo em `ramo_da_oferta`); as outras, contra
+// a vigente. `null` quando a oferta não está mais no estado: a fala nunca é
+// conferida contra a de outro ramo.
+export function ofertaDaFala(
+  mensagem: Mensagem,
+  ficha: Pick<Ficha, "oferta_vigente" | "ofertas"> | null,
+): OfertaConferida | null {
+  const ramo = mensagem.ramo_da_oferta ?? ficha?.oferta_vigente?.ramo;
+  const valores = ramo ? ficha?.ofertas[ramo]?.valores : undefined;
+  return ramo && valores ? { ramo, valores } : null;
+}
+
+// Valores citados que não aparecem na oferta, de qualquer ramo: o servidor
+// manda os reais que a fala de oferta mostra. `null` quando não há oferta
+// para conferir.
+export function foraDaOferta(citados: number[], oferta: OfertaConferida | null): number[] | null {
   if (!oferta) return null;
-  const conhecidos = new Set([oferta.liberado, oferta.valor_parcela, oferta.valor_seguro].map(centavos));
+  const conhecidos = new Set(oferta.valores.map(centavos));
   return citados.filter((c) => !conhecidos.has(c));
 }
 
