@@ -121,10 +121,18 @@ segue o mesmo caminho da com seguro: a proposta vai sem o bloco
 `informacaoDeSeguros` (resposta da Granatech, 2026-11-16; na homologação todo
 produto tem seguro, então esse corpo só roda em produção).
 
-- **Dados:** confirma o nome da mãe e o endereço da Granatech (se divergirem,
-  handoff), pede o estado civil e a conta, um dado por mensagem: banco por nome
-  ou código (lista `GET /bancos` com cache de 1 dia), tipo, agência, conta com
-  dígito e "a conta está no seu CPF?".
+- **Dados:** antes de qualquer pergunta, confere os três dados do tomador que
+  o banco exige: nascimento, nome da mãe e endereço. O nascimento é o da
+  Granatech; se ela não devolver, vale o que o cliente informou na
+  identificação. Mãe e endereço só vêm da Granatech: o agente não pede ao
+  cliente (decisão do dono do produto em 2026-11-18, issue 25; rever com números
+  reais depois do lançamento). Faltando qualquer um, handoff
+  `dados_divergentes` antes de criar a proposta; a mesma conferência roda de
+  novo no SIM do resumo, antes da prova, da intenção e do POST. Depois confirma
+  o nome da mãe e o endereço da Granatech (se divergirem, handoff), pede o
+  estado civil e a conta, um dado por mensagem: banco por nome ou código (lista
+  `GET /bancos` com cache de 1 dia), tipo, agência, conta com dígito e "a conta
+  está no seu CPF?".
 - **Aceite:** o resumo traz valores, seguro e a conta mascarada. O SIM é gravado
   como prova `proposta` (com o texto exato do resumo) antes do POST.
 - **Proposta:** `criar_proposta` (intenção gravada, um POST só, reconciliação

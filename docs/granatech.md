@@ -160,7 +160,10 @@ Fora da API real: `cenario` na query de `GET /consulta-saldo`, mandado só pelo
 cliente de teste do Saturday (decisão 0024). Com `sucesso`, `sem_margem` ou
 `erro`, o simulador envia sozinho o webhook `SUCCESS`, `NO_MARGIN` ou
 `UNEXPECTED_ERROR`, `atraso_detalhe_s` depois do termo. Com `termo_pendente`, o
-termo responde 400 e nenhum evento sai.
+termo responde 400 e nenhum evento sai. Com `sem_nascimento`, `sem_mae` ou
+`sem_endereco` (cliente sem dados, como os CPFs da api-dev), a consulta dá
+`SUCCESS`, mas a `pessoa_natural` do detalhe vem sem `birth_date`,
+`mother_name` ou `address`.
 
 Nos testes do core, o simulador roda em processo pelo `TestClient`
 (`tests/conftest.py`, fixtures `simulador_granatech` e `http_granatech`).
@@ -209,8 +212,10 @@ Cada uma está no código como `TODO(granatech)`:
 - dados do tomador quando a consulta vem sem eles: os CPFs gerados pela
   api-dev vêm sem nascimento, mãe e endereço, e o `dados-tomador` recusa
   (`data_nascimento must be a Date instance`, `nome_completo_mae must be a
-  string`). A homologação usa os dados de teste do exemplo da collection; a
-  jornada do agente ainda não pede ao cliente o que faltar;
+  string`). A homologação usa os dados de teste do exemplo da collection. Na
+  jornada, o nascimento ausente vem do que o cliente informou; sem mãe ou
+  endereço a conversa vai para o atendente antes da proposta (issue 25,
+  `docs/clt.md`). Falta saber se em produção a consulta sempre traz os três;
 - significado de `FIDUCIARY_INSTITUTION_NO_AUTHORIZATION` e
   `WORKER_MUST_CANCEL_RETURN_REQUEST` (por ora, alerta);
 - em que campo o `GET /propostas/{id}` devolve o status (por isso a aba não tem
