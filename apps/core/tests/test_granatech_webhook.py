@@ -41,23 +41,31 @@ EVENTO = {
 }
 
 
-def _api(service: AgentService, fabrica: Any = None, **extras: Any) -> TestClient:
+def _api(service: AgentService, fabrica: sessionmaker[Session], **extras: Any) -> TestClient:
     return TestClient(_montar_app(settings_granatech(**extras), service, fabrica))
 
 
-# ------------------------------------------------------------------ autenticação (sem banco)
+@pytest.fixture
+def api_pg(service: AgentService, fabrica: sessionmaker[Session]) -> TestClient:
+    return _api(service, fabrica)
 
 
-def test_sem_token_configurado_responde_503(service: AgentService) -> None:
-    api = _api(service, granatech_webhook_token=SecretStr(""))
+# ------------------------------------------------------------------ autenticação
+
+
+def test_sem_token_configurado_responde_503(
+    service: AgentService, fabrica: sessionmaker[Session]
+) -> None:
+    # Fora da fixture: é o único que sobe a aplicação com outra configuração.
+    api = _api(service, fabrica, granatech_webhook_token=SecretStr(""))
 
     resposta = api.post("/webhooks/granatech", json=EVENTO, headers={"x-webhook-token": ""})
 
     assert resposta.status_code == 503
 
 
-def test_token_errado_responde_401(service: AgentService) -> None:
-    resposta = _api(service).post(
+def test_token_errado_responde_401(api_pg: TestClient) -> None:
+    resposta = api_pg.post(
         "/webhooks/granatech", json=EVENTO, headers={"x-webhook-token": "errado"}
     )
 
@@ -65,12 +73,12 @@ def test_token_errado_responde_401(service: AgentService) -> None:
 
 
 def test_recusa_registra_o_diagnostico_sem_o_token(
-    service: AgentService, caplog: pytest.LogCaptureFixture
+    api_pg: TestClient, caplog: pytest.LogCaptureFixture
 ) -> None:
     """Token cru em Authorization (sem Bearer): 401, e o log diz o que mudar."""
 
     with caplog.at_level("WARNING", logger="saturday.web.api.granatech"):
-        resposta = _api(service).post(
+        resposta = api_pg.post(
             "/webhooks/granatech?origem=dev",
             json=EVENTO,
             headers={"authorization": TOKEN, "user-agent": "granatech-webhook/1.0"},
@@ -92,12 +100,10 @@ def test_recusa_registra_o_diagnostico_sem_o_token(
 
 
 def test_token_com_espaco_aparece_no_diagnostico(
-    service: AgentService, caplog: pytest.LogCaptureFixture
+    api_pg: TestClient, caplog: pytest.LogCaptureFixture
 ) -> None:
     with caplog.at_level("WARNING", logger="saturday.web.api.granatech"):
-        _api(service).post(
-            "/webhooks/granatech", json=EVENTO, headers={"x-webhook-token": TOKEN + " "}
-        )
+        api_pg.post("/webhooks/granatech", json=EVENTO, headers={"x-webhook-token": TOKEN + " "})
 
     [registro] = [r for r in caplog.records if r.getMessage() == "granatech_token_invalido"]
     assert registro.__dict__["token_com_espacos"] is True
@@ -105,8 +111,8 @@ def test_token_com_espaco_aparece_no_diagnostico(
     assert registro.__dict__["token_fontes"] == ["x-webhook-token"]
 
 
-def test_sem_token_na_requisicao_responde_401(service: AgentService) -> None:
-    assert _api(service).post("/webhooks/granatech", json=EVENTO).status_code == 401
+def test_sem_token_na_requisicao_responde_401(api_pg: TestClient) -> None:
+    assert api_pg.post("/webhooks/granatech", json=EVENTO).status_code == 401
 
 
 @pytest.mark.parametrize(
@@ -118,27 +124,18 @@ def test_sem_token_na_requisicao_responde_401(service: AgentService) -> None:
     ],
 )
 def test_token_aceito_nas_tres_formas(
-    service: AgentService, fabrica: sessionmaker[Session], url: str, cabecalhos: dict[str, str]
+    api_pg: TestClient, url: str, cabecalhos: dict[str, str]
 ) -> None:
-    api = _api(service, fabrica)
-
-    assert api.post(url, json=EVENTO, headers=cabecalhos).status_code == 200
+    assert api_pg.post(url, json=EVENTO, headers=cabecalhos).status_code == 200
 
 
-def test_corpo_que_nao_e_objeto_responde_400(service: AgentService) -> None:
-    resposta = _api(service).post(
-        "/webhooks/granatech", json=[1, 2], headers={"x-webhook-token": TOKEN}
-    )
+def test_corpo_que_nao_e_objeto_responde_400(api_pg: TestClient) -> None:
+    resposta = api_pg.post("/webhooks/granatech", json=[1, 2], headers={"x-webhook-token": TOKEN})
 
     assert resposta.status_code == 400
 
 
 # ------------------------------------------------------------------ fila e worker (Postgres)
-
-
-@pytest.fixture
-def api_pg(service: AgentService, fabrica: sessionmaker[Session]) -> TestClient:
-    return _api(service, fabrica)
 
 
 @pytest.fixture
