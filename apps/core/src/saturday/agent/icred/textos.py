@@ -10,13 +10,21 @@ from saturday.agent.icred.regras import eh_estimativa, total_na_conta
 
 # Versão dos textos de consentimento e de aceite, gravada com a prova.
 VERSAO = "icred-1"
+# O mesmo pedido de consulta quando o C6 já falou na conversa.
+VERSAO_DEPOIS_C6 = "icred-1-depois-c6"
 
-PEDIR_SIM = (
-    "Recebi o seu extrato. Antes de te passar o resultado, posso consultar também "
+# Só a abertura muda entre os dois pedidos. Mudou o texto, mude a versão: a
+# prova guarda os dois.
+_PEDIDO = (
+    "posso consultar também "
     "o iCred, um banco parceiro, para ver se ele tem uma condição melhor para "
     "você. Para isso vou usar o seu CPF e este número de telefone. Posso "
     "consultar? Responda *SIM* ou *NÃO*."
 )
+PEDIR_SIM = "Recebi o seu extrato. Antes de te passar o resultado, " + _PEDIDO
+# Depois do C6 o extrato não acabou de chegar.
+PEDIR_SIM_DEPOIS_C6 = "Antes de continuar, " + _PEDIDO
+PEDIDOS_SIM = {VERSAO: PEDIR_SIM, VERSAO_DEPOIS_C6: PEDIR_SIM_DEPOIS_C6}
 PEDIR_CPF = "Obrigado! Me envie o seu CPF, só os números, para eu fazer a consulta."
 CPF_INVALIDO = "Não consegui ler esse CPF. Envie os 11 números, por favor."
 CONSULTANDO = (

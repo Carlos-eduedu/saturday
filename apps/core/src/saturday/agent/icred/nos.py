@@ -84,6 +84,16 @@ def _valor_c6(state: AgentState) -> Decimal:
     return Decimal(str(resultado.get("troco_total") or 0))
 
 
+def _pedir_sim(state: AgentState) -> dict[str, Any]:
+    """Pede o SIM da consulta; a versão do texto fica no estado, para a prova."""
+
+    # O C6 já falou quando o cliente respondeu ao pedido de simulação dele
+    # (SIM ou NÃO): aí o pedido do iCred não abre com a chegada do extrato.
+    c6_falou = (state.get("cliente") or {}).get("c6_autorizado") is not None
+    versao = textos.VERSAO_DEPOIS_C6 if c6_falou else textos.VERSAO
+    return _falar({"etapa": "sim", "pedido": versao}, textos.PEDIDOS_SIM[versao], "icred:pedir_sim")
+
+
 def porta(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
     """Depois do cálculo: pede o SIM da consulta, uma vez por conversa."""
 
@@ -94,14 +104,14 @@ def porta(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
     # Extrato novo no meio da jornada do iCred: a pergunta aberta continua valendo,
     # senão o SIM seguinte responderia à oferta errada.
     if etapa in ("sim", "cpf"):
-        return _falar({"etapa": "sim"}, textos.PEDIR_SIM, "icred:pedir_sim")
+        return _pedir_sim(state)
     if etapa == "consultando":
         return _falar(dados, textos.CONSULTANDO, "icred:consultando")
     if etapa == "oferta":
         return _falar(dados, textos.oferta(list(dados.get("contratos") or [])), "icred:oferta")
     if etapa or not state.get("telefone"):
         return {}
-    return _falar({"etapa": "sim"}, textos.PEDIR_SIM, "icred:pedir_sim")
+    return _pedir_sim(state)
 
 
 def _resposta(texto: str) -> bool | None:
@@ -168,12 +178,14 @@ def _consultar(
     if cliente is None or not telefone:
         return _seguir(dados)
     conversa_id = _conversa_id(state)
+    # Conversa que recebeu o pedido antes de a versão ir para o estado viu o original.
+    versao = str(dados.get("pedido") or textos.VERSAO)
     consentimentos.gravar_prova(
         contexto.fabrica,
         conversa_id=conversa_id,
         tipo="icred_consulta",
-        texto_mostrado=textos.PEDIR_SIM,
-        versao=textos.VERSAO,
+        texto_mostrado=textos.PEDIDOS_SIM[versao],
+        versao=versao,
         resposta_literal=str(dados.pop("sim", "")),
         wamid=dados.pop("sim_wamid", None),
         cpf=cpf,
