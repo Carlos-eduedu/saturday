@@ -22,7 +22,6 @@ from saturday.dados.modelos import (
     Auditoria,
     ConsultaGranatech,
     Conversa,
-    Mensagem,
     PropostaGranatech,
     UsuarioPainel,
 )
@@ -107,9 +106,9 @@ def desfazer(sessao: Session, conversa: Conversa, usuario_id: uuid.UUID) -> bool
     ação desfeita precisa ser a última da conversa e o estado, o que ela deixou.
     Os alertas que a ação resolveu voltam a ficar abertos (docs/decisoes/0018).
 
-    Devolve se a conversa voltou à IA depois de o atendente ter escrito ao
-    cliente: aí houve atendimento humano, e quem chama deixa a marca dele no
-    histórico do grafo (docs/decisoes/0033).
+    Devolve se a conversa voltou à IA: quem chama confere se o atendente
+    escreveu ao cliente e, se sim, deixa a marca do atendimento no histórico
+    do grafo (docs/decisoes/0033).
     """
 
     ultima = sessao.scalars(
@@ -153,18 +152,7 @@ def desfazer(sessao: Session, conversa: Conversa, usuario_id: uuid.UUID) -> bool
         str(conversa.id),
         {"acao": ultima.acao, "alertas_reabertos": reabertos},
     )
-    # Só o assumir sai da IA: desfeito depois de o atendente escrever, é uma devolução.
-    return destino_atendimento == "ia" and bool(
-        sessao.scalar(
-            select(Mensagem.id)
-            .where(
-                Mensagem.conversa_id == conversa.id,
-                Mensagem.autor == "atendente",
-                Mensagem.criada_em >= ultima.criada_em,
-            )
-            .limit(1)
-        )
-    )
+    return destino_atendimento == "ia"
 
 
 def transferir(

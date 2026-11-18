@@ -8,6 +8,7 @@ CLT: Postgres real e o simulador da Granatech em processo.
 
 from __future__ import annotations
 
+import uuid
 from datetime import timedelta
 from types import ModuleType
 from typing import Any
@@ -57,21 +58,36 @@ def nova(_nova_fase5: Any) -> Any:  # noqa: F811
     return criar
 
 
-def _atendente_no_meio(jornada: Jornada, liberacao: str = "devolver") -> None:
+def _atendente_no_meio(
+    jornada: Jornada, liberacao: str = "devolver", *, escreve: bool = True
+) -> None:
     """Um atendente assume a conversa, e ela volta à IA por um dos três caminhos.
 
-    No `prazo`, quem devolve é o próprio turno seguinte do cliente.
+    Com `escreve`, ele fala com o cliente antes: só então houve atendimento
+    (issue 45). No `prazo`, a conversa assumida cai em handoff e quem devolve é
+    o próprio turno seguinte do cliente.
     """
 
     with abrir_sessao(jornada.fabrica) as sessao:
         usuario = UsuarioPainel(
-            email=f"{liberacao}@exemplo.test", nome="Ana", senha_hash="x", perfil="atendente"
+            email=f"{uuid.uuid4().hex[:8]}@exemplo.test",
+            nome="Ana",
+            senha_hash="x",
+            perfil="atendente",
         )
         sessao.add(usuario)
         sessao.flush()
         conversa = repositorios.buscar_conversa(sessao, jornada.id)
         assert conversa is not None
         atendimento.assumir(sessao, conversa, usuario.id)
+        if escreve:
+            repositorios.registrar_saida(
+                sessao,
+                conversa,
+                conteudo="Oi, sou a Ana.",
+                autor="atendente",
+                usuario_id=usuario.id,
+            )
         ids = conversa.id, usuario.id
     if liberacao == "devolver":
         jornada.servico.devolver(*ids, gestor=False)
@@ -158,6 +174,70 @@ def test_sim_com_a_consulta_aberta_depois_do_atendente_nao_faz_nada_de_novo(
     assert jornada.clt()["etapa"] == "consultando"
     assert len(_provas(jornada)) == 1
     assert len(simulador_granatech.CONSULTAS) == 1
+
+
+# ------------------------------------------- a marca só com fala do atendente (issue 45)
+
+
+@pytest.mark.parametrize("liberacao", LIBERACOES)
+def test_sim_vale_quando_a_conversa_volta_sem_o_atendente_ter_escrito(
+    nova: Any, simulador_granatech: ModuleType, liberacao: str
+) -> None:
+    jornada = nova()
+    jornada.roteiro(*ATE_CONSENTIMENTO)
+    _atendente_no_meio(jornada, liberacao, escreve=False)
+
+    # Ninguém falou com o cliente: o pedido ainda é a última coisa que ele viu.
+    assert jornada.falar("sim").answer == texto("consultando")
+    assert _provas(jornada) == [("consulta", texto("consentimento"), "sim")]
+    assert len(simulador_granatech.CONSULTAS) == 1
+
+
+def test_fala_de_um_atendente_conta_quando_outro_devolve_sem_escrever(
+    nova: Any, fabrica: sessionmaker[Session], simulador_granatech: ModuleType
+) -> None:
+    jornada = nova()
+    jornada.roteiro(*ATE_CONSENTIMENTO)
+    with abrir_sessao(fabrica) as sessao:
+        ana, bia = (
+            UsuarioPainel(email=f"{n}@exemplo.test", nome=n, senha_hash="x", perfil="atendente")
+            for n in ("ana", "bia")
+        )
+        sessao.add_all([ana, bia])
+        sessao.flush()
+        conversa = repositorios.buscar_conversa(sessao, jornada.id)
+        assert conversa is not None
+        atendimento.assumir(sessao, conversa, ana.id)
+        mensagem = repositorios.registrar_saida(
+            sessao, conversa, conteudo="Oi, sou a Ana.", autor="atendente", usuario_id=ana.id
+        )
+        # A entrega falhou: o cliente pode ter recebido, conta como escrita.
+        repositorios.marcar_envio(sessao, mensagem, wamid=None, status="failed")
+        atendimento.transferir(sessao, conversa, bia.id)
+        ids = conversa.id, bia.id
+
+    # Vale desde que a conversa saiu da IA, não só desde o último a assumir.
+    jornada.servico.devolver(*ids, gestor=False)
+
+    assert jornada.falar("sim").answer == texto("consentimento")
+    assert _provas(jornada) == []
+    assert _nada_consultado(fabrica, simulador_granatech)
+
+
+def test_fala_antiga_do_atendente_nao_conta_na_volta_seguinte(
+    nova: Any, simulador_granatech: ModuleType
+) -> None:
+    jornada = nova()
+    jornada.roteiro(*ATE_CONSENTIMENTO)
+    _atendente_no_meio(jornada)
+    assert jornada.falar("sim").answer == texto("consentimento")
+
+    # Segunda saída da IA, agora sem ninguém escrever: a fala da primeira vez
+    # já foi contada, e o pedido refeito é a última coisa que o cliente viu.
+    _atendente_no_meio(jornada, "prazo", escreve=False)
+
+    assert jornada.falar("sim").answer == texto("consultando")
+    assert _provas(jornada) == [("consulta", texto("consentimento"), "sim")]
 
 
 # ---------------------------------------------------------------- oferta

@@ -394,7 +394,7 @@ class AgentService:
                 self._devolver_sem_usuario(sessao, conversa, config)
             else:
                 # Já com a IA, ou conversa anterior à Fase 3, só com checkpoint.
-                self._liberar_handoff(config)
+                self._liberar_handoff(sessao, conversa, config)
         return {"conversation_id": conversation_id, "status": "in_progress"}
 
     def devolver(self, conversa_id: uuid.UUID, usuario_id: uuid.UUID, gestor: bool) -> str:
@@ -411,7 +411,7 @@ class AgentService:
             acoes.devolver(sessao, conversa, usuario_id, gestor)
             config = self.config(conversa.conversation_id)
             if self.estado_atual(config):
-                self._liberar_handoff(config)
+                self._liberar_handoff(sessao, conversa, config)
             return conversa.conversation_id
 
     def desfazer(self, conversa_id: uuid.UUID, usuario_id: uuid.UUID) -> None:
@@ -419,15 +419,17 @@ class AgentService:
 
         Se a conversa voltou à IA depois de o atendente ter escrito ao cliente,
         é uma devolução: o checkpoint recebe a mesma liberação, com a marca do
-        atendimento, sob a trava e antes do commit, como em `devolver`.
+        atendimento, sob a trava e antes do commit, como em `devolver`. Sem
+        fala do atendente, nada muda no checkpoint: ninguém atendeu.
         """
 
         with acoes.conversa_travada(self.fabrica, conversa_id) as (sessao, conversa):
             if not acoes.desfazer(sessao, conversa, usuario_id):
                 return
             config = self.config(conversa.conversation_id)
-            if self.estado_atual(config):
-                self._liberar_handoff(config)
+            estado = self.estado_atual(config)
+            if estado and self._fala_nova_de_atendente(sessao, conversa, estado):
+                self._liberar_handoff(sessao, conversa, config)
 
     def _devolver_sem_usuario(
         self, sessao: Session, conversa: Conversa, config: dict[str, Any]
@@ -438,7 +440,7 @@ class AgentService:
         """
 
         atendimento.devolver(sessao, conversa, None)
-        return self._liberar_handoff(config)
+        return self._liberar_handoff(sessao, conversa, config)
 
     def editar_ficha(self, conversation_id: str, campos: dict[str, Any]) -> None:
         """Grava na ficha os dados corrigidos pela equipe no painel.
@@ -563,7 +565,7 @@ class AgentService:
                 return dizer(comandos.JA_COM_IA)
             atendimento.devolver(sessao, conversa, None)
             if estado:
-                self._liberar_handoff(config)
+                self._liberar_handoff(sessao, conversa, config)
             return dizer(comandos.DEVOLVIDA)
         if nome not in ("/ir", "/cenario"):
             return dizer(comandos.DESCONHECIDO)
@@ -776,10 +778,37 @@ class AgentService:
     def _registro(self, sessao: Session, conversa: Conversa) -> RegistroPostgres:
         return RegistroPostgres(sessao, conversa, self.webhook, self.fabrica)
 
-    def _liberar_handoff(self, config: dict[str, Any]) -> dict[str, Any]:
-        # O SIM de depois não responde a pedido nem a oferta de antes do
-        # atendente (regra 3): `ultima_mensagem_agente` passa a ver a marca.
-        liberacao = {**self._atualizacao_liberacao(), "messages": [marca_de_atendimento_humano()]}
+    @staticmethod
+    def _fala_nova_de_atendente(
+        sessao: Session, conversa: Conversa | None, estado: dict[str, Any]
+    ) -> int:
+        """Id da última fala de atendente que nenhuma devolução contou; 0 se não há.
+
+        O atendente só escreve com a conversa assumida, e toda volta à IA
+        guarda no estado até onde contou (`fala_atendente`): fala nova é fala
+        escrita desde que a conversa saiu da IA, por qualquer atendente.
+        """
+
+        if conversa is None:
+            return 0
+        ultima = repositorios.ultima_fala_de_atendente(sessao, conversa.id)
+        return ultima if ultima > int(estado.get("fala_atendente") or 0) else 0
+
+    def _liberar_handoff(
+        self, sessao: Session, conversa: Conversa | None, config: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Devolve o checkpoint à IA; com fala de atendente, deixa a marca dela.
+
+        Com a marca, o SIM de depois não responde a pedido nem a oferta de
+        antes do atendente (regra 3, decisão 0033). Sem fala nenhuma (prazo
+        vencido, `/release`, devolver sem ter escrito) o pedido continua sendo
+        a última coisa que o cliente viu, e não há marca.
+        """
+
+        liberacao = self._atualizacao_liberacao()
+        fala = self._fala_nova_de_atendente(sessao, conversa, self.estado_atual(config))
+        if fala:
+            liberacao.update(messages=[marca_de_atendimento_humano()], fala_atendente=fala)
         self.graph.update_state(config, liberacao)
         return self.estado_atual(config)
 

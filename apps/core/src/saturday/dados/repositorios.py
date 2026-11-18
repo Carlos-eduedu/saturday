@@ -150,6 +150,21 @@ def registrar_saida(
     return linha.id
 
 
+def ultima_fala_de_atendente(sessao: Session, conversa_id: uuid.UUID) -> int:
+    """Id da última mensagem que um atendente escreveu ao cliente; 0 se nenhuma.
+
+    Conta a mensagem gravada, entregue ou não: a que falhou na entrega o
+    cliente pode ter recebido (decisão 0033).
+    """
+
+    ultima = sessao.scalar(
+        select(func.max(Mensagem.id)).where(
+            Mensagem.conversa_id == conversa_id, Mensagem.autor == "atendente"
+        )
+    )
+    return int(ultima or 0)
+
+
 def buscar_conversa(sessao: Session, conversation_id: str) -> Conversa | None:
     return sessao.scalar(select(Conversa).where(Conversa.conversation_id == conversation_id))
 

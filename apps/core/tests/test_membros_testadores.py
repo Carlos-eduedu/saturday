@@ -194,8 +194,9 @@ def test_humano_e_devolver_pelo_chat(service_pg, fabrica, conversa):
     from sqlalchemy import select
 
     from saturday.agent import comandos
+    from saturday.agent.state import ultima_mensagem_agente
     from saturday.agent.textos import MENSAGEM_REINICIADA
-    from saturday.dados import atendimento
+    from saturday.dados import atendimento, repositorios
     from saturday.dados.modelos import Alerta, Conversa
 
     membro = _membro(fabrica, testa=True)
@@ -226,6 +227,21 @@ def test_humano_e_devolver_pelo_chat(service_pg, fabrica, conversa):
         atendimento.assumir(s, linha, uuid.UUID(membro))
     assert _dizer(service_pg, conversa, "/devolver").answer == comandos.DEVOLVIDA
     assert _conversa_db(fabrica, conversa).atendimento == "ia"
+
+    # A marca de atendimento segue a regra de todos (issue 45): só existe se um
+    # atendente escreveu ao membro desde que a conversa saiu da IA.
+    def ultima_do_agente() -> str | None:
+        return ultima_mensagem_agente(service_pg.estado_atual(service_pg.config(conversa)))
+
+    assert ultima_do_agente() != ""
+    with abrir(fabrica) as s:
+        linha = s.scalar(select(Conversa).where(Conversa.conversation_id == conversa))
+        atendimento.assumir(s, linha, uuid.UUID(membro))
+        repositorios.registrar_saida(
+            s, linha, conteudo="Oi!", autor="atendente", usuario_id=uuid.UUID(membro)
+        )
+    _dizer(service_pg, conversa, "/devolver")
+    assert ultima_do_agente() == ""
 
 
 @pytest.mark.filterwarnings("ignore:You should not use the 'timeout' argument")

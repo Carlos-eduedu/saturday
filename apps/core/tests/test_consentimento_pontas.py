@@ -103,11 +103,12 @@ def _tipos_de_prova(jornada: Jornada) -> list[str]:
     return [tipo for tipo, _cpf, _resposta in jornada.provas()]
 
 
-def _atendente_no_meio(jornada: Jornada, liberacao: str) -> None:
+def _atendente_no_meio(jornada: Jornada, liberacao: str, *, escreve: bool = True) -> None:
     """Um atendente assume a conversa, e ela volta à IA por um dos três caminhos.
 
-    O que ele escreve pelo painel não entra no grafo: aqui basta a entrada e a
-    saída dele. No `prazo`, quem devolve é o próprio turno seguinte do cliente.
+    O que ele escreve pelo painel não entra no grafo, mas é o que faz da saída
+    dele um atendimento (issue 45): sem `escreve`, ninguém falou com o cliente.
+    No `prazo`, quem devolve é o próprio turno seguinte do cliente.
     """
 
     with abrir_sessao(jornada.fabrica) as sessao:
@@ -119,6 +120,14 @@ def _atendente_no_meio(jornada: Jornada, liberacao: str) -> None:
         conversa = repositorios.buscar_conversa(sessao, jornada.id)
         assert conversa is not None
         atendimento.assumir(sessao, conversa, usuario.id)
+        if escreve:
+            repositorios.registrar_saida(
+                sessao,
+                conversa,
+                conteudo="Oi, sou a Ana.",
+                autor="atendente",
+                usuario_id=usuario.id,
+            )
         ids = conversa.id, usuario.id
     if liberacao == "devolver":
         jornada.servico.devolver(*ids, gestor=False)
@@ -312,6 +321,97 @@ def test_duvida_depois_do_atendente_nao_traz_o_pedido_e_o_sim_seguinte_refaz(
     assert so_icred.falar("como funciona?").answer == RESPOSTA_DA_DUVIDA
     assert so_icred.falar("sim").answer == textos.PEDIR_SIM
     assert so_icred.provas() == []
+
+
+# Issue 45: o furo "devolução → dúvida → sim" que existia no CLT. No iCred a
+# guarda compara o texto da última fala, e a resposta à dúvida não é o pedido.
+def test_duvida_depois_do_atendente_e_o_sim_seguinte_refaz_o_pedido_do_cpf(
+    so_icred: Jornada, simulador_icred: ModuleType
+) -> None:
+    so_icred.extrato()
+    assert so_icred.falar("sim").answer == textos.PEDIR_CPF
+    _atendente_no_meio(so_icred, "devolver")
+
+    # No pedido de CPF a dúvida já recebe o pedido de novo (docs/icred.md).
+    assert so_icred.falar("como funciona?").answer == textos.PEDIR_CPF
+    assert so_icred.provas() == []
+    assert simulador_icred.CHAMADAS == []
+
+    assert so_icred.falar(CPF).answer == textos.CONSULTANDO
+
+
+def test_duvida_depois_do_atendente_e_o_sim_seguinte_refaz_a_oferta(
+    so_icred: Jornada, simulador_icred: ModuleType
+) -> None:
+    so_icred.ate_a_consulta()
+    so_icred.resultado("COM_OFERTA", [{**simulador_icred.PRODUTO_NOVO, "liberado": 50000.0}])
+    oferta = so_icred.ultima_saida()
+    _atendente_no_meio(so_icred, "devolver")
+
+    assert so_icred.falar("como funciona?").answer == RESPOSTA_DA_DUVIDA
+    resposta = so_icred.falar("sim")
+
+    assert (resposta.status, resposta.answer) == ("answered", oferta)
+    assert _tipos_de_prova(so_icred) == ["icred_consulta"]
+
+    aceite = so_icred.falar("sim")
+    assert (aceite.status, aceite.handoff_reason) == ("handoff", "icred_aceite")
+
+
+@pytest.mark.parametrize("bancos", ["os_dois", "so_c6"])
+def test_duvida_depois_do_atendente_e_o_sim_seguinte_nao_autoriza_o_c6(
+    request: pytest.FixtureRequest, simulador_c6: ModuleType, bancos: str
+) -> None:
+    jornada: Jornada = request.getfixturevalue(bancos)
+    assert jornada.extrato().answer == CONSENTIMENTO_C6
+    _atendente_no_meio(jornada, "devolver")
+
+    assert jornada.falar("como funciona?").answer == RESPOSTA_DA_DUVIDA
+    jornada.falar("sim")
+
+    assert jornada.provas() == []
+    assert ("POST", ROTA_SIMULACAO) not in simulador_c6.CHAMADAS
+    assert "c6_autorizado" not in jornada.estado()["cliente"]
+
+
+# Issue 45: sem fala de atendente não houve atendimento, e não há marca.
+@pytest.mark.parametrize("liberacao", LIBERACOES)
+def test_so_icred_sim_vale_quando_a_conversa_volta_sem_o_atendente_ter_escrito(
+    so_icred: Jornada, liberacao: str
+) -> None:
+    assert so_icred.extrato().answer == textos.PEDIR_SIM
+    _atendente_no_meio(so_icred, liberacao, escreve=False)
+
+    assert so_icred.falar("sim").answer == textos.PEDIR_CPF
+    assert so_icred.falar(CPF).answer == textos.CONSULTANDO
+    assert so_icred.provas() == [("icred_consulta", CPF, "sim")]
+
+
+@pytest.mark.parametrize("liberacao", LIBERACOES)
+def test_so_icred_sim_a_oferta_vale_quando_a_conversa_volta_sem_o_atendente_ter_escrito(
+    so_icred: Jornada, simulador_icred: ModuleType, liberacao: str
+) -> None:
+    so_icred.ate_a_consulta()
+    so_icred.resultado("COM_OFERTA", [{**simulador_icred.PRODUTO_NOVO, "liberado": 50000.0}])
+    _atendente_no_meio(so_icred, liberacao, escreve=False)
+
+    aceite = so_icred.falar("sim")
+
+    assert (aceite.status, aceite.handoff_reason) == ("handoff", "icred_aceite")
+    assert so_icred.provas()[-1] == ("icred_aceite", CPF, "sim")
+
+
+# O que a devolução zera no C6 não depende da fala do atendente (issue 45).
+@pytest.mark.parametrize("liberacao", LIBERACOES)
+def test_c6_devolvido_sem_o_atendente_escrever_continua_sem_o_pedido(
+    so_c6: Jornada, simulador_c6: ModuleType, liberacao: str
+) -> None:
+    assert so_c6.extrato().answer == CONSENTIMENTO_C6
+    _atendente_no_meio(so_c6, liberacao, escreve=False)
+
+    assert so_c6.falar("sim").answer == RESPOSTA_DA_DUVIDA
+    assert so_c6.provas() == []
+    assert ("POST", ROTA_SIMULACAO) not in simulador_c6.CHAMADAS
 
 
 def test_os_dois_sim_depois_do_atendente_refaz_o_pedido_do_icred(

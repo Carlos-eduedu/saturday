@@ -64,6 +64,9 @@ class AgentState(MessagesState, total=False):
     # Consulta e oferta do iCred no ramo INSS: etapa, consulta e pacote (ver agent/icred).
     icred: dict[str, Any]
     handoff_em: str | None
+    # Id da última mensagem de atendente já contada por uma devolução à IA: só
+    # fala mais nova que essa deixa a marca de atendimento (decisão 0033).
+    fala_atendente: int
     # Sem reducer de propósito: a lista é substituída a cada gravação.
     message_ids_recentes: list[str]
     # Resposta já dada por `message_id`, para o repetido devolver o mesmo texto.
