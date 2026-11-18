@@ -89,11 +89,14 @@ histórico pula mensagem vazia) e a fala do atendente continua fora do grafo.
 No C6 a devolução já apagava o pedido (`aguardando`) e a oferta
 (`oferta_pendente`): o "sim" de depois não autoriza a simulação nem aceita o
 contrato novo, e vai para a resposta do modelo; o C6 não mostra o pedido nem a
-oferta de novo (só com um extrato novo). O ramo CLT não usa essa guarda: lá o
-SIM dado depois da devolução ainda responde ao pedido de antes do atendente.
-Limite conhecido: o "Desfazer" do painel (`painel/acoes.desfazer`, até 15
-segundos depois de assumir) devolve a conversa à IA sem passar por
-`_liberar_handoff`, portanto sem a marca.
+oferta de novo (só com um extrato novo). O ramo CLT lê a mesma marca desde a
+issue 44 (`docs/clt.md`, "Atendente no meio").
+O "Desfazer" do painel (`AgentService.desfazer`, até 15 segundos depois de
+assumir) conta como atendimento humano quando o atendente escreveu ao cliente
+antes de desfazer e a conversa volta à IA: passa pela mesma `_liberar_handoff`
+e deixa a marca. Se ele não escreveu nada, não há marca e o "sim" seguinte
+vale para o pedido que o cliente viu por último
+([decisão 0033](decisoes/0033-sim-so-vale-para-o-ultimo-pedido-visto.md)).
 
 **CPF digitado diferente do extrato (issue 42).** Com CPF legível no extrato
 (`icred.cpf` no estado), um CPF válido e diferente dele não é consultado e não

@@ -137,6 +137,15 @@ uma entrega fora das fases.
   nem oferta de antes do atendente; no pedido de CPF a afirmação curta ("ok")
   recebe o pedido de novo sem ir à triagem; e a ficha mostra como desistida a consulta do titular descartado. Ver
   `docs/icred.md`.
+- O SIM só vale para o último pedido que o cliente viu, em todos os ramos
+  (issue 44, docs/decisoes/0033): no CLT, depois da devolução pelo atendente, o
+  "sim" não grava prova, não abre consulta, não aceita a oferta nem cria a
+  proposta; a etapa mostra o pedido de novo e só o "sim" seguinte vale
+  (`_refazer_pedido`, em `agent/clt/nos.py`). O "Desfazer" do painel deixa a
+  mesma marca quando o atendente escreveu ao cliente antes de desfazer.
+  **Limite conhecido:** no CLT a guarda vale só para a primeira resposta depois
+  da devolução (outra fala da IA no meio, como a resposta a uma dúvida, ainda
+  deixa o "sim" seguinte valer); falta a decisão do dono.
 - `migrations/` fica em `apps/core/migrations/`, não na raiz: as migrações
   descrevem os modelos daquele pacote e precisam do ambiente `uv` dele para
   importar. Desvio consciente da árvore desenhada na especificação.

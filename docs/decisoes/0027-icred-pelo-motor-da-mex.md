@@ -155,3 +155,8 @@ atendente devolver a conversa à IA o "sim" não aceita pedido nem oferta de
 antes dele: a IA mostra de novo, e só o "sim" seguinte vale. E no pedido de
 CPF só a afirmação curta ("ok", "sim", "tá bom") recebe o pedido de novo sem
 passar pela triagem; o resto vai para o classificador, como antes.
+
+**Nota de 2026-11-18 (issue 44).** A regra "o SIM só vale para o último pedido
+que o cliente viu" passou a valer em todos os ramos, com o mesmo mecanismo da
+marca, e o "Desfazer" do painel deixou de ser limite: ver a
+[decisão 0033](0033-sim-so-vale-para-o-ultimo-pedido-visto.md).

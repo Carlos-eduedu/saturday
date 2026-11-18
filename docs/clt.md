@@ -78,6 +78,36 @@ Uma resposta não reconhecida faz a pergunta se repetir; dois erros seguidos no
 mesmo dado levam a handoff. Texto com `?` vai para a FAQ sem mudar a etapa. Em
 `nao_elegivel`, só a FAQ responde, e só um atendente reabre a conversa.
 
+## Atendente no meio
+
+Um SIM só vale para o último pedido que o cliente viu
+([decisão 0033](decisoes/0033-sim-so-vale-para-o-ultimo-pedido-visto.md)). A
+devolução à IA deixa no histórico a marca de atendimento humano (a mesma do
+iCred, `docs/icred.md`); enquanto ela for a última mensagem do agente, o "sim"
+não vale e a etapa mostra o pedido de novo, com a chave da mensagem e os
+valores do estado. Só o "sim" seguinte vale, com a prova do texto mostrado. A
+conferência fica num ponto só: `_refazer_pedido`, chamado pelo nó `clt` antes
+da etapa (`agent/clt/nos.py`).
+
+| Etapa e passo | "Sim" logo depois da devolução |
+| --- | --- |
+| `consentimento` / `sim` | Pedido de autorização de novo; sem prova, consulta ou cota |
+| `oferta` | A oferta de novo; os dados da proposta não começam |
+| `aceite` / `sim` | O resumo de novo, montado do estado; sem prova, intenção ou `POST` |
+| `consentimento` / `confirmar_celular` | A confirmação do celular de novo |
+| `dados_proposta` / `mae`, `endereco`, `titular` | A confirmação de novo |
+| `nova_conta` / `titular` | A confirmação de novo |
+| `recontato` / `optin` | O pedido de aviso de novo; sem opt-in nem recontato |
+| `triagem` (perguntas de sim ou não) | A pergunta de novo |
+| `consultando`, `proposta`, `formalizacao` | Nada muda: a etapa espera o evento |
+
+"Não", pergunta, pedido de mudança e resposta não reconhecida seguem para a
+etapa como sempre. A guarda vale para a primeira resposta depois da devolução:
+se o cliente primeiro recebe outra fala da IA (pergunta, "não", resposta não
+reconhecida, anexo) e depois responde "sim", o "sim" vale. O prazo do handoff e
+a rota `/release` deixam a marca mesmo sem ninguém ter falado com o cliente
+(limites registrados na decisão 0033). Testes em `tests/test_clt_devolucao.py`.
+
 ## Turnos de sistema
 
 `AgentService.continuar(conversation_id, evento)` roda o grafo sem mensagem do
@@ -170,7 +200,9 @@ Granatech simulada ([decisão 0024](decisoes/0024-comandos-do-membro-testador.md
 A leitura e os textos ficam em `agent/comandos.py`; quem executa é o
 `AgentService._executar_comando`, antes do silêncio com humano. O `/ir` para
 `consultando` ou `oferta` vira o turno de sistema `membro:ir`, que segue do
-pedido do SIM pelo mesmo `_autorizou` da jornada. Os testes estão em
+pedido do SIM pelo mesmo `_autorizou` da jornada. O `/ir` que para numa etapa
+põe a pergunta mostrada no histórico do grafo: é o último pedido que o membro
+viu, mesmo logo depois de um `/devolver`. Os testes estão em
 `tests/test_membros_testadores.py`.
 
 ## Testes
