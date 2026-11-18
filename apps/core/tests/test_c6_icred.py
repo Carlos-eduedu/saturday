@@ -334,6 +334,25 @@ def test_pedido_do_c6_aberto_nao_ganha_prova_pelo_sim_dado_a_oferta_do_icred(
     assert ("POST", ROTA_SIMULACAO) not in simulador_c6.CHAMADAS
 
 
+def test_duvida_na_oferta_do_icred_nao_refaz_o_pedido_do_c6_que_ficou_aberto(
+    jornada: Jornada, fakes: Fakes, simulador_icred: ModuleType
+) -> None:
+    jornada.extrato()
+    jornada.falar("não")
+    assert jornada.falar("sim").answer == textos.CONSULTANDO
+    fakes.llm.extrato = {**fakes.llm.extrato, "cpf": OUTRO_TITULAR}
+    assert _um_pedido_de_sim(jornada.extrato().answer) == CONSENTIMENTO_C6
+    jornada.resultado("COM_OFERTA", [{**simulador_icred.PRODUTO_NOVO, "liberado": 50000.0}])
+
+    # A dúvida é respondida; o pedido do C6 não volta a ser o último mostrado.
+    duvida = jornada.falar("tem seguro?").answer or ""
+    assert not any(pedido in duvida for pedido in PEDIDOS_DE_SIM)
+
+    aceite = jornada.falar("sim")
+    assert (aceite.status, aceite.handoff_reason) == ("handoff", "icred_aceite")
+    assert "simulacao_c6" not in [tipo for tipo, _versao, _texto in _provas(jornada)]
+
+
 def test_so_com_o_icred_o_extrato_reenviado_refaz_a_pergunta_e_o_sim_seguinte_vale(
     fabrica: sessionmaker[Session],
     http_icred: TestClient,

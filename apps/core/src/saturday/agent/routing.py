@@ -42,6 +42,10 @@ def after_classify(state: AgentState) -> str:
         return "clt"
     if state.get("intent") == "saudacao":
         return "boas_vindas"
+    if (state.get("icred") or {}).get("etapa") in ESPERANDO_CLIENTE:
+        # A dúvida veio com um pedido do iCred aberto: pergunta ou oferta mais
+        # antiga do C6 não é refeita nem aceita por cima dele.
+        return "generate_answer"
     if state.get("aguardando"):
         return "collect_customer_data"
     if state.get("oferta_pendente"):

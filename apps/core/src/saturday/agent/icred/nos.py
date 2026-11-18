@@ -124,6 +124,10 @@ def porta(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
     # Extrato novo no meio da jornada do iCred: o aviso e a oferta são refeitos
     # aqui, na vez dele. O pedido de SIM sem resposta foi cancelado em
     # `extrato_novo` e sai de novo no fim desta função.
+    if etapa in ("sim", "cpf"):
+        # Não deve chegar aqui; se chegar, refaz a pergunta em vez de deixar um
+        # pedido antigo esperando o SIM de outra mensagem.
+        return _pedir_sim(state)
     if etapa == "consultando":
         return _falar(dados, textos.CONSULTANDO, "icred:consultando")
     if etapa in ("oferta", "oferta_suspensa"):
