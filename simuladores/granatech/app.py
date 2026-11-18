@@ -89,7 +89,21 @@ PRODUTOS = [("AA17", 17), ("AA25", 25), ("AAA36", 36), ("AAA48", 48)]
 
 # Fora da API real: `cenario` na abertura da consulta (membro testador do
 # Saturday, decisão 0024). O simulador manda este status sozinho depois do termo.
-STATUS_DO_CENARIO = {"sucesso": "SUCCESS", "sem_margem": "NO_MARGIN", "erro": "UNEXPECTED_ERROR"}
+STATUS_DO_CENARIO = {
+    "sucesso": "SUCCESS",
+    "sem_margem": "NO_MARGIN",
+    "erro": "UNEXPECTED_ERROR",
+    "sem_nascimento": "SUCCESS",
+    "sem_mae": "SUCCESS",
+    "sem_endereco": "SUCCESS",
+}
+# Cliente sem dados: a consulta dá certo, mas a pessoa vem sem este campo
+# (como as consultas da api-dev).
+CAMPO_AUSENTE = {
+    "sem_nascimento": "birth_date",
+    "sem_mae": "mother_name",
+    "sem_endereco": "address",
+}
 TERMO_PENDENTE = "termo_pendente"
 
 
@@ -247,11 +261,9 @@ async def detalhe_consulta(id_consulta: str, request: Request) -> Any:
         return _erro(404, "consulta não encontrada")
     if not _pronta(consulta):
         return {"id": id_consulta, "margens": [], "pessoa_natural": None}
-    return {
-        "id": id_consulta,
-        "margens": _margens(),
-        "pessoa_natural": {**PESSOA, "document": consulta["cpf"]},
-    }
+    pessoa = {**PESSOA, "document": consulta["cpf"]}
+    pessoa.pop(CAMPO_AUSENTE.get(str(consulta.get("cenario")), ""), None)
+    return {"id": id_consulta, "margens": _margens(), "pessoa_natural": pessoa}
 
 
 @app.get(PREFIXO + "/consulta-saldo")
