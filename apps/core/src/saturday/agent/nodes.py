@@ -21,6 +21,7 @@ from saturday.agent.coleta import (
     parse_data_nascimento,
 )
 from saturday.agent.context import AgentContext
+from saturday.agent.icred.nos import extrato_novo
 from saturday.agent.state import AgentState
 from saturday.agent.textos import (
     CONSENTIMENTO_C6,
@@ -387,6 +388,7 @@ def read_statement(state: AgentState, runtime: Runtime[AgentContext]) -> dict[st
         "c6_novo": None,
         "oferta_pendente": False,
         "resposta_oferta": None,
+        "icred": extrato_novo(state.get("icred")),
     }
 
 

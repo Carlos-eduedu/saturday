@@ -233,3 +233,122 @@ def test_icred_que_nao_ganha_da_portabilidade_entrega_a_portabilidade(
 
     assert PORTABILIDADE in jornada.ultima_saida()
     assert OFERTA_C6 not in jornada.ultima_saida()
+
+
+# ------------------------------- o SIM vale só para o último pedido mostrado
+
+OUTRO_TITULAR = "52998224725"
+PROVA_C6 = ("simulacao_c6", "2026-11-16", CONSENTIMENTO_C6)
+PROVA_ICRED_DEPOIS = ("icred_consulta", "icred-1-depois-c6", PEDIDO_DEPOIS_DO_C6)
+
+
+def test_extrato_novo_cancela_o_pedido_do_icred_e_o_sim_vai_para_o_c6(
+    jornada: Jornada, fakes: Fakes, simulador_icred: ModuleType
+) -> None:
+    completo = dict(fakes.llm.extrato)
+    fakes.llm.extrato = {**completo, "numeroBeneficio": None, "baseCalculo": None}
+    assert _um_pedido_de_sim(jornada.extrato().answer) == PEDIDO_ORIGINAL
+    fakes.llm.extrato = completo
+    assert _um_pedido_de_sim(jornada.extrato().answer) == CONSENTIMENTO_C6
+
+    # O último pedido mostrado é o do C6: o SIM simula no C6 e mais nada.
+    assert OFERTA_C6 in (jornada.falar("sim").answer or "")
+    assert _provas(jornada) == [PROVA_C6]
+    assert simulador_icred.CHAMADAS == []
+
+    # O iCred pergunta de novo na vez dele, já com a abertura de depois do C6.
+    fakes.jev.resultado = resultado_jev(resposta_oferta="recusa")
+    assert _um_pedido_de_sim(jornada.falar("esse não quero").answer) == PEDIDO_DEPOIS_DO_C6
+    assert jornada.falar("sim").answer == textos.CONSULTANDO
+    assert _provas(jornada) == [PROVA_C6, PROVA_ICRED_DEPOIS]
+
+
+def test_extrato_de_outro_titular_cancela_o_pedido_do_icred(
+    jornada: Jornada, fakes: Fakes, simulador_icred: ModuleType
+) -> None:
+    jornada.extrato()
+    assert _um_pedido_de_sim(jornada.falar("não").answer) == PEDIDO_DEPOIS_DO_C6
+    fakes.llm.extrato = {**fakes.llm.extrato, "cpf": OUTRO_TITULAR}
+    assert _um_pedido_de_sim(jornada.extrato().answer) == CONSENTIMENTO_C6
+
+    assert OFERTA_C6 in (jornada.falar("sim").answer or "")
+    assert _provas(jornada) == [PROVA_C6]
+    assert simulador_icred.CHAMADAS == []
+
+    fakes.jev.resultado = resultado_jev(resposta_oferta="recusa")
+    assert _um_pedido_de_sim(jornada.falar("esse não quero").answer) == PEDIDO_DEPOIS_DO_C6
+    assert jornada.falar("sim").answer == textos.CONSULTANDO
+    assert _provas(jornada) == [PROVA_C6, PROVA_ICRED_DEPOIS]
+    # A consulta sai com o CPF do extrato que vale agora.
+    (remota,) = simulador_icred.CONSULTAS.values()
+    assert remota["cpf"] == OUTRO_TITULAR
+
+
+def test_extrato_novo_suspende_a_oferta_do_icred_ate_ela_ser_mostrada_de_novo(
+    jornada: Jornada, fakes: Fakes, simulador_icred: ModuleType
+) -> None:
+    jornada.extrato()
+    jornada.falar("não")
+    assert jornada.falar("sim").answer == textos.CONSULTANDO
+    jornada.resultado("COM_OFERTA", [{**simulador_icred.PRODUTO_NOVO, "liberado": 50000.0}])
+    oferta_icred = jornada.ultima_saida()
+    assert oferta_icred.startswith("Consultei o iCred")
+    fakes.llm.extrato = {**fakes.llm.extrato, "cpf": OUTRO_TITULAR}
+    assert _um_pedido_de_sim(jornada.extrato().answer) == CONSENTIMENTO_C6
+
+    # O SIM responde ao C6, não à oferta do iCred que ficou para trás.
+    resposta = jornada.falar("sim")
+
+    assert OFERTA_C6 in (resposta.answer or "")
+    assert [tipo for tipo, _versao, _texto in _provas(jornada)] == [
+        "icred_consulta",
+        "simulacao_c6",
+    ]
+    # Recusado o contrato novo, a oferta do iCred volta e só então pode ser aceita.
+    fakes.jev.resultado = resultado_jev(resposta_oferta="recusa")
+    assert jornada.falar("esse não quero").answer == oferta_icred
+    aceite = jornada.falar("sim")
+    assert (aceite.status, aceite.handoff_reason) == ("handoff", "icred_aceite")
+
+
+def test_pedido_do_c6_aberto_nao_ganha_prova_pelo_sim_dado_a_oferta_do_icred(
+    jornada: Jornada, fakes: Fakes, simulador_icred: ModuleType, simulador_c6: ModuleType
+) -> None:
+    jornada.extrato()
+    jornada.falar("não")
+    assert jornada.falar("sim").answer == textos.CONSULTANDO
+    # Consulta aberta: o extrato de outro titular faz o C6 pedir o SIM dele.
+    fakes.llm.extrato = {**fakes.llm.extrato, "cpf": OUTRO_TITULAR}
+    assert _um_pedido_de_sim(jornada.extrato().answer) == CONSENTIMENTO_C6
+    jornada.resultado("COM_OFERTA", [{**simulador_icred.PRODUTO_NOVO, "liberado": 50000.0}])
+    assert jornada.ultima_saida().startswith("Consultei o iCred")
+
+    # O último pedido mostrado é a oferta do iCred: o SIM é o aceite dela.
+    aceite = jornada.falar("sim")
+
+    assert (aceite.status, aceite.handoff_reason) == ("handoff", "icred_aceite")
+    assert [tipo for tipo, _versao, _texto in _provas(jornada)] == [
+        "icred_consulta",
+        "icred_aceite",
+    ]
+    assert ("POST", ROTA_SIMULACAO) not in simulador_c6.CHAMADAS
+
+
+def test_so_com_o_icred_o_extrato_reenviado_refaz_a_pergunta_e_o_sim_seguinte_vale(
+    fabrica: sessionmaker[Session],
+    http_icred: TestClient,
+    fakes: Fakes,
+    simulador_icred: ModuleType,
+) -> None:
+    fakes.llm.extrato = dados_extrato()
+    jornada = Jornada(fabrica, http_icred, fakes, simulador_icred)
+    assert jornada.extrato().answer == PEDIDO_ORIGINAL
+    assert jornada.falar("sim").answer == textos.PEDIR_CPF
+
+    # Extrato de novo depois do SIM e antes do CPF: a pergunta volta ao começo.
+    assert jornada.extrato().answer == PEDIDO_ORIGINAL
+    assert _provas(jornada) == []
+
+    assert jornada.falar("sim, autorizo").answer == textos.PEDIR_CPF
+    assert jornada.falar(CPF).answer == textos.CONSULTANDO
+    assert _provas(jornada) == [("icred_consulta", "icred-1", PEDIDO_ORIGINAL)]

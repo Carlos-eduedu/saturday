@@ -7,6 +7,10 @@ e aceite. A gravação da proposta é do atendente nesta fase.
 Etapas em ``state["icred"]["etapa"]``: ``sim`` → ``cpf`` → ``consultando`` →
 ``oferta`` → ``fim``. "Seguir" é voltar ao caminho de antes do iCred: o cálculo
 roda de novo e a conversa recebe a oferta de portabilidade ou o handoff dele.
+
+Um SIM só vale para o último pedido mostrado (nota de 2026-11-18 na decisão
+0027): extrato novo cancela o pedido de SIM ou de CPF sem resposta e põe a
+oferta em ``oferta_suspensa``, até a `porta` perguntar de novo na vez do iCred.
 """
 
 from __future__ import annotations
@@ -84,6 +88,22 @@ def _valor_c6(state: AgentState) -> Decimal:
     return Decimal(str(resultado.get("troco_total") or 0))
 
 
+def extrato_novo(dados: dict[str, Any] | None) -> dict[str, Any] | None:
+    """O estado do iCred depois de um extrato novo aceito.
+
+    O que o iCred perguntou deixa de esperar resposta: outra pergunta (o SIM do
+    C6, por exemplo) pode sair antes de a `porta` rodar, e o SIM seguinte é
+    dela. Consulta aberta e jornada encerrada ficam como estão.
+    """
+
+    etapa = (dados or {}).get("etapa")
+    if etapa in ("sim", "cpf"):
+        return {}
+    if etapa == "oferta":
+        return {**(dados or {}), "etapa": "oferta_suspensa"}
+    return dados
+
+
 def _pedir_sim(state: AgentState) -> dict[str, Any]:
     """Pede o SIM da consulta; a versão do texto fica no estado, para a prova."""
 
@@ -101,13 +121,13 @@ def porta(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
         return {}
     dados = dict(state.get("icred") or {})
     etapa = dados.get("etapa")
-    # Extrato novo no meio da jornada do iCred: a pergunta aberta continua valendo,
-    # senão o SIM seguinte responderia à oferta errada.
-    if etapa in ("sim", "cpf"):
-        return _pedir_sim(state)
+    # Extrato novo no meio da jornada do iCred: o aviso e a oferta são refeitos
+    # aqui, na vez dele. O pedido de SIM sem resposta foi cancelado em
+    # `extrato_novo` e sai de novo no fim desta função.
     if etapa == "consultando":
         return _falar(dados, textos.CONSULTANDO, "icred:consultando")
-    if etapa == "oferta":
+    if etapa in ("oferta", "oferta_suspensa"):
+        dados["etapa"] = "oferta"
         return _falar(dados, textos.oferta(list(dados.get("contratos") or [])), "icred:oferta")
     if etapa or not state.get("telefone"):
         return {}
