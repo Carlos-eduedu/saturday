@@ -659,6 +659,10 @@ def clt(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
         refeito = _refazer_pedido(t, etapa)
         if refeito is not None:
             return refeito
+    if state.get("attachments") and etapa == "aceite":
+        # O passo do resumo também se chama `sim`, mas a pergunta dele é o
+        # resumo, não o pedido da consulta (issue 46).
+        return proposta.pedir_aceite(t)
     passo = str(t.clt.get("passo"))
     chave = PERGUNTAS.get(passo)
     if state.get("attachments") and chave and not variaveis(chaves()[chave]):

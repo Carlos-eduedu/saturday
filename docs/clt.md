@@ -78,6 +78,12 @@ Uma resposta não reconhecida faz a pergunta se repetir; dois erros seguidos no
 mesmo dado levam a handoff. Texto com `?` vai para a FAQ sem mudar a etapa. Em
 `nao_elegivel`, só a FAQ responde, e só um atendente reabre a conversa.
 
+Anexo no meio da jornada não é lido: a resposta é `sem_documento` com a
+pergunta do passo (quando ela é um texto sem variáveis). No resumo da proposta
+(`aceite`), cujo passo também se chama `sim`, o anexo recebe o resumo de novo,
+montado do estado, e é esse o texto da prova do "sim" seguinte (issue 46; antes
+saía o pedido de autorização da consulta). Testes em `tests/test_clt_anexo.py`.
+
 ## Atendente no meio
 
 Um SIM só vale para o último pedido que o cliente viu
