@@ -7,8 +7,8 @@ decisões estão em `docs/decisoes/0027-icred-pelo-motor-da-mex.md`.
 
 1. O cliente manda o extrato. Depois do cálculo da portabilidade (com contrato
    elegível ou com `sem_portabilidade`), o nó `icred_porta` pede o SIM para
-   consultar o iCred, uma vez por conversa. Conversa sem telefone não é
-   consultada.
+   consultar o iCred, uma vez por conversa (de novo só para o extrato de outro
+   titular). Conversa sem telefone não é consultada.
 2. SIM: o agente pede o CPF, a não ser que a conversa já o tenha (o fluxo do
    C6, decisão 0026, guarda em `cliente.cpf`). Com o CPF válido, grava a
    prova `icred_consulta` e abre a consulta (`acao: consultar`,
@@ -58,27 +58,54 @@ versão. Só com o iCred ligado nada muda.
 O contrato novo recusado não entra na comparação: o iCred é comparado só com o
 troco da portabilidade. Testes em `apps/core/tests/test_c6_icred.py`.
 
-**O SIM vale só para o último pedido mostrado.** Um extrato novo aceito
-(inclusive de outro titular) desfaz o que o iCred esperava do cliente
-(`extrato_novo`, em `agent/icred/nos.py`, chamado por `read_statement`):
+**O SIM vale só para o último pedido mostrado.** Vale também só com o iCred
+ligado. São duas guardas.
+
+A primeira: o SIM da consulta, o CPF e o SIM da oferta só são aceitos quando a
+última mensagem do agente foi o pedido correspondente (`ultima_mensagem_agente`,
+em `agent/state.py`, a mesma função que o C6 usa no SIM dele). Se outra fala
+entrou no meio (extrato recusado por estar ilegível ou ser de outro mês,
+mensagem vazia, dúvida respondida), o pedido é refeito e nenhuma prova é
+gravada; o SIM seguinte vale. No pedido de CPF, o que é refeito é o pedido de
+SIM, do começo. NÃO continua valendo em qualquer momento.
+
+A segunda: um extrato novo desfaz o que o iCred esperava do cliente
+(`extrato_novo`, em `agent/icred/nos.py`, chamado por `read_statement`,
+inclusive quando o extrato termina em handoff dentro da leitura: espécie não
+atendida ou conferência que não fechou). Do mesmo titular:
 
 - pedido de SIM ou de CPF sem resposta: cancelado. Se o extrato faz o C6 pedir
   o SIM dele, o SIM seguinte é do C6 e só grava a prova do C6. O iCred pergunta
   de novo quando a conversa chega à `icred_porta`, com a abertura que couber;
 - oferta do iCred sem resposta: fica em `oferta_suspensa` e não pode ser
-  aceita até a `icred_porta` mostrá-la de novo;
+  aceita até a `icred_porta` mostrá-la de novo. Se o extrato terminou em
+  handoff, ela não volta: a conversa está com o atendente;
 - consulta aberta (`consultando`): nada muda. Se o extrato não gera outra
   pergunta, o cliente recebe de novo o aviso de que a consulta está em
-  andamento; se gera (o SIM do C6 para outro titular), essa pergunta sai e o
-  resultado da consulta chega depois, como oferta do iCred. Se a oferta do
-  iCred chega com o pedido do C6 ainda aberto, o SIM seguinte é o aceite dela
-  e não grava prova do C6; uma dúvida nesse meio é respondida sem refazer o
-  pedido do C6 nem aceitar oferta mais antiga (`after_classify`, em
-  `agent/routing.py`).
+  andamento; se gera (o SIM do C6), essa pergunta sai e o resultado da consulta
+  chega depois, como oferta do iCred. Se a oferta do iCred chega com o pedido
+  do C6 ainda aberto, o SIM seguinte é o aceite dela e não grava prova do C6;
+  uma dúvida nesse meio é respondida sem refazer o pedido do C6 nem aceitar
+  oferta mais antiga (`after_classify`, em `agent/routing.py`).
 
-Extrato recusado (ilegível, de outro mês) não cancela nada. A oferta do iCred
-suspensa por um extrato de outro titular continua sendo a da consulta do
-titular anterior quando volta a ser mostrada: isso não foi decidido.
+**Extrato de outro titular: descarta.** O titular do iCred fica em `icred.cpf`
+no estado: o CPF do extrato quando o pedido de SIM saiu e, depois, o CPF
+consultado. Extrato com CPF legível e diferente desse zera o estado do iCred,
+em qualquer etapa (também depois de encerrado): a oferta do titular anterior
+não volta, nenhuma prova sai com o CPF dele e o novo titular recebe o pedido de
+SIM quando a conversa chega à `icred_porta`. Extrato sem CPF legível é tratado
+como do mesmo titular.
+
+A consulta aberta do titular anterior deixa de ser a da conversa. A linha em
+`consultas_icred` fica, como `desistida` (o estado que o prazo de espera já
+usava; sem migração): o resultado que chegar não é gravado nem vira turno
+(log `icred_resultado_de_consulta_desistida`), e o prazo de espera não a
+procura nem abre alerta. Evento de resultado ou de prazo que chegue ao nó sem
+corresponder à consulta vigente é ignorado (log `icred_evento_ignorado`, com
+`conversa_ref`). A ficha do painel mostra a última consulta da conversa: até o
+novo titular ter a dele, a seção "Consulta no iCred" mostra a do titular
+anterior ("Aguardando o resultado" se ela estava aberta, o pacote se já tinha
+terminado).
 
 O agente nunca chama `/gravar`, `acao: gravar` nem `aceitar_mudanca`. A comissão
 é descartada em `bancos/icred/normalizacao.py`. A oferta não cita seguro

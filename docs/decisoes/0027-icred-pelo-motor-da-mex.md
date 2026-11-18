@@ -141,4 +141,8 @@ SIM vale só para o último pedido mostrado. Extrato novo, inclusive de outro
 titular, cancela o pedido de SIM do iCred ainda sem resposta, e o iCred
 pergunta de novo na vez dele; nenhuma prova `icred_consulta` é gravada por um
 SIM dado a um pedido do C6, nem o contrário. Os caminhos estão em
-`docs/icred.md`.
+`docs/icred.md`. Fechando a issue no mesmo dia: extrato de outro titular
+descarta o que o iCred tinha do titular anterior (pedido, consulta aberta e
+oferta) e o iCred recomeça do pedido de SIM para o novo; e o SIM que não
+responde à última mensagem do agente refaz o pedido em vez de gravar a prova,
+como o C6 já fazia.

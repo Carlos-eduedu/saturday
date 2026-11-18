@@ -107,8 +107,10 @@ uma entrega fora das fases.
   no link de assinatura (seção Pendências da 0027 e "Continua sem resposta" em
   `docs/icred.md`, sem `TODO` no código). Com o C6 ligado junto, o pedido de
   SIM do iCred vem depois do C6 com abertura própria, e um SIM só vale para
-  o último pedido mostrado: extrato novo cancela o pedido do iCred sem resposta
-  (issue 22). Ver `docs/icred.md`.
+  o último pedido mostrado: extrato novo cancela o pedido do iCred sem resposta,
+  extrato de outro titular descarta consulta e oferta do titular anterior, e
+  o SIM que não responde à última mensagem do agente refaz o pedido, também só
+  com o iCred ligado (issue 22). Ver `docs/icred.md`.
 - `migrations/` fica em `apps/core/migrations/`, não na raiz: as migrações
   descrevem os modelos daquele pacote e precisam do ambiente `uv` dele para
   importar. Desvio consciente da árvore desenhada na especificação.
