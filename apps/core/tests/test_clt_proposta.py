@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 from test_clt_jornada import (  # noqa: F401 - fixtures
+    ATE_CONSENTIMENTO,
     Jornada,
     _ate_oferta,
     brasilapi,
@@ -232,6 +233,79 @@ def test_timeout_sem_proposta_vai_para_handoff_sem_novo_post(
 
 
 # ---------------------------------------------------------------- dados e aceite
+
+
+def _ate_oferta_sem(jornada: Jornada, simulador: ModuleType, cenario: str) -> None:
+    """Até a oferta, com a consulta do simulador no cenário de dado ausente."""
+
+    jornada.roteiro(*ATE_CONSENTIMENTO, "SIM")
+    simulador.CONSULTAS[jornada.consulta()]["cenario"] = cenario
+    jornada.evento_consulta("SUCCESS")
+    jornada.roteiro("1")
+
+
+def _propostas_gravadas(fabrica: sessionmaker[Session]) -> int:
+    with abrir_sessao(fabrica) as sessao:
+        return int(sessao.scalar(select(func.count()).select_from(PropostaGranatech)) or 0)
+
+
+def test_sem_nascimento_na_granatech_usa_o_que_o_cliente_informou(
+    nova: Any, simulador_granatech: ModuleType
+) -> None:
+    jornada = nova()
+    _ate_oferta_sem(jornada, simulador_granatech, "sem_nascimento")
+    jornada.roteiro(*DADOS_ATE_RESUMO)
+
+    assert jornada.falar("SIM").answer == texto("proposta_enviada")
+    assert _posts_de_proposta(simulador_granatech) == 1
+    tomador = simulador_granatech.PROPOSTAS[_proposta(jornada)]["dados_tomador"]
+    # "15/05/1990", respondido pelo cliente na identificação.
+    assert tomador["data_nascimento"] == "1990-05-15T00:00:00.000Z"
+
+
+def test_sem_nascimento_em_lugar_nenhum_vai_para_handoff_antes_da_proposta(
+    nova: Any, fabrica: sessionmaker[Session], simulador_granatech: ModuleType
+) -> None:
+    jornada = nova()
+    _ate_oferta_sem(jornada, simulador_granatech, "sem_nascimento")
+    clt = jornada.clt()
+    del clt["dados"]["nascimento"]
+    jornada.servico.graph.update_state(jornada.servico.config(jornada.id), {"clt": clt})
+
+    resposta = jornada.falar("quero")
+    assert resposta.status == "handoff" and resposta.handoff_reason == "dados_divergentes"
+    assert _posts_de_proposta(simulador_granatech) == 0
+    assert _propostas_gravadas(fabrica) == 0
+
+
+@pytest.mark.parametrize("cenario", ["sem_mae", "sem_endereco"])
+def test_sem_mae_ou_endereco_vai_para_handoff_antes_da_proposta(
+    nova: Any, fabrica: sessionmaker[Session], simulador_granatech: ModuleType, cenario: str
+) -> None:
+    jornada = nova()
+    _ate_oferta_sem(jornada, simulador_granatech, cenario)
+
+    resposta = jornada.falar("quero")
+    assert resposta.status == "handoff" and resposta.handoff_reason == "dados_divergentes"
+    assert _posts_de_proposta(simulador_granatech) == 0
+    assert _propostas_gravadas(fabrica) == 0
+
+
+def test_nascimento_perdido_depois_do_resumo_nao_cria_a_proposta(
+    nova: Any, fabrica: sessionmaker[Session], simulador_granatech: ModuleType
+) -> None:
+    # A conferência vale de novo na hora do POST, não só no começo dos dados.
+    jornada = nova()
+    _ate_oferta_sem(jornada, simulador_granatech, "sem_nascimento")
+    jornada.roteiro(*DADOS_ATE_RESUMO)
+    clt = jornada.clt()
+    del clt["dados"]["nascimento"]
+    jornada.servico.graph.update_state(jornada.servico.config(jornada.id), {"clt": clt})
+
+    resposta = jornada.falar("SIM")
+    assert resposta.status == "handoff" and resposta.handoff_reason == "dados_divergentes"
+    assert _posts_de_proposta(simulador_granatech) == 0
+    assert _propostas_gravadas(fabrica) == 0
 
 
 def test_mae_divergente_vai_para_handoff(nova: Any) -> None:

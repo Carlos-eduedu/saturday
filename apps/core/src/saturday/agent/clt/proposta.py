@@ -57,6 +57,21 @@ def _pessoa(t: Turno) -> Pessoa | None:
     return _detalhe(t).pessoa
 
 
+def _tomador_completo(t: Turno, pessoa: Pessoa | None) -> bool:
+    """Nascimento, mãe e endereço: sem um deles o banco recusa os dados do tomador.
+
+    Mãe e endereço só vêm da Granatech: o agente não pede ao cliente. O
+    nascimento que ela não devolver é o que o cliente informou na identificação.
+    """
+
+    return (
+        pessoa is not None
+        and bool(pessoa.nome_mae)
+        and pessoa.endereco is not None
+        and (pessoa.nascimento is not None or bool(t.dados.get("nascimento")))
+    )
+
+
 def _linha_endereco(pessoa: Pessoa) -> str:
     e = pessoa.endereco
     if e is None:
@@ -110,7 +125,7 @@ def iniciar(t: Turno) -> dict[str, Any]:
         # Proposta automática desligada: um especialista segue daqui.
         return t.handoff("aceite_clt", texto("aceite"))
     pessoa = _pessoa(t)
-    if pessoa is None or not pessoa.nome_mae or pessoa.endereco is None:
+    if pessoa is None or not _tomador_completo(t, pessoa):
         return t.handoff("dados_divergentes")
     return t.perguntar("dados_proposta", "mae", mae=pessoa.nome_mae)
 
@@ -266,6 +281,10 @@ def seguir_proposta(t: Turno) -> dict[str, Any]:
     """
 
     detalhe = _detalhe(t)
+    pessoa = detalhe.pessoa
+    if pessoa is None or not _tomador_completo(t, pessoa):
+        # Antes da intenção e do POST: proposta sem os dados do tomador não nasce.
+        return t.handoff("dados_divergentes")
     oferta = t.clt["oferta"]
     vinculo = next(v for v in detalhe.vinculos if v.id_margem == oferta["id_margem"])
     produto = next(p for p in vinculo.produtos if p.id == oferta["id_produto"])
@@ -289,10 +308,9 @@ def seguir_proposta(t: Turno) -> dict[str, Any]:
         return t.handoff("granatech_indisponivel")
 
     t.clt.update(etapa="proposta", passo=None, erros=0, proposta=id_proposta)
-    if detalhe.pessoa is None:
-        return t.handoff("dados_divergentes")
     tomador = montar_dados_tomador(
-        pessoa=detalhe.pessoa,
+        pessoa=pessoa,
+        nascimento=t.dados.get("nascimento"),
         cpf=t.dados["cpf"],
         nome=t.dados["nome"],
         estado_civil=t.dados["estado_civil"],

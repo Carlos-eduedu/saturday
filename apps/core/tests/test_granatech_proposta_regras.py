@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date
+from typing import Any
 
 import pytest
 
@@ -70,3 +72,22 @@ def test_dados_tomador() -> None:
     assert corpo["estado_civil"] == "CASADO"
     assert corpo["tipo_dados_bancarios"] == "dados_bancarios"
     assert corpo["banco_detalhe"]["banco_codigo"] == "341"
+
+    # O nascimento informado pelo cliente só entra quando a Granatech não devolve o dela.
+    conta = {"banco_codigo": "341", "agencia": "1", "numero_conta": "2", "digito_conta": "3"}
+    comuns: dict[str, Any] = {
+        "cpf": "00189004967",
+        "nome": "Cliente",
+        "estado_civil": "CASADO",
+        "celular": "11987654321",
+        "conta": {**conta, "tipo_conta": "conta_corrente"},
+        "nascimento": "1985-01-02",
+    }
+    assert (
+        montar_dados_tomador(pessoa=pessoa, **comuns)["data_nascimento"]
+        == "1990-05-15T00:00:00.000Z"
+    )
+    sem = replace(pessoa, nascimento=None)
+    assert (
+        montar_dados_tomador(pessoa=sem, **comuns)["data_nascimento"] == "1985-01-02T00:00:00.000Z"
+    )

@@ -413,25 +413,27 @@ def montar_dados_tomador(
     estado_civil: str,
     celular: str,
     conta: dict[str, str],
+    nascimento: str | None = None,
 ) -> dict[str, Any]:
     """Corpo do ``POST /propostas/{id}/dados-tomador``.
 
     Mãe, nascimento e endereço vêm da Granatech (confirmados pelo cliente); nome,
-    estado civil, celular e conta vêm da conversa. ``conta`` traz ``banco_codigo``,
+    estado civil, celular e conta vêm da conversa. ``nascimento`` (ISO, informado
+    pelo cliente) só entra quando a Granatech não devolveu o dela. ``conta`` traz ``banco_codigo``,
     ``agencia``, ``digito_agencia``, ``numero_conta``, ``digito_conta`` e
     ``tipo_conta`` (``conta_corrente`` ou ``conta_poupanca``).
     """
 
     endereco = pessoa.endereco
+    if pessoa.nascimento is not None:
+        nascimento = pessoa.nascimento.isoformat()
     return {
         "nome_completo": nome,
         # TODO(granatech): valores aceitos de `estado_civil` (enviamos em maiúsculas).
         "estado_civil": estado_civil,
         # A api-dev pede "Date instance" (400 com só a data); o exemplo da collection
         # de contratação manda meia-noite UTC.
-        "data_nascimento": (
-            f"{pessoa.nascimento.isoformat()}T00:00:00.000Z" if pessoa.nascimento else None
-        ),
+        "data_nascimento": f"{nascimento}T00:00:00.000Z" if nascimento else None,
         "telefone_endereco": celular,
         "nome_completo_mae": pessoa.nome_mae,
         "cep": endereco.cep if endereco else None,

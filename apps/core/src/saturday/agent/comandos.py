@@ -17,7 +17,16 @@ from saturday.privacidade import mascarar_cpf, mascarar_data, mascarar_email, ma
 # Etapas do CLT aonde o `/ir` chega, na ordem da jornada.
 DESTINOS = ("triagem", "empresa", "identificacao", "consentimento", "consultando", "oferta")
 # Resultado que o simulador da Granatech dá à próxima consulta.
-CENARIOS = ("sucesso", "sem_margem", "erro", "termo_pendente")
+CENARIOS = (
+    "sucesso",
+    "sem_margem",
+    "erro",
+    "termo_pendente",
+    # Consulta com sucesso, mas a pessoa vem sem o dado.
+    "sem_nascimento",
+    "sem_mae",
+    "sem_endereco",
+)
 
 SEM_SIMULADOR = (
     "Este comando só funciona com a Granatech simulada. Aqui a consulta é real: "
