@@ -290,8 +290,10 @@ def pedido_de_mudanca(texto: str) -> Pedido | None:
 
 # ---------------------------------------------------------------- dados da proposta
 
+# A Granatech não aceita união estável: no documento a pessoa segue solteira
+# (decisão do usuário, 2026-11-19).
 _ESTADOS_CIVIS = (
-    (r"\buniao estavel\b|\bamasiad|\bmoro junto|\bmoramos junto", "UNIAO_ESTAVEL"),
+    (r"\buniao estavel\b|\bamasiad|\bmoro junto|\bmoramos junto", "SOLTEIRO"),
     (r"\bsolteir", "SOLTEIRO"),
     (r"\bcasad", "CASADO"),
     (r"\bdivorciad", "DIVORCIADO"),

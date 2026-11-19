@@ -269,10 +269,8 @@ def test_simulacao_vazia_e_erro() -> None:
         normalizar_simulacao({})
 
 
-def test_id_da_proposta_aceita_os_tres_formatos() -> None:
+def test_id_da_proposta_no_item_da_listagem() -> None:
     assert id_da_proposta({"id": 10}) == "10"
-    assert id_da_proposta({"id_proposta": "p1"}) == "p1"
-    assert id_da_proposta({"data": {"id": "p2"}}) == "p2"
     assert id_da_proposta({"ok": True}) is None
 
 
@@ -287,7 +285,8 @@ def test_id_da_proposta_aceita_o_texto_puro_da_api_dev() -> None:
 
 def test_itens_da_listagem() -> None:
     assert itens_da_listagem([{"id": 1}]) == [{"id": 1}]
-    assert itens_da_listagem({"data": [{"id": 2}]}) == [{"id": 2}]
+    pagina = {"total": 1, "pagina_atual": 1, "proxima_pagina": None, "itens": [{"id": 2}]}
+    assert itens_da_listagem(pagina) == [{"id": 2}]
     assert itens_da_listagem({"nada": 1}) == []
 
 

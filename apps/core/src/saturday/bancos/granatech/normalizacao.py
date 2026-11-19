@@ -298,40 +298,27 @@ def normalizar_simulacao(dados: dict[str, Any]) -> Simulacao:
 
 
 def itens_da_listagem(dados: object) -> list[dict[str, Any]]:
-    """Itens de uma listagem paginada.
+    """Itens de uma listagem: a paginada traz ``itens`` (resposta da Granatech,
+    2026-11-19); o ``GET /bancos`` devolve a lista pura."""
 
-    TODO(granatech): formato real das listagens; aceita lista pura ou um
-    objeto com `data`, `dados`, `items` ou `content`.
-    """
-
+    if isinstance(dados, dict):
+        dados = dados.get("itens")
     if isinstance(dados, list):
         return [i for i in dados if isinstance(i, dict)]
-    if isinstance(dados, dict):
-        for chave in ("data", "dados", "items", "content"):
-            valor = dados.get(chave)
-            if isinstance(valor, list):
-                return [i for i in valor if isinstance(i, dict)]
     return []
 
 
 def id_da_proposta(dados: object) -> str | None:
     """Id da proposta na resposta do ``POST /propostas``.
 
-    A api-dev devolve só o id, como texto JSON (``"29ee4653-..."``, rodada 10 da
-    homologação, 2026-11-13). TODO(granatech): confirmar; aceita também `id`,
-    `id_proposta` ou `data.id` num objeto.
+    Vem só o id, como texto JSON (``"29ee4653-..."``, rodada 10 da homologação;
+    confirmado pela Granatech em 2026-11-19). Num item da listagem, é o ``id``.
     """
 
     if isinstance(dados, str):
         return dados.strip() or None
-    if not isinstance(dados, dict):
-        return None
-    for valor in (dados.get("id"), dados.get("id_proposta")):
-        if valor:
-            return str(valor)
-    interno = dados.get("data")
-    if isinstance(interno, dict) and interno.get("id"):
-        return str(interno["id"])
+    if isinstance(dados, dict) and dados.get("id"):
+        return str(dados["id"])
     return None
 
 
@@ -429,7 +416,7 @@ def montar_dados_tomador(
         nascimento = pessoa.nascimento.isoformat()
     return {
         "nome_completo": nome,
-        # TODO(granatech): valores aceitos de `estado_civil` (enviamos em maiúsculas).
+        # Aceitos: SOLTEIRO, CASADO, DIVORCIADO, SEPARADO e VIUVO (Granatech, 2026-11-19).
         "estado_civil": estado_civil,
         # A api-dev pede "Date instance" (400 com só a data); o exemplo da collection
         # de contratação manda meia-noite UTC.

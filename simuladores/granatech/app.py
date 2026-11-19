@@ -6,8 +6,8 @@ dispara eventos de webhook (inclusive duplicados e fora de ordem) e programa
 falhas: 401, 500 ou timeout, com a opção de executar a operação antes de falhar
 (o caso "incerto" de uma proposta).
 
-Formatos ainda não confirmados pela Granatech (listagens, resposta do POST de
-proposta) seguem uma forma plausível e estão marcados com TODO(granatech).
+Listagens, resposta do POST de proposta e webhook de proposta seguem o formato
+confirmado pela Granatech em 2026-11-19.
 
 Rodar local:
     uvicorn app:app --app-dir simuladores/granatech --port 8200
@@ -234,9 +234,8 @@ async def listar_consultas(request: Request) -> Any:
     if falha is not None:
         return falha
     cpf = request.query_params.get("valor_filtro", "")
-    # TODO(granatech): formato real da listagem por CPF.
-    return {
-        "data": [
+    return _pagina(
+        [
             {
                 "id": identificador,
                 "cpf": consulta["cpf"],
@@ -246,6 +245,20 @@ async def listar_consultas(request: Request) -> Any:
             for identificador, consulta in CONSULTAS.items()
             if consulta["cpf"] == cpf
         ]
+    )
+
+
+def _pagina(itens: list[Any]) -> dict[str, Any]:
+    """Listagem paginada no formato real; o simulador devolve tudo numa página."""
+
+    return {
+        "total": len(itens),
+        "pagina_atual": 1,
+        "tamanho_pagina": max(len(itens), 10),
+        "total_paginas": 1 if itens else 0,
+        "pagina_anterior": None,
+        "proxima_pagina": None,
+        "itens": itens,
     }
 
 
@@ -406,8 +419,7 @@ async def criar_proposta(request: Request) -> Any:
     }
     if falha is not None:
         return falha
-    # TODO(granatech): formato real da resposta (id, id_proposta ou data.id).
-    return {"id": identificador}
+    return identificador
 
 
 @app.get(PREFIXO + "/propostas/lista")
@@ -416,8 +428,7 @@ async def listar_propostas(request: Request) -> Any:
     if falha is not None:
         return falha
     termo_busca = request.query_params.get("termo_busca", "")
-    # TODO(granatech): formato real da listagem de propostas.
-    return {"data": [p for p in PROPOSTAS.values() if termo_busca in (p["cpf"], p["id"])]}
+    return _pagina([p for p in PROPOSTAS.values() if termo_busca in (p["cpf"], p["id"])])
 
 
 @app.get(PREFIXO + "/propostas/{id_proposta}")
@@ -506,12 +517,13 @@ def montar_evento(pedido: dict[str, Any]) -> dict[str, Any]:
                 proposta["status"] = pedido["status"]
             if pedido.get("tipo_notificacao") == "REFAZER_SEGURANCA_IDENTIDADE":
                 proposta["versao_link"] = int(proposta.get("versao_link", 1)) + 1
+        # Formato da homologação, que vale em produção: a notificação vai em
+        # `status`; sem notificação, vai o status da proposta.
         return {
-            "tipo": "proposta",
-            "status_da_proposta": pedido.get("status"),
-            "tipo_notificacao": pedido.get("tipo_notificacao"),
+            "tipo": "PROPOSTA",
+            "status": pedido.get("tipo_notificacao") or pedido.get("status"),
             "id_proposta": pedido.get("id"),
-            "informacoes": pedido.get("informacoes"),
+            "cpf": proposta["cpf"] if proposta else None,
         }
     consulta = CONSULTAS.get(str(pedido.get("id")), {})
     if pedido.get("status") == "SUCCESS" and consulta:

@@ -260,8 +260,6 @@ def test_success_sem_cliente_so_atualiza_o_status(
         "NO_MARGIN",
         "USED",
         "UNEXPECTED_ERROR",
-        "FIDUCIARY_INSTITUTION_NO_AUTHORIZATION",
-        "WORKER_MUST_CANCEL_RETURN_REQUEST",
     ],
 )
 def test_cada_status_de_consulta_e_aplicado(
@@ -279,12 +277,7 @@ def test_cada_status_de_consulta_e_aplicado(
     _rodar_worker(fabrica, service, cliente, settings)
 
     assert _consulta(fabrica, aberta.id_externo).status == status
-    atencao = {
-        "UNEXPECTED_ERROR",
-        "FIDUCIARY_INSTITUTION_NO_AUTHORIZATION",
-        "WORKER_MUST_CANCEL_RETURN_REQUEST",
-    }
-    assert bool(_alertas(fabrica)) == (status in atencao)
+    assert bool(_alertas(fabrica)) == (status == "UNEXPECTED_ERROR")
 
 
 def test_consulta_com_id_consulta_da_api_dev_e_aplicada(
@@ -435,7 +428,7 @@ def _proposta(fabrica: sessionmaker[Session], id_externo: str) -> PropostaGranat
         ("PENDING_PAYMENT", "SUCESSO_SEGURANCA_IDENTIDADE", "PENDING_PAYMENT"),
         ("PENDING_REFORMALIZATION", "REFAZER_SEGURANCA_IDENTIDADE", "PENDING_REFORMALIZATION"),
         ("REPROVED", "REPROVADO", "REPROVED"),
-        ("CANCELED", "CANCELADO", "CANCELED"),
+        ("CANCELED", "PROPOSTA_CANCELADA", "CANCELED"),
         ("PAYED", "PAGO", "PAYED"),
         ("PENDING_PAYMENT", "PROPOSTA_PAGA", "PAYED"),
     ],

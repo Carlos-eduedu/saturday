@@ -304,7 +304,7 @@ def _seguir_consulta(t: Turno, *antes: str) -> dict[str, Any]:
         return _pos_consulta(t, detalhe)
     if status == "NO_MARGIN":
         return t.nao_elegivel("nao_elegivel_sem_margem")
-    if status in ("USED", "UNEXPECTED_ERROR") or status.startswith(("FIDUCIARY", "WORKER")):
+    if status in ("USED", "UNEXPECTED_ERROR"):
         return t.handoff("consulta_com_erro")
     return t.responder(*antes)
 

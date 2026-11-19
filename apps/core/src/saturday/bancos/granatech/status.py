@@ -17,15 +17,14 @@ CONSULTA: dict[str, int] = {
     "NO_MARGIN": FINAL,
     "USED": FINAL,
     "UNEXPECTED_ERROR": FINAL,
-    # TODO(granatech): significado destes dois; por ora viram alerta.
-    "FIDUCIARY_INSTITUTION_NO_AUTHORIZATION": FINAL,
-    "WORKER_MUST_CANCEL_RETURN_REQUEST": FINAL,
 }
 
 # A documentação lista os status em inglês, mas a api-dev manda o webhook de
 # consulta em português (worker do dev, 2026-11-13: rodadas 6 a 8 da
-# homologação). Só os nomes já vistos; o resto continua virando alerta.
-# TODO(granatech): lista completa dos status de consulta em português.
+# homologação). O PDF "Consultas - Webhook" (2026-11-19) lista os sete status só
+# em inglês; aqui ficam os nomes em português já vistos, e o resto vira alerta.
+# TODO(granatech): nomes em português de PENDING, PROCESSING, NO_MARGIN, USED e
+# UNEXPECTED_ERROR.
 SINONIMOS_CONSULTA = {
     "AGUARDANDO_AUTORIZACAO_DO_CLIENTE": "AWAITING_CLIENT_AUTHORIZATION",
     "CONCLUIDO": "SUCCESS",
@@ -39,13 +38,7 @@ def normalizar_consulta(status: str) -> str:
 
 
 # Consultas que não servem para reaproveitar: a próxima precisa ser nova.
-CONSULTA_SEM_REAPROVEITAMENTO = frozenset(
-    {
-        "UNEXPECTED_ERROR",
-        "FIDUCIARY_INSTITUTION_NO_AUTHORIZATION",
-        "WORKER_MUST_CANCEL_RETURN_REQUEST",
-    }
-)
+CONSULTA_SEM_REAPROVEITAMENTO = frozenset({"UNEXPECTED_ERROR"})
 # Status que pedem atenção humana logo que chegam.
 CONSULTA_ALERTA = CONSULTA_SEM_REAPROVEITAMENTO
 
@@ -67,8 +60,9 @@ NOTIFICACAO_PAGA = frozenset({"PAGO", "PROPOSTA_PAGA"})
 REGRESSOES_LEGITIMAS = frozenset({"REFAZER_SEGURANCA_IDENTIDADE", "FALHA_PAGAMENTO"})
 
 
-# A api-dev manda o webhook de proposta com o nome da notificação em `status` e
-# sem `tipo_notificacao` (rodada 11 da homologação, 2026-11-13). Cada
+# O webhook de proposta vem com o nome da notificação em `status` e sem
+# `tipo_notificacao` (rodada 11 da homologação, 2026-11-13; a Granatech confirmou
+# em 2026-11-19 que produção manda igual à homologação). Cada
 # notificação tem um status só, na tabela de docs/granatech-homologacao/
 # webhook-propostas.md.
 STATUS_DA_NOTIFICACAO = {
