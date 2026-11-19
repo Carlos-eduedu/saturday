@@ -310,7 +310,7 @@ def test_nao_na_confirmacao_depois_do_atendente_continua_valendo(nova: Any) -> N
 
     resposta = jornada.falar("não")
 
-    assert (resposta.status, resposta.handoff_reason) == ("handoff", "dados_divergentes")
+    assert resposta.answer == texto("pedir_mae")
 
 
 def test_sim_depois_do_atendente_refaz_a_confirmacao_do_celular(nova: Any) -> None:

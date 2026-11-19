@@ -171,12 +171,16 @@ produto tem seguro, então esse corpo só roda em produção).
 - **Dados:** antes de qualquer pergunta, confere os três dados do tomador que
   o banco exige: nascimento, nome da mãe e endereço. O nascimento é o da
   Granatech; se ela não devolver, vale o que o cliente informou na
-  identificação. Mãe e endereço só vêm da Granatech: o agente não pede ao
-  cliente ([decisão 0029](decisoes/0029-dados-do-tomador-conferidos-antes-da-proposta.md)). Faltando qualquer um, handoff
-  `dados_divergentes` antes de criar a proposta; a mesma conferência roda de
-  novo no SIM do resumo, antes da prova, da intenção e do POST. Depois confirma
-  o nome da mãe e o endereço da Granatech (se divergirem, handoff), pede o
-  estado civil e a conta, um dado por mensagem: banco por nome ou código (lista
+  identificação; sem nenhum dos dois, handoff `dados_divergentes`
+  ([decisão 0029](decisoes/0029-dados-do-tomador-conferidos-antes-da-proposta.md)).
+  Confirma o nome da mãe e o endereço da Granatech; se faltarem, ou se o
+  cliente disser que estão errados, ele informa: o nome completo da mãe, e o
+  endereço pelo CEP (BrasilAPI, com confirmação), número e complemento; CEP não
+  achado, pede rua, bairro, cidade e UF
+  ([decisão 0034](decisoes/0034-mae-e-endereco-informados-pelo-cliente.md)). A
+  conferência dos três dados roda de novo no SIM do resumo, antes da prova, da
+  intenção e do POST. Depois pede o estado civil ("união estável" grava
+  `SOLTEIRO`) e a conta, um dado por mensagem: banco por nome ou código (lista
   `GET /bancos` com cache de 1 dia), tipo, agência, conta com dígito e "a conta
   está no seu CPF?".
 - **Aceite:** o resumo traz valores, seguro e a conta mascarada. O SIM é gravado

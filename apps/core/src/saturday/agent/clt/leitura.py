@@ -213,6 +213,66 @@ def nome_completo(texto: str) -> str | None:
     return " ".join(partes)
 
 
+def cep(texto: str) -> str | None:
+    digitos = _digitos(texto)
+    return digitos if digitos and len(digitos) == 8 else None
+
+
+_UFS = frozenset(
+    [
+        "AC",
+        "AL",
+        "AP",
+        "AM",
+        "BA",
+        "CE",
+        "DF",
+        "ES",
+        "GO",
+        "MA",
+        "MT",
+        "MS",
+        "MG",
+        "PA",
+        "PB",
+        "PR",
+        "PE",
+        "PI",
+        "RJ",
+        "RN",
+        "RS",
+        "RO",
+        "RR",
+        "SC",
+        "SP",
+        "SE",
+        "TO",
+    ]
+)
+
+
+def uf(texto: str) -> str | None:
+    sigla = texto.strip().upper()
+    return sigla if sigla in _UFS else None
+
+
+def numero_endereco(texto: str) -> str | None:
+    """Número da casa; "sem número" vira ``S/N``."""
+
+    if re.search(r"\bsem n|\bs/?n\b", normalizar(texto)):
+        return "S/N"
+    numero = texto.strip()
+    return numero if 0 < len(numero) <= 10 else None
+
+
+def complemento(texto: str) -> str:
+    """Complemento do endereço; "não", "não tem" ou "nenhum" viram vazio."""
+
+    if sim_ou_nao(texto) is False or normalizar(texto).startswith("sem "):
+        return ""
+    return " ".join(texto.split())[:60]
+
+
 def data_nascimento(texto: str, hoje: date) -> date | None:
     lida = parse_data_nascimento(texto, hoje)
     return date.fromisoformat(lida[0]) if lida else None

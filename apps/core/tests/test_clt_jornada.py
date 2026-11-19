@@ -67,12 +67,16 @@ class FakeBrasilAPI:
         self.dados: dict[str, Any] | None = dict(EMPRESA_OK)
         self.erro = False
         self.chamadas = 0
+        self.ceps: dict[str, dict[str, str]] = {}
 
     def buscar_empresa(self, cnpj: str, *, conversa_id: Any = None) -> dict[str, Any] | None:
         self.chamadas += 1
         if self.erro:
             raise ErroBrasilAPI("fora do ar")
         return self.dados
+
+    def buscar_cep(self, cep: str, *, conversa_id: Any = None) -> dict[str, str] | None:
+        return self.ceps.get(cep)
 
 
 class Jornada:

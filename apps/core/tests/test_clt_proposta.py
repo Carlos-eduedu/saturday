@@ -279,17 +279,111 @@ def test_sem_nascimento_em_lugar_nenhum_vai_para_handoff_antes_da_proposta(
     assert _propostas_gravadas(fabrica) == 0
 
 
-@pytest.mark.parametrize("cenario", ["sem_mae", "sem_endereco"])
-def test_sem_mae_ou_endereco_vai_para_handoff_antes_da_proposta(
-    nova: Any, fabrica: sessionmaker[Session], simulador_granatech: ModuleType, cenario: str
+def _dados_tomador(simulador: ModuleType, jornada: Jornada) -> dict[str, Any]:
+    return dict(simulador.PROPOSTAS[_proposta(jornada)]["dados_tomador"])
+
+
+DEPOIS_DO_ENDERECO = ("casado", "itau", "corrente", "1234", "12345-6", "sim")
+
+
+def test_sem_mae_na_granatech_o_cliente_informa(nova: Any, simulador_granatech: ModuleType) -> None:
+    jornada = nova()
+    _ate_oferta_sem(jornada, simulador_granatech, "sem_mae")
+
+    assert jornada.falar("quero").answer == texto("pedir_mae")
+    assert jornada.falar("maria").answer.startswith(texto("mae_invalida"))
+    assert jornada.falar("Maria das Dores Souza").answer.startswith("Seu endereço é")
+    jornada.roteiro("sim", *DEPOIS_DO_ENDERECO)
+
+    assert jornada.falar("SIM").answer == texto("proposta_enviada")
+    assert _dados_tomador(simulador_granatech, jornada)["nome_completo_mae"] == (
+        "MARIA DAS DORES SOUZA"
+    )
+
+
+def test_sem_endereco_na_granatech_o_cliente_informa_pelo_cep(
+    nova: Any,
+    simulador_granatech: ModuleType,
+    brasilapi: Any,  # noqa: F811
+) -> None:
+    brasilapi.ceps["01310100"] = {
+        "logradouro": "Avenida Paulista",
+        "bairro": "Bela Vista",
+        "cidade": "São Paulo",
+        "uf": "SP",
+    }
+    jornada = nova()
+    _ate_oferta_sem(jornada, simulador_granatech, "sem_endereco")
+
+    jornada.falar("quero")
+    assert jornada.falar("sim").answer == texto("pedir_cep")
+    assert jornada.falar("123").answer.startswith(texto("cep_invalido"))
+    assert jornada.falar("01310-100").answer == texto(
+        "confirmar_endereco_cep", endereco="Avenida Paulista - Bela Vista - São Paulo/SP"
+    )
+    assert jornada.falar("sim").answer == texto("pedir_numero")
+    assert jornada.falar("1578").answer == texto("pedir_complemento")
+    assert jornada.falar("não tem").answer == texto("pedir_estado_civil")
+    jornada.roteiro(*DEPOIS_DO_ENDERECO)
+
+    assert jornada.falar("SIM").answer == texto("proposta_enviada")
+    tomador = _dados_tomador(simulador_granatech, jornada)
+    assert (tomador["cep"], tomador["endereco"], tomador["numero_endereco"]) == (
+        "01310100",
+        "Avenida Paulista",
+        "1578",
+    )
+    assert (tomador["bairro"], tomador["cidade"], tomador["estado"]) == (
+        "Bela Vista",
+        "São Paulo",
+        "SP",
+    )
+    assert tomador["complemento"] == ""
+
+
+def test_cep_nao_encontrado_o_cliente_informa_cada_campo(
+    nova: Any, simulador_granatech: ModuleType
 ) -> None:
     jornada = nova()
-    _ate_oferta_sem(jornada, simulador_granatech, cenario)
+    _ate_oferta_sem(jornada, simulador_granatech, "sem_endereco")
+    jornada.roteiro("quero", "sim")
 
-    resposta = jornada.falar("quero")
-    assert resposta.status == "handoff" and resposta.handoff_reason == "dados_divergentes"
-    assert _posts_de_proposta(simulador_granatech) == 0
-    assert _propostas_gravadas(fabrica) == 0
+    assert jornada.falar("99999-999").answer == texto("pedir_logradouro")
+    assert jornada.falar("Rua das Flores").answer == texto("pedir_bairro")
+    assert jornada.falar("Centro").answer == texto("pedir_cidade")
+    assert jornada.falar("Campinas").answer == texto("pedir_uf")
+    assert jornada.falar("XX").answer.startswith(texto("uf_invalida"))
+    assert jornada.falar("sp").answer == texto("pedir_numero")
+    assert jornada.falar("sem número").answer == texto("pedir_complemento")
+    assert jornada.falar("apto 12").answer == texto("pedir_estado_civil")
+    jornada.roteiro(*DEPOIS_DO_ENDERECO)
+
+    assert jornada.falar("SIM").answer == texto("proposta_enviada")
+    tomador = _dados_tomador(simulador_granatech, jornada)
+    assert (tomador["cep"], tomador["endereco"], tomador["estado"]) == (
+        "99999999",
+        "Rua das Flores",
+        "SP",
+    )
+    assert (tomador["numero_endereco"], tomador["complemento"]) == ("S/N", "apto 12")
+
+
+def test_cep_errado_pede_o_cep_de_novo(
+    nova: Any,
+    simulador_granatech: ModuleType,
+    brasilapi: Any,  # noqa: F811
+) -> None:
+    brasilapi.ceps["01310100"] = {
+        "logradouro": "Avenida Paulista",
+        "bairro": "Bela Vista",
+        "cidade": "São Paulo",
+        "uf": "SP",
+    }
+    jornada = nova()
+    _ate_oferta_sem(jornada, simulador_granatech, "sem_endereco")
+    jornada.roteiro("quero", "sim", "01310-100")
+
+    assert jornada.falar("não").answer == texto("pedir_cep")
 
 
 def test_nascimento_perdido_depois_do_resumo_nao_cria_a_proposta(
@@ -325,12 +419,22 @@ def test_envio_dos_dados_recusado_deixa_a_proposta_criada_e_vai_para_handoff(
     assert _proposta(jornada) in simulador_granatech.PROPOSTAS
 
 
-def test_mae_divergente_vai_para_handoff(nova: Any) -> None:
+def test_mae_divergente_o_cliente_corrige(nova: Any, simulador_granatech: ModuleType) -> None:
     jornada = nova()
     _ate_oferta(jornada)
     jornada.falar("quero")
-    resposta = jornada.falar("não")
-    assert resposta.status == "handoff" and resposta.handoff_reason == "dados_divergentes"
+    assert jornada.falar("não").answer == texto("pedir_mae")
+    jornada.roteiro("Ana Paula Lima", "sim", *DEPOIS_DO_ENDERECO)
+
+    assert jornada.falar("SIM").answer == texto("proposta_enviada")
+    assert _dados_tomador(simulador_granatech, jornada)["nome_completo_mae"] == "ANA PAULA LIMA"
+
+
+def test_endereco_divergente_o_cliente_informa_outro(nova: Any) -> None:
+    jornada = nova()
+    _ate_oferta(jornada)
+    jornada.roteiro("quero", "sim")
+    assert jornada.falar("não").answer == texto("pedir_cep")
 
 
 def test_conta_de_terceiro_volta_ao_banco(nova: Any) -> None:

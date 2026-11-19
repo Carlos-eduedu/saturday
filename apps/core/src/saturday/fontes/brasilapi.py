@@ -1,4 +1,5 @@
-"""BrasilAPI: dados públicos de empresa por CNPJ, com cache de 30 dias.
+"""BrasilAPI: dados públicos de empresa por CNPJ, com cache de 30 dias, e endereço
+por CEP (sem cache), para o tomador que a Granatech devolve sem endereço.
 
 Só empresa: a busca por CPF (NovaVida) fica para quando entrar
 (docs/decisoes/0006). O cache guarda só os campos da regra da empresa; o quadro
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 SERVICO = "brasilapi"
 BASE_URL = "https://brasilapi.com.br"
 ROTA = "/api/cnpj/v1/{cnpj}"
+ROTA_CEP = "/api/cep/v1/{cep}"
 CACHE = timedelta(days=30)
 TIMEOUT_S = 10
 ESPERA_RETRY_S = 1.5
@@ -77,6 +79,31 @@ class BrasilAPI:
                 self._dormir(ESPERA_RETRY_S)
         raise ErroBrasilAPI(f"cnpj indisponível: {situacao}")
 
+    def buscar_cep(self, cep: str, *, conversa_id: Any = None) -> dict[str, str] | None:
+        """Rua, bairro, cidade e UF do CEP; ``None`` se não achou ou não respondeu.
+
+        Sem repetição: quem chama pergunta o endereço ao cliente.
+        """
+
+        inicio = time.monotonic()
+        situacao: int | None = None
+        try:
+            resposta = self._http.get(f"{self._base}/api/cep/v1/{cep}", timeout=TIMEOUT_S)
+            situacao = resposta.status_code
+            dados = resposta.json() if situacao == 200 else None
+        except httpx.HTTPError, ValueError:
+            dados = None
+        finally:
+            self._registrar(situacao, inicio, conversa_id, ROTA_CEP)
+        if not isinstance(dados, dict):
+            return None
+        return {
+            "logradouro": str(dados.get("street") or "").strip(),
+            "bairro": str(dados.get("neighborhood") or "").strip(),
+            "cidade": str(dados.get("city") or "").strip(),
+            "uf": str(dados.get("state") or "").strip().upper(),
+        }
+
     def _chamar(self, cnpj: str, conversa_id: Any) -> dict[str, Any] | int | None:
         """Os dados recortados, ou o status HTTP da falha (``None`` sem resposta)."""
 
@@ -117,10 +144,12 @@ class BrasilAPI:
                 )
             )
 
-    def _registrar(self, situacao: int | None, inicio: float, conversa_id: Any) -> None:
+    def _registrar(
+        self, situacao: int | None, inicio: float, conversa_id: Any, rota: str = ROTA
+    ) -> None:
         duracao_ms = (time.monotonic() - inicio) * 1000
         registrar_chamada(SERVICO, duracao_ms, status=situacao if situacao else "erro")
-        logger.info("brasilapi_chamada rota=%s status=%s ms=%.0f", ROTA, situacao, duracao_ms)
+        logger.info("brasilapi_chamada rota=%s status=%s ms=%.0f", rota, situacao, duracao_ms)
         try:
             with abrir_sessao(self._fabrica) as sessao:
                 sessao.add(
@@ -128,7 +157,7 @@ class BrasilAPI:
                         conversa_id=conversa_id,
                         servico=SERVICO,
                         metodo="GET",
-                        rota=ROTA,
+                        rota=rota,
                         status_http=situacao,
                         duracao_ms=int(duracao_ms),
                     )

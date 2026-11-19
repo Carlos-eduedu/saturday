@@ -1,7 +1,8 @@
 # 0029 — Dados do tomador conferidos antes da proposta
 
 - **Data:** 2026-11-18
-- **Status:** aceita
+- **Status:** aceita; mãe e endereço substituídos pela
+  [0034](0034-mae-e-endereco-informados-pelo-cliente.md)
 - **Desvia de:** especificação, "Especificação: jornada CLT, triagem e
   mensagens" (os dados do tomador vêm da Granatech)
 

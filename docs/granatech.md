@@ -220,7 +220,8 @@ Cada uma está no código como `TODO(granatech)`:
 - **`estado_civil`:** `SOLTEIRO`, `CASADO`, `DIVORCIADO`, `SEPARADO` e
   `VIUVO`. "União estável" (e "amasiado", "moro junto") grava `SOLTEIRO`.
 - **Dados do tomador:** na maioria dos casos a consulta traz nascimento, mãe e
-  endereço; se faltar, podemos preencher.
+  endereço; se faltar, podemos preencher. A mãe e o endereço que faltarem o
+  cliente informa na conversa (decisão 0034).
 
 ### Respondidas em 2026-11-16
 

@@ -578,7 +578,7 @@ def _recontato_tempo_casa_vencido(t: Turno) -> dict[str, Any]:
 # Passos respondidos com sim ou não, fora o pedido do SIM e a oferta.
 SIM_OU_NAO = frozenset(
     {"carteira", "contrato_especial", "granatech", "funcionarios", "optin"}
-    | {"confirmar_celular", "mae", "endereco", "titular"}
+    | {"confirmar_celular", "mae", "endereco", "endereco_cep", "titular"}
 )
 
 
@@ -611,7 +611,7 @@ def _refazer_pedido(t: Turno, etapa: str) -> dict[str, Any] | None:
     if passo == "optin":
         quando = date.fromisoformat(str(t.clt["recontato_em"]))
         return t.responder(texto("recontato_tempo_casa", data=quando.strftime("%d/%m/%Y")))
-    if passo in ("mae", "endereco"):
+    if passo in ("mae", "endereco", "endereco_cep"):
         return proposta.pedir_confirmacao(t, passo)
     return t.perguntar(etapa, passo)
 

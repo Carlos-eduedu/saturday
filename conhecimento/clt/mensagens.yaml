@@ -130,12 +130,26 @@ mensagens:
     Para montar a proposta, confirme alguns dados que o banco tem. O nome da sua
     mãe é {mae}? Responda sim ou não.
   confirmar_endereco: Seu endereço é {endereco}? Responda sim ou não.
+  pedir_mae: Para montar a proposta, qual é o nome completo da sua mãe?
+  mae_invalida: Não entendi. Mande o nome completo da sua mãe, com sobrenome.
+  pedir_cep: "Qual é o CEP da sua casa? Por exemplo: 01001-000."
+  cep_invalido: "Não entendi o CEP. Mande os 8 números, por exemplo: 01001-000."
+  confirmar_endereco_cep: Encontrei {endereco}. Está certo? Responda sim ou não.
+  pedir_logradouro: Qual é o nome da sua rua ou avenida?
+  pedir_bairro: Qual é o bairro?
+  pedir_cidade: Qual é a cidade?
+  pedir_uf: "E o estado? Mande a sigla, por exemplo: SP."
+  uf_invalida: "Não entendi o estado. Mande a sigla com 2 letras, por exemplo: SP."
+  endereco_invalido: Não entendi. Pode escrever de novo?
+  pedir_numero: Qual é o número da casa? Se não tiver, responda sem número.
+  numero_invalido: "Não entendi o número. Mande só o número da casa, por exemplo: 120."
+  pedir_complemento: >-
+    Tem complemento, como apartamento ou bloco? Se não tiver, responda não.
   pedir_estado_civil: >-
-    Qual é o seu estado civil? Solteiro, casado, divorciado, viúvo, união
-    estável ou separado.
-  estado_civil_invalido: >-
-    Não entendi. Responda solteiro, casado, divorciado, viúvo, união estável ou
+    Qual é o seu estado civil? Solteiro, casado, divorciado, viúvo ou
     separado.
+  estado_civil_invalido: >-
+    Não entendi. Responda solteiro, casado, divorciado, viúvo ou separado.
   pedir_banco: >-
     Em qual banco você quer receber o dinheiro? Pode dizer o nome ou o código
     do banco. A conta precisa estar no seu CPF.

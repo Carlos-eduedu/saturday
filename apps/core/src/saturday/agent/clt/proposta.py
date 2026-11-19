@@ -13,6 +13,7 @@ sai de ``bancos.granatech.status.acao_da_proposta``.
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from datetime import date
 from decimal import Decimal
 from typing import Any
@@ -25,6 +26,7 @@ from saturday.agent.clt.turno import Turno, reais
 from saturday.bancos.granatech.cliente import ErroGranatech, ErroIncerto
 from saturday.bancos.granatech.normalizacao import (
     DetalheConsulta,
+    Endereco,
     Pessoa,
     Simulacao,
     montar_corpo_proposta,
@@ -39,6 +41,8 @@ logger = logging.getLogger("saturday.agent.clt.nos")
 CONSENTIMENTO_PROPOSTA = "proposta"
 # Etapas em que a jornada espera um evento do banco.
 AGUARDANDO = frozenset({"proposta", "formalizacao"})
+# Endereço informado pelo cliente: os quatro primeiros não podem ficar vazios.
+CAMPOS_ENDERECO = ("logradouro", "bairro", "cidade", "uf", "numero", "complemento")
 PASSOS_CONTA = ("banco", "banco_lista", "tipo_conta", "agencia", "conta", "titular")
 MOTIVO_CANCELAMENTO_MAX = 200
 
@@ -54,17 +58,30 @@ def _detalhe(t: Turno) -> DetalheConsulta:
 
 
 def _pessoa(t: Turno) -> Pessoa | None:
-    return _detalhe(t).pessoa
+    """O tomador da Granatech, com a mãe e o endereço que o cliente informou.
+
+    O que o cliente informa vale sobre o da Granatech: ele só informa quando ela
+    não devolveu ou quando ele disse que o dela está errado (decisão 0034).
+    """
+
+    pessoa = _detalhe(t).pessoa
+    if pessoa is None:
+        return None
+    endereco = t.dados.get("endereco")
+    return replace(
+        pessoa,
+        nome_mae=t.dados.get("mae") or pessoa.nome_mae,
+        endereco=Endereco(**endereco) if endereco else pessoa.endereco,
+    )
 
 
 def _tomador_completo(t: Turno, pessoa: Pessoa | None) -> bool:
     """Nascimento, mãe e endereço: sem um deles o banco recusa os dados do tomador.
 
-    Mãe e endereço só vêm da Granatech: o agente não pede ao cliente. O
-    nascimento que ela não devolver é o que o cliente informou na identificação.
+    O nascimento que a Granatech não devolver é o que o cliente informou na
+    identificação; a mãe e o endereço que faltarem, o cliente informa nos dados
+    da proposta.
     """
-
-    # TODO(granatech): em produção a consulta sempre traz nascimento, mãe e endereço?
 
     return (
         pessoa is not None
@@ -127,20 +144,92 @@ def iniciar(t: Turno) -> dict[str, Any]:
         # Proposta automática desligada: um especialista segue daqui.
         return t.handoff("aceite_clt", texto("aceite"))
     pessoa = _pessoa(t)
-    if pessoa is None or not _tomador_completo(t, pessoa):
+    if pessoa is None or not (pessoa.nascimento or t.dados.get("nascimento")):
         return t.handoff("dados_divergentes")
+    if not pessoa.nome_mae:
+        return t.perguntar("dados_proposta", "mae_informar")
     return t.perguntar("dados_proposta", "mae", mae=pessoa.nome_mae)
 
 
 def pedir_confirmacao(t: Turno, passo: str) -> dict[str, Any]:
-    """A confirmação da mãe ou do endereço outra vez, com o dado da Granatech."""
+    """A confirmação da mãe ou do endereço outra vez."""
 
     pessoa = _pessoa(t)
     if pessoa is None:
         return t.handoff("dados_divergentes")
     if passo == "mae":
         return t.perguntar("dados_proposta", passo, mae=pessoa.nome_mae)
+    if passo == "endereco_cep":
+        novo = t.dados["endereco_novo"]
+        return t.perguntar("dados_proposta", passo, endereco=_linha_cep(novo))
     return t.perguntar("dados_proposta", passo, endereco=_linha_endereco(pessoa))
+
+
+def _depois_da_mae(t: Turno) -> dict[str, Any]:
+    pessoa = _pessoa(t)
+    if pessoa is None:
+        return t.handoff("dados_divergentes")
+    if pessoa.endereco is None:
+        return t.perguntar("dados_proposta", "cep")
+    return t.perguntar("dados_proposta", "endereco", endereco=_linha_endereco(pessoa))
+
+
+def _linha_cep(novo: dict[str, str]) -> str:
+    return f"{novo['logradouro']} - {novo['bairro']} - {novo['cidade']}/{novo['uf']}"
+
+
+def _proximo_do_endereco(t: Turno) -> dict[str, Any]:
+    """Pergunta o primeiro campo que falta; completo, grava e segue."""
+
+    novo = t.dados["endereco_novo"]
+    for campo in CAMPOS_ENDERECO:
+        if campo not in novo or (campo not in ("numero", "complemento") and not novo[campo]):
+            return t.perguntar("dados_proposta", campo)
+    t.dados["endereco"] = t.dados.pop("endereco_novo")
+    return t.perguntar("dados_proposta", "estado_civil")
+
+
+def _endereco(t: Turno, passo: str) -> dict[str, Any]:
+    """Passos do endereço informado pelo cliente (decisão 0034)."""
+
+    novo = t.dados.get("endereco_novo")
+    if passo == "cep":
+        cep = leitura.cep(t.texto)
+        if cep is None:
+            return t.erro("cep_invalido")
+        brasilapi = t.contexto.brasilapi
+        achado = brasilapi.buscar_cep(cep, conversa_id=t.conversa_id) if brasilapi else None
+        t.dados["endereco_novo"] = {"cep": cep, **(achado or {})}
+        if achado and all(achado.get(c) for c in CAMPOS_ENDERECO[:4]):
+            return t.perguntar("dados_proposta", "endereco_cep", endereco=_linha_cep(achado))
+        # CEP sem resposta ou sem rua: o cliente informa o que faltou.
+        return _proximo_do_endereco(t)
+    if novo is None:
+        return t.perguntar("dados_proposta", "cep")
+    if passo == "endereco_cep":
+        resposta = leitura.sim_ou_nao(t.texto)
+        if resposta is None:
+            return t.erro("repetir_sim_nao")
+        if resposta is False:
+            t.dados.pop("endereco_novo")
+            return t.perguntar("dados_proposta", "cep")
+        return _proximo_do_endereco(t)
+    if passo == "uf":
+        valor = leitura.uf(t.texto)
+        if valor is None:
+            return t.erro("uf_invalida")
+    elif passo == "numero":
+        valor = leitura.numero_endereco(t.texto)
+        if valor is None:
+            return t.erro("numero_invalido")
+    elif passo == "complemento":
+        valor = leitura.complemento(t.texto)
+    else:
+        valor = " ".join(t.texto.split())[:80]
+        if len(valor) < 2:
+            return t.erro("endereco_invalido")
+    novo[passo] = valor
+    return _proximo_do_endereco(t)
 
 
 # ---------------------------------------------------------------- dados da proposta
@@ -153,13 +242,22 @@ def dados_proposta(t: Turno) -> dict[str, Any]:
         if resposta is None:
             return t.erro("repetir_sim_nao")
         if resposta is False:
-            return t.handoff("dados_divergentes")
+            # O cliente corrige o dado da Granatech (decisão 0034).
+            if passo == "mae":
+                return t.perguntar("dados_proposta", "mae_informar")
+            t.dados.pop("endereco", None)
+            return t.perguntar("dados_proposta", "cep")
         if passo == "mae":
-            pessoa = _pessoa(t)
-            if pessoa is None:
-                return t.handoff("dados_divergentes")
-            return t.perguntar("dados_proposta", "endereco", endereco=_linha_endereco(pessoa))
+            return _depois_da_mae(t)
         return t.perguntar("dados_proposta", "estado_civil")
+    if passo == "mae_informar":
+        mae = leitura.nome_completo(t.texto)
+        if mae is None:
+            return t.erro("mae_invalida")
+        t.dados["mae"] = mae.upper()
+        return _depois_da_mae(t)
+    if passo in ("cep", "endereco_cep", *CAMPOS_ENDERECO):
+        return _endereco(t, passo)
     if passo == "estado_civil":
         estado = leitura.estado_civil(t.texto)
         if estado is None:
@@ -321,10 +419,11 @@ def seguir_proposta(t: Turno) -> dict[str, Any]:
         return t.handoff("granatech_indisponivel")
 
     t.clt.update(etapa="proposta", passo=None, erros=0, proposta=id_proposta)
-    if detalhe.pessoa is None:
+    pessoa = _pessoa(t)
+    if pessoa is None:
         return t.handoff("dados_divergentes")
     tomador = montar_dados_tomador(
-        pessoa=detalhe.pessoa,
+        pessoa=pessoa,
         nascimento=t.dados.get("nascimento"),
         cpf=t.dados["cpf"],
         nome=t.dados["nome"],
