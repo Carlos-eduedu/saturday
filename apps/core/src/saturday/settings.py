@@ -174,11 +174,19 @@ class Settings(BaseSettings):
                 "SATURDAY_LLM_MODEL": self.llm_model,
                 "SATURDAY_VISION_MODEL": self.vision_model,
                 "SATURDAY_DATABASE_URL": self.database_url.get_secret_value(),
-                "SATURDAY_WHATSAPP_TOKEN": self.whatsapp_token.get_secret_value(),
-                "SATURDAY_WHATSAPP_APP_SECRET": self.whatsapp_app_secret.get_secret_value(),
-                "SATURDAY_WHATSAPP_VERIFY_TOKEN": self.whatsapp_verify_token.get_secret_value(),
                 "SATURDAY_SESSAO_SEGREDO": self.sessao_segredo.get_secret_value(),
             }
+            # A Meta só é exigida com número dela configurado: um ambiente pode
+            # atender só pela Evolution. Sem o app secret, o webhook da Meta
+            # recusa tudo (`web/api/whatsapp.py`).
+            if self.whatsapp_numeros:
+                obrigatorias |= {
+                    "SATURDAY_WHATSAPP_TOKEN": self.whatsapp_token.get_secret_value(),
+                    "SATURDAY_WHATSAPP_APP_SECRET": self.whatsapp_app_secret.get_secret_value(),
+                    "SATURDAY_WHATSAPP_VERIFY_TOKEN": (
+                        self.whatsapp_verify_token.get_secret_value()
+                    ),
+                }
             faltando = [nome for nome, valor in obrigatorias.items() if not valor]
             if faltando:
                 raise RuntimeError(
@@ -206,10 +214,10 @@ class Settings(BaseSettings):
                 f"SATURDAY_API_KEY é obrigatória quando SATURDAY_ENVIRONMENT={self.environment}."
             )
 
-        if self.environment != "pytest" and not self.whatsapp_numeros:
+        if self.environment != "pytest" and not (self.whatsapp_numeros or self.evolution_ativo):
             raise RuntimeError(
-                "SATURDAY_WHATSAPP_NUMEROS é obrigatória: sem um phone_number_id ativo "
-                "o canal não sabe de qual número responder."
+                "Nenhum canal de WhatsApp: preencha SATURDAY_WHATSAPP_NUMEROS (Meta) "
+                "ou ligue SATURDAY_EVOLUTION_ATIVO."
             )
 
         if self.granatech_ativo and self.environment != "pytest":

@@ -120,3 +120,30 @@ def test_evolution_ligada_exige_chave_e_token() -> None:
         evolution_api_key=SecretStr("chave"),
         evolution_webhook_token=SecretStr("token"),
     ).validar_para_subir()
+
+
+def test_so_com_a_evolution_sobe_sem_as_variaveis_da_meta() -> None:
+    _completo(
+        environment="dev",
+        whatsapp_numeros=[],
+        whatsapp_token=SecretStr(""),
+        whatsapp_app_secret=SecretStr(""),
+        whatsapp_verify_token=SecretStr(""),
+        evolution_ativo=True,
+        evolution_api_key=SecretStr("chave"),
+        evolution_webhook_token=SecretStr("token"),
+    ).validar_para_subir()
+
+
+def test_numero_da_meta_exige_as_variaveis_da_meta() -> None:
+    settings = _completo(environment="dev", whatsapp_token=SecretStr(""))
+
+    with pytest.raises(RuntimeError, match="SATURDAY_WHATSAPP_TOKEN"):
+        settings.validar_para_subir()
+
+
+def test_sem_nenhum_canal_nao_sobe() -> None:
+    settings = _completo(environment="dev", whatsapp_numeros=[])
+
+    with pytest.raises(RuntimeError, match="Nenhum canal de WhatsApp"):
+        settings.validar_para_subir()

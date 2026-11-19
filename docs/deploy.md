@@ -139,7 +139,9 @@ gestor). Rode no seu terminal: ele não grava nenhum valor em arquivo.
      `docs/granatech-homologacao/roteiro-homologacao.md`), `SATURDAY_GRANATECH_ATIVO=true`,
      `SATURDAY_GRANATECH_PROPOSTA_ATIVA=false` fora de produção;
    - `SATURDAY_WHATSAPP_NUMEROS` (o `phone_number_id` do número do ambiente;
-     fora de produção, só número de teste da Meta);
+     fora de produção, só número de teste da Meta). Vazia, a Meta fica
+     desligada e os três segredos dela deixam de ser exigidos; aí a Evolution
+     precisa estar ligada, porque o serviço não sobe sem nenhum canal;
    - `SATURDAY_WHATSAPP_ROTULOS` (opcional: `phone_number_id=Rótulo`, o nome que
      a tela Canais mostra para cada número);
    - `SATURDAY_DOMINIO_PUBLICO` = domínio da API (obrigatória com a proposta
@@ -156,7 +158,7 @@ gestor). Rode no seu terminal: ele não grava nenhum valor em arquivo.
    commit: `SATURDAY_API_KEY`, `SATURDAY_SESSAO_SEGREDO`,
    `SATURDAY_OPENROUTER_API_KEY`, `SATURDAY_TRANSCRICAO_API_KEY`,
    `SATURDAY_WHATSAPP_TOKEN`, `SATURDAY_WHATSAPP_APP_SECRET`,
-   `SATURDAY_WHATSAPP_VERIFY_TOKEN`, `SATURDAY_GRANATECH_CHAVE_API`,
+   `SATURDAY_WHATSAPP_VERIFY_TOKEN` (só com a Meta), `SATURDAY_GRANATECH_CHAVE_API`,
    `SATURDAY_GRANATECH_WEBHOOK_TOKEN`, `SATURDAY_S3_ACCESS_KEY`,
    `SATURDAY_S3_SECRET_KEY` e a senha dentro de `SATURDAY_DATABASE_URL`. Gere
    `API_KEY`, `SESSAO_SEGREDO`, `VERIFY_TOKEN` e `WEBHOOK_TOKEN` com
