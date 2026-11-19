@@ -97,6 +97,7 @@ def test_consulta_final_nunca_e_sobrescrita(final: str) -> None:
     [
         ("AGUARDANDO_AUTORIZACAO_DO_CLIENTE", "AWAITING_CLIENT_AUTHORIZATION"),
         ("CONCLUIDO", "SUCCESS"),
+        ("ERRO_INESPERADO", "UNEXPECTED_ERROR"),
     ],
 )
 def test_status_de_consulta_em_portugues_vira_o_documentado(

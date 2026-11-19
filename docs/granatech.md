@@ -198,9 +198,10 @@ Cada uma está no código como `TODO(granatech)`:
 
 - nomes em português dos status de consulta: a api-dev manda o webhook em
   português e o PDF "Consultas-Webhook" (reenviado em 2026-11-19) só traz os
-  sete em inglês. Só `AGUARDANDO_AUTORIZACAO_DO_CLIENTE` e `CONCLUIDO` (já
-  vistos) são traduzidos; faltam os de `PENDING`, `PROCESSING`, `NO_MARGIN`,
-  `USED` e `UNEXPECTED_ERROR`. Outro nome vira alerta.
+  sete em inglês. Só `AGUARDANDO_AUTORIZACAO_DO_CLIENTE`, `CONCLUIDO` e
+  `ERRO_INESPERADO` (este visto na produção em 2026-11-19) são traduzidos;
+  faltam os de `PENDING`, `PROCESSING`, `NO_MARGIN` e `USED`. Outro nome vira
+  alerta.
 
 ### Respondidas em 2026-11-19
 

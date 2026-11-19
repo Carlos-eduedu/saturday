@@ -23,11 +23,12 @@ CONSULTA: dict[str, int] = {
 # consulta em português (worker do dev, 2026-11-13: rodadas 6 a 8 da
 # homologação). O PDF "Consultas - Webhook" (2026-11-19) lista os sete status só
 # em inglês; aqui ficam os nomes em português já vistos, e o resto vira alerta.
-# TODO(granatech): nomes em português de PENDING, PROCESSING, NO_MARGIN, USED e
-# UNEXPECTED_ERROR.
+# `ERRO_INESPERADO` chegou da produção em 2026-11-19 (worker de prod).
+# TODO(granatech): nomes em português de PENDING, PROCESSING, NO_MARGIN e USED.
 SINONIMOS_CONSULTA = {
     "AGUARDANDO_AUTORIZACAO_DO_CLIENTE": "AWAITING_CLIENT_AUTHORIZATION",
     "CONCLUIDO": "SUCCESS",
+    "ERRO_INESPERADO": "UNEXPECTED_ERROR",
 }
 
 

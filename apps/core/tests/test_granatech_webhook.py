@@ -328,6 +328,34 @@ def test_consulta_concluida_em_portugues_e_aplicada(
     assert _alertas(fabrica) == []
 
 
+def test_erro_inesperado_em_portugues_e_aplicado(
+    api_pg: TestClient,
+    cliente: ClienteGranatech,
+    fabrica: sessionmaker[Session],
+    service: AgentService,
+    settings: Settings,
+) -> None:
+    """Produção manda `ERRO_INESPERADO` (2026-11-19): vale `UNEXPECTED_ERROR`, sem alerta de
+    status desconhecido."""
+
+    aberta = cliente.abrir_consulta(CPF, "FULANO", "11987654321")
+    corpo = {
+        "cpf": CPF,
+        "id_consulta": aberta.id_externo,
+        "status": "ERRO_INESPERADO",
+        "tipo": "CONSULTA",
+    }
+
+    resposta = api_pg.post("/webhooks/granatech", json=corpo, headers={"x-webhook-token": TOKEN})
+    _rodar_worker(fabrica, service, cliente, settings)
+
+    assert resposta.status_code == 200
+    assert _consulta(fabrica, aberta.id_externo).status == "UNEXPECTED_ERROR"
+    motivos = [a.get("motivo") for a in _alertas(fabrica)]
+    assert motivos
+    assert "status_desconhecido" not in motivos
+
+
 def test_consulta_fora_de_ordem_nao_regride(
     cliente: ClienteGranatech,
     http_granatech: TestClient,
