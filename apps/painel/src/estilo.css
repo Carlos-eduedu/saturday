@@ -959,6 +959,13 @@ main:has(.historico) { padding-bottom: 0; }
 .dialogo--grafo .dialogo__conteudo { overflow: hidden; }
 .dialogo--grafo .grafo-tela { flex: 1; min-height: 0; }
 .dialogo--grafo .grafo-quadro { flex: 1; min-height: 0; }
+/* Da largura de um tablet para cima o grafo cabe inteiro no quadro: encolhe
+   junto com o diálogo, sem rolar. No celular fica no tamanho natural e o
+   quadro rola seguindo o nó que acende, senão o texto fica ilegível. */
+@media (min-width: 768px) {
+  .dialogo--grafo .grafo-quadro { display: grid; place-items: center; overflow: hidden; }
+  .dialogo--grafo .grafo-quadro svg { max-width: 100%; max-height: 100%; width: auto; height: auto; }
+}
 .dialogo footer a.botao { gap: 0.4rem; }
 .form-ficha { display: flex; flex-direction: column; gap: 1.25rem; }
 .form-ficha fieldset { border: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); gap: 0.75rem 1rem; }

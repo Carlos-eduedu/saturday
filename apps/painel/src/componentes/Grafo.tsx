@@ -11,7 +11,7 @@ const FIM = "__end__";
 const LARGURA_NO = 176;
 const ALTURA_NO = 48;
 const VAO_X = 20;
-const VAO_Y = 64;
+const VAO_Y = 28;
 const MARGEM = 12;
 
 interface Posicao {
@@ -19,16 +19,48 @@ interface Posicao {
   y: number;
 }
 
-// Camadas pelo caminho mais longo desde a entrada (o grafo é acíclico); o fim
-// fica sempre na última. Dentro da camada, ordena pela média dos predecessores
-// para cruzar menos arestas.
+// A confluência do grafo tem ciclo (o iCred volta para a classificação). A
+// camada pelo caminho mais longo não converge enquanto a aresta de retorno
+// estiver na conta, e o desenho vira uma tira de dezenas de linhas vazias.
+// A aresta que fecha o ciclo continua desenhada, mas não define camada: o nó
+// de destino fica no primeiro nível que o alcança.
+function arestasDeRetorno(grafo: Grafo): Set<string> {
+  const saida = new Map<string, string[]>();
+  for (const a of grafo.arestas) {
+    if (a.para === FIM) continue;
+    saida.set(a.de, [...(saida.get(a.de) ?? []), a.para]);
+  }
+  const aberto = new Set<string>();
+  const fechado = new Set<string>();
+  const retornos = new Set<string>();
+  const visitar = (id: string) => {
+    aberto.add(id);
+    for (const destino of saida.get(id) ?? []) {
+      if (aberto.has(destino)) {
+        retornos.add(`${id}>${destino}`);
+        continue;
+      }
+      if (!fechado.has(destino)) visitar(destino);
+    }
+    aberto.delete(id);
+    fechado.add(id);
+  };
+  visitar(INICIO);
+  for (const n of grafo.nos) if (!fechado.has(n.id)) visitar(n.id);
+  return retornos;
+}
+
+// Camadas pelo caminho mais longo desde a entrada; o fim fica sempre na última.
+// Dentro da camada, ordena pela média dos predecessores para cruzar menos
+// arestas.
 function posicionar(grafo: Grafo): { pos: Map<string, Posicao>; largura: number; altura: number } {
+  const retornos = arestasDeRetorno(grafo);
   const camada = new Map<string, number>([[INICIO, 0]]);
   for (let mudou = true, voltas = 0; mudou && voltas < grafo.nos.length; voltas++) {
     mudou = false;
     for (const a of grafo.arestas) {
       const origem = camada.get(a.de);
-      if (origem === undefined || a.para === FIM) continue;
+      if (origem === undefined || a.para === FIM || retornos.has(`${a.de}>${a.para}`)) continue;
       if ((camada.get(a.para) ?? -1) < origem + 1) {
         camada.set(a.para, origem + 1);
         mudou = true;
@@ -68,6 +100,14 @@ function posicionar(grafo: Grafo): { pos: Map<string, Posicao>; largura: number;
 
 // Duração de cada passo da progressão: o caminho inteiro cabe em ~3 s.
 const passoDaRota = (n: number) => Math.min(280, Math.round(3000 / Math.max(1, n)));
+
+// O nome começa a 12 px e o nó tem 176 px: acima de 24 caracteres o texto passa
+// da borda e encosta no nó vizinho. A reticência avisa do corte; o `aria-label`
+// do nó e o painel de detalhe guardam o nome inteiro.
+const NOME_MAXIMO = 24;
+function cortarNome(nome: string): string {
+  return nome.length > NOME_MAXIMO ? `${nome.slice(0, NOME_MAXIMO - 1).trimEnd()}…` : nome;
+}
 
 function VisaoGrafo({
   grafo,
@@ -211,7 +251,7 @@ function VisaoGrafo({
                 )}
                 <rect width={LARGURA_NO} height={ALTURA_NO} rx={raio} />
                 <text x={12} y={20} className="grafo-nome">
-                  {rotulo(NOS, n.id)}
+                  {cortarNome(rotulo(NOS, n.id))}
                 </text>
                 <text x={12} y={37} className="grafo-meta">
                   {n.modelo ? "IA · " : ""}
