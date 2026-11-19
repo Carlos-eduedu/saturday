@@ -259,18 +259,27 @@ def uf(texto: str) -> str | None:
 def numero_endereco(texto: str) -> str | None:
     """Número da casa; "sem número" vira ``S/N``."""
 
-    if re.search(r"\bsem n|\bs/?n\b", normalizar(texto)):
+    normal = normalizar(texto)
+    if re.search(r"\bsem n|\bs/?n\b|^n/?a$", normal) or sim_ou_nao(texto) is False:
         return "S/N"
     numero = texto.strip()
-    return numero if 0 < len(numero) <= 10 else None
+    return numero if 0 < len(numero) <= 10 and re.search(r"\d", numero) else None
 
 
-def complemento(texto: str) -> str:
-    """Complemento do endereço; "não", "não tem" ou "nenhum" viram vazio."""
+_SO_AFIRMACAO = re.compile(r"^\s*(sim|tem)(\s+(sim|tem))?\b[\s,.:;-]*", re.I)
 
-    if sim_ou_nao(texto) is False or normalizar(texto).startswith("sem "):
+
+def complemento(texto: str) -> str | None:
+    """Complemento do endereço: "não", "nenhum" ou "N/A" viram vazio; só "sim"
+    (ou "tem") é ``None``, para perguntar qual é."""
+
+    normal = normalizar(texto)
+    sem_digito = not re.search(r"\d", normal)
+    negou = sim_ou_nao(texto) is False or normal.startswith("sem") or normal in ("n/a", "na")
+    if sem_digito and negou:
         return ""
-    return " ".join(texto.split())[:60]
+    resto = " ".join(_SO_AFIRMACAO.sub("", texto).split())
+    return resto[:60] or None
 
 
 def data_nascimento(texto: str, hoje: date) -> date | None:

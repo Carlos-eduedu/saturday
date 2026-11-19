@@ -45,12 +45,21 @@ CENARIO_ESCOLHIDO = "A próxima consulta vai dar: {cenario}."
 # Turno de sistema do `/ir`: o nó CLT segue do pedido do SIM (`agent/clt/nos.py`).
 EVENTO_IR = "membro:ir"
 
+
+def _oculto(_valor: str) -> str:
+    return "***"
+
+
 _MASCARAS = {
     "cpf": mascarar_cpf,
     "email": mascarar_email,
     "celular": mascarar_telefone,
     "nascimento": mascarar_data,
     "nome": primeiro_nome,
+    # Regra 9: mãe e endereço informados na proposta CLT (decisão 0034).
+    "mae": _oculto,
+    "endereco": _oculto,
+    "endereco_novo": _oculto,
 }
 
 

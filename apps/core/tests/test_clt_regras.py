@@ -330,3 +330,39 @@ def test_marketing_e_cancelamento() -> None:
 )
 def test_leitura_do_contrato_especial(texto: str, esperado: bool | None) -> None:
     assert leitura.contrato_especial(texto) is esperado
+
+
+@pytest.mark.parametrize(
+    ("texto", "esperado"),
+    [
+        ("120", "120"),
+        ("1578 A", "1578 A"),
+        ("sem número", "S/N"),
+        ("s/n", "S/N"),
+        ("não tem", "S/N"),
+        ("N/A", "S/N"),
+        ("nao", "S/N"),
+        ("casa", None),
+    ],
+)
+def test_numero_endereco(texto: str, esperado: str | None) -> None:
+    assert leitura.numero_endereco(texto) == esperado
+
+
+@pytest.mark.parametrize(
+    ("texto", "esperado"),
+    [
+        ("não tem", ""),
+        ("nao", ""),
+        ("nenhum", ""),
+        ("N/A", ""),
+        ("sem complemento", ""),
+        ("apto 3, bloco B", "apto 3, bloco B"),
+        ("Bloco N apto 4", "Bloco N apto 4"),
+        ("tem sim, apto 12", "apto 12"),
+        ("sim", None),
+        ("tem", None),
+    ],
+)
+def test_complemento(texto: str, esperado: str | None) -> None:
+    assert leitura.complemento(texto) == esperado

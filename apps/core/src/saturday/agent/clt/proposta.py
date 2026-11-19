@@ -224,6 +224,8 @@ def _endereco(t: Turno, passo: str) -> dict[str, Any]:
             return t.erro("numero_invalido")
     elif passo == "complemento":
         valor = leitura.complemento(t.texto)
+        if valor is None:
+            return t.erro("complemento_qual")
     else:
         valor = " ".join(t.texto.split())[:80]
         if len(valor) < 2:

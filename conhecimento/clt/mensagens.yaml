@@ -143,6 +143,7 @@ mensagens:
   endereco_invalido: Não entendi. Pode escrever de novo?
   pedir_numero: Qual é o número da casa? Se não tiver, responda sem número.
   numero_invalido: "Não entendi o número. Mande só o número da casa, por exemplo: 120."
+  complemento_qual: "Qual é o complemento? Por exemplo: apto 12, bloco B."
   pedir_complemento: >-
     Tem complemento, como apartamento ou bloco? Se não tiver, responda não.
   pedir_estado_civil: >-
