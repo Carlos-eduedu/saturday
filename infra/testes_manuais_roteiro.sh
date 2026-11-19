@@ -258,14 +258,14 @@ conferir "Dois cliques em \"Reenviar link\" com menos de um minuto mostram, no s
 
 # ── 4. Legenda e nome de arquivo ──────────────────────────────────────────
 stage "Legenda e nome de arquivo em envio real"
-step "Do celular, escreva qualquer coisa para o número de desenvolvimento (abre a janela de 24 h)."
+say "Pela Evolution, o canal da produção: a instância do dev precisa estar conectada em Canais."
+step "Do celular, escreva qualquer coisa para o número de desenvolvimento."
 step "No painel, assuma essa conversa."
 step "Envie uma foto JPG com um texto junto. No celular: a foto chega com o texto como legenda."
 step "Envie um PDF chamado \"Proposta João 1.pdf\" com um texto junto. No celular: o nome aparece com acento e espaço, e o texto como legenda."
 step "Grave e envie um áudio. No celular: chega e toca, sem legenda."
 say "Esperado: no painel, as três mensagens ficam como entregues, sem \"falhou\"."
-note "O passo a passo completo está em docs/meta.md."
-conferir "Legenda e nome de arquivo conferidos em um envio real no dev"
+conferir "Legenda e nome de arquivo conferidos em um envio real no dev, pela Evolution"
 
 # ── Resumo ────────────────────────────────────────────────────────────────
 _clear
@@ -280,7 +280,6 @@ if command -v gh >/dev/null 2>&1 && confirm "Anotar esse resultado como comentá
 else
   note "Nada foi enviado. Copie as linhas acima para a issue $ISSUE quando quiser."
 fi
-note "Se a legenda e o nome de arquivo deram certo, avise: o TODO(meta) de enviar_midia pode sair."
 printf '\n'
 
 }
