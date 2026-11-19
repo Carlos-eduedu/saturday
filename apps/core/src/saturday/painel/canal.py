@@ -28,6 +28,7 @@ MODELOS_DO_PAINEL = tuple(
 )
 
 CANAL_COM_JANELA = "whatsapp"
+CANAL_EVOLUTION = "evolution"
 
 
 @dataclass(frozen=True)
@@ -37,6 +38,9 @@ class Permitido:
     # `None` no canal que não tem janela.
     janela: Literal["aberta", "fechada"] | None
     modelos: tuple[str, ...]
+    # Conversa da Evolution cuja instância o gestor apagou: não há por onde
+    # enviar até o cliente escrever para um número conectado.
+    instancia_apagada: bool = False
 
     @property
     def texto_livre(self) -> bool:
@@ -45,7 +49,14 @@ class Permitido:
         return self.envia and self.janela != "fechada"
 
 
-def permitido(canal: str, ultima_entrada_em: datetime | None, agora: datetime) -> Permitido:
+def permitido(
+    canal: str, ultima_entrada_em: datetime | None, agora: datetime, *, instancia: str | None
+) -> Permitido:
+    """``instancia`` é o ``phone_number_id`` da conversa; apagar a instância o
+    limpa (`web/api/canais.py`)."""
+
+    if canal == CANAL_EVOLUTION and not instancia:
+        return Permitido(envia=False, janela=None, modelos=(), instancia_apagada=True)
     if canal != CANAL_COM_JANELA:
         return Permitido(envia=canal in CANAIS_WHATSAPP, janela=None, modelos=())
     aberta = janela_aberta(ultima_entrada_em, agora)

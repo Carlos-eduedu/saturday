@@ -190,7 +190,12 @@ def _cabecalho(retrato: Retrato) -> str:
         _campo("Aberta em", _quando(conversa.criada_em)),
         _campo("Cliente escreveu pela última vez em", _quando(conversa.ultima_entrada_em)),
     ]
-    janela = permitido(conversa.canal, conversa.ultima_entrada_em, retrato.exportado_em).janela
+    janela = permitido(
+        conversa.canal,
+        conversa.ultima_entrada_em,
+        retrato.exportado_em,
+        instancia=conversa.phone_number_id,
+    ).janela
     if janela is not None:
         linhas.append(_campo("Janela de 24 h", janela))
     atencao = retrato.supervisao.get("atencao") or []

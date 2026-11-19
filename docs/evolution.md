@@ -15,6 +15,10 @@ e [decisoes/0011](decisoes/0011-configuracoes-da-instancia-pelo-painel.md).
   instância (tabela `instancias`). Se ela voltar com outro celular, é
   desconectada na hora e abre o alerta "instância reconectada com outro
   celular". Outro número exige apagar e criar outra instância.
+- Apagar a instância pelo painel tira ela das conversas: o painel recusa o
+  envio nelas (aviso no lugar do campo de mensagem) até o cliente escrever para
+  um número conectado, que a conversa passa a usar. Uma instância recriada com
+  o mesmo nome não herda essas conversas.
 - Queda definitiva (`connection.update` com `close` ou `refused`) abre o
   alerta "instância desconectada", um por instância enquanto estiver aberto.
 - O canal é `evolution`. A conversa é `evolution:{celular}`: o mesmo celular no

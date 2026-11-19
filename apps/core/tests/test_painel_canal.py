@@ -26,7 +26,16 @@ HA_DOIS_DIAS = AGORA - timedelta(days=2)
     ],
 )
 def test_o_que_o_canal_permite(canal, entrada, envia, janela, texto_livre, tem_modelo):
-    p = permitido(canal, entrada, AGORA)
+    p = permitido(canal, entrada, AGORA, instancia="instancia")
 
     assert (p.envia, p.janela, p.texto_livre) == (envia, janela, texto_livre)
     assert p.modelos == (MODELOS_DO_PAINEL if tem_modelo else ())
+    assert p.instancia_apagada is False
+
+
+def test_evolution_sem_instancia_nao_envia():
+    """Apagar a instância limpa a das conversas: não há por onde enviar."""
+
+    p = permitido("evolution", HA_UMA_HORA, AGORA, instancia=None)
+
+    assert (p.envia, p.texto_livre, p.instancia_apagada) == (False, False, True)

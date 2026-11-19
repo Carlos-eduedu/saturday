@@ -409,7 +409,8 @@ def apagar(
     except ErroWhatsApp as exc:
         raise _falha(exc) from exc
     with abrir_sessao(fabrica) as sessao:
-        # O nome fica livre para outro telefone.
+        # O nome fica livre para outro telefone, e as conversas deixam de
+        # apontar para ele: o painel recusa o envio em vez de perder a mensagem.
         instancias.soltar(sessao, nome)
         auditar(sessao, usuario.id, "canal_apagar", nome)
     return Response(status_code=204)

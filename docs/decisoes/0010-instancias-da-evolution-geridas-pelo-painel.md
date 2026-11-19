@@ -27,7 +27,10 @@ para ler o QR. A equipe quer gerir os canais pelo próprio painel.
 - **Telefone fixado:** a tabela `instancias` guarda só o nome e o telefone da
   primeira conexão. Se a instância voltar com outro telefone, o Saturday a
   desconecta na hora e abre um alerta: outro número exige apagar e criar outra
-  instância. Apagar a instância apaga a linha.
+  instância. Apagar a instância apaga a linha e limpa a instância das
+  conversas dela: o painel recusa o envio ali, em vez de enfileirar um envio
+  que a Evolution recusa com 404, até o cliente escrever para um número
+  conectado.
 - Queda definitiva da instância (`connection.update` com `close` ou
   `refused`) vira o alerta "instância desconectada".
 - Contrato permitido, somado ao da 0009 e conferido no código da tag 2.3.7:

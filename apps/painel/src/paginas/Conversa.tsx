@@ -362,6 +362,14 @@ export function Conversa({ eu, fichaEmAba = false }: { eu: Eu; fichaEmAba?: bool
                 }}
               />
             )}
+            {conversa.instancia_apagada && (
+              <div className="envio">
+                <p className="aviso" role="status">
+                  A instância desta conversa foi apagada: a resposta só sai quando o cliente escrever
+                  para um número conectado.
+                </p>
+              </div>
+            )}
           </div>
         )}
       </section>

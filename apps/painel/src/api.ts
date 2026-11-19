@@ -46,6 +46,8 @@ export interface Resumo {
   envia: boolean;
   janela: "aberta" | "fechada" | null;
   modelos: string[];
+  // Conversa da Evolution cuja instância foi apagada: sem envio, com aviso.
+  instancia_apagada: boolean;
   ultima_mensagem: { autor: string; texto: string; em: string } | null;
   etapa: string | null;
   // Nome do membro testador dono do telefone (decisão 0020), ou null.

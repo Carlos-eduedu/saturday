@@ -453,7 +453,7 @@ def usuarios(_usuario: Logado, fabrica: Fabrica) -> list[dict[str, Any]]:
 
 def _resumo(conversa: Conversa, agora: datetime) -> dict[str, Any]:
     entrada = conversa.ultima_entrada_em
-    canal = permitido(conversa.canal, entrada, agora)
+    canal = permitido(conversa.canal, entrada, agora, instancia=conversa.phone_number_id)
     return {
         "id": str(conversa.id),
         "canal": conversa.canal,
@@ -466,6 +466,7 @@ def _resumo(conversa: Conversa, agora: datetime) -> dict[str, Any]:
         "envia": canal.envia,
         "janela": canal.janela,
         "modelos": list(canal.modelos),
+        "instancia_apagada": canal.instancia_apagada,
     }
 
 

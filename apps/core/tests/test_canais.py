@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from saturday.canais.evolution import webhook as parser
 from saturday.canais.evolution.cliente import EvolutionClient
 from saturday.canais.whatsapp.cliente import ErroPermanente, NumeroMeta, WhatsAppClient
-from saturday.dados.modelos import Alerta, Auditoria, EventoRecebido, Instancia
+from saturday.dados.modelos import Alerta, Auditoria, Conversa, EventoRecebido, Instancia
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.jobs import instancias as eventos_instancias
 from saturday.settings import Settings
@@ -443,12 +443,26 @@ def test_apagar_solta_o_telefone(
     _, modulo = simulador
     modulo.INSTANCIAS["mex-vendas"] = {"estado": "open", "telefone": TELEFONE, "webhook": None}
     eventos_instancias.aplicar(fabrica, cliente, _conexao("open"))
+    with abrir_sessao(fabrica) as sessao:
+        for conversation_id, instancia in (("da-apagada", "mex-vendas"), ("da-outra", "mex-sac")):
+            sessao.add(
+                Conversa(
+                    conversation_id=conversation_id,
+                    canal="evolution",
+                    telefone=TELEFONE,
+                    phone_number_id=instancia,
+                )
+            )
 
     assert api.delete("/admin/canais/evolution/mex-vendas", headers=cabecalhos).status_code == 204
 
     assert "mex-vendas" not in modulo.INSTANCIAS
     with abrir_sessao(fabrica) as sessao:
         assert sessao.get(Instancia, "mex-vendas") is None
+        # Sem instância, o painel recusa o envio em vez de enfileirar um 404.
+        linhas = sessao.execute(select(Conversa.conversation_id, Conversa.phone_number_id))
+        instancias = {nome: instancia for nome, instancia in linhas}
+        assert instancias == {"da-apagada": None, "da-outra": "mex-sac"}
 
 
 def test_webhook_de_conexao_vai_para_a_fila(

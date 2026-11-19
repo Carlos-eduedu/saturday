@@ -216,7 +216,18 @@ def _conferir_envio(conversa: Conversa, usuario_id: uuid.UUID) -> Permitido:
 
     if conversa.atendimento != "assumida" or conversa.atendente_id != usuario_id:
         raise AcaoRecusada(409, "assuma a conversa antes de responder")
-    canal = permitido(conversa.canal, conversa.ultima_entrada_em, datetime.now(UTC))
+    canal = permitido(
+        conversa.canal,
+        conversa.ultima_entrada_em,
+        datetime.now(UTC),
+        instancia=conversa.phone_number_id,
+    )
+    if canal.instancia_apagada:
+        raise AcaoRecusada(
+            409,
+            "a instância desta conversa foi apagada: a resposta só sai quando o cliente "
+            "escrever para um número conectado",
+        )
     if not canal.envia or not conversa.telefone or not conversa.phone_number_id:
         raise AcaoRecusada(409, "o painel só envia pelo WhatsApp")
     return canal

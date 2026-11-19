@@ -265,6 +265,34 @@ def test_desfazer_vence_com_o_prazo(client_pg, service_pg, fabrica, ana, convers
     assert _atendimento(client_pg, alvo) == ("assumida", ana)
 
 
+def test_instancia_apagada_recusa_o_envio(client_pg, service_pg, fabrica, ana, conversa):
+    """Caso de prod (19/11): o envio pela instância apagada dava 404 e se perdia."""
+
+    _cliente_escreve(service_pg, conversa, "oi")
+    alvo = _conversa_id(fabrica, conversa)
+    csrf = entrar(client_pg, "ana@exemplo.test")
+    client_pg.post(f"/admin/conversas/{alvo}/assumir", headers=csrf)
+    with abrir(fabrica) as s:
+        s.execute(
+            update(Conversa)
+            .where(Conversa.id == uuid.UUID(alvo))
+            .values(canal="evolution", phone_number_id=None)
+        )
+    with abrir(fabrica) as s:
+        na_fila = s.scalar(select(func.count()).select_from(Outbox))
+
+    resposta = client_pg.post(
+        f"/admin/conversas/{alvo}/mensagens", headers=csrf, json={"texto": "oi"}
+    )
+
+    assert resposta.status_code == 409
+    assert "instância desta conversa foi apagada" in resposta.json()["detail"]
+    with abrir(fabrica) as s:
+        assert s.scalar(select(func.count()).select_from(Outbox)) == na_fila
+    item = client_pg.get(f"/admin/conversas/{alvo}").json()
+    assert (item["envia"], item["instancia_apagada"]) == (False, True)
+
+
 def test_conversa_do_chat_nao_tem_janela_nem_envio(client_pg, service_pg, ana, conversa):
     """Janela é da Meta: no canal `chat` o painel não mostra o selo nem envia."""
 
