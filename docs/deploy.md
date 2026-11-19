@@ -134,7 +134,9 @@ gestor). Rode no seu terminal: ele não grava nenhum valor em arquivo.
    - `SATURDAY_DATABASE_URL=postgresql://saturday:<senha>@<appName-do-postgres>:5432/saturday`;
    - `SATURDAY_S3_ENDPOINT`, `SATURDAY_S3_BUCKET`, `SATURDAY_S3_REGIAO`;
    - `SATURDAY_GRANATECH_BASE_URL` (`https://api-dev.granatech.com.br` fora de
-     produção), `SATURDAY_GRANATECH_ATIVO=true`,
+     produção; `https://api.granatech.com.br` em produção, com a chave que a
+     Granatech entrega ao concluir a homologação, conforme
+     `docs/granatech-homologacao/roteiro-homologacao.md`), `SATURDAY_GRANATECH_ATIVO=true`,
      `SATURDAY_GRANATECH_PROPOSTA_ATIVA=false` fora de produção;
    - `SATURDAY_WHATSAPP_NUMEROS` (o `phone_number_id` do número do ambiente;
      fora de produção, só número de teste da Meta);
