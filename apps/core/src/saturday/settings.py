@@ -177,8 +177,8 @@ class Settings(BaseSettings):
                 "SATURDAY_SESSAO_SEGREDO": self.sessao_segredo.get_secret_value(),
             }
             # A Meta só é exigida com número dela configurado: um ambiente pode
-            # atender só pela Evolution. Sem o app secret, o webhook da Meta
-            # recusa tudo (`web/api/whatsapp.py`).
+            # atender só pela Evolution. Sem número, o webhook da Meta descarta
+            # todo evento (`web/api/whatsapp.py`).
             if self.whatsapp_numeros:
                 obrigatorias |= {
                     "SATURDAY_WHATSAPP_TOKEN": self.whatsapp_token.get_secret_value(),

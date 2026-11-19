@@ -101,11 +101,13 @@ def _dos_numeros_configurados(
     encontrados: list[parser.Evento],
     settings: Settings,
 ) -> list[parser.Evento]:
-    """Só os números ativos; evento de outro número é ignorado, não é erro."""
+    """Só os números ativos; evento de outro número é ignorado, não é erro.
+
+    Sem número configurado a Meta está desligada: nenhum evento entra, mesmo
+    assinado (os segredos podem ter ficado no ambiente).
+    """
 
     ativos = set(settings.whatsapp_numeros)
-    if not ativos:
-        return encontrados
     return [evento for evento in encontrados if evento.phone_number_id in ativos]
 
 

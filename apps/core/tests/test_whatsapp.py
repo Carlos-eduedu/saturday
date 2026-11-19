@@ -256,3 +256,17 @@ def _payload_mensagem(mensagem: dict[str, object]) -> dict[str, object]:
             }
         ]
     }
+
+
+def test_sem_numero_da_meta_nenhum_evento_entra() -> None:
+    from types import SimpleNamespace
+
+    from saturday.settings import Settings
+    from saturday.web.api.whatsapp import _dos_numeros_configurados
+
+    eventos = [SimpleNamespace(phone_number_id="100000000000001")]
+    desligada = Settings(environment="pytest", whatsapp_numeros=[])
+    ligada = Settings(environment="pytest", whatsapp_numeros=["100000000000001"])
+
+    assert _dos_numeros_configurados(eventos, desligada) == []  # type: ignore[arg-type]
+    assert _dos_numeros_configurados(eventos, ligada) == eventos  # type: ignore[arg-type]
