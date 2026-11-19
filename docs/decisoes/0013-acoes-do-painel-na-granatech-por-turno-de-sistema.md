@@ -27,9 +27,10 @@ próprio cliente, conferido em código e com prova gravada (regras 3, 4 e 5 do
 - As ações são cinco: reconciliar proposta incerta, reenviar o link de
   biometria, cancelar proposta (confirmação com motivo obrigatório), corrigir a
   conta e atualizar o detalhe da consulta.
-- **Sem "atualizar status"**: o campo de status do `GET /propostas/{id}` não
-  está documentado (regra 12). `TODO(granatech): em que campo o GET
-  /propostas/{id} devolve o status?` O status segue chegando só pelo webhook.
+- **Sem "atualizar status"**: na época, o campo de status do
+  `GET /propostas/{id}` não estava documentado (regra 12). A Granatech
+  respondeu em 2026-11-19 que é `status`; o botão ainda não foi feito, e o
+  status segue chegando só pelo webhook.
 - **Reconciliar** refaz o passo do aceite, que nunca repete o POST (com
   proposta incerta, `criar_proposta` só procura na listagem). Achada, a
   jornada segue sozinha: dados do tomador, aviso ao cliente e a conversa volta

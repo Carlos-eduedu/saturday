@@ -196,32 +196,31 @@ do cliente. Item sem conversa fica só para leitura.
 
 Cada uma está no código como `TODO(granatech)`:
 
-- formato das listagens de consulta e de proposta (aceitamos lista ou `data`,
-  `dados`, `items`, `content`);
-- formato da resposta do `POST /propostas`: a api-dev devolve só o id, como
-  texto JSON (rodada 10, 2026-11-13); aceitamos também `id`, `id_proposta` ou
-  `data.id`;
-- lista completa dos status de consulta em português: a api-dev manda o
-  webhook em português, e só `AGUARDANDO_AUTORIZACAO_DO_CLIENTE` e `CONCLUIDO`
-  (já vistos) são traduzidos para os nomes da documentação; outro nome vira
-  alerta;
-- formato do webhook de proposta: a api-dev manda
+- nomes em português dos status de consulta: a api-dev manda o webhook em
+  português e o PDF "Consultas-Webhook" (reenviado em 2026-11-19) só traz os
+  sete em inglês. Só `AGUARDANDO_AUTORIZACAO_DO_CLIENTE` e `CONCLUIDO` (já
+  vistos) são traduzidos; faltam os de `PENDING`, `PROCESSING`, `NO_MARGIN`,
+  `USED` e `UNEXPECTED_ERROR`. Outro nome vira alerta.
+
+### Respondidas em 2026-11-19
+
+- **Listagens** (`consulta-saldo/usuario` e `propostas/lista`): objeto paginado
+  `{total, pagina_atual, tamanho_pagina, total_paginas, pagina_anterior,
+  proxima_pagina, itens}`; lemos `itens`. O `GET /bancos` segue em lista pura.
+- **`POST /propostas`:** o 201 traz só o id, como texto JSON, também em
+  produção.
+- **Webhook de proposta:** produção manda igual à homologação,
   `{tipo: "PROPOSTA", status, id_proposta, cpf}`, com o nome da notificação em
-  `status` e sem `tipo_notificacao` (rodada 11); lemos os dois formatos e
-  tiramos o status da tabela de `webhook-propostas.md`;
-- dados do tomador quando a consulta vem sem eles: os CPFs gerados pela
-  api-dev vêm sem nascimento, mãe e endereço, e o `dados-tomador` recusa
-  (`data_nascimento must be a Date instance`, `nome_completo_mae must be a
-  string`). A homologação usa os dados de teste do exemplo da collection. Na
-  jornada, o nascimento ausente vem do que o cliente informou; sem mãe ou
-  endereço a conversa vai para o atendente antes da proposta (issue 25,
-  `docs/clt.md`). Falta saber se em produção a consulta sempre traz os três;
-- significado de `FIDUCIARY_INSTITUTION_NO_AUTHORIZATION` e
-  `WORKER_MUST_CANCEL_RETURN_REQUEST` (por ora, alerta);
-- em que campo o `GET /propostas/{id}` devolve o status (por isso a aba não tem
-  "atualizar status"; o status chega só pelo webhook);
-- valores aceitos de `estado_civil` nos dados do tomador (enviamos SOLTEIRO,
-  CASADO, DIVORCIADO, VIUVO, UNIAO_ESTAVEL ou SEPARADO).
+  `status`.
+- **`GET /propostas/{id}`:** o status vem na propriedade `status`. O painel
+  ainda não tem "atualizar status" (decisão 0013).
+- **`FIDUCIARY_INSTITUTION_NO_AUTHORIZATION` e
+  `WORKER_MUST_CANCEL_RETURN_REQUEST`:** são do FGTS, não do consignado; saíram
+  do código. Se chegarem, viram alerta de status desconhecido.
+- **`estado_civil`:** `SOLTEIRO`, `CASADO`, `DIVORCIADO`, `SEPARADO` e
+  `VIUVO`. "União estável" (e "amasiado", "moro junto") grava `SOLTEIRO`.
+- **Dados do tomador:** na maioria dos casos a consulta traz nascimento, mãe e
+  endereço; se faltar, podemos preencher.
 
 ### Respondidas em 2026-11-16
 

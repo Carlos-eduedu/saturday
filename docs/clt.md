@@ -136,7 +136,7 @@ Os eventos são estes:
 | --- | --- | --- |
 | `consulta_pronta` | `jobs/granatech` no `SUCCESS` | Vínculo e oferta |
 | `consulta_sem_margem` | `NO_MARGIN` | Não elegível |
-| `consulta_erro:<status>` | `USED`, `UNEXPECTED_ERROR` e os de significado pendente | Handoff |
+| `consulta_erro:<status>` | `USED` e `UNEXPECTED_ERROR` | Handoff |
 | `termo_pendente` | `jobs/alertas`, consulta parada em `AWAITING_CLIENT_AUTHORIZATION` | Link do termo |
 | `recontato:<n>` | `jobs/recontatos` | Nova tentativa de consulta |
 

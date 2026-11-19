@@ -24,11 +24,12 @@ ele não conflita:
   e sem o bloco recusa todo produto com seguro (`é obrigatório informar as
   informações de seguro`). Com a cobertura, aceitou nas rodadas 10, 11 e 13.
   Sem cobertura numérica no produto, sobra o `"SM-…"`.
-- **Resposta do `POST /propostas`:** o 201 traz só o id, como texto JSON;
-  aceitamos também `id`, `id_proposta` ou `data.id` num objeto.
+- **Resposta do `POST /propostas`:** o 201 traz só o id, como texto JSON
+  (confirmado pela Granatech em 2026-11-19).
 - **Webhook de proposta:** chega como `{tipo: "PROPOSTA", status, id_proposta,
   cpf}`, com o nome da notificação (`AGUARDANDO_CONFIRMACAO`) em `status` e sem
-  `tipo_notificacao`. Lemos os dois formatos; o status sai da tabela de
+  `tipo_notificacao`. A Granatech confirmou em 2026-11-19 que produção manda
+  igual. Lemos os dois formatos; o status sai da tabela de
   `docs/granatech-homologacao/webhook-propostas.md`.
 - **Webhook de consulta:** status em português; `AGUARDANDO_AUTORIZACAO_DO_CLIENTE`
   e `CONCLUIDO` viram `AWAITING_CLIENT_AUTHORIZATION` e `SUCCESS`. Outro nome
