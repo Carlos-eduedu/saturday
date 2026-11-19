@@ -292,6 +292,8 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
           '--gs-row': `${S.row}px`,
           '--gs-font': `${S.font}px`,
           '--gs-menu-w': `${menuWidth}px`,
+          '--gs-pad': `${PAD}px`,
+          '--gs-gap': `${GAP}px`,
           '--gs-pop': `${popDuration}ms`,
           '--gs-pop-out': `${popOut}ms`,
           '--gs-glide': `${glideDuration}ms`,

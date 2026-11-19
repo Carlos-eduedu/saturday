@@ -11,6 +11,12 @@
   --gs-row: 30px;
   --gs-font: 13px;
   --gs-menu-w: 176px;
+  /* Espaço interno do menu e vão entre as opções: o mesmo número do componente
+     (PAD e GAP), para a altura do menu fechar em linha inteira. */
+  --gs-pad: 4px;
+  --gs-gap: 1px;
+  /* Linhas inteiras à vista: a última opção não aparece pela metade. */
+  --gs-rows: 8;
   --gs-pop: 180ms;
   --gs-pop-out: 120ms;
   --gs-glide: 220ms;
@@ -125,11 +131,14 @@
   width: var(--gs-menu-w);
   min-width: 100%;
   max-width: calc(100vw - 2rem);
-  /* Lista longa (catálogo de modelos) rola dentro do menu. */
-  max-height: min(22rem, 60vh);
+  /* Lista longa (catálogo de modelos) rola dentro do menu, e a altura fecha em
+     linha inteira para não cortar a última opção no meio. */
+  max-height: min(calc(var(--gs-pad) * 2 + var(--gs-rows) * (var(--gs-row) + var(--gs-gap)) - var(--gs-gap)), 60vh);
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 4px;
+  scroll-padding-block: var(--gs-pad);
+  padding: var(--gs-pad);
   border: 1px solid var(--borda);
   border-radius: var(--gs-radius);
   background: var(--gs-surface);
@@ -171,7 +180,10 @@
 .glide-select__list {
   position: relative;
   display: grid;
-  gap: 1px;
+  /* A coluna segue a largura do menu: sem isto a grade cresce até o texto mais
+     longo, o menu ganha rolagem horizontal e a opção vaza para fora. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--gs-gap);
   /* No toque a lista rola; tocar sem arrastar escolhe. */
   touch-action: pan-y;
 }
