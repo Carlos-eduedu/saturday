@@ -192,6 +192,31 @@ novo depois de 1 minuto ([decisão 0025](decisoes/0025-uma-acao-do-gestor-por-ve
 Abrir consulta, simular e criar proposta não existem no painel: dependem do SIM
 do cliente. Item sem conversa fica só para leitura.
 
+## Integração (APP MEX)
+
+O Saturday é proxy da Granatech para o APP MEX ([decisão 0035](decisoes/0035-api-granatech-para-o-app-mex.md)):
+o APP MEX fala no formato da Granatech, e o Saturday troca o token da
+integração pelo login da MEX. Triagem e consentimento pela integração são do
+APP MEX ([decisão 0036](decisoes/0036-consentimento-e-triagem-pela-integracao.md));
+cota e teto continuam do Saturday.
+
+- **Tokens:** página Integrações do painel, só gestor
+  (`/admin/gestao/integracoes`). O token (`sat_...`) aparece uma vez; o banco
+  guarda o sha256. Escopos: `leitura`, `revelar`, `acoes`, `operacoes`,
+  `homologacao`. Criar e revogar vão para a auditoria.
+- **Chamada:** `Authorization: Bearer sat_...`. Sem token ou revogado: 401; sem
+  o escopo: 403; Granatech desligada: 503; falha de rede ou 5xx dela: 502.
+- **Proxy (fase 1, só leitura, escopo `leitura`)**, em
+  `/integracao/granatech/api-consignado/v1/`: `GET consulta-saldo/usuario`,
+  `GET consulta-saldo/{id}`, `GET bancos`, `GET propostas/lista`,
+  `GET propostas/{id}`. Query string e corpo passam crus; a recusa da Granatech
+  (4xx) volta com o status e o corpo dela. Rota fora da lista: 404.
+- **Rotas do Saturday:** `GET /integracao/cota` (`leitura`) e
+  `POST /integracao/consultas/{id_da_granatech}/revelar` (`revelar`, auditado
+  sem usuário e com `origem: integracao`).
+- **A fazer:** webhook de saída (fase 2), proxy de escrita com cota, teto,
+  `Idempotency-Key` e 409 em item de conversa (fase 3), homologação (fase 4).
+
 ## Pendências com a Granatech
 
 Cada uma está no código como `TODO(granatech)`:

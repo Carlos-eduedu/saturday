@@ -211,6 +211,13 @@ o repositório ainda não sabe quantos parâmetros cada modelo tem, e os modelos
 com botão de link levam o código de um link curto (`/l/{codigo}`), que o
 compositor do painel não gera.
 
+### Integração (`/integracao/*`)
+
+Proxy da Granatech para o APP MEX (decisão 0035), autenticado por
+`Authorization: Bearer` com um token gerado na página Integrações do painel
+(`/admin/gestao/integracoes`, só gestor). Rotas, escopos e respostas em
+`docs/granatech.md`, "Integração (APP MEX)".
+
 ### Política de retenção do extrato
 
 O extrato é guardado por no máximo `SATURDAY_RETENCAO_EXTRATO_DIAS` dias

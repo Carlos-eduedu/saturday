@@ -295,6 +295,19 @@ export interface ConfiguracoesInstancia {
   msgCall: string;
 }
 
+// Página Integrações (decisão 0035): token do APP MEX no proxy da Granatech.
+export type EscopoIntegracao = "leitura" | "revelar" | "acoes" | "operacoes" | "homologacao";
+
+export interface Integracao {
+  id: string;
+  nome: string;
+  escopos: EscopoIntegracao[];
+  criada_por: string | null;
+  criada_em: string;
+  revogada_em: string | null;
+  ultimo_uso_em: string | null;
+}
+
 export interface Qr {
   qr: string | null;
   estado: string;
@@ -811,6 +824,10 @@ export const api = {
   membros: () => chamar<Membro[]>("GET", "/membros"),
   membro: (id: string) => chamar<Membro>("GET", `/membros/${id}`),
   criarUsuario: (dados: NovoUsuario) => chamar<{ id: string }>("POST", "/gestao/usuarios", dados),
+  integracoes: () => chamar<Integracao[]>("GET", "/gestao/integracoes"),
+  criarIntegracao: (nome: string, escopos: EscopoIntegracao[]) =>
+    chamar<Integracao & { token: string }>("POST", "/gestao/integracoes", { nome, escopos }),
+  revogarIntegracao: (id: string) => chamar<void>("POST", `/gestao/integracoes/${id}/revogar`),
   editarUsuario: (
     id: string,
     dados: {

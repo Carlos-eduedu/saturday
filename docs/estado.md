@@ -71,6 +71,13 @@ uma entrega fora das fases.
   regras do produto estão na aba Operação e o C6 da aba Bancos descreve o
   contrato novo. Faltam refinanciamento, digitação e acompanhamento da
   proposta. Detalhes e pendências em `docs/c6.md`.
+- **Integração da Granatech para o APP MEX (decisões 0035 e 0036), em andamento:**
+  feita a fase 1 de 4: tokens com escopo na página Integrações (só gestor, só o
+  hash no banco), proxy de leitura em `/integracao/granatech/api-consignado/v1/`
+  (consultas, detalhe, bancos, propostas e detalhe, crus), cota e revelar CPF em
+  `/integracao/`. Faltam o webhook de saída (fase 2), o proxy de escrita com
+  cota, teto e `Idempotency-Key` (fase 3) e a homologação (fase 4). Detalhes em
+  `docs/granatech.md`, "Integração (APP MEX)".
 - **Fase 5 concluída:** ramo CLT em `agent/clt/` até a oferta, com triagem antes
   da identificação (docs/decisoes/0007), BrasilAPI com cache em `empresas_cnpj`
   e sem `FonteCadastral` (docs/decisoes/0006), prova do SIM antes de qualquer

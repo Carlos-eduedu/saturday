@@ -160,7 +160,7 @@ textarea { resize: vertical; }
 label { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.85rem; font-weight: 500; color: var(--suave); }
 
 /* ---------------------------------------------------------------- cartão único */
-.cartao, .login, .inbox li a, .alertas li, .ficha, .canais > section {
+.cartao, .login, .inbox li a, .alertas li, .ficha, :is(.canais, .integracoes) > section {
   background: var(--superficie);
   border: 1px solid var(--borda);
   border-radius: var(--raio-l);
@@ -1290,11 +1290,11 @@ main:has(.historico) { padding-bottom: 0; }
 .turno .erro { color: var(--erro); font-weight: 600; }
 
 /* ---------------------------------------------------------------- canais (decisão 0010) */
-.canais { display: flex; flex-direction: column; gap: 1.5rem; }
-.canais > section { padding: 1.25rem; }
-.canais ul { margin: 0; padding-left: 1.1rem; }
-.canais table { width: 100%; border-collapse: collapse; }
-.canais th {
+:is(.canais, .integracoes) { display: flex; flex-direction: column; gap: 1.5rem; }
+:is(.canais, .integracoes) > section { padding: 1.25rem; }
+:is(.canais, .integracoes) ul { margin: 0; padding-left: 1.1rem; }
+:is(.canais, .integracoes) table { width: 100%; border-collapse: collapse; }
+:is(.canais, .integracoes) th {
   text-align: left;
   font-size: 0.8rem;
   font-weight: 500;
@@ -1302,14 +1302,14 @@ main:has(.historico) { padding-bottom: 0; }
   padding: 0.5rem;
   border-bottom: 1px solid var(--borda);
 }
-.canais td { padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--borda); }
-.canais tbody tr:last-child td { border-bottom: none; }
-.canais td.acoes { display: table-cell; text-align: right; white-space: nowrap; }
-.canais td.acoes button + button { margin-left: 0.4rem; }
+:is(.canais, .integracoes) td { padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--borda); }
+:is(.canais, .integracoes) tbody tr:last-child td { border-bottom: none; }
+:is(.canais, .integracoes) td.acoes { display: table-cell; text-align: right; white-space: nowrap; }
+:is(.canais, .integracoes) td.acoes button + button { margin-left: 0.4rem; }
 .nova-instancia { display: flex; gap: 0.5rem; align-items: end; margin-top: 1.25rem; }
 /* QR e detalhes abrem dentro da seção Evolution, logo abaixo da tabela:
    uma região separada por fio, não um cartão dentro do cartão. */
-.canais tr.aberta { background: var(--destaque-suave); }
+:is(.canais, .integracoes) tr.aberta { background: var(--destaque-suave); }
 .painel-instancia {
   display: flex; flex-direction: column; gap: 0.75rem; align-items: flex-start;
   margin-top: 1rem; padding-top: 1.25rem; border-top: 1px solid var(--borda);
@@ -1333,6 +1333,16 @@ main:has(.historico) { padding-bottom: 0; }
 .configuracoes .opcao { flex-direction: row; align-items: center; gap: 0.6rem; color: var(--texto); font-weight: 400; min-height: var(--alvo); }
 .configuracoes .opcao input { min-height: 0; width: 1.15rem; height: 1.15rem; accent-color: var(--destaque); }
 .configuracoes .opcao small { display: inline; margin-left: 0.4rem; }
+/* Integrações (decisão 0035): mesma tabela e mesmos cartões dos Canais. */
+.integracoes fieldset { border: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+.integracoes legend { font-size: 0.85rem; color: var(--suave); margin-bottom: 0.25rem; }
+.integracoes .opcao { flex-direction: row; align-items: center; gap: 0.6rem; color: var(--texto); font-weight: 400; min-height: var(--alvo); }
+.integracoes .opcao input { min-height: 0; width: 1.15rem; height: 1.15rem; accent-color: var(--destaque); }
+.nova-integracao { display: flex; flex-direction: column; gap: 1rem; align-items: start; }
+.nova-integracao label:has(input:not([type="checkbox"])) { width: 100%; max-width: 24rem; }
+.integracoes tr.revogada td { color: var(--suave); }
+.token-novo { display: flex; flex-direction: column; gap: 0.75rem; }
+.token-novo code { overflow-wrap: anywhere; font-size: 0.95rem; }
 .acoes-form { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .confere { color: var(--ia); font-weight: 500; }
 .divergencias { color: var(--handoff); }
@@ -1352,15 +1362,15 @@ main:has(.historico) { padding-bottom: 0; }
 .evento-falta { color: var(--erro); font-weight: 600; }
 .qr img { display: block; background: #fff; padding: 8px; border-radius: var(--raio-m); }
 @media (max-width: 767px) {
-  .canais thead { display: none; }
-  .canais table, .canais tbody, .canais tr, .canais td { display: block; }
-  .canais tr { padding: 0.75rem 0; border-bottom: 1px solid var(--borda); }
-  .canais tbody tr:last-child { border-bottom: none; }
-  .canais td { border: none; padding: 0.15rem 0; }
-  .canais td[data-rotulo]::before { content: attr(data-rotulo) ": "; color: var(--suave); font-size: 0.85rem; }
-  .canais td:first-child { font-weight: 600; }
-  .canais td.acoes { display: flex; gap: 0.4rem; justify-content: flex-start; flex-wrap: wrap; padding-top: 0.5rem; white-space: normal; }
-  .canais td.acoes button + button { margin-left: 0; }
+  :is(.canais, .integracoes) thead { display: none; }
+  :is(.canais, .integracoes) table, :is(.canais, .integracoes) tbody, :is(.canais, .integracoes) tr, :is(.canais, .integracoes) td { display: block; }
+  :is(.canais, .integracoes) tr { padding: 0.75rem 0; border-bottom: 1px solid var(--borda); }
+  :is(.canais, .integracoes) tbody tr:last-child { border-bottom: none; }
+  :is(.canais, .integracoes) td { border: none; padding: 0.15rem 0; }
+  :is(.canais, .integracoes) td[data-rotulo]::before { content: attr(data-rotulo) ": "; color: var(--suave); font-size: 0.85rem; }
+  :is(.canais, .integracoes) td:first-child { font-weight: 600; }
+  :is(.canais, .integracoes) td.acoes { display: flex; gap: 0.4rem; justify-content: flex-start; flex-wrap: wrap; padding-top: 0.5rem; white-space: normal; }
+  :is(.canais, .integracoes) td.acoes button + button { margin-left: 0; }
   .nova-instancia { flex-direction: column; align-items: stretch; }
   .canais tr.aberta { padding-inline: 0.75rem; margin-inline: -0.75rem; border-radius: var(--raio-m); }
 }

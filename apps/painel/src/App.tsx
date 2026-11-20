@@ -14,6 +14,7 @@ import { Caixa } from "./paginas/Caixa";
 import { Login } from "./paginas/Login";
 import { TrocarSenha } from "./componentes/TrocarSenha";
 import { PaginaDoMembro } from "./paginas/Membro";
+import { Integracoes } from "./paginas/Integracoes";
 import { Membros } from "./paginas/Usuarios";
 import { iniciarTempoReal } from "./tempoReal";
 import { useRecurso } from "./useRecurso";
@@ -120,7 +121,15 @@ function Logado({
     { label: "Bancos", ariaLabel: "Ir para os bancos", link: "/bancos", ativo: em("/bancos") },
     { label: "Agente", ariaLabel: "Ir para o agente", link: "/agente", ativo: em("/agente") },
     ...(eu.perfil === "gestor"
-      ? [{ label: "Canais", ariaLabel: "Ir para os canais", link: "/canais", ativo: em("/canais") }]
+      ? [
+          { label: "Canais", ariaLabel: "Ir para os canais", link: "/canais", ativo: em("/canais") },
+          {
+            label: "Integrações",
+            ariaLabel: "Ir para as integrações",
+            link: "/integracoes",
+            ativo: em("/integracoes"),
+          },
+        ]
       : []),
     // Todos: o atendente vê só a seção "Você"; o gestor, também a equipe.
     { label: "Membros", ariaLabel: "Ir para os membros", link: "/membros", ativo: em("/membros") },
@@ -191,6 +200,7 @@ function Logado({
           <Route path="/bancos/:banco" element={<Bancos eu={eu} />} />
           <Route path="/agente" element={<Agente />} />
           {eu.perfil === "gestor" && <Route path="/canais" element={<Canais />} />}
+          {eu.perfil === "gestor" && <Route path="/integracoes" element={<Integracoes />} />}
           <Route path="/membros" element={<Membros eu={eu} />} />
           <Route
             path="/membros/:id"

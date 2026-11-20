@@ -407,7 +407,7 @@ function PainelQr({ nome, inicial, fechar }: { nome: string; inicial: Qr; fechar
 }
 
 // Leva quem clicou até o painel que abriu e põe o foco no título dele.
-function useAoAbrir() {
+export function useAoAbrir() {
   const ref = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     const titulo = ref.current;
