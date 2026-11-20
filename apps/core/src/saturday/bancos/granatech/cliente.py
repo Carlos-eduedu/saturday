@@ -192,7 +192,7 @@ class ClienteGranatech:
         rota_modelo: str,
         caminho: str,
         *,
-        params: dict[str, Any] | None = None,
+        params: dict[str, Any] | httpx.QueryParams | None = None,
         json: dict[str, Any] | None = None,
         token: str | None,
         conversa_id: Any = None,
@@ -243,7 +243,7 @@ class ClienteGranatech:
         rota_modelo: str,
         caminho: str,
         *,
-        params: dict[str, Any] | None = None,
+        params: dict[str, Any] | httpx.QueryParams | None = None,
         json: dict[str, Any] | None = None,
         conversa_id: Any = None,
     ) -> Any:
@@ -464,19 +464,21 @@ class ClienteGranatech:
             )
 
     def repassar(
-        self, metodo: str, rota_modelo: str, caminho: str, params: dict[str, Any] | None = None
+        self, metodo: str, rota_modelo: str, caminho: str, params: httpx.QueryParams | None = None
     ) -> tuple[int, Any]:
         """Proxy da integração (decisão 0035): status e corpo crus da Granatech.
 
         Só GET por enquanto. A recusa (4xx) volta como veio; falha de rede ou 5xx
-        sobe como `ErroGranatech`, para virar 502.
+        sobe como `ErroGranatech`, para virar 502. 401 e 403 também sobem: são do
+        login da MEX, e o chamador os leria como recusa do próprio token.
         """
 
         try:
             return 200, self._chamar(metodo, rota_modelo, caminho, params=params)
         except ErroGranatech as erro:
-            if erro.status is not None and 400 <= erro.status < 500:
-                return erro.status, erro.corpo
+            status = erro.status
+            if status is not None and 400 <= status < 500 and status not in (401, 403):
+                return status, erro.corpo
             raise
 
     def listar_consultas_por_cpf(self, cpf: str) -> list[dict[str, Any]]:

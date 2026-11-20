@@ -210,7 +210,9 @@ cota e teto continuam do Saturday.
   `/integracao/granatech/api-consignado/v1/`: `GET consulta-saldo/usuario`,
   `GET consulta-saldo/{id}`, `GET bancos`, `GET propostas/lista`,
   `GET propostas/{id}`. Query string e corpo passam crus; a recusa da Granatech
-  (4xx) volta com o status e o corpo dela. Rota fora da lista: 404.
+  (4xx) volta com o status e o corpo dela (`null` se ela não mandou JSON),
+  menos 401 e 403, que são do login da MEX e viram 502. Rota fora da lista: 404;
+  id no caminho fora de `[A-Za-z0-9_-]`: 422.
 - **Rotas do Saturday:** `GET /integracao/cota` (`leitura`) e
   `POST /integracao/consultas/{id_da_granatech}/revelar` (`revelar`, auditado
   sem usuário e com `origem: integracao`).

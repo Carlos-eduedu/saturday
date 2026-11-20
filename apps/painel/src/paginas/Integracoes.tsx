@@ -194,7 +194,8 @@ function TokenNovo({ nome, token, fechar }: { nome: string; token: string; fecha
   // O formulário fica embaixo; o token aparece no topo e a tela vai até ele.
   const topo = useAoAbrir();
   return (
-    <section className="token-novo" role="status" aria-label={`Token de ${nome}`}>
+    // Sem `role="status"`: o leitor de tela leria o token em voz alta. O foco vai ao título.
+    <section className="token-novo" aria-label={`Token de ${nome}`}>
       <h2 ref={topo} tabIndex={-1}>
         Token de {nome}
       </h2>

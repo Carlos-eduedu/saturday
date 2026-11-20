@@ -10,7 +10,8 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Path, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
@@ -33,6 +34,8 @@ router = APIRouter(prefix="/integracao", tags=["integracao"])
 Fabrica = Annotated[sessionmaker[Session], Depends(get_fabrica)]
 Leitura = Annotated[IntegracaoLogada, Depends(integracao("leitura"))]
 Revelar = Annotated[IntegracaoLogada, Depends(integracao("revelar"))]
+# Id da Granatech no caminho: sem `/`, `..` nem `?`, para não sair da lista de rotas.
+Id = Annotated[str, Path(pattern=r"^[A-Za-z0-9_-]{1,64}$")]
 
 
 def get_granatech(request: Request) -> ClienteGranatech:
@@ -53,7 +56,8 @@ def _repassar(
             "GET",
             f"{CONSIGNADO}{rota_modelo}",
             f"{CONSIGNADO}{caminho}",
-            dict(request.query_params) or None,
+            # Lista de pares: chave repetida (`?status=a&status=b`) passa inteira.
+            httpx.QueryParams(request.url.query) or None,
         )
     except ErroGranatech as exc:
         raise HTTPException(status_code=502, detail="Granatech indisponível") from exc
@@ -71,7 +75,7 @@ def consultas(request: Request, _i: Leitura, cliente: Granatech) -> JSONResponse
 
 
 @router.get(f"{GRANATECH}/consulta-saldo/{{id_consulta}}")
-def consulta(id_consulta: str, request: Request, _i: Leitura, cliente: Granatech) -> JSONResponse:
+def consulta(id_consulta: Id, request: Request, _i: Leitura, cliente: Granatech) -> JSONResponse:
     return _repassar(cliente, "/consulta-saldo/{id}", f"/consulta-saldo/{id_consulta}", request)
 
 
@@ -86,7 +90,7 @@ def propostas(request: Request, _i: Leitura, cliente: Granatech) -> JSONResponse
 
 
 @router.get(f"{GRANATECH}/propostas/{{id_proposta}}")
-def proposta(id_proposta: str, request: Request, _i: Leitura, cliente: Granatech) -> JSONResponse:
+def proposta(id_proposta: Id, request: Request, _i: Leitura, cliente: Granatech) -> JSONResponse:
     return _repassar(cliente, "/propostas/{id}", f"/propostas/{id_proposta}", request)
 
 
@@ -99,7 +103,7 @@ def cota(request: Request, _i: Leitura, fabrica: Fabrica) -> dict[str, Any]:
 
 
 @router.post("/consultas/{id_consulta}/revelar")
-def revelar_cpf(id_consulta: str, quem: Revelar, fabrica: Fabrica) -> dict[str, str]:
+def revelar_cpf(id_consulta: Id, quem: Revelar, fabrica: Fabrica) -> dict[str, str]:
     """CPF da consulta pelo id da Granatech, o único que o APP MEX conhece."""
 
     with abrir_sessao(fabrica) as sessao:

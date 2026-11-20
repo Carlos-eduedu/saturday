@@ -5,8 +5,10 @@ Postgres real, simulador da Granatech em processo e a API por cima.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
+import httpx
 import pytest
 from conftest import entrar_como, settings_granatech
 from fastapi.testclient import TestClient
@@ -183,3 +185,70 @@ def test_revelar_audita_com_a_origem(api: TestClient, fabrica: Any) -> None:
     (linha,) = _auditoria(fabrica, "revelar:cpf")
     assert linha.usuario_id is None
     assert linha.detalhe is not None and linha.detalhe["origem"] == "integracao"
+
+
+# ------------------------------------------------------------------ falhas da Granatech
+
+
+def _api_com(
+    client_pg: TestClient,
+    fabrica: sessionmaker[Session],
+    rota: Callable[[httpx.Request], httpx.Response],
+) -> list[httpx.Request]:
+    """Granatech de mentira: login aceito e o resto respondido por `rota`."""
+
+    pedidos: list[httpx.Request] = []
+
+    def responder(pedido: httpx.Request) -> httpx.Response:
+        if pedido.url.path == "/api/v1/auth/login":
+            return httpx.Response(200, json={"token": "t", "expira_em": "1h"})
+        pedidos.append(pedido)
+        return rota(pedido)
+
+    http = httpx.Client(transport=httpx.MockTransport(responder), base_url="http://granatech")
+    cliente = ClienteGranatech(http, settings_granatech(), fabrica, dormir=lambda _s: None)
+    client_pg.app.dependency_overrides[get_granatech] = lambda: cliente  # type: ignore[attr-defined]
+    return pedidos
+
+
+def test_busca_chega_a_granatech_com_os_parametros(client_pg: TestClient, fabrica: Any) -> None:
+    pedidos = _api_com(client_pg, fabrica, lambda _p: httpx.Response(200, json={"dados": []}))
+    token = _token(client_pg, fabrica, "leitura")
+    resposta = client_pg.get(
+        f"{PROXY}/propostas/lista?termo_busca=52998224725&status=A&status=B", headers=token
+    )
+    assert resposta.status_code == 200
+    assert pedidos[0].url.params.multi_items() == [
+        ("termo_busca", "52998224725"),
+        ("status", "A"),
+        ("status", "B"),
+    ]
+
+
+def test_falha_da_granatech_vira_502(client_pg: TestClient, fabrica: Any) -> None:
+    pedidos = _api_com(client_pg, fabrica, lambda _p: httpx.Response(503))
+    token = _token(client_pg, fabrica, "leitura")
+    assert client_pg.get(f"{PROXY}/bancos", headers=token).status_code == 502
+    assert len(pedidos) == 2  # o GET tenta de novo uma vez
+
+
+def test_recusa_do_login_da_mex_nao_parece_recusa_do_token(
+    client_pg: TestClient, fabrica: Any
+) -> None:
+    # 401 e 403 da Granatech são do login da MEX; o APP MEX leria como token revogado.
+    _api_com(client_pg, fabrica, lambda _p: httpx.Response(401, json={"message": "não"}))
+    token = _token(client_pg, fabrica, "leitura")
+    assert client_pg.get(f"{PROXY}/bancos", headers=token).status_code == 502
+
+
+def test_granatech_desligada_503(client_pg: TestClient, fabrica: Any) -> None:
+    token = _token(client_pg, fabrica, "leitura")
+    assert client_pg.get(f"{PROXY}/bancos", headers=token).status_code == 503
+
+
+def test_id_que_sairia_da_lista_e_recusado(client_pg: TestClient, fabrica: Any) -> None:
+    pedidos = _api_com(client_pg, fabrica, lambda _p: httpx.Response(200, json={}))
+    token = _token(client_pg, fabrica, "leitura")
+    assert client_pg.get(f"{PROXY}/propostas/x%3Fa%3Db", headers=token).status_code == 422
+    assert client_pg.get(f"{PROXY}/consulta-saldo/a.b", headers=token).status_code == 422
+    assert pedidos == []
