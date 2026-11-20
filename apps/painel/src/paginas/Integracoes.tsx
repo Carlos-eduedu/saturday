@@ -1,15 +1,23 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
-import { api, type EscopoIntegracao, type Integracao, mensagemDeFalha } from "../api";
+import {
+  api,
+  type EntregaIntegracao,
+  type EscopoIntegracao,
+  type Integracao,
+  mensagemDeFalha,
+} from "../api";
 import { useConfirmar } from "../componentes/Confirmar";
 import { Falha } from "../componentes/Falha";
 import { Vazio } from "../componentes/Vazio";
-import { relativo } from "../rotulos";
+import { relativo, rotulo, SITUACAO_DA_CONSULTA, SITUACAO_DA_PROPOSTA } from "../rotulos";
 import { useAcao } from "../useAcao";
 import { useAoAbrir } from "./Canais";
 
 // Tela Integrações (decisão 0035), só para gestor: tokens de sistemas de fora
 // (o APP MEX) no proxy da Granatech. O token aparece uma vez, logo depois de
-// criado; o servidor guarda só o hash. Revogar é para sempre.
+// criado; o servidor guarda só o hash. Revogar é para sempre. Cada token pode
+// ter um webhook, que recebe o status novo das consultas e propostas que ele
+// abriu, assinado com um segredo que também aparece uma vez.
 
 const ESCOPOS: { valor: EscopoIntegracao; rotulo: string; texto: string }[] = [
   { valor: "leitura", rotulo: "Leitura", texto: "consultas, propostas, bancos e cota" },
@@ -22,7 +30,8 @@ const ROTULO_ESCOPO = Object.fromEntries(ESCOPOS.map((e) => [e.valor, e.rotulo])
 
 export function Integracoes() {
   const [lista, setLista] = useState<Integracao[] | null>(null);
-  const [novoToken, setNovoToken] = useState<{ nome: string; token: string } | null>(null);
+  const [revelado, setRevelado] = useState<Revelacao | null>(null);
+  const [webhookDe, setWebhookDe] = useState<string | null>(null);
   const { agir, erro, setErro } = useAcao(() => carregar());
   const carregar = useCallback(() => {
     api
@@ -51,15 +60,37 @@ export function Integracoes() {
           {erro}
         </p>
       )}
-      {novoToken && (
-        <TokenNovo key={novoToken.token} {...novoToken} fechar={() => setNovoToken(null)} />
-      )}
+      {revelado && <Revelado key={revelado.valor} {...revelado} fechar={() => setRevelado(null)} />}
       <section>
         <h2>Tokens</h2>
-        <TabelaIntegracoes lista={lista} agir={agir} />
+        <TabelaIntegracoes
+          lista={lista}
+          agir={agir}
+          aberta={webhookDe}
+          abrir={(id) => setWebhookDe(id === webhookDe ? null : id)}
+        />
+        {/* Abre logo abaixo da tabela, perto de quem clicou, como em Canais. */}
+        {webhookDe && lista.some((i) => i.id === webhookDe && !i.revogada_em) && (
+          <PainelWebhook
+            key={webhookDe}
+            integracao={lista.find((i) => i.id === webhookDe) as Integracao}
+            agir={agir}
+            revelar={setRevelado}
+            fechar={() => setWebhookDe(null)}
+          />
+        )}
       </section>
       <section>
-        <NovaIntegracao agir={agir} criada={(nome, token) => setNovoToken({ nome, token })} />
+        <NovaIntegracao
+          agir={agir}
+          criada={(nome, token) =>
+            setRevelado({
+              titulo: `Token de ${nome}`,
+              valor: token,
+              aviso: "Copie agora: ele não aparece de novo. Se perder, revogue e crie outro.",
+            })
+          }
+        />
       </section>
     </div>
   );
@@ -68,9 +99,13 @@ export function Integracoes() {
 function TabelaIntegracoes({
   lista,
   agir,
+  aberta,
+  abrir,
 }: {
   lista: Integracao[];
   agir: (acao: () => Promise<unknown>) => Promise<unknown>;
+  aberta: string | null;
+  abrir: (id: string) => void;
 }) {
   const confirmar = useConfirmar();
   if (lista.length === 0)
@@ -85,12 +120,16 @@ function TabelaIntegracoes({
           <th>Escopos</th>
           <th>Criada por</th>
           <th>Último uso</th>
+          <th>Webhook</th>
           <th />
         </tr>
       </thead>
       <tbody>
         {lista.map((i) => (
-          <tr key={i.id} className={i.revogada_em ? "revogada" : undefined}>
+          <tr
+            key={i.id}
+            className={i.revogada_em ? "revogada" : aberta === i.id ? "aberta" : undefined}
+          >
             <td>
               {i.nome}
               {i.revogada_em && <span className="nota"> · revogada</span>}
@@ -100,7 +139,13 @@ function TabelaIntegracoes({
             <td data-rotulo="Último uso">
               {i.ultimo_uso_em ? relativo(i.ultimo_uso_em, agora) : "nunca"}
             </td>
+            <td data-rotulo="Webhook">{i.webhook_url ? hostDe(i.webhook_url) : "—"}</td>
             <td className="acoes">
+              {!i.revogada_em && (
+                <button type="button" aria-expanded={aberta === i.id} onClick={() => abrir(i.id)}>
+                  {aberta === i.id ? "Fechar webhook" : "Webhook"}
+                </button>
+              )}
               {!i.revogada_em && (
                 <button
                   type="button"
@@ -189,25 +234,25 @@ function NovaIntegracao({
   );
 }
 
-function TokenNovo({ nome, token, fechar }: { nome: string; token: string; fechar: () => void }) {
+type Revelacao = { titulo: string; valor: string; aviso: string };
+
+// Token ou segredo recém-gerado: aparece uma vez, no topo, e a tela vai até ele.
+function Revelado({ titulo, valor, aviso, fechar }: Revelacao & { fechar: () => void }) {
   const [copiado, setCopiado] = useState(false);
-  // O formulário fica embaixo; o token aparece no topo e a tela vai até ele.
   const topo = useAoAbrir();
   return (
-    // Sem `role="status"`: o leitor de tela leria o token em voz alta. O foco vai ao título.
-    <section className="token-novo" aria-label={`Token de ${nome}`}>
+    // Sem `role="status"`: o leitor de tela leria o valor em voz alta. O foco vai ao título.
+    <section className="token-novo" aria-label={titulo}>
       <h2 ref={topo} tabIndex={-1}>
-        Token de {nome}
+        {titulo}
       </h2>
-      <p className="aviso">
-        Copie agora: ele não aparece de novo. Se perder, revogue e crie outro.
-      </p>
-      <code className="dado">{token}</code>
+      <p className="aviso">{aviso}</p>
+      <code className="dado">{valor}</code>
       <div className="acoes-form">
         <button
           type="button"
           onClick={() =>
-            navigator.clipboard.writeText(token).then(
+            navigator.clipboard.writeText(valor).then(
               () => setCopiado(true),
               () => setCopiado(false),
             )
@@ -220,5 +265,137 @@ function TokenNovo({ nome, token, fechar }: { nome: string; token: string; fecha
         </button>
       </div>
     </section>
+  );
+}
+
+function hostDe(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+}
+
+const SITUACAO_ENTREGA: Record<EntregaIntegracao["situacao"], string> = {
+  entregue: "entregue",
+  pendente: "na fila",
+  desistiu: "não entregue",
+};
+
+function PainelWebhook({
+  integracao,
+  agir,
+  revelar,
+  fechar,
+}: {
+  integracao: Integracao;
+  agir: (acao: () => Promise<unknown>) => Promise<unknown>;
+  revelar: (r: Revelacao) => void;
+  fechar: () => void;
+}) {
+  const [url, setUrl] = useState(integracao.webhook_url ?? "");
+  const [entregas, setEntregas] = useState<EntregaIntegracao[] | null>(null);
+  const confirmar = useConfirmar();
+  const topo = useAoAbrir();
+  useEffect(() => {
+    api
+      .entregasIntegracao(integracao.id)
+      .then(setEntregas)
+      .catch(() => setEntregas([]));
+  }, [integracao.id]);
+
+  function salvar(evento: FormEvent) {
+    evento.preventDefault();
+    agir(() => api.definirWebhook(integracao.id, url.trim() || null));
+  }
+
+  async function gerar() {
+    if (
+      integracao.tem_segredo &&
+      !(await confirmar({
+        titulo: `Trocar o segredo do webhook de ${integracao.nome}?`,
+        texto:
+          "O segredo atual para de valer na hora: os avisos seguintes saem assinados com o novo, " +
+          "e o sistema que recebe precisa ser atualizado.",
+        acao: "Trocar o segredo",
+        perigo: true,
+      }))
+    )
+      return;
+    agir(async () => {
+      const { segredo } = await api.gerarSegredo(integracao.id);
+      revelar({
+        titulo: `Segredo do webhook de ${integracao.nome}`,
+        valor: segredo,
+        aviso: "Copie agora: ele não aparece de novo. Com ele o sistema confere a assinatura.",
+      });
+    });
+  }
+
+  const agora = Date.now();
+  return (
+    <div className="painel-instancia painel-webhook">
+      <div className="painel-topo">
+        <h3 ref={topo} tabIndex={-1}>
+          Webhook de {integracao.nome}
+        </h3>
+        <button type="button" onClick={fechar}>
+          Fechar
+        </button>
+      </div>
+      <p className="nota">
+        Recebe o status novo das consultas e propostas abertas por este token, assinado no
+        cabeçalho <code>X-Saturday-Signature</code>. O CPF vai mascarado.
+      </p>
+      <form onSubmit={salvar} className="nova-instancia endereco-webhook">
+        <label>
+          Endereço
+          <input
+            type="url"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://app.mex.com.br/avisos"
+          />
+        </label>
+        <button type="submit">{url.trim() ? "Salvar endereço" : "Tirar o webhook"}</button>
+      </form>
+      <div className="acoes-form">
+        <button type="button" onClick={gerar}>
+          {integracao.tem_segredo ? "Trocar o segredo" : "Gerar o segredo"}
+        </button>
+        {!integracao.tem_segredo && (
+          <span className="aviso">Sem segredo, nenhum aviso sai.</span>
+        )}
+      </div>
+      <h4>Últimas entregas</h4>
+      {entregas === null ? (
+        <p className="nota">Carregando…</p>
+      ) : entregas.length === 0 ? (
+        <p className="vazio">Nenhum aviso ainda.</p>
+      ) : (
+        <ul className="lista-numeros">
+          {entregas.map((e) => (
+            <li key={e.id}>
+              <span className="dado">{relativo(e.criada_em, agora)}</span>
+              <span>
+                {e.tipo === "consulta" ? "Consulta" : "Proposta"} ·{" "}
+                {e.status
+                  ? rotulo(
+                      e.tipo === "consulta" ? SITUACAO_DA_CONSULTA : SITUACAO_DA_PROPOSTA,
+                      e.status,
+                    )
+                  : "—"}
+              </span>
+              <span className={`estado-entrega entrega-${e.situacao}`}>
+                {SITUACAO_ENTREGA[e.situacao]}
+              </span>
+              <span className="nota">
+                {e.tentativas} tentativa{e.tentativas === 1 ? "" : "s"}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

@@ -306,6 +306,18 @@ export interface Integracao {
   criada_em: string;
   revogada_em: string | null;
   ultimo_uso_em: string | null;
+  webhook_url: string | null;
+  tem_segredo: boolean;
+}
+
+export interface EntregaIntegracao {
+  id: number;
+  tipo: "consulta" | "proposta";
+  status: string | null;
+  situacao: "entregue" | "pendente" | "desistiu";
+  tentativas: number;
+  criada_em: string;
+  entregue_em: string | null;
 }
 
 export interface Qr {
@@ -828,6 +840,12 @@ export const api = {
   criarIntegracao: (nome: string, escopos: EscopoIntegracao[]) =>
     chamar<Integracao & { token: string }>("POST", "/gestao/integracoes", { nome, escopos }),
   revogarIntegracao: (id: string) => chamar<void>("POST", `/gestao/integracoes/${id}/revogar`),
+  definirWebhook: (id: string, url: string | null) =>
+    chamar<void>("PUT", `/gestao/integracoes/${id}/webhook`, { url }),
+  gerarSegredo: (id: string) =>
+    chamar<{ segredo: string }>("POST", `/gestao/integracoes/${id}/webhook/segredo`),
+  entregasIntegracao: (id: string) =>
+    chamar<EntregaIntegracao[]>("GET", `/gestao/integracoes/${id}/webhook/entregas`),
   editarUsuario: (
     id: string,
     dados: {

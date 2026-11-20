@@ -217,8 +217,34 @@ cota e teto continuam do Saturday.
 - **Rotas do Saturday:** `GET /integracao/cota` (`leitura`) e
   `POST /integracao/consultas/{id_da_granatech}/revelar` (`revelar`, auditado
   sem usuário e com `origem: integracao`).
-- **A fazer:** webhook de saída (fase 2), proxy de escrita com cota, teto,
-  `Idempotency-Key` e 409 em item de conversa (fase 3), homologação (fase 4).
+- **Webhook de saída (fase 2):** cada integração pode ter um endereço
+  (`https://`; `http://localhost` fora de homolog e prod) e um segredo
+  (`whsec_...`, mostrado uma vez; trocar invalida o anterior), cadastrados na
+  página Integrações (`PUT /admin/gestao/integracoes/{id}/webhook`,
+  `POST .../webhook/segredo`, `GET .../webhook/entregas`). Quando um evento da
+  Granatech muda o status de uma consulta ou proposta com `integracao_id`, o
+  worker grava no outbox (canal `integracao`, mesma transação do status) e
+  entrega `POST` com o corpo `{"tipo": "consulta"|"proposta", "evento": <evento
+  da Granatech, CPF mascarado>, "recebido_em": ...}`. Status repetido ou
+  regressão não avisa. 2xx é entregue; o resto tenta de novo com o backoff do
+  outbox e, no teto, desiste com o alerta `integracao_webhook_falhou`.
+  Integração revogada ou sem endereço desiste sem chamar. O segredo fica em
+  claro no banco, porque assina o corpo.
+- **Conferir a assinatura** (lado do APP MEX), igual ao webhook do `/chat`:
+
+  ```python
+  import hashlib, hmac
+
+  def assinatura_valida(segredo: str, timestamp: str, corpo: bytes, recebida: str) -> bool:
+      esperada = hmac.new(segredo.encode(), f"{timestamp}.".encode() + corpo, hashlib.sha256)
+      return hmac.compare_digest(f"sha256={esperada.hexdigest()}", recebida)
+  ```
+
+  Com `timestamp = X-Saturday-Timestamp`, `recebida = X-Saturday-Signature` e o
+  corpo cru, antes de ler o JSON. Recuse timestamp com mais de 5 minutos.
+- **A fazer:** proxy de escrita com cota, teto, `Idempotency-Key` e 409 em item
+  de conversa, que grava a `integracao_id` (fase 3; até lá nenhum aviso sai de
+  verdade), homologação (fase 4).
 
 ## Pendências com a Granatech
 
