@@ -601,6 +601,10 @@ class HomologacaoGranatech(Base):
     pedido_por: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("usuarios_painel.id", ondelete="SET NULL")
     )
+    # Pedida pela integração (decisão 0035, fase 4), no lugar de um usuário.
+    integracao_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("integracoes.id", ondelete="SET NULL")
+    )
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
     iniciado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     terminado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

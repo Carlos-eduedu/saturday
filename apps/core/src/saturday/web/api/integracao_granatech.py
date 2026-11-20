@@ -13,7 +13,7 @@ from typing import Annotated, Any
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Path, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -22,6 +22,7 @@ from saturday.dados.modelos import ConsultaGranatech
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.painel.auditoria import auditar
 from saturday.privacidade import mascarar_cpfs
+from saturday.web.api import granatech_admin as painel
 from saturday.web.api.admin import cota_da_granatech
 from saturday.web.dependencies import (
     IntegracaoLogada,
@@ -36,6 +37,7 @@ router = APIRouter(prefix="/integracao", tags=["integracao"])
 Fabrica = Annotated[sessionmaker[Session], Depends(get_fabrica)]
 Leitura = Annotated[IntegracaoLogada, Depends(integracao("leitura"))]
 Revelar = Annotated[IntegracaoLogada, Depends(integracao("revelar"))]
+Homologacao = Annotated[IntegracaoLogada, Depends(integracao("homologacao"))]
 # Id da Granatech no caminho: sem `/`, `..` nem `?`, para não sair da lista de rotas.
 Id = Annotated[str, Path(pattern=r"^[A-Za-z0-9_-]{1,64}$")]
 
@@ -126,3 +128,35 @@ def revelar_cpf(id_consulta: Id, quem: Revelar, fabrica: Fabrica) -> dict[str, s
             {"origem": "integracao", "integracao": str(quem.id)},
         )
     return {"campo": "cpf", "valor": cpf}
+
+
+# ------------------------------------------------------- homologação (fase 4, decisão 0014)
+# As mesmas rodadas da aba Granatech: só fora de produção (404) e uma por vez (409).
+
+
+@router.get("/homologacao")
+def listar_rodadas(request: Request, _i: Homologacao, fabrica: Fabrica) -> dict[str, Any]:
+    return painel.listar_rodadas_json(painel.homologacao_disponivel(request), fabrica)
+
+
+@router.post("/homologacao", status_code=201)
+def pedir_rodada(
+    pedido: painel.PedidoRodada, request: Request, quem: Homologacao, fabrica: Fabrica
+) -> dict[str, Any]:
+    painel.homologacao_disponivel(request)
+    return painel.pedir_rodada_json(
+        fabrica, pedido.fase, usuario_id=None, integracao_id=quem.id, nome=quem.nome
+    )
+
+
+@router.get("/homologacao/{rodada_id}")
+def ver_rodada(
+    rodada_id: int, request: Request, _i: Homologacao, fabrica: Fabrica
+) -> dict[str, Any]:
+    painel.homologacao_disponivel(request)
+    return painel.ver_rodada_json(fabrica, rodada_id)
+
+
+@router.get("/homologacao/{rodada_id}/zip")
+def baixar_rodada(rodada_id: int, request: Request, _i: Homologacao, fabrica: Fabrica) -> Response:
+    return painel.zip_da_rodada(painel.homologacao_disponivel(request), fabrica, rodada_id)

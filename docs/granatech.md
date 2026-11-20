@@ -269,7 +269,12 @@ cota e teto continuam do Saturday.
   proposta. Abrir consulta trava por CPF (agente e proxy não gastam cota duas
   vezes) e o GET que abre não se repete num timeout; criar proposta trava por
   consulta (dois pedidos juntos fazem um POST só).
-- **A fazer:** homologação pela integração (fase 4).
+- **Homologação (fase 4)**, escopo `homologacao`, em `/integracao/`: `GET
+  homologacao`, `POST homologacao` `{fase: 1|2}`, `GET homologacao/{id}` e `GET
+  homologacao/{id}/zip`, com o mesmo JSON e as mesmas regras da aba Granatech
+  (decisão 0014): 404 em produção ou com a Granatech de produção, 409 com uma
+  rodada em andamento. A rodada guarda a integração que pediu, e a aba Granatech
+  mostra o nome dela em "pedido por".
 
 ## Pendências com a Granatech
 

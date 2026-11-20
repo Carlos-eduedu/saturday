@@ -35,6 +35,7 @@ from saturday.dados.modelos import (
     Auditoria,
     ConsultaGranatech,
     HomologacaoGranatech,
+    Integracao,
     PropostaGranatech,
     UsuarioPainel,
 )
@@ -583,13 +584,14 @@ def atualizar_detalhe(
 
 
 # ------------------------------------------------------------ homologação (decisão 0014)
+# O painel e a integração (decisão 0035, fase 4) usam as mesmas funções abaixo.
 
 
 class PedidoRodada(BaseModel):
     fase: Literal[1, 2]
 
 
-def _homologacao_disponivel(request: Request) -> Settings:
+def homologacao_disponivel(request: Request) -> Settings:
     settings = get_settings(request)
     if not homologacao.disponivel(settings):
         raise HTTPException(status_code=404, detail="homologação indisponível neste ambiente")
@@ -614,27 +616,27 @@ def _linha_rodada(r: HomologacaoGranatech, nome: str | None) -> dict[str, Any]:
     }
 
 
-def _rodada(sessao: Session, rodada_id: int) -> tuple[HomologacaoGranatech, str | None]:
-    linha = sessao.execute(
-        select(HomologacaoGranatech, UsuarioPainel.nome)
+def _com_quem_pediu() -> Any:
+    # Quem pediu: a pessoa do painel ou, sem ela, a integração.
+    return (
+        select(HomologacaoGranatech, func.coalesce(UsuarioPainel.nome, Integracao.nome))
         .outerjoin(UsuarioPainel, UsuarioPainel.id == HomologacaoGranatech.pedido_por)
-        .where(HomologacaoGranatech.id == rodada_id)
-    ).first()
+        .outerjoin(Integracao, Integracao.id == HomologacaoGranatech.integracao_id)
+    )
+
+
+def _rodada(sessao: Session, rodada_id: int) -> tuple[HomologacaoGranatech, str | None]:
+    linha = sessao.execute(_com_quem_pediu().where(HomologacaoGranatech.id == rodada_id)).first()
     if linha is None:
         raise HTTPException(status_code=404, detail="rodada não encontrada")
     return linha[0], linha[1]
 
 
-@router.get("/homologacao")
-def listar_rodadas(request: Request, _usuario: Gestor, fabrica: Fabrica) -> dict[str, Any]:
-    settings = _homologacao_disponivel(request)
+def listar_rodadas_json(settings: Settings, fabrica: sessionmaker[Session]) -> dict[str, Any]:
     dominio = settings.dominio_publico
     with abrir_sessao(fabrica) as sessao:
         linhas = sessao.execute(
-            select(HomologacaoGranatech, UsuarioPainel.nome)
-            .outerjoin(UsuarioPainel, UsuarioPainel.id == HomologacaoGranatech.pedido_por)
-            .order_by(HomologacaoGranatech.id.desc())
-            .limit(LIMITE)
+            _com_quem_pediu().order_by(HomologacaoGranatech.id.desc()).limit(LIMITE)
         ).all()
         rodadas = [_linha_rodada(r, nome) for r, nome in linhas]
     return {
@@ -645,35 +647,33 @@ def listar_rodadas(request: Request, _usuario: Gestor, fabrica: Fabrica) -> dict
     }
 
 
-@router.post("/homologacao", status_code=201)
-def pedir_rodada(
-    pedido: PedidoRodada, request: Request, usuario: GestorCsrf, fabrica: Fabrica
+def pedir_rodada_json(
+    fabrica: sessionmaker[Session],
+    fase: int,
+    *,
+    usuario_id: uuid.UUID | None,
+    integracao_id: uuid.UUID | None,
+    nome: str,
 ) -> dict[str, Any]:
-    _homologacao_disponivel(request)
     try:
         with abrir_sessao(fabrica) as sessao:
-            rodada = HomologacaoGranatech(fase=pedido.fase, pedido_por=usuario.id)
+            rodada = HomologacaoGranatech(
+                fase=fase, pedido_por=usuario_id, integracao_id=integracao_id
+            )
             sessao.add(rodada)
             sessao.flush()
-            auditar(
-                sessao,
-                usuario.id,
-                "granatech:homologacao",
-                f"rodada:{rodada.id}",
-                {"fase": pedido.fase},
-            )
+            detalhe: dict[str, Any] = {"fase": fase}
+            if integracao_id is not None:
+                detalhe |= {"origem": "integracao", "integracao": str(integracao_id)}
+            auditar(sessao, usuario_id, "granatech:homologacao", f"rodada:{rodada.id}", detalhe)
             repositorios.notificar(sessao, "homologacao", rodada=rodada.id)
-            return _linha_rodada(rodada, usuario.nome)
+            return _linha_rodada(rodada, nome)
     except IntegrityError:
         # Índice único: já existe uma rodada pendente ou em andamento.
         raise HTTPException(status_code=409, detail="já há uma rodada em andamento") from None
 
 
-@router.get("/homologacao/{rodada_id}")
-def ver_rodada(
-    rodada_id: int, request: Request, _usuario: Gestor, fabrica: Fabrica
-) -> dict[str, Any]:
-    _homologacao_disponivel(request)
+def ver_rodada_json(fabrica: sessionmaker[Session], rodada_id: int) -> dict[str, Any]:
     with abrir_sessao(fabrica) as sessao:
         rodada, nome = _rodada(sessao, rodada_id)
         return {
@@ -684,9 +684,7 @@ def ver_rodada(
         }
 
 
-@router.get("/homologacao/{rodada_id}/zip")
-def baixar_rodada(rodada_id: int, request: Request, _usuario: Gestor, fabrica: Fabrica) -> Response:
-    settings = _homologacao_disponivel(request)
+def zip_da_rodada(settings: Settings, fabrica: sessionmaker[Session], rodada_id: int) -> Response:
     with abrir_sessao(fabrica) as sessao:
         rodada, _nome = _rodada(sessao, rodada_id)
         buffer = io.BytesIO()
@@ -711,3 +709,31 @@ def baixar_rodada(rodada_id: int, request: Request, _usuario: Gestor, fabrica: F
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{nome}"'},
     )
+
+
+@router.get("/homologacao")
+def listar_rodadas(request: Request, _usuario: Gestor, fabrica: Fabrica) -> dict[str, Any]:
+    return listar_rodadas_json(homologacao_disponivel(request), fabrica)
+
+
+@router.post("/homologacao", status_code=201)
+def pedir_rodada(
+    pedido: PedidoRodada, request: Request, usuario: GestorCsrf, fabrica: Fabrica
+) -> dict[str, Any]:
+    homologacao_disponivel(request)
+    return pedir_rodada_json(
+        fabrica, pedido.fase, usuario_id=usuario.id, integracao_id=None, nome=usuario.nome
+    )
+
+
+@router.get("/homologacao/{rodada_id}")
+def ver_rodada(
+    rodada_id: int, request: Request, _usuario: Gestor, fabrica: Fabrica
+) -> dict[str, Any]:
+    homologacao_disponivel(request)
+    return ver_rodada_json(fabrica, rodada_id)
+
+
+@router.get("/homologacao/{rodada_id}/zip")
+def baixar_rodada(rodada_id: int, request: Request, _usuario: Gestor, fabrica: Fabrica) -> Response:
+    return zip_da_rodada(homologacao_disponivel(request), fabrica, rodada_id)
