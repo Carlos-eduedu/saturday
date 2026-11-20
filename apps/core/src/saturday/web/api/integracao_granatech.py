@@ -134,9 +134,18 @@ def revelar_cpf(id_consulta: Id, quem: Revelar, fabrica: Fabrica) -> dict[str, s
 # As mesmas rodadas da aba Granatech: só fora de produção (404) e uma por vez (409).
 
 
+def _sem_nome_do_gestor(rodada: dict[str, Any], quem: IntegracaoLogada) -> dict[str, Any]:
+    """O nome de quem pediu pelo painel é da equipe: para fora vai só "painel"."""
+
+    if rodada["pedido_por"] not in (None, quem.nome):
+        rodada = {**rodada, "pedido_por": "painel"}
+    return rodada
+
+
 @router.get("/homologacao")
-def listar_rodadas(request: Request, _i: Homologacao, fabrica: Fabrica) -> dict[str, Any]:
-    return painel.listar_rodadas_json(painel.homologacao_disponivel(request), fabrica)
+def listar_rodadas(request: Request, quem: Homologacao, fabrica: Fabrica) -> dict[str, Any]:
+    lista = painel.listar_rodadas_json(painel.homologacao_disponivel(request), fabrica)
+    return {**lista, "rodadas": [_sem_nome_do_gestor(r, quem) for r in lista["rodadas"]]}
 
 
 @router.post("/homologacao", status_code=201)
@@ -151,10 +160,10 @@ def pedir_rodada(
 
 @router.get("/homologacao/{rodada_id}")
 def ver_rodada(
-    rodada_id: int, request: Request, _i: Homologacao, fabrica: Fabrica
+    rodada_id: int, request: Request, quem: Homologacao, fabrica: Fabrica
 ) -> dict[str, Any]:
     painel.homologacao_disponivel(request)
-    return painel.ver_rodada_json(fabrica, rodada_id)
+    return _sem_nome_do_gestor(painel.ver_rodada_json(fabrica, rodada_id), quem)
 
 
 @router.get("/homologacao/{rodada_id}/zip")

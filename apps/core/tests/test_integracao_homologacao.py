@@ -80,3 +80,20 @@ def test_indisponivel_com_a_granatech_de_producao(service: AgentService, fabrica
     token = _token(client, fabrica, "homologacao")
     assert client.get(ROTA, headers=token).status_code == 404
     assert client.post(ROTA, json={"fase": 1}, headers=token).status_code == 404
+
+
+def test_indisponivel_em_producao(service: AgentService, fabrica: Any) -> None:
+    # O cookie do painel é `Secure` em produção: o token sai de um cliente de dev.
+    token = _token(_cliente(service, fabrica), fabrica, "homologacao")
+    producao = _cliente(service, fabrica, environment="prod")
+    assert producao.post(ROTA, json={"fase": 1}, headers=token).status_code == 404
+
+
+def test_rodada_do_painel_nao_mostra_o_nome_do_gestor(service: AgentService, fabrica: Any) -> None:
+    client = _cliente(service, fabrica)
+    token = _token(client, fabrica, "homologacao")
+    csrf = entrar_como(client, fabrica, "gestor")
+    client.post("/admin/granatech/homologacao", json={"fase": 1}, headers=csrf)
+    client.cookies.clear()
+    (rodada,) = client.get(ROTA, headers=token).json()["rodadas"]
+    assert rodada["pedido_por"] == "painel"

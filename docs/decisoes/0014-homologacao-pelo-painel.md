@@ -2,6 +2,7 @@
 
 - **Data:** 2026-11-13
 - **Status:** aceita
+- **Estendida por:** [0035](0035-api-granatech-para-o-app-mex.md) (fase 4: a integração com o escopo `homologacao` também pede e baixa rodadas)
 
 ## Contexto
 
