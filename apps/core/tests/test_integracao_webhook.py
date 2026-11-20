@@ -200,6 +200,70 @@ def test_integracao_revogada_desiste_sem_chamar(fabrica: Any, settings: Settings
 
     assert pedidos == []
     assert _avisos(fabrica)[0].falhou_em is not None
+    # Revogar foi o gestor: não é falha a avisar.
+    with abrir_sessao(fabrica) as sessao:
+        assert sessao.scalars(select(Alerta)).all() == []
+
+
+def test_entrega_leva_o_id_para_descartar_repetido(fabrica: Any, settings: Settings) -> None:
+    _consulta(fabrica, _integracao(fabrica))
+    _evento_consulta(fabrica, "PROCESSING")
+    http, pedidos = _recebidos([200])
+    _drenar(fabrica, settings, http)
+    assert pedidos[0].headers["X-Saturday-Entrega"] == str(_avisos(fabrica)[0].id)
+
+
+def test_endpoint_que_falha_nao_segura_o_lote(fabrica: Any, settings: Settings) -> None:
+    # Depois de uma falha, as outras linhas da mesma integração nem chamam.
+    _consulta(fabrica, _integracao(fabrica))
+    _evento_consulta(fabrica, "PROCESSING")
+    _evento_consulta(fabrica, "SUCCESS")
+    http, pedidos = _recebidos([500, 500])
+    drenar(fabrica, EntregadorIntegracao(http, fabrica), settings)
+    assert len(pedidos) == 1
+
+
+def test_um_alerta_aberto_por_integracao(fabrica: Any, settings: Settings) -> None:
+    _consulta(fabrica, _integracao(fabrica))
+    _evento_consulta(fabrica, "PROCESSING")
+    _evento_consulta(fabrica, "SUCCESS")
+    http, _ = _recebidos([500] * 50)
+    for _ in range(settings.outbox_max_tentativas):
+        _drenar(fabrica, settings, http)
+    assert all(a.falhou_em is not None for a in _avisos(fabrica))
+    with abrir_sessao(fabrica) as sessao:
+        assert len(sessao.scalars(select(Alerta)).all()) == 1
+
+
+def test_sem_segredo_nao_avisa(fabrica: Any) -> None:
+    _consulta(fabrica, _integracao(fabrica, webhook_segredo=None))
+    _evento_consulta(fabrica, "PROCESSING")
+    assert _avisos(fabrica) == []
+
+
+def test_consulta_pronta_pelo_painel_tambem_avisa(fabrica: Any) -> None:
+    _consulta(fabrica, _integracao(fabrica))
+    with abrir_sessao(fabrica) as sessao:
+        linha = sessao.scalars(select(ConsultaGranatech)).one()
+        assert jobs.aplicar_status_da_consulta(sessao, linha, "SUCCESS", origem="painel")
+    (aviso,) = _avisos(fabrica)
+    esperado = {"id_consulta": "c-1", "status": "SUCCESS", "origem": "painel"}
+    assert aviso.payload["evento"] == esperado
+
+
+def test_cpf_aninhado_sai_mascarado(fabrica: Any) -> None:
+    _consulta(fabrica, _integracao(fabrica))
+    jobs.aplicar(
+        fabrica,
+        None,
+        {
+            "tipo": "consulta",
+            "id_consulta": "c-1",
+            "status": "PROCESSING",
+            "pessoa_natural": {"document": CPF},
+        },
+    )
+    assert _avisos(fabrica)[0].payload["evento"]["pessoa_natural"] == {"document": "***.***.***-25"}
 
 
 # ------------------------------------------------------------------ painel

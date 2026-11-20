@@ -127,11 +127,8 @@ def _consulta(
             _alertar(sessao, None, motivo="consulta_desconhecida", id=id_externo, status=novo)
             return
 
-        antes = linha.status
-        if not aplicar_status_da_consulta(sessao, linha, novo):
+        if not aplicar_status_da_consulta(sessao, linha, novo, evento=payload):
             return
-        if linha.status != antes:
-            avisar_integracao(sessao, linha.integracao_id, "consulta", payload)
         status = linha.status
         tem_detalhe = linha.detalhe is not None
         conversation_id = repositorios.conversation_id_de(sessao, linha.conversa_id)
@@ -147,7 +144,12 @@ def _consulta(
 
 
 def aplicar_status_da_consulta(
-    sessao: Session, linha: ConsultaGranatech, novo: str, *, origem: str | None = None
+    sessao: Session,
+    linha: ConsultaGranatech,
+    novo: str,
+    *,
+    origem: str | None = None,
+    evento: dict[str, Any] | None = None,
 ) -> bool:
     """Aplica um status à consulta já travada, sem regredir (regra 10).
 
@@ -169,6 +171,14 @@ def aplicar_status_da_consulta(
         )
         return False
     if ordem.aceita_consulta(linha.status, novo):
+        if linha.status != novo:
+            # Pelo painel não há evento da Granatech: vai o mínimo, com a origem.
+            avisar_integracao(
+                sessao,
+                linha.integracao_id,
+                "consulta",
+                evento or {"id_consulta": linha.id_externo, "status": novo, "origem": origem},
+            )
         linha.status = novo
         if novo in ordem.CONSULTA_ALERTA:
             _alertar(
@@ -188,14 +198,16 @@ def avisar_integracao(
 ) -> None:
     """Item aberto pelo proxy: o status novo vai ao webhook da integração (decisão 0035).
 
-    Na transação do status, pelo outbox; sem webhook cadastrado ou revogada, nada.
+    Na transação do status, pelo outbox; sem endereço, sem segredo ou revogada, nada.
     O evento sai como a Granatech mandou, menos o CPF, mascarado.
     """
 
     if integracao_id is None:
         return
     integracao = sessao.get(Integracao, integracao_id)
-    if integracao is None or integracao.revogada_em is not None or not integracao.webhook_url:
+    if integracao is None or integracao.revogada_em is not None:
+        return
+    if not integracao.webhook_url or not integracao.webhook_segredo:
         return
     evento = {k: v for k, v in payload.items() if not k.startswith("_")}
     fila.enfileirar(

@@ -9,7 +9,7 @@ from sqlalchemy import ColumnElement, and_, exists, func, not_, select
 from sqlalchemy.orm import Session
 
 from saturday.dados import repositorios
-from saturday.dados.modelos import Conversa, Outbox
+from saturday.dados.modelos import Alerta, Conversa, Outbox
 
 # Tempo que a linha fica reservada por um worker. Se ele morrer no meio da
 # entrega, outro worker a pega depois deste prazo — é o lease que evita duas
@@ -140,12 +140,7 @@ def marcar_desistencia(sessao: Session, linha: Outbox, *, erro: str) -> None:
     sessao.flush()
     # O erro fica na linha; o alerta leva só a referência.
     if linha.integracao_id is not None:
-        # Aviso ao APP MEX (decisão 0035): o alerta diz de que integração.
-        repositorios.abrir_alerta(
-            sessao,
-            "integracao_webhook_falhou",
-            detalhe={"outbox": linha.id, "integracao": str(linha.integracao_id)},
-        )
+        _alertar_integracao(sessao, linha, erro)
         return
     repositorios.abrir_alerta(
         sessao, "envio_falhou", conversa_id=linha.conversa_id, detalhe={"outbox": linha.id}
@@ -158,3 +153,27 @@ def marcar_falha(sessao: Session, linha: Outbox, *, erro: str, espera_s: float) 
     linha.ultimo_erro = erro[:2000]
     linha.proxima_tentativa_em = agora() + timedelta(seconds=espera_s)
     sessao.flush()
+
+
+def _alertar_integracao(sessao: Session, linha: Outbox, erro: str) -> None:
+    """Aviso ao APP MEX desistido (decisão 0035): um alerta aberto por integração.
+
+    Desistência permanente é revogação ou endereço tirado pelo gestor: sem alerta.
+    """
+
+    if erro.startswith("permanente"):
+        return
+    integracao = str(linha.integracao_id)
+    aberto = sessao.scalar(
+        select(Alerta.id).where(
+            Alerta.tipo == "integracao_webhook_falhou",
+            Alerta.resolvido_em.is_(None),
+            Alerta.detalhe["integracao"].astext == integracao,
+        )
+    )
+    if aberto is None:
+        repositorios.abrir_alerta(
+            sessao,
+            "integracao_webhook_falhou",
+            detalhe={"outbox": linha.id, "integracao": integracao},
+        )

@@ -226,10 +226,18 @@ cota e teto continuam do Saturday.
   worker grava no outbox (canal `integracao`, mesma transação do status) e
   entrega `POST` com o corpo `{"tipo": "consulta"|"proposta", "evento": <evento
   da Granatech, CPF mascarado>, "recebido_em": ...}`. Status repetido ou
-  regressão não avisa. 2xx é entregue; o resto tenta de novo com o backoff do
-  outbox e, no teto, desiste com o alerta `integracao_webhook_falhou`.
-  Integração revogada ou sem endereço desiste sem chamar. O segredo fica em
-  claro no banco, porque assina o corpo.
+  regressão não avisa; o "atualizar detalhe" do painel também avisa, com
+  `{"id_consulta", "status", "origem": "painel"}` no lugar do evento. Sem
+  segredo gerado, nada entra na fila. 2xx é entregue; o resto tenta de novo com
+  o backoff do outbox (timeout de 3 s, e a integração que falhou fica 1 minuto
+  sem ser chamada, para não segurar o worker) e, no teto, desiste com o alerta
+  `integracao_webhook_falhou`, um aberto por integração. Integração revogada ou
+  sem endereço desiste sem chamar e sem alerta. O segredo fica em claro no
+  banco, porque assina o corpo.
+- **Repetição e ordem:** um 2xx perdido no caminho faz o aviso sair de novo. O
+  cabeçalho `X-Saturday-Entrega` traz o id da entrega: o APP MEX descarta o que
+  já viu. Avisos podem chegar fora de ordem (um que falhou volta depois do
+  seguinte); aplique pelo status, sem regredir, ou por `recebido_em`.
 - **Conferir a assinatura** (lado do APP MEX), igual ao webhook do `/chat`:
 
   ```python

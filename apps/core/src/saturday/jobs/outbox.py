@@ -14,7 +14,8 @@ from __future__ import annotations
 import logging
 import random
 import time
-from typing import Protocol
+from collections.abc import Callable
+from typing import Any, Protocol
 
 import httpx
 from sqlalchemy.orm import Session, sessionmaker
@@ -24,7 +25,7 @@ from saturday.dados import outbox as fila
 from saturday.dados.modelos import Integracao, Outbox
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.services.webhook import WebhookClient, cabecalhos_assinados, corpo_json
-from saturday.settings import WEBHOOK_TIMEOUT_S, Settings
+from saturday.settings import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -56,19 +57,36 @@ class EntregadorWebhook:
         return Resultado.TEMPORARIO
 
 
+# O aviso divide o laço do worker com o WhatsApp: um endpoint parado não pode
+# segurar o lote. Timeout curto e, depois de uma falha, a integração espera.
+TIMEOUT_INTEGRACAO_S = 3.0
+PAUSA_INTEGRACAO_S = 60.0
+
+
 class EntregadorIntegracao:
     """Aviso de status ao webhook de uma integração (decisão 0035).
 
     URL e segredo são lidos na entrega: troca de endereço vale para o que está
     na fila. Integração revogada, apagada ou sem webhook desiste. Qualquer outra
-    falha vale nova tentativa, como no webhook do `/chat`.
+    falha vale nova tentativa, como no webhook do `/chat`, e põe a integração
+    em pausa: as outras linhas dela nem chamam até a pausa passar.
     """
 
-    def __init__(self, http: httpx.Client, fabrica: sessionmaker[Session]) -> None:
+    def __init__(
+        self,
+        http: httpx.Client,
+        fabrica: sessionmaker[Session],
+        *,
+        relogio: Callable[[], float] = time.monotonic,
+    ) -> None:
         self._http = http
         self._fabrica = fabrica
+        self._relogio = relogio
+        self._pausada_ate: dict[Any, float] = {}
 
     def entregar(self, linha: Outbox, *, permitir_modelo: bool = False) -> Resultado:
+        if self._relogio() < self._pausada_ate.get(linha.integracao_id, 0.0):
+            return Resultado.TEMPORARIO
         with abrir_sessao(self._fabrica) as sessao:
             integracao = sessao.get(Integracao, linha.integracao_id)
             if integracao is None or integracao.revogada_em is not None:
@@ -83,26 +101,34 @@ class EntregadorIntegracao:
             resposta = self._http.post(
                 url,
                 content=corpo,
-                headers=cabecalhos_assinados(segredo, corpo),
-                timeout=WEBHOOK_TIMEOUT_S,
+                # O id da linha deixa o APP MEX descartar o aviso repetido.
+                headers={
+                    **cabecalhos_assinados(segredo, corpo),
+                    "X-Saturday-Entrega": str(linha.id),
+                },
+                timeout=TIMEOUT_INTEGRACAO_S,
             )
             situacao = resposta.status_code
-        except httpx.HTTPError as exc:
+        except Exception as exc:  # noqa: BLE001 - só o tipo: a mensagem pode trazer a URL
             logger.warning(
                 "integracao_webhook_falhou integracao=%s erro=%s",
                 linha.integracao_id,
                 type(exc).__name__,
             )
-            return Resultado.TEMPORARIO
         finally:
             # Só metadados: o corpo leva dados do cliente (regra 9).
             logger.info(
-                "integracao_webhook integracao=%s status=%s ms=%d",
+                "integracao_webhook integracao=%s entrega=%s status=%s ms=%d",
                 linha.integracao_id,
+                linha.id,
                 situacao,
                 (time.monotonic() - inicio) * 1000,
             )
-        return Resultado.OK if 200 <= situacao < 300 else Resultado.TEMPORARIO
+        if situacao is not None and 200 <= situacao < 300:
+            self._pausada_ate.pop(linha.integracao_id, None)
+            return Resultado.OK
+        self._pausada_ate[linha.integracao_id] = self._relogio() + PAUSA_INTEGRACAO_S
+        return Resultado.TEMPORARIO
 
 
 class EntregadorPorCanal:

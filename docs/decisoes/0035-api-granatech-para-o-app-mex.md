@@ -47,7 +47,7 @@ MEX dos status exige chamá-lo.
   da integração com `usuario_id` nulo e `detalhe.origem = "integracao"`.
 - **Webhook de saída.** Cada token tem um endpoint. Evento da Granatech de item
   da integração é tratado como hoje e repassado cru, assinado com HMAC-SHA256
-  por um segredo do endpoint (mostrado uma vez), pelo outbox (canal `webhook`,
+  por um segredo do endpoint (mostrado uma vez), pelo outbox (canal `integracao`,
   reagendamento da 0001). Endpoint fora do ar não trava nada.
 - **Rotas próprias** em `/integracao/`: revelar CPF, cota do dia e do mês,
   homologação (0014).
