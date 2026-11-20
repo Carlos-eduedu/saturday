@@ -73,9 +73,11 @@ _DURACAO = re.compile(r"^\s*(\d+)\s*(h|m|min|s)?\s*$", re.IGNORECASE)
 class ErroGranatech(Exception):
     """Resposta de erro comprovada (a Granatech recusou ou não foi alcançada)."""
 
-    def __init__(self, mensagem: str, *, status: int | None = None) -> None:
+    def __init__(self, mensagem: str, *, status: int | None = None, corpo: Any = None) -> None:
         super().__init__(mensagem)
         self.status = status
+        # Corpo da recusa (4xx), para o proxy devolver como veio.
+        self.corpo = corpo
 
 
 class ErroIncerto(ErroGranatech):
@@ -223,7 +225,11 @@ class ClienteGranatech:
         if situacao >= 500 and metodo != "GET":
             raise ErroIncerto(f"{metodo} {rota_modelo}: {situacao}", status=situacao)
         if situacao >= 400:
-            raise ErroGranatech(f"{metodo} {rota_modelo}: {situacao}", status=situacao)
+            try:
+                corpo = resposta.json() if resposta.content else None
+            except ValueError:
+                corpo = None
+            raise ErroGranatech(f"{metodo} {rota_modelo}: {situacao}", status=situacao, corpo=corpo)
         if not resposta.content:
             return {}
         try:
@@ -456,6 +462,22 @@ class ClienteGranatech:
                 link_termo=linha.link_termo,
                 reaproveitada=reaproveitada,
             )
+
+    def repassar(
+        self, metodo: str, rota_modelo: str, caminho: str, params: dict[str, Any] | None = None
+    ) -> tuple[int, Any]:
+        """Proxy da integração (decisão 0035): status e corpo crus da Granatech.
+
+        Só GET por enquanto. A recusa (4xx) volta como veio; falha de rede ou 5xx
+        sobe como `ErroGranatech`, para virar 502.
+        """
+
+        try:
+            return 200, self._chamar(metodo, rota_modelo, caminho, params=params)
+        except ErroGranatech as erro:
+            if erro.status is not None and 400 <= erro.status < 500:
+                return erro.status, erro.corpo
+            raise
 
     def listar_consultas_por_cpf(self, cpf: str) -> list[dict[str, Any]]:
         dados = self._chamar(

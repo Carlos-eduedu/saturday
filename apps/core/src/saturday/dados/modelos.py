@@ -283,6 +283,26 @@ class Auditoria(Base):
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
 
 
+class Integracao(Base):
+    """Acesso de um sistema de fora (o APP MEX) ao proxy da Granatech (decisão 0035).
+
+    O token aparece uma vez, na criação; aqui fica só o sha256 dele.
+    """
+
+    __tablename__ = "integracoes"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    nome: Mapped[str] = mapped_column(String(80), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    escopos: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+    criada_por: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("usuarios_painel.id", ondelete="SET NULL")
+    )
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
+    revogada_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ultimo_uso_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class SessaoPainel(Base):
     """Sessão de login. O cookie leva o token; aqui fica só o sha256 dele."""
 

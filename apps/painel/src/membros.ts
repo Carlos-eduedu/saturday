@@ -24,6 +24,8 @@ const ACOES: Record<string, string> = {
   perfil_foto_remover: "Removeu a própria foto",
   perfil_disponibilidade: "Mudou a disponibilidade",
   granatech_reenviar_link: "Reenviou um link da Granatech",
+  integracao_criar: "Criou um token de integração",
+  integracao_revogar: "Revogou um token de integração",
   usuario_criar: "Adicionou um membro",
   usuario_editar: "Editou um membro",
   usuario_senha: "Redefiniu a senha de um membro",

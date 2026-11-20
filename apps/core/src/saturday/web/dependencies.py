@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import secrets
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Annotated, cast
 
 from fastapi import Cookie, Depends, Header, HTTPException, Request, Security
@@ -13,7 +15,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.agent.service import AgentService
 from saturday.dados.sessao import sessao as abrir_sessao
-from saturday.painel import membros, sessoes
+from saturday.painel import integracoes, membros, sessoes
 from saturday.settings import Settings
 
 COOKIE_SESSAO = "saturday_sessao"
@@ -172,3 +174,28 @@ def gestor_com_csrf(usuario: Annotated[UsuarioLogado, Depends(exigir_csrf)]) -> 
     """Telas de gestão (Canais, Usuários): ações que mudam estado."""
 
     return _gestor(usuario)
+
+
+@dataclass(frozen=True)
+class IntegracaoLogada:
+    id: uuid.UUID
+    nome: str
+
+
+def integracao(escopo: str) -> Callable[..., IntegracaoLogada]:
+    """Dependência do proxy (decisão 0035): `Authorization: Bearer` com o escopo."""
+
+    def conferir(
+        request: Request, authorization: Annotated[str | None, Header()] = None
+    ) -> IntegracaoLogada:
+        esquema, _, token = (authorization or "").partition(" ")
+        if esquema.lower() != "bearer":
+            token = ""
+        with abrir_sessao(get_fabrica(request)) as sessao:
+            try:
+                linha = integracoes.autenticar(sessao, token.strip(), escopo, datetime.now(UTC))
+            except integracoes.IntegracaoRecusada as exc:
+                raise HTTPException(status_code=exc.status, detail=exc.detalhe) from exc
+            return IntegracaoLogada(id=linha.id, nome=linha.nome)
+
+    return conferir

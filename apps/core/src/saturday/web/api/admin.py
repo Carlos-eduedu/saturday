@@ -53,7 +53,7 @@ from saturday.painel.midia import mime_base
 from saturday.painel.produtos import produtos
 from saturday.portabilidade.mensagem import resumo_da_oferta
 from saturday.privacidade import MASCARAS
-from saturday.settings import TZ_OPERACAO
+from saturday.settings import TZ_OPERACAO, Settings
 from saturday.web.api.canais import Gestor
 from saturday.web.api.granatech_admin import Conta
 from saturday.web.dependencies import (
@@ -936,7 +936,12 @@ def resolver_alerta(alerta_id: int, usuario: ComCsrf, fabrica: Fabrica) -> Respo
 
 @router.get("/cota")
 def cota(request: Request, _usuario: Logado, fabrica: Fabrica) -> dict[str, Any]:
-    settings = get_settings(request)
+    return cota_da_granatech(get_settings(request), fabrica)
+
+
+def cota_da_granatech(settings: Settings, fabrica: sessionmaker[Session]) -> dict[str, Any]:
+    """Usadas e teto do dia e do mês; também na integração (decisão 0035)."""
+
     hoje = datetime.now(ZoneInfo(TZ_OPERACAO)).date()
     with abrir_sessao(fabrica) as sessao:
         base = select(func.coalesce(func.sum(Cota.usadas), 0)).where(Cota.parceiro == "granatech")

@@ -12,12 +12,15 @@ from saturday.dados.modelos import Auditoria
 
 def auditar(
     sessao: Session,
-    usuario_id: uuid.UUID,
+    usuario_id: uuid.UUID | None,
     acao: str,
     alvo: str = "",
     detalhe: dict[str, Any] | None = None,
 ) -> None:
-    """Grava na transação da própria ação: ação sem rastro não acontece."""
+    """Grava na transação da própria ação: ação sem rastro não acontece.
+
+    `usuario_id` nulo: ação de uma integração, que diz quem foi no `detalhe`.
+    """
 
     sessao.add(Auditoria(usuario_id=usuario_id, acao=acao, alvo=alvo, detalhe=detalhe))
     sessao.flush()
