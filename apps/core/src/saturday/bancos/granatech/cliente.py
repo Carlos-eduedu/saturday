@@ -91,6 +91,9 @@ class ConsultaAberta:
     status: str
     link_termo: str | None
     reaproveitada: bool
+    # Dono da consulta: a conversa do agente ou a integração (decisão 0035).
+    conversa_id: Any = None
+    integracao_id: Any = None
 
 
 def expira_em_segundos(valor: object, agora: datetime) -> float:
@@ -317,6 +320,7 @@ class ClienteGranatech:
         *,
         conversa_id: Any = None,
         cenario: str | None = None,
+        integracao_id: Any = None,
     ) -> ConsultaAberta:
         """Reaproveita uma consulta recente do CPF ou abre outra, gastando cota.
 
@@ -326,7 +330,9 @@ class ClienteGranatech:
         """
 
         if not (self.teste and cenario):
-            reaproveitada = self._consulta_local(cpf) or self._consulta_remota(cpf, conversa_id)
+            reaproveitada = self._consulta_local(cpf) or self._consulta_remota(
+                cpf, conversa_id, integracao_id
+            )
             if reaproveitada is not None:
                 return reaproveitada
 
@@ -367,6 +373,7 @@ class ClienteGranatech:
             ),
             link_termo=dados.get("link_termo_consentimento"),
             conversa_id=conversa_id,
+            integracao_id=integracao_id,
             reaproveitada=False,
         )
 
@@ -398,9 +405,13 @@ class ClienteGranatech:
                 status=linha.status,
                 link_termo=linha.link_termo,
                 reaproveitada=True,
+                conversa_id=linha.conversa_id,
+                integracao_id=linha.integracao_id,
             )
 
-    def _consulta_remota(self, cpf: str, conversa_id: Any) -> ConsultaAberta | None:
+    def _consulta_remota(
+        self, cpf: str, conversa_id: Any, integracao_id: Any = None
+    ) -> ConsultaAberta | None:
         limite = self._limite_reaproveitamento()
         candidatas = []
         for item in self.listar_consultas_por_cpf(cpf):
@@ -423,6 +434,7 @@ class ClienteGranatech:
             ),
             link_termo=item.get("link_termo_consentimento"),
             conversa_id=conversa_id,
+            integracao_id=integracao_id,
             reaproveitada=True,
         )
 
@@ -435,6 +447,7 @@ class ClienteGranatech:
         link_termo: object,
         conversa_id: Any,
         reaproveitada: bool,
+        integracao_id: Any = None,
     ) -> ConsultaAberta:
         with abrir_sessao(self._fabrica) as sessao:
             linha = sessao.scalars(
@@ -451,6 +464,7 @@ class ClienteGranatech:
                     status=status,
                     link_termo=str(link_termo) if link_termo else None,
                     conversa_id=conversa_id,
+                    integracao_id=integracao_id,
                     historico=[],
                 )
                 sessao.add(linha)
@@ -461,20 +475,28 @@ class ClienteGranatech:
                 status=linha.status,
                 link_termo=linha.link_termo,
                 reaproveitada=reaproveitada,
+                conversa_id=linha.conversa_id,
+                integracao_id=linha.integracao_id,
             )
 
     def repassar(
-        self, metodo: str, rota_modelo: str, caminho: str, params: httpx.QueryParams | None = None
+        self,
+        metodo: str,
+        rota_modelo: str,
+        caminho: str,
+        params: httpx.QueryParams | None = None,
+        json: dict[str, Any] | None = None,
     ) -> tuple[int, Any]:
         """Proxy da integração (decisão 0035): status e corpo crus da Granatech.
 
-        Só GET por enquanto. A recusa (4xx) volta como veio; falha de rede ou 5xx
-        sobe como `ErroGranatech`, para virar 502. 401 e 403 também sobem: são do
-        login da MEX, e o chamador os leria como recusa do próprio token.
+        A recusa (4xx) volta como veio; falha de rede ou 5xx sobe como
+        `ErroGranatech` (`ErroIncerto` no POST), para virar 502. 401 e 403 também
+        sobem: são do login da MEX, e o chamador os leria como recusa do próprio
+        token. Só o GET repete (`_chamar`).
         """
 
         try:
-            return 200, self._chamar(metodo, rota_modelo, caminho, params=params)
+            return 200, self._chamar(metodo, rota_modelo, caminho, params=params, json=json)
         except ErroGranatech as erro:
             status = erro.status
             if status is not None and 400 <= status < 500 and status not in (401, 403):
@@ -658,6 +680,7 @@ class ClienteGranatech:
         corpo: dict[str, Any],
         conversa_id: Any = None,
         condicoes: dict[str, Any] | None = None,
+        integracao_id: Any = None,
     ) -> str:
         """Cria a proposta uma única vez e devolve o id da Granatech.
 
@@ -701,6 +724,7 @@ class ClienteGranatech:
                     consulta_id=consulta_id,
                     teste=self.teste,
                     conversa_id=conversa_id,
+                    integracao_id=integracao_id,
                     estado_envio="intencao",
                     valor_parcela=parcela,
                     numero_parcelas=prazo,

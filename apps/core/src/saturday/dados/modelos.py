@@ -311,6 +311,28 @@ class Integracao(Base):
     webhook_segredo: Mapped[str | None] = mapped_column(String(80))
 
 
+class SimulacaoIntegracao(Base):
+    """Simulação repassada a uma integração (decisão 0035, fase 3).
+
+    A proposta pelo proxy só passa se o corpo bater com uma destas: o Saturday
+    confere o teto pelo que a Granatech calculou, não pelo que o APP MEX manda.
+    """
+
+    __tablename__ = "simulacoes_integracao"
+    __table_args__ = (Index("ix_simulacoes_integracao_busca", "integracao_id", "id_margem"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    integracao_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("integracoes.id", ondelete="CASCADE"), nullable=False
+    )
+    id_produto: Mapped[str] = mapped_column(String(64), nullable=False)
+    id_margem: Mapped[str] = mapped_column(String(64), nullable=False)
+    numero_parcelas: Mapped[int] = mapped_column(Integer, nullable=False)
+    valor_parcela: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    liberado: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
+
+
 class SessaoPainel(Base):
     """Sessão de login. O cookie leva o token; aqui fica só o sha256 dele."""
 
