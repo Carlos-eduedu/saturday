@@ -48,7 +48,7 @@ apps/painel/.impeccable/
 .impeccable/critique/
 .mcp.json
 # Config MCP local do pi: caminhos da máquina, a app do AgentsRoom reescreve
-.pi/mcp.json
+.pi/
 # Só os da raiz: os do painel (apps/painel/) são versionados
 /package.json
 /package-lock.json
