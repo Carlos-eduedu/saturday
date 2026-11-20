@@ -47,7 +47,14 @@ apps/painel/.impeccable/
 .github/skills/
 .impeccable/critique/
 .mcp.json
+# Config MCP local do pi: caminhos da máquina, a app do AgentsRoom reescreve
+.pi/mcp.json
 # Só os da raiz: os do painel (apps/painel/) são versionados
 /package.json
 /package-lock.json
 /node_modules/
+.agentsroom/handoff-transcript-*.txt
+.agentsroom/handoff-summary-*.md
+.agentsroom/fork-context-*.txt
+.agentsroom/transfer-context-*.txt
+.agentsroom/handoff-context-*.txt
