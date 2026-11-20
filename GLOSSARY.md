@@ -176,3 +176,19 @@ Usuário do painel que atende conversas.
 **Gestor**:
 Usuário do painel com acesso a tudo, inclusive configuração e usuários.
 _Evitar_: admin, supervisor
+
+## Integração
+
+**APP MEX**:
+Sistema da MEX que usa o Saturday para falar com a Granatech. Colhe a triagem e
+o consentimento do cliente por conta própria.
+
+**Integração**:
+Acesso de um sistema de fora ao Saturday, com token, escopos e o endereço que
+recebe os avisos. Não é um canal: por ela não passa conversa com o cliente.
+_Evitar_: canal, provedor
+
+**Proxy**:
+O papel do Saturday na integração: repassa à Granatech o pedido no formato dela
+e só barra o que fura a cota, o teto ou o escopo.
+_Evitar_: balcão manual (o que a decisão 0013 recusou)
