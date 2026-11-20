@@ -24,14 +24,17 @@ from sqlalchemy.orm import Session, sessionmaker
 from saturday.agent.service import AgentService
 from saturday.bancos.granatech import status as ordem
 from saturday.bancos.granatech.cliente import ClienteGranatech
+from saturday.dados import outbox as fila
 from saturday.dados import repositorios
-from saturday.dados.modelos import ConsultaGranatech, PropostaGranatech
+from saturday.dados.modelos import ConsultaGranatech, Integracao, PropostaGranatech
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.jobs.homologacao import eh_da_homologacao
+from saturday.privacidade import mascarar_cpfs
 
 logger = logging.getLogger(__name__)
 
 ALERTA = "granatech_evento"
+CANAL_INTEGRACAO = "integracao"
 
 
 class DetalheAindaNaoPronto(Exception):
@@ -124,8 +127,11 @@ def _consulta(
             _alertar(sessao, None, motivo="consulta_desconhecida", id=id_externo, status=novo)
             return
 
+        antes = linha.status
         if not aplicar_status_da_consulta(sessao, linha, novo):
             return
+        if linha.status != antes:
+            avisar_integracao(sessao, linha.integracao_id, "consulta", payload)
         status = linha.status
         tem_detalhe = linha.detalhe is not None
         conversation_id = repositorios.conversation_id_de(sessao, linha.conversa_id)
@@ -175,6 +181,30 @@ def aplicar_status_da_consulta(
     else:
         logger.info("granatech_consulta_status_ignorado atual=%s novo=%s", linha.status, novo)
     return True
+
+
+def avisar_integracao(
+    sessao: Session, integracao_id: Any, tipo: str, payload: dict[str, Any]
+) -> None:
+    """Item aberto pelo proxy: o status novo vai ao webhook da integração (decisão 0035).
+
+    Na transação do status, pelo outbox; sem webhook cadastrado ou revogada, nada.
+    O evento sai como a Granatech mandou, menos o CPF, mascarado.
+    """
+
+    if integracao_id is None:
+        return
+    integracao = sessao.get(Integracao, integracao_id)
+    if integracao is None or integracao.revogada_em is not None or not integracao.webhook_url:
+        return
+    evento = {k: v for k, v in payload.items() if not k.startswith("_")}
+    fila.enfileirar(
+        sessao,
+        conversa_id=None,
+        integracao_id=integracao.id,
+        canal=CANAL_INTEGRACAO,
+        payload={"tipo": tipo, "evento": mascarar_cpfs(evento), "recebido_em": _agora()},
+    )
 
 
 def evento_da_consulta(status: str) -> str | None:
@@ -241,6 +271,8 @@ def _proposta(
             linha.tipo_notificacao = notificacao
             acao = ordem.acao_da_proposta(novo, notificacao)
             avisar = f"proposta:{acao}" if mudou else None
+            if mudou:
+                avisar_integracao(sessao, linha.integracao_id, "proposta", payload)
         else:
             avisar = None
             logger.info("granatech_proposta_status_ignorado atual=%s novo=%s", linha.status, novo)

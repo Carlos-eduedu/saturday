@@ -27,10 +27,13 @@ def enfileirar(
     conversa_id: Any,
     canal: str,
     payload: dict[str, Any],
+    integracao_id: Any = None,
 ) -> Outbox:
     """Grava o envio na transação corrente. Só é durável no commit do turno."""
 
-    linha = Outbox(conversa_id=conversa_id, canal=canal, payload=payload)
+    linha = Outbox(
+        conversa_id=conversa_id, integracao_id=integracao_id, canal=canal, payload=payload
+    )
     sessao.add(linha)
     sessao.flush()
     return linha
@@ -136,6 +139,14 @@ def marcar_desistencia(sessao: Session, linha: Outbox, *, erro: str) -> None:
     linha.ultimo_erro = erro[:2000]
     sessao.flush()
     # O erro fica na linha; o alerta leva só a referência.
+    if linha.integracao_id is not None:
+        # Aviso ao APP MEX (decisão 0035): o alerta diz de que integração.
+        repositorios.abrir_alerta(
+            sessao,
+            "integracao_webhook_falhou",
+            detalhe={"outbox": linha.id, "integracao": str(linha.integracao_id)},
+        )
+        return
     repositorios.abrir_alerta(
         sessao, "envio_falhou", conversa_id=linha.conversa_id, detalhe={"outbox": linha.id}
     )

@@ -18,6 +18,24 @@ from saturday.settings import WEBHOOK_TIMEOUT_S, Settings
 logger = logging.getLogger(__name__)
 
 
+def corpo_json(payload: dict[str, Any]) -> bytes:
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+
+
+def cabecalhos_assinados(segredo: str, corpo: bytes) -> dict[str, str]:
+    """`X-Saturday-Signature` = HMAC-SHA256 de ``"<timestamp>." + corpo``."""
+
+    timestamp = str(int(time.time()))
+    assinatura = hmac.new(
+        segredo.encode("utf-8"), f"{timestamp}.".encode() + corpo, hashlib.sha256
+    ).hexdigest()
+    return {
+        "Content-Type": "application/json",
+        "X-Saturday-Timestamp": timestamp,
+        "X-Saturday-Signature": f"sha256={assinatura}",
+    }
+
+
 class WebhookClient:
     """Envia eventos ao webhook com o cliente HTTP compartilhado."""
 
@@ -39,26 +57,13 @@ class WebhookClient:
         status = payload.get("status")
         inicio = time.monotonic()
         try:
-            corpo = json.dumps(
-                payload,
-                ensure_ascii=False,
-                separators=(",", ":"),
-            ).encode("utf-8")
-            timestamp = str(int(time.time()))
-            segredo = self._settings.webhook_secret.get_secret_value()
-            assinatura = hmac.new(
-                segredo.encode("utf-8"),
-                f"{timestamp}.".encode() + corpo,
-                hashlib.sha256,
-            ).hexdigest()
+            corpo = corpo_json(payload)
             response = self._http.post(
                 self._settings.webhook_url,
                 content=corpo,
-                headers={
-                    "Content-Type": "application/json",
-                    "X-Saturday-Timestamp": timestamp,
-                    "X-Saturday-Signature": f"sha256={assinatura}",
-                },
+                headers=cabecalhos_assinados(
+                    self._settings.webhook_secret.get_secret_value(), corpo
+                ),
                 timeout=WEBHOOK_TIMEOUT_S,
             )
             response.raise_for_status()

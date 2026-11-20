@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from typing import Any
 
 from saturday.canais.base import CANAIS_WHATSAPP
 
@@ -62,3 +63,22 @@ MASCARAS = {
     "telefone": mascarar_telefone,
     "data_nascimento": mascarar_data,
 }
+
+
+# Onde a Granatech põe o CPF: `cpf` (listas, propostas) e `pessoa_natural.document`.
+_CHAVES_DE_DOCUMENTO = {"document", "documento"}
+
+
+def mascarar_cpfs(corpo: Any) -> Any:
+    """CPF mascarado em qualquer nível de um JSON da Granatech (proxy e aviso, decisão 0035)."""
+
+    if isinstance(corpo, list):
+        return [mascarar_cpfs(item) for item in corpo]
+    if not isinstance(corpo, dict):
+        return corpo
+    return {
+        chave: mascarar_cpf(valor)
+        if isinstance(valor, str) and ("cpf" in chave.lower() or chave in _CHAVES_DE_DOCUMENTO)
+        else mascarar_cpfs(valor)
+        for chave, valor in corpo.items()
+    }

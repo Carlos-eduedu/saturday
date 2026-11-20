@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
@@ -18,6 +18,7 @@ from saturday.web.dependencies import (
     gestor_com_csrf,
     gestor_logado,
     get_fabrica,
+    get_settings,
 )
 
 router = APIRouter(prefix="/admin/gestao/integracoes", tags=["painel"])
@@ -43,6 +44,8 @@ def _linha(i: Integracao, criada_por: str | None) -> dict[str, Any]:
         "criada_em": i.criada_em.isoformat(),
         "revogada_em": i.revogada_em.isoformat() if i.revogada_em else None,
         "ultimo_uso_em": i.ultimo_uso_em.isoformat() if i.ultimo_uso_em else None,
+        "webhook_url": i.webhook_url,
+        "tem_segredo": i.webhook_segredo is not None,
     }
 
 
@@ -72,3 +75,68 @@ def revogar(integracao_id: uuid.UUID, usuario: GestorCsrf, fabrica: Fabrica) -> 
         if not integracoes.revogar(sessao, integracao_id, usuario.id):
             raise HTTPException(status_code=404, detail="integração não encontrada ou já revogada")
     return Response(status_code=204)
+
+
+# ------------------------------------------------------------------ webhook (fase 2)
+
+
+class Webhook(BaseModel):
+    url: str | None = Field(default=None, max_length=2000)
+
+
+def _recusa(exc: integracoes.IntegracaoRecusada) -> HTTPException:
+    return HTTPException(status_code=exc.status, detail=exc.detalhe)
+
+
+@router.put("/{integracao_id}/webhook", status_code=204)
+def definir_webhook(
+    integracao_id: uuid.UUID,
+    dados: Webhook,
+    request: Request,
+    usuario: GestorCsrf,
+    fabrica: Fabrica,
+) -> Response:
+    url = (dados.url or "").strip() or None
+    local = get_settings(request).environment not in ("homolog", "prod")
+    if url is not None and not integracoes.url_aceita(url, local=local):
+        raise HTTPException(status_code=422, detail="o endereço precisa começar com https://")
+    with abrir_sessao(fabrica) as sessao:
+        try:
+            integracoes.definir_webhook(sessao, integracao_id, url, usuario.id)
+        except integracoes.IntegracaoRecusada as exc:
+            raise _recusa(exc) from exc
+    return Response(status_code=204)
+
+
+@router.post("/{integracao_id}/webhook/segredo")
+def gerar_segredo(
+    integracao_id: uuid.UUID, usuario: GestorCsrf, fabrica: Fabrica
+) -> dict[str, str]:
+    """Devolve o segredo uma única vez; o anterior deixa de valer."""
+
+    with abrir_sessao(fabrica) as sessao:
+        try:
+            return {"segredo": integracoes.gerar_segredo(sessao, integracao_id, usuario.id)}
+        except integracoes.IntegracaoRecusada as exc:
+            raise _recusa(exc) from exc
+
+
+@router.get("/{integracao_id}/webhook/entregas")
+def entregas(integracao_id: uuid.UUID, _usuario: Gestor, fabrica: Fabrica) -> list[dict[str, Any]]:
+    with abrir_sessao(fabrica) as sessao:
+        return [
+            {
+                "id": e.id,
+                "tipo": e.payload.get("tipo"),
+                "status": (e.payload.get("evento") or {}).get("status"),
+                "situacao": "entregue"
+                if e.entregue_em
+                else "desistiu"
+                if e.falhou_em
+                else "pendente",
+                "tentativas": e.tentativas,
+                "criada_em": e.criada_em.isoformat(),
+                "entregue_em": e.entregue_em.isoformat() if e.entregue_em else None,
+            }
+            for e in integracoes.entregas(sessao, integracao_id)
+        ]

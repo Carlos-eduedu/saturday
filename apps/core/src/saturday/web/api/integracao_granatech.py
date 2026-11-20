@@ -21,7 +21,7 @@ from saturday.bancos.granatech.cliente import CONSIGNADO, ClienteGranatech, Erro
 from saturday.dados.modelos import ConsultaGranatech
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.painel.auditoria import auditar
-from saturday.privacidade import mascarar_cpf
+from saturday.privacidade import mascarar_cpfs
 from saturday.web.api.admin import cota_da_granatech
 from saturday.web.dependencies import (
     IntegracaoLogada,
@@ -64,25 +64,6 @@ def _repassar(
     except ErroGranatech as exc:
         raise HTTPException(status_code=502, detail="Granatech indisponível") from exc
     return JSONResponse(status_code=status, content=mascarar_cpfs(corpo))
-
-
-# Onde a Granatech põe o CPF: `cpf` (listas, propostas) e `pessoa_natural.document`.
-_CHAVES_DE_DOCUMENTO = {"document", "documento"}
-
-
-def mascarar_cpfs(corpo: Any) -> Any:
-    """Único desvio do cru: o CPF inteiro só sai pelo revelar, auditado (regra 9)."""
-
-    if isinstance(corpo, list):
-        return [mascarar_cpfs(item) for item in corpo]
-    if not isinstance(corpo, dict):
-        return corpo
-    return {
-        chave: mascarar_cpf(valor)
-        if isinstance(valor, str) and ("cpf" in chave.lower() or chave in _CHAVES_DE_DOCUMENTO)
-        else mascarar_cpfs(valor)
-        for chave, valor in corpo.items()
-    }
 
 
 # ------------------------------------------------------------------ proxy (leitura)

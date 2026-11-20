@@ -26,6 +26,8 @@ const ACOES: Record<string, string> = {
   granatech_reenviar_link: "Reenviou um link da Granatech",
   integracao_criar: "Criou um token de integração",
   integracao_revogar: "Revogou um token de integração",
+  integracao_webhook: "Mudou o webhook de uma integração",
+  integracao_segredo: "Gerou o segredo do webhook de uma integração",
   usuario_criar: "Adicionou um membro",
   usuario_editar: "Editou um membro",
   usuario_senha: "Redefiniu a senha de um membro",

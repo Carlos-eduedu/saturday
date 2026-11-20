@@ -10,11 +10,12 @@ import hashlib
 import secrets
 import uuid
 from datetime import datetime, timedelta
+from urllib.parse import urlsplit
 
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
-from saturday.dados.modelos import Integracao
+from saturday.dados.modelos import Integracao, Outbox
 from saturday.painel.auditoria import auditar
 
 ESCOPOS = ("leitura", "revelar", "acoes", "operacoes", "homologacao")
@@ -88,3 +89,58 @@ def autenticar(sessao: Session, token: str, escopo: str, agora: datetime) -> Int
     if linha.ultimo_uso_em is None or agora - linha.ultimo_uso_em >= GRAVAR_USO_A_CADA:
         linha.ultimo_uso_em = agora
     return linha
+
+
+# ------------------------------------------------------------------ webhook (fase 2)
+
+ENTREGAS_NA_TELA = 10
+
+
+def url_aceita(url: str, *, local: bool) -> bool:
+    """Só https; `http://localhost` vale fora de homolog e prod."""
+
+    partes = urlsplit(url)
+    if not partes.hostname:
+        return False
+    if partes.scheme == "https":
+        return True
+    return local and partes.scheme == "http" and partes.hostname in ("localhost", "127.0.0.1")
+
+
+def _ativa(sessao: Session, integracao_id: uuid.UUID) -> Integracao:
+    linha = sessao.get(Integracao, integracao_id)
+    if linha is None or linha.revogada_em is not None:
+        raise IntegracaoRecusada(404, "integração não encontrada ou revogada")
+    return linha
+
+
+def definir_webhook(
+    sessao: Session, integracao_id: uuid.UUID, url: str | None, por: uuid.UUID
+) -> None:
+    """Grava ou apaga o endereço. Sem endereço, nenhum aviso novo entra na fila."""
+
+    linha = _ativa(sessao, integracao_id)
+    linha.webhook_url = url
+    # Só o host na auditoria: o caminho pode levar um token do APP MEX.
+    host = urlsplit(url).hostname if url else None
+    auditar(sessao, por, "integracao_webhook", f"integracao:{integracao_id}", {"host": host})
+
+
+def gerar_segredo(sessao: Session, integracao_id: uuid.UUID, por: uuid.UUID) -> str:
+    """Segredo novo do HMAC, mostrado uma vez. O anterior para de valer na hora."""
+
+    linha = _ativa(sessao, integracao_id)
+    linha.webhook_segredo = "whsec_" + secrets.token_urlsafe(32)
+    auditar(sessao, por, "integracao_segredo", f"integracao:{integracao_id}")
+    return linha.webhook_segredo
+
+
+def entregas(sessao: Session, integracao_id: uuid.UUID) -> list[Outbox]:
+    return list(
+        sessao.scalars(
+            select(Outbox)
+            .where(Outbox.integracao_id == integracao_id)
+            .order_by(Outbox.id.desc())
+            .limit(ENTREGAS_NA_TELA)
+        ).all()
+    )

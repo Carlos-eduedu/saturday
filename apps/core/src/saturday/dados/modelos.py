@@ -132,8 +132,12 @@ class Outbox(Base):
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    conversa_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("conversas.id", ondelete="CASCADE"), nullable=False
+    # Nula no aviso a uma integração (canal `integracao`, decisão 0035).
+    conversa_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("conversas.id", ondelete="CASCADE")
+    )
+    integracao_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("integracoes.id", ondelete="CASCADE"), index=True
     )
     canal: Mapped[str] = mapped_column(String(32), nullable=False)
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
@@ -301,6 +305,10 @@ class Integracao(Base):
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
     revogada_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ultimo_uso_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Aviso de status (decisão 0035). O segredo assina o corpo (HMAC), então fica
+    # em claro; aparece ao gestor uma vez, como o token.
+    webhook_url: Mapped[str | None] = mapped_column(Text)
+    webhook_segredo: Mapped[str | None] = mapped_column(String(80))
 
 
 class SessaoPainel(Base):
@@ -360,6 +368,10 @@ class ConsultaGranatech(Base):
     cpf: Mapped[str] = mapped_column(String(11), nullable=False)
     conversa_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("conversas.id", ondelete="CASCADE")
+    )
+    # Aberta pelo proxy (decisão 0035): o status é avisado a esta integração.
+    integracao_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("integracoes.id", ondelete="SET NULL")
     )
     status: Mapped[str] = mapped_column(String(64), nullable=False)
     link_termo: Mapped[str | None] = mapped_column(Text)
@@ -424,6 +436,9 @@ class PropostaGranatech(Base):
     )
     conversa_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("conversas.id", ondelete="CASCADE")
+    )
+    integracao_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("integracoes.id", ondelete="SET NULL")
     )
     id_externo: Mapped[str | None] = mapped_column(String(64))
     # Proposta do simulador, de membro testador (decisão 0020).

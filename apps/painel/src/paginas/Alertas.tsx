@@ -19,6 +19,7 @@ const ROTULOS: Record<string, string> = {
   icred_consulta_parada: "Consulta do iCred sem resposta: a conversa seguiu sem ela",
   instancia_desconectada: "Instância da Evolution desconectada",
   instancia_numero_trocado: "Instância reconectada com outro celular (desconectada)",
+  integracao_webhook_falhou: "Aviso de status a uma integração não entregue",
 };
 
 export function Alertas() {

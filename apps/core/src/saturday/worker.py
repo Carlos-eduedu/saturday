@@ -21,7 +21,13 @@ from saturday.jobs import alertas, recontatos
 from saturday.jobs import icred as eventos_icred
 from saturday.jobs.eventos import processar
 from saturday.jobs.homologacao import Rodadas
-from saturday.jobs.outbox import Entregador, EntregadorPorCanal, EntregadorWebhook, drenar
+from saturday.jobs.outbox import (
+    Entregador,
+    EntregadorIntegracao,
+    EntregadorPorCanal,
+    EntregadorWebhook,
+    drenar,
+)
 from saturday.log import configurar_logging
 from saturday.settings import Settings, get_settings
 from saturday.storage.base import criar_storage
@@ -66,6 +72,7 @@ def rodar(settings: Settings, parar: threading.Event) -> None:
         granatech = criar_cliente_granatech(http, settings, fabrica)
         entregadores: dict[str, Entregador] = {
             "webhook": EntregadorWebhook(http, settings),
+            "integracao": EntregadorIntegracao(http, fabrica),
             "whatsapp": saida_whatsapp,
         }
         evolution = criar_canal_evolution(http, settings, fabrica, storage)
