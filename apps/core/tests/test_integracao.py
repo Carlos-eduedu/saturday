@@ -225,6 +225,20 @@ def test_busca_chega_a_granatech_com_os_parametros(client_pg: TestClient, fabric
     ]
 
 
+def test_leitura_devolve_o_cpf_mascarado(client_pg: TestClient, fabrica: Any) -> None:
+    # O CPF inteiro só sai pelo revelar, auditado; o resto volta cru.
+    corpo = {
+        "dados": [{"id": "p1", "cpf": "52998224725", "valor": 1000}],
+        "pessoa_natural": {"document": "52998224725", "nome": "Ana"},
+    }
+    _api_com(client_pg, fabrica, lambda _p: httpx.Response(200, json=corpo))
+    token = _token(client_pg, fabrica, "leitura")
+    assert client_pg.get(f"{PROXY}/propostas/lista", headers=token).json() == {
+        "dados": [{"id": "p1", "cpf": "***.***.***-25", "valor": 1000}],
+        "pessoa_natural": {"document": "***.***.***-25", "nome": "Ana"},
+    }
+
+
 def test_falha_da_granatech_vira_502(client_pg: TestClient, fabrica: Any) -> None:
     pedidos = _api_com(client_pg, fabrica, lambda _p: httpx.Response(503))
     token = _token(client_pg, fabrica, "leitura")

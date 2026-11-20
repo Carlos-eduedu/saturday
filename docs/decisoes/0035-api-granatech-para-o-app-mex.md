@@ -24,6 +24,10 @@ MEX dos status exige chamá-lo.
   usuário, detalhe), `termo-consentimento`, `simulacao/{id_produto}`, `bancos`,
   `propostas` (criar, `lista`, detalhe, `dados-tomador`, `cancelar`,
   `dados-bancarios`). Outra rota: 404 (regra 12).
+- **CPF mascarado, único desvio do cru.** Na resposta do proxy, o valor de toda
+  chave com "cpf" no nome e de `document`/`documento` sai mascarado
+  (`***.***.***-25`). O CPF inteiro só sai pelo revelar, com o escopo
+  `revelar` e auditado (regra 9); sem isso, o escopo `leitura` já o mostraria.
 - **O que o proxy barra**, antes ou depois de repassar:
   - token sem o escopo da rota (403);
   - consulta que fura a cota diária ou mensal; CPF com consulta recente devolve

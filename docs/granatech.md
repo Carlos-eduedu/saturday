@@ -209,7 +209,8 @@ cota e teto continuam do Saturday.
 - **Proxy (fase 1, só leitura, escopo `leitura`)**, em
   `/integracao/granatech/api-consignado/v1/`: `GET consulta-saldo/usuario`,
   `GET consulta-saldo/{id}`, `GET bancos`, `GET propostas/lista`,
-  `GET propostas/{id}`. Query string e corpo passam crus; a recusa da Granatech
+  `GET propostas/{id}`. Query string e corpo passam crus, menos o CPF (chaves
+  com "cpf" no nome e `document`/`documento`), que sai mascarado; a recusa da Granatech
   (4xx) volta com o status e o corpo dela (`null` se ela não mandou JSON),
   menos 401 e 403, que são do login da MEX e viram 502. Rota fora da lista: 404;
   id no caminho fora de `[A-Za-z0-9_-]`: 422.
