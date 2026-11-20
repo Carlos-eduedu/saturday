@@ -119,7 +119,7 @@ export function Canais() {
     );
 
   return (
-    <div className="canais">
+    <div className="canais tela-compacta">
       <h1 className="titulo-tela">Canais</h1>
       <ResumoCanais canais={canais} />
       {erro && (

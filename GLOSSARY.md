@@ -188,6 +188,13 @@ Acesso de um sistema de fora ao Saturday, com token, escopos e o endereço que
 recebe os avisos. Não é um canal: por ela não passa conversa com o cliente.
 _Evitar_: canal, provedor
 
+**Parceiro**:
+Serviço externo que o Saturday chama: Meta, Evolution, Granatech, C6, iCred,
+BrasilAPI, OpenRouter, a transcrição de áudio e o storage. O oposto da
+integração: é o Saturday quem chama, não quem é chamado. A chave de um parceiro
+nunca é editada pelo painel.
+_Evitar_: integração, provedor, fornecedor
+
 **Proxy**:
 O papel do Saturday na integração: repassa à Granatech o pedido no formato dela
 e só barra o que fura a cota, o teto ou o escopo.

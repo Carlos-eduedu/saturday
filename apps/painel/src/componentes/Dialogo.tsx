@@ -10,6 +10,7 @@ export function Dialogo({
   rodape,
   largo = false,
   classe,
+  travado = false,
   children,
 }: {
   titulo: ReactNode;
@@ -19,6 +20,8 @@ export function Dialogo({
   largo?: boolean;
   // Variação própria de quem usa (o grafo ocupa quase a tela toda).
   classe?: string;
+  // Valor que aparece uma vez (token, segredo): Esc e clique fora não fecham.
+  travado?: boolean;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -36,7 +39,8 @@ export function Dialogo({
       // O detalhe do nó abre dentro do modal do grafo: o `close` dele chega
       // aqui pela árvore do React e não pode fechar este.
       onClose={(e) => e.target === ref.current && aoFechar()}
-      onClick={(e) => e.target === ref.current && fechar()}
+      onCancel={(e) => travado && e.preventDefault()}
+      onClick={(e) => !travado && e.target === ref.current && fechar()}
     >
       <div className="dialogo__corpo">
         <header>

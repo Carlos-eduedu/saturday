@@ -160,7 +160,8 @@ textarea { resize: vertical; }
 label { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.85rem; font-weight: 500; color: var(--suave); }
 
 /* ---------------------------------------------------------------- cartão único */
-.cartao, .login, .inbox li a, .alertas li, .ficha, :is(.canais, .integracoes) > section {
+.cartao, .login, .inbox li a, .alertas li, .ficha, .canais > section,
+.integracoes .painel-aba > section, .grade-parceiros > li {
   background: var(--superficie);
   border: 1px solid var(--borda);
   border-radius: var(--raio-l);
@@ -1291,7 +1292,12 @@ main:has(.historico) { padding-bottom: 0; }
 
 /* ---------------------------------------------------------------- canais (decisão 0010) */
 :is(.canais, .integracoes) { display: flex; flex-direction: column; gap: 1.5rem; }
-:is(.canais, .integracoes) > section { padding: 1.25rem; }
+/* Topo compacto (Canais e Integrações): o título encosta no conteúdo, só o gap separa. */
+.tela-compacta { gap: 1rem; }
+.tela-compacta > .titulo-tela { margin: 0; }
+/* Lista de seletores, não `:is()`: o `:is()` levaria a especificidade de
+   `.integracoes .painel-aba` também para Canais e venceria o resumo. */
+.canais > section, .integracoes .painel-aba > section { padding: 1.25rem; }
 :is(.canais, .integracoes) ul { margin: 0; padding-left: 1.1rem; }
 :is(.canais, .integracoes) table { width: 100%; border-collapse: collapse; }
 :is(.canais, .integracoes) th {
@@ -1309,7 +1315,7 @@ main:has(.historico) { padding-bottom: 0; }
 .nova-instancia { display: flex; gap: 0.5rem; align-items: end; margin-top: 1.25rem; }
 /* QR e detalhes abrem dentro da seção Evolution, logo abaixo da tabela:
    uma região separada por fio, não um cartão dentro do cartão. */
-:is(.canais, .integracoes) tr.aberta { background: var(--destaque-suave); }
+.canais tr.aberta { background: var(--destaque-suave); }
 .painel-instancia {
   display: flex; flex-direction: column; gap: 0.75rem; align-items: flex-start;
   margin-top: 1rem; padding-top: 1.25rem; border-top: 1px solid var(--borda);
@@ -1343,6 +1349,19 @@ main:has(.historico) { padding-bottom: 0; }
 .endereco-webhook label { flex: 1; max-width: 36rem; }
 .endereco-webhook input { width: 100%; }
 .token-novo { display: flex; flex-direction: column; gap: 0.75rem; }
+.integracoes .cabeca-secao .nota { margin: 0; flex: 1 1 24rem; }
+.integracoes .painel-aba > .nota { margin: 0; }
+.dialogo h3 { font-size: 1rem; }
+/* Parceiros: um cartão por serviço, em grade que vira coluna no celular. */
+.integracoes .grade-parceiros { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: 1rem; }
+.parceiro { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; padding: 1.1rem 1.25rem; }
+.parceiro > * { margin: 0; }
+.parceiro header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; width: 100%; }
+.parceiro h2 { margin: 0; font-size: 1.05rem; }
+.parceiro p { font-size: 0.9rem; }
+.parceiro code { font-size: 0.8rem; color: var(--suave); }
+.parceiro a { margin-top: auto; font-size: 0.9rem; }
+.selo-desligado { color: var(--suave); }
 .token-novo code { overflow-wrap: anywhere; font-size: 0.95rem; }
 .acoes-form { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .confere { color: var(--ia); font-weight: 500; }

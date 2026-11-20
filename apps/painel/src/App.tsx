@@ -201,6 +201,9 @@ function Logado({
           <Route path="/agente" element={<Agente />} />
           {eu.perfil === "gestor" && <Route path="/canais" element={<Canais />} />}
           {eu.perfil === "gestor" && <Route path="/integracoes" element={<Integracoes />} />}
+          {eu.perfil === "gestor" && (
+            <Route path="/integracoes/:aba" element={<Integracoes />} />
+          )}
           <Route path="/membros" element={<Membros eu={eu} />} />
           <Route
             path="/membros/:id"

@@ -1,23 +1,34 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { Link, Navigate, useNavigate, useParams } from "react-router";
 import {
   api,
   type EntregaIntegracao,
   type EscopoIntegracao,
   type Integracao,
   mensagemDeFalha,
+  type Parceiro,
 } from "../api";
+import { Abas, idAba } from "../componentes/Abas";
 import { useConfirmar } from "../componentes/Confirmar";
+import { Dialogo } from "../componentes/Dialogo";
 import { Falha } from "../componentes/Falha";
 import { Vazio } from "../componentes/Vazio";
 import { relativo, rotulo, SITUACAO_DA_CONSULTA, SITUACAO_DA_PROPOSTA } from "../rotulos";
 import { useAcao } from "../useAcao";
-import { useAoAbrir } from "./Canais";
 
-// Tela Integrações (decisão 0035), só para gestor: tokens de sistemas de fora
-// (o APP MEX) no proxy da Granatech. O token aparece uma vez, logo depois de
-// criado; o servidor guarda só o hash. Revogar é para sempre. Cada token pode
-// ter um webhook, que recebe o status novo das consultas e propostas que ele
-// abriu, assinado com um segredo que também aparece uma vez.
+// Tela Integrações, só para gestor, em duas abas:
+// - Parceiros: os serviços que o Saturday chama, só leitura. Dos segredos o
+//   servidor manda só se estão configurados (regra 8).
+// - Tokens de acesso (decisão 0035): tokens de sistemas de fora (o APP MEX) no
+//   proxy da Granatech. O token aparece uma vez, logo depois de criado; o
+//   servidor guarda só o hash. Revogar é para sempre. Cada token pode ter um
+//   webhook, que recebe o status novo das consultas e propostas que ele abriu,
+//   assinado com um segredo que também aparece uma vez.
+
+const ABAS: ["parceiros" | "tokens", string][] = [
+  ["parceiros", "Parceiros"],
+  ["tokens", "Tokens de acesso"],
+];
 
 const ESCOPOS: { valor: EscopoIntegracao; rotulo: string; texto: string }[] = [
   { valor: "leitura", rotulo: "Leitura", texto: "consultas, propostas, bancos e cota" },
@@ -29,8 +40,98 @@ const ESCOPOS: { valor: EscopoIntegracao; rotulo: string; texto: string }[] = [
 const ROTULO_ESCOPO = Object.fromEntries(ESCOPOS.map((e) => [e.valor, e.rotulo]));
 
 export function Integracoes() {
+  const { aba } = useParams();
+  const navegar = useNavigate();
+  if (aba !== "parceiros" && aba !== "tokens")
+    return <Navigate to="/integracoes/parceiros" replace />;
+
+  return (
+    <div className="integracoes tela-compacta">
+      <h1 className="titulo-tela">Integrações</h1>
+      <Abas
+        rotulo="Integrações"
+        painel="integracoes-painel"
+        opcoes={ABAS}
+        valor={aba}
+        mudar={(v) => navegar(`/integracoes/${v}`)}
+      />
+      <div
+        role="tabpanel"
+        id="integracoes-painel"
+        aria-labelledby={idAba("integracoes-painel", aba)}
+        className="painel-aba"
+      >
+        {aba === "parceiros" ? <Parceiros /> : <Tokens />}
+      </div>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------ parceiros
+
+const SELO_PARCEIRO: Record<Parceiro["situacao"], [string, string]> = {
+  ligado: ["Ligado", "selo-ia"],
+  desligado: ["Desligado", "selo-desligado"],
+  falta_chave: ["Falta chave", "selo-handoff"],
+};
+
+function Parceiros() {
+  const [lista, setLista] = useState<Parceiro[] | null>(null);
+  const [erro, setErro] = useState("");
+  const carregar = useCallback(() => {
+    setErro("");
+    api
+      .parceiros()
+      .then(setLista)
+      .catch((e: unknown) => setErro(mensagemDeFalha(e)));
+  }, []);
+  useEffect(carregar, [carregar]);
+
+  if (!lista)
+    return erro ? (
+      <Falha titulo="Não deu para carregar os parceiros." texto={erro} aoTentar={carregar} />
+    ) : (
+      <p className="centro">Carregando…</p>
+    );
+
+  return (
+    <>
+      <p className="nota">
+        Serviços que o Saturday chama. As chaves ficam no servidor: aqui só aparece se estão
+        configuradas.
+      </p>
+      <ul className="grade-parceiros">
+        {lista.map((p) => {
+          const [texto, classe] =
+            p.sempre && p.situacao === "ligado" ? ["Sempre ligado", "selo-ia"] : SELO_PARCEIRO[p.situacao];
+          const faltam = Object.entries(p.segredos)
+            .filter(([, ok]) => !ok)
+            .map(([nome]) => nome.replaceAll("_", " "));
+          return (
+            <li key={p.id} className="parceiro">
+              <header>
+                <h2>{p.nome}</h2>
+                <span className={`selo ${classe}`}>{texto}</span>
+              </header>
+              <p>{p.descricao}</p>
+              {p.host && <code className="dado">{p.host}</code>}
+              {p.situacao === "falta_chave" && (
+                <p className="aviso">Sem {faltam.join(", ")} no servidor.</p>
+              )}
+              {p.em_canais && <Link to="/canais">Ver em Canais</Link>}
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  );
+}
+
+// ------------------------------------------------------------------ tokens
+
+function Tokens() {
   const [lista, setLista] = useState<Integracao[] | null>(null);
-  const [revelado, setRevelado] = useState<Revelacao | null>(null);
+  const [criando, setCriando] = useState(false);
   const [webhookDe, setWebhookDe] = useState<string | null>(null);
   const { agir, erro, setErro } = useAcao(() => carregar());
   const carregar = useCallback(() => {
@@ -43,77 +144,56 @@ export function Integracoes() {
 
   if (!lista)
     return erro ? (
-      <Falha titulo="Não deu para carregar as integrações." texto={erro} aoTentar={carregar} />
+      <Falha titulo="Não deu para carregar os tokens." texto={erro} aoTentar={carregar} />
     ) : (
       <p className="centro">Carregando…</p>
     );
 
+  const comWebhook = lista.find((i) => i.id === webhookDe && !i.revogada_em);
   return (
-    <div className="integracoes">
-      <h1 className="titulo-tela">Integrações</h1>
-      <p className="nota">
-        Tokens de sistemas de fora no proxy da Granatech. Cada consulta aberta por eles gasta a
-        mesma cota do agente.
-      </p>
+    <>
+      <div className="cabeca-secao">
+        <p className="nota">
+          Tokens de sistemas de fora no proxy da Granatech. Cada consulta aberta por eles gasta a
+          mesma cota do agente.
+        </p>
+        <button type="button" className="principal" onClick={() => setCriando(true)}>
+          Novo token
+        </button>
+      </div>
       {erro && (
         <p className="erro" role="alert">
           {erro}
         </p>
       )}
-      {revelado && <Revelado key={revelado.valor} {...revelado} fechar={() => setRevelado(null)} />}
       <section>
-        <h2>Tokens</h2>
-        <TabelaIntegracoes
-          lista={lista}
-          agir={agir}
-          aberta={webhookDe}
-          abrir={(id) => setWebhookDe(id === webhookDe ? null : id)}
-        />
-        {/* Abre logo abaixo da tabela, perto de quem clicou, como em Canais. */}
-        {webhookDe && lista.some((i) => i.id === webhookDe && !i.revogada_em) && (
-          <PainelWebhook
-            key={webhookDe}
-            integracao={lista.find((i) => i.id === webhookDe) as Integracao}
-            agir={agir}
-            revelar={setRevelado}
-            fechar={() => {
-              // O painel some com o foco dentro: ele volta ao botão que o abriu.
-              document.querySelector<HTMLElement>(`[data-webhook="${webhookDe}"]`)?.focus();
-              setWebhookDe(null);
-            }}
-          />
-        )}
+        <TabelaIntegracoes lista={lista} agir={agir} abrir={setWebhookDe} />
       </section>
-      <section>
-        <NovaIntegracao
-          agir={agir}
-          criada={(nome, token) =>
-            setRevelado({
-              titulo: `Token de ${nome}`,
-              valor: token,
-              aviso: "Copie agora: ele não aparece de novo. Se perder, revogue e crie outro.",
-            })
-          }
+      {criando && <NovaIntegracao recarregar={carregar} fechar={() => setCriando(false)} />}
+      {comWebhook && (
+        <PainelWebhook
+          key={comWebhook.id}
+          integracao={comWebhook}
+          recarregar={carregar}
+          fechar={() => setWebhookDe(null)}
         />
-      </section>
-    </div>
+      )}
+    </>
   );
 }
 
 function TabelaIntegracoes({
   lista,
   agir,
-  aberta,
   abrir,
 }: {
   lista: Integracao[];
   agir: (acao: () => Promise<unknown>) => Promise<unknown>;
-  aberta: string | null;
   abrir: (id: string) => void;
 }) {
   const confirmar = useConfirmar();
   if (lista.length === 0)
-    return <Vazio titulo="Nenhuma integração." texto="Crie o primeiro token abaixo." />;
+    return <Vazio titulo="Nenhum token." texto="Crie o primeiro em Novo token." />;
 
   const agora = Date.now();
   return (
@@ -130,10 +210,7 @@ function TabelaIntegracoes({
       </thead>
       <tbody>
         {lista.map((i) => (
-          <tr
-            key={i.id}
-            className={i.revogada_em ? "revogada" : aberta === i.id ? "aberta" : undefined}
-          >
+          <tr key={i.id} className={i.revogada_em ? "revogada" : undefined}>
             <td>
               {i.nome}
               {i.revogada_em && <span className="nota"> · revogada</span>}
@@ -146,13 +223,8 @@ function TabelaIntegracoes({
             <td data-rotulo="Webhook">{i.webhook_url ? hostDe(i.webhook_url) : "—"}</td>
             <td className="acoes">
               {!i.revogada_em && (
-                <button
-                  type="button"
-                  data-webhook={i.id}
-                  aria-expanded={aberta === i.id}
-                  onClick={() => abrir(i.id)}
-                >
-                  {aberta === i.id ? "Fechar webhook" : "Webhook"}
+                <button type="button" onClick={() => abrir(i.id)}>
+                  Webhook
                 </button>
               )}
               {!i.revogada_em && (
@@ -181,15 +253,12 @@ function TabelaIntegracoes({
   );
 }
 
-function NovaIntegracao({
-  agir,
-  criada,
-}: {
-  agir: (acao: () => Promise<unknown>) => Promise<unknown>;
-  criada: (nome: string, token: string) => void;
-}) {
+// Modal de criar: nome e escopos; criado, o próprio modal mostra o token uma vez.
+function NovaIntegracao({ recarregar, fechar }: { recarregar: () => void; fechar: () => void }) {
   const [nome, setNome] = useState("");
   const [escopos, setEscopos] = useState<EscopoIntegracao[]>(["leitura"]);
+  const [criada, setCriada] = useState<{ nome: string; token: string } | null>(null);
+  const { agir, erro } = useAcao(recarregar);
 
   function criar(evento: FormEvent) {
     evento.preventDefault();
@@ -197,9 +266,7 @@ function NovaIntegracao({
     if (escolhido.length < 2 || escopos.length === 0) return;
     agir(async () => {
       const nova = await api.criarIntegracao(escolhido, escopos);
-      criada(nova.nome, nova.token);
-      setNome("");
-      setEscopos(["leitura"]);
+      setCriada({ nome: nova.nome, token: nova.token });
     });
   }
 
@@ -208,53 +275,79 @@ function NovaIntegracao({
       atuais.includes(valor) ? atuais.filter((e) => e !== valor) : [...atuais, valor],
     );
 
-  return (
-    <form onSubmit={criar} className="nova-integracao">
-      <h2>Novo token</h2>
-      <label>
-        Nome
-        <input
-          value={nome}
-          onChange={(e) => setNome(e.target.value)}
-          minLength={2}
-          maxLength={80}
-          required
-          placeholder="ex.: APP MEX"
+  if (criada)
+    return (
+      <Dialogo titulo={`Token de ${criada.nome}`} aoFechar={fechar} travado>
+        <Revelado
+          valor={criada.token}
+          aviso="Copie agora: ele não aparece de novo. Se perder, revogue e crie outro."
+          fechar={fechar}
         />
-      </label>
-      <fieldset>
-        <legend>Escopos</legend>
-        {ESCOPOS.map((e) => (
-          <label key={e.valor} className="opcao">
-            <input
-              type="checkbox"
-              checked={escopos.includes(e.valor)}
-              onChange={() => alternar(e.valor)}
-            />
-            {e.rotulo}
-            <small className="nota">{e.texto}</small>
-          </label>
-        ))}
-      </fieldset>
-      <button type="submit" disabled={escopos.length === 0}>
-        Criar token
-      </button>
-    </form>
+      </Dialogo>
+    );
+
+  return (
+    <Dialogo
+      titulo="Novo token"
+      aoFechar={fechar}
+      rodape={
+        <>
+          <button type="button" onClick={fechar}>
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            form="nova-integracao"
+            className="principal"
+            disabled={escopos.length === 0}
+          >
+            Criar token
+          </button>
+        </>
+      }
+    >
+      <form id="nova-integracao" onSubmit={criar} className="nova-integracao">
+        {erro && (
+          <p className="erro" role="alert">
+            {erro}
+          </p>
+        )}
+        <label>
+          Nome
+          <input
+            value={nome}
+            onChange={(e) => setNome(e.target.value)}
+            minLength={2}
+            maxLength={80}
+            required
+            placeholder="ex.: APP MEX"
+          />
+        </label>
+        <fieldset>
+          <legend>Escopos</legend>
+          {ESCOPOS.map((e) => (
+            <label key={e.valor} className="opcao">
+              <input
+                type="checkbox"
+                checked={escopos.includes(e.valor)}
+                onChange={() => alternar(e.valor)}
+              />
+              {e.rotulo}
+              <small className="nota">{e.texto}</small>
+            </label>
+          ))}
+        </fieldset>
+      </form>
+    </Dialogo>
   );
 }
 
-type Revelacao = { titulo: string; valor: string; aviso: string };
-
-// Token ou segredo recém-gerado: aparece uma vez, no topo, e a tela vai até ele.
-function Revelado({ titulo, valor, aviso, fechar }: Revelacao & { fechar: () => void }) {
+// Token ou segredo recém-gerado: aparece uma vez, dentro do modal.
+// Sem `role="status"`: o leitor de tela leria o valor em voz alta.
+function Revelado({ valor, aviso, fechar }: { valor: string; aviso: string; fechar: () => void }) {
   const [copiado, setCopiado] = useState(false);
-  const topo = useAoAbrir();
   return (
-    // Sem `role="status"`: o leitor de tela leria o valor em voz alta. O foco vai ao título.
-    <section className="token-novo" aria-label={titulo}>
-      <h2 ref={topo} tabIndex={-1}>
-        {titulo}
-      </h2>
+    <div className="token-novo">
       <p className="aviso">{aviso}</p>
       <code className="dado">{valor}</code>
       <div className="acoes-form">
@@ -273,7 +366,7 @@ function Revelado({ titulo, valor, aviso, fechar }: Revelacao & { fechar: () => 
           Já guardei
         </button>
       </div>
-    </section>
+    </div>
   );
 }
 
@@ -293,19 +386,18 @@ const SITUACAO_ENTREGA: Record<EntregaIntegracao["situacao"], string> = {
 
 function PainelWebhook({
   integracao,
-  agir,
-  revelar,
+  recarregar,
   fechar,
 }: {
   integracao: Integracao;
-  agir: (acao: () => Promise<unknown>) => Promise<unknown>;
-  revelar: (r: Revelacao) => void;
+  recarregar: () => void;
   fechar: () => void;
 }) {
   const [url, setUrl] = useState(integracao.webhook_url ?? "");
   const [entregas, setEntregas] = useState<EntregaIntegracao[] | null>(null);
+  const [segredo, setSegredo] = useState<string | null>(null);
+  const { agir, erro } = useAcao(recarregar);
   const confirmar = useConfirmar();
-  const topo = useAoAbrir();
   useEffect(() => {
     api
       .entregasIntegracao(integracao.id)
@@ -332,30 +424,40 @@ function PainelWebhook({
     )
       return;
     agir(async () => {
-      const { segredo } = await api.gerarSegredo(integracao.id);
-      revelar({
-        titulo: `Segredo do webhook de ${integracao.nome}`,
-        valor: segredo,
-        aviso: "Copie agora: ele não aparece de novo. Com ele o sistema confere a assinatura.",
-      });
+      setSegredo((await api.gerarSegredo(integracao.id)).segredo);
     });
   }
 
+  if (segredo)
+    return (
+      // `key` distinta: o X fecha o <dialog> nativo, e a volta ao webhook
+      // precisa de outro elemento, aberto de novo pelo `showModal`.
+      <Dialogo
+        key="segredo"
+        titulo={`Segredo do webhook de ${integracao.nome}`}
+        aoFechar={() => setSegredo(null)}
+        travado
+      >
+        <Revelado
+          valor={segredo}
+          aviso="Copie agora: ele não aparece de novo. Com ele o sistema confere a assinatura."
+          fechar={() => setSegredo(null)}
+        />
+      </Dialogo>
+    );
+
   const agora = Date.now();
   return (
-    <div className="painel-instancia painel-webhook">
-      <div className="painel-topo">
-        <h3 ref={topo} tabIndex={-1}>
-          Webhook de {integracao.nome}
-        </h3>
-        <button type="button" onClick={fechar}>
-          Fechar
-        </button>
-      </div>
+    <Dialogo key="webhook" titulo={`Webhook de ${integracao.nome}`} aoFechar={fechar} largo>
       <p className="nota">
         Recebe o status novo das consultas e propostas abertas por este token, assinado no
         cabeçalho <code>X-Saturday-Signature</code>. O CPF vai mascarado.
       </p>
+      {erro && (
+        <p className="erro" role="alert">
+          {erro}
+        </p>
+      )}
       <form onSubmit={salvar} className="nova-instancia endereco-webhook">
         <label>
           Endereço
@@ -372,11 +474,9 @@ function PainelWebhook({
         <button type="button" onClick={gerar}>
           {integracao.tem_segredo ? "Trocar o segredo" : "Gerar o segredo"}
         </button>
-        {!integracao.tem_segredo && (
-          <span className="aviso">Sem segredo, nenhum aviso sai.</span>
-        )}
+        {!integracao.tem_segredo && <span className="aviso">Sem segredo, nenhum aviso sai.</span>}
       </div>
-      <h4>Últimas entregas</h4>
+      <h3>Últimas entregas</h3>
       {entregas === null ? (
         <p className="nota">Carregando…</p>
       ) : entregas.length === 0 ? (
@@ -406,6 +506,6 @@ function PainelWebhook({
           ))}
         </ul>
       )}
-    </div>
+    </Dialogo>
   );
 }

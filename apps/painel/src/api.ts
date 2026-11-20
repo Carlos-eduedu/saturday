@@ -295,6 +295,19 @@ export interface ConfiguracoesInstancia {
   msgCall: string;
 }
 
+// Aba Parceiros de Integrações: o que o Saturday chama, só leitura. Dos
+// segredos vem só se estão configurados, nunca o valor.
+export type Parceiro = {
+  id: string;
+  nome: string;
+  descricao: string;
+  situacao: "ligado" | "desligado" | "falta_chave";
+  sempre: boolean;
+  host: string;
+  segredos: Record<string, boolean>;
+  em_canais: boolean;
+};
+
 // Página Integrações (decisão 0035): token do APP MEX no proxy da Granatech.
 export type EscopoIntegracao = "leitura" | "revelar" | "acoes" | "operacoes" | "homologacao";
 
@@ -837,6 +850,7 @@ export const api = {
   membros: () => chamar<Membro[]>("GET", "/membros"),
   membro: (id: string) => chamar<Membro>("GET", `/membros/${id}`),
   criarUsuario: (dados: NovoUsuario) => chamar<{ id: string }>("POST", "/gestao/usuarios", dados),
+  parceiros: () => chamar<Parceiro[]>("GET", "/gestao/parceiros"),
   integracoes: () => chamar<Integracao[]>("GET", "/gestao/integracoes"),
   criarIntegracao: (nome: string, escopos: EscopoIntegracao[]) =>
     chamar<Integracao & { token: string }>("POST", "/gestao/integracoes", { nome, escopos }),
