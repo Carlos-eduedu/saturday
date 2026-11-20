@@ -1,7 +1,7 @@
 # 0035 — Saturday como proxy da Granatech para o APP MEX
 
 - **Data:** 2026-11-20
-- **Status:** proposta
+- **Status:** aceita
 - **Emenda:** regra 1 do `AGENTS.md`
 - **Estende:** [0013](0013-acoes-do-painel-na-granatech-por-turno-de-sistema.md), [0025](0025-uma-acao-do-gestor-por-vez.md)
 - **Ver também:** [0036](0036-consentimento-e-triagem-pela-integracao.md)
@@ -31,11 +31,14 @@ MEX dos status exige chamá-lo.
 - **O que o proxy barra**, antes ou depois de repassar:
   - token sem o escopo da rota (403);
   - consulta que fura a cota diária ou mensal; CPF com consulta recente devolve
-    a mesma, sem abrir outra (regra 5);
+    a mesma, sem abrir outra (regra 5). Se a recente é de uma conversa do agente
+    ou de outra integração, 409 na abertura: o CPF está em atendimento;
   - simulação ou proposta com liberado acima do teto (422, regra 6);
-  - proposta sem `Idempotency-Key` ou de simulação que o Saturday não repassou;
-    a intenção é gravada antes, não há retry, e o resultado incerto vira 202
-    "incerta" (regra 4);
+  - proposta que não repete uma simulação repassada a esta integração nas
+    últimas 24 h (produto, margem, prazo, parcela e liberado); a intenção é
+    gravada antes, não há retry, e o resultado incerto vira 202 "incerta"
+    (regra 4). Repetir o POST da mesma consulta devolve a mesma proposta, sem
+    novo POST na Granatech: por isso não há `Idempotency-Key`;
   - escrita em consulta ou proposta que nasceu numa conversa do agente (409:
     a etapa da conversa ficaria mentindo, como na 0013).
 - **Registro local.** Consultas e propostas da integração vão às tabelas de

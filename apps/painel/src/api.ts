@@ -318,6 +318,7 @@ export interface EntregaIntegracao {
   tentativas: number;
   criada_em: string;
   entregue_em: string | null;
+  motivo: string | null;
 }
 
 export interface Qr {

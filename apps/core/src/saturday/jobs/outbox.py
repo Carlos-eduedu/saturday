@@ -63,6 +63,13 @@ TIMEOUT_INTEGRACAO_S = 3.0
 PAUSA_INTEGRACAO_S = 60.0
 
 
+class FalhaDoAviso(Exception):
+    """Motivo curto da falha, que vai para `ultimo_erro` e a tela de entregas.
+
+    Nunca a mensagem da exceção de rede: ela pode trazer a URL da integração.
+    """
+
+
 class EntregadorIntegracao:
     """Aviso de status ao webhook de uma integração (decisão 0035).
 
@@ -86,7 +93,7 @@ class EntregadorIntegracao:
 
     def entregar(self, linha: Outbox, *, permitir_modelo: bool = False) -> Resultado:
         if self._relogio() < self._pausada_ate.get(linha.integracao_id, 0.0):
-            return Resultado.TEMPORARIO
+            raise FalhaDoAviso("em pausa depois de uma falha recente")
         with abrir_sessao(self._fabrica) as sessao:
             integracao = sessao.get(Integracao, linha.integracao_id)
             if integracao is None or integracao.revogada_em is not None:
@@ -97,6 +104,7 @@ class EntregadorIntegracao:
         corpo = corpo_json(linha.payload)
         inicio = time.monotonic()
         situacao: int | None = None
+        motivo = ""
         try:
             resposta = self._http.post(
                 url,
@@ -110,6 +118,7 @@ class EntregadorIntegracao:
             )
             situacao = resposta.status_code
         except Exception as exc:  # noqa: BLE001 - só o tipo: a mensagem pode trazer a URL
+            motivo = f"sem resposta ({type(exc).__name__})"
             logger.warning(
                 "integracao_webhook_falhou integracao=%s erro=%s",
                 linha.integracao_id,
@@ -128,7 +137,7 @@ class EntregadorIntegracao:
             self._pausada_ate.pop(linha.integracao_id, None)
             return Resultado.OK
         self._pausada_ate[linha.integracao_id] = self._relogio() + PAUSA_INTEGRACAO_S
-        return Resultado.TEMPORARIO
+        raise FalhaDoAviso(motivo or f"respondeu {situacao}")
 
 
 class EntregadorPorCanal:

@@ -137,6 +137,10 @@ def entregas(integracao_id: uuid.UUID, _usuario: Gestor, fabrica: Fabrica) -> li
                 "tentativas": e.tentativas,
                 "criada_em": e.criada_em.isoformat(),
                 "entregue_em": e.entregue_em.isoformat() if e.entregue_em else None,
+                # `_entregar` grava "FalhaDoAviso: <motivo>"; a tela mostra só o motivo.
+                "motivo": (e.ultimo_erro or "").rpartition(": ")[2] or None
+                if not e.entregue_em
+                else None,
             }
             for e in integracoes.entregas(sessao, integracao_id)
         ]

@@ -250,9 +250,21 @@ cota e teto continuam do Saturday.
 
   Com `timestamp = X-Saturday-Timestamp`, `recebida = X-Saturday-Signature` e o
   corpo cru, antes de ler o JSON. Recuse timestamp com mais de 5 minutos.
-- **A fazer:** proxy de escrita com cota, teto, `Idempotency-Key` e 409 em item
-  de conversa, que grava a `integracao_id` (fase 3; até lá nenhum aviso sai de
-  verdade), homologação (fase 4).
+- **Escrita (fase 3)**, no mesmo prefixo. Item de outra integração ou de
+  conversa do agente: 409. As respostas da Granatech voltam cruas (CPF
+  mascarado; 401/403 dela viram 502).
+
+  | Rota | Escopo | O que o Saturday confere |
+  | --- | --- | --- |
+  | `GET consulta-saldo?cpf&nome&telefone` | `operacoes` | Reaproveita a consulta recente do CPF sem gastar cota (`reaproveitada: true`); senão reserva cota (sem cota: 429) e abre. A consulta fica com a integração dona. Recente de outro dono: 409. Resposta: `{id, status, link_termo_consentimento, reaproveitada}`. |
+  | `POST termo-consentimento` | `operacoes` | `id_consulta` da integração. |
+  | `GET simulacao/{id_produto}` | `operacoes` | Liberado de algum bloco acima do teto: 422, sem a simulação. As outras ficam guardadas por 24 h. |
+  | `POST propostas` | `operacoes` | Só com `SATURDAY_GRANATECH_PROPOSTA_ATIVA` (503). `id_consulta` da integração; `informacoesFinanceira[0]` repete uma simulação guardada (`id_produto`, `id_margem`, `numero_parcelas`, `valor_parcela`, `valor_solicitado`) e está no teto (422). Intenção gravada antes, sem retry. Resposta `{id, reaproveitada}`; repetir devolve a mesma, sem novo POST. Incerta: 202 `{situacao: "incerta", ...}` — consulte `propostas/lista` antes de repetir. |
+  | `POST propostas/{id}/dados-tomador` | `operacoes` | Proposta da integração. |
+  | `POST propostas/{id}/cancelar` | `acoes` | Proposta da integração. |
+  | `PATCH propostas/{id}/dados-bancarios` | `acoes` | Proposta da integração e `SATURDAY_GRANATECH_DADOS_BANCARIOS_ATIVO` (503). |
+
+- **A fazer:** homologação pela integração (fase 4).
 
 ## Pendências com a Granatech
 

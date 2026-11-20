@@ -1,7 +1,7 @@
 # 0036 — Consentimento e triagem pela integração são do APP MEX
 
 - **Data:** 2026-11-20
-- **Status:** proposta
+- **Status:** aceita
 - **Emenda:** regras 3 e 5 do `AGENTS.md`
 - **Ver também:** [0035](0035-api-granatech-para-o-app-mex.md)
 

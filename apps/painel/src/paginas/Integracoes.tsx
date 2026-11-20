@@ -76,7 +76,11 @@ export function Integracoes() {
             integracao={lista.find((i) => i.id === webhookDe) as Integracao}
             agir={agir}
             revelar={setRevelado}
-            fechar={() => setWebhookDe(null)}
+            fechar={() => {
+              // O painel some com o foco dentro: ele volta ao botão que o abriu.
+              document.querySelector<HTMLElement>(`[data-webhook="${webhookDe}"]`)?.focus();
+              setWebhookDe(null);
+            }}
           />
         )}
       </section>
@@ -142,7 +146,12 @@ function TabelaIntegracoes({
             <td data-rotulo="Webhook">{i.webhook_url ? hostDe(i.webhook_url) : "—"}</td>
             <td className="acoes">
               {!i.revogada_em && (
-                <button type="button" aria-expanded={aberta === i.id} onClick={() => abrir(i.id)}>
+                <button
+                  type="button"
+                  data-webhook={i.id}
+                  aria-expanded={aberta === i.id}
+                  onClick={() => abrir(i.id)}
+                >
                   {aberta === i.id ? "Fechar webhook" : "Webhook"}
                 </button>
               )}
@@ -391,6 +400,7 @@ function PainelWebhook({
               </span>
               <span className="nota">
                 {e.tentativas} tentativa{e.tentativas === 1 ? "" : "s"}
+                {e.motivo && ` · ${e.motivo}`}
               </span>
             </li>
           ))}

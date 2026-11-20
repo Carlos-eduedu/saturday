@@ -132,13 +132,17 @@ def _digitos(valor: str | None, tamanho: int, campo: str) -> str:
 
 
 def conferir_reaproveitada(aberta: ConsultaAberta, quem: IntegracaoLogada) -> None:
-    """Consulta reaproveitada de outro dono não volta ao APP MEX.
+    """Consulta recente de outro dono não volta ao APP MEX: recusa na abertura.
 
-    TODO(decisão): CPF em conversa com o agente — ver a pergunta no Inbox.
+    CPF em conversa com o agente (ou aberto por outra integração) está em
+    atendimento; não gasta cota e o APP MEX sabe na hora (decisão 0035).
     """
 
     if aberta.reaproveitada and (aberta.conversa_id is not None or aberta.integracao_id != quem.id):
-        raise HTTPException(status_code=409, detail="CPF em atendimento por outro canal")
+        raise HTTPException(
+            status_code=409,
+            detail="CPF em atendimento por outro canal (agente ou outra integração)",
+        )
 
 
 @router.get(f"{GRANATECH}/consulta-saldo")

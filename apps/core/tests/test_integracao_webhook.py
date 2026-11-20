@@ -298,6 +298,12 @@ def test_painel_lista_as_entregas(client_pg: TestClient, fabrica: Any, settings:
     assert entrega["tipo"] == "consulta"
     assert entrega["status"] == "PROCESSING"
     assert entrega["situacao"] == "pendente"
+    assert entrega["motivo"] is None
+
+    http, _ = _recebidos([503])
+    _drenar(fabrica, settings, http)
+    (entrega,) = client_pg.get(f"{PAINEL}/{integracao_id}/webhook/entregas").json()
+    assert entrega["motivo"] == "respondeu 503"
 
 
 pytestmark = pytest.mark.filterwarnings("ignore:You should not use the 'timeout' argument")
