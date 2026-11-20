@@ -31,6 +31,12 @@ def chave_trava(conversation_id: str) -> int:
     return bits - (1 << 64) if bits >= (1 << 63) else bits
 
 
+def travar(sessao: Session, chave: str) -> None:
+    """Espera a trava de ``chave`` até o fim da transação atual."""
+
+    sessao.execute(text("SELECT pg_advisory_xact_lock(:chave)"), {"chave": chave_trava(chave)})
+
+
 def travar_conversa(sessao: Session, conversation_id: str) -> None:
     """Espera a trava da conversa até o fim da transação atual.
 

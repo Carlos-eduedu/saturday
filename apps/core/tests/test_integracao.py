@@ -160,7 +160,7 @@ def test_proxy_repassa_a_busca(api: TestClient, fabrica: Any) -> None:
 def test_rota_fora_da_lista_404(api: TestClient, fabrica: Any) -> None:
     token = _token(api, fabrica, "leitura")
     assert api.get(f"{PROXY}/tools/cpf", headers=token).status_code == 404
-    assert api.post(f"{PROXY}/propostas", json={}, headers=token).status_code == 404
+    assert api.post(f"{PROXY}/propostas/x/aprovar", json={}, headers=token).status_code == 404
     assert api.post(f"{PROXY}/bancos", headers=token).status_code == 405
 
 

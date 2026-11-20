@@ -59,6 +59,7 @@ export const MOTIVOS_HANDOFF: Record<string, string> = {
   sem_resposta: "Sem resposta",
   status_desconhecido: "Status desconhecido",
   termo_falhou: "Termo falhou",
+  cpf_em_outro_canal: "CPF em atendimento pelo APP MEX",
   handoff: "Handoff",
 };
 

@@ -327,6 +327,8 @@ class SimulacaoIntegracao(Base):
     )
     id_produto: Mapped[str] = mapped_column(String(64), nullable=False)
     id_margem: Mapped[str] = mapped_column(String(64), nullable=False)
+    # Bloco com ou sem seguro: a proposta com `informacaoDeSeguros` casa só com o primeiro.
+    seguro: Mapped[bool] = mapped_column(Boolean, nullable=False)
     numero_parcelas: Mapped[int] = mapped_column(Integer, nullable=False)
     valor_parcela: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     liberado: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)

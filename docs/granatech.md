@@ -264,6 +264,11 @@ cota e teto continuam do Saturday.
   | `POST propostas/{id}/cancelar` | `acoes` | Proposta da integração. |
   | `PATCH propostas/{id}/dados-bancarios` | `acoes` | Proposta da integração e `SATURDAY_GRANATECH_DADOS_BANCARIOS_ATIVO` (503). |
 
+- **Do lado do agente:** se o CPF tem consulta recente aberta pelo APP MEX, a
+  conversa vai para um humano (`cpf_em_outro_canal`), sem herdar a consulta nem a
+  proposta. Abrir consulta trava por CPF (agente e proxy não gastam cota duas
+  vezes) e o GET que abre não se repete num timeout; criar proposta trava por
+  consulta (dois pedidos juntos fazem um POST só).
 - **A fazer:** homologação pela integração (fase 4).
 
 ## Pendências com a Granatech

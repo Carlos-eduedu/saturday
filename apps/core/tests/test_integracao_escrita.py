@@ -87,6 +87,8 @@ def _corpo_proposta(id_consulta: str, simulacao: dict[str, Any]) -> dict[str, An
                 "numero_parcelas": bloco["numero_parcelas"],
             }
         ],
+        # O simulador só devolve o bloco com seguro.
+        "informacaoDeSeguros": {"valor_seguro": bloco["valor_seguro"]},
     }
 
 
@@ -304,3 +306,82 @@ def test_proposta_incerta_responde_202_sem_repetir(
     assert len(posts) == 1  # a segunda só procurou na listagem
     with abrir_sessao(fabrica) as sessao:
         assert sessao.scalars(select(PropostaGranatech.estado_envio)).one() == "incerta"
+
+
+# ------------------------------------------------------------------ revisão da fase 3
+
+
+@pytest.mark.parametrize(
+    "estragar",
+    [
+        lambda c: c["informacoesFinanceira"].append(dict(c["informacoesFinanceira"][0])),
+        lambda c: c["informacoesFinanceira"][0].update(numero_parcelas=True),
+        lambda c: c["informacoesFinanceira"][0].update(valor_parcela="abc"),
+        lambda c: c.update(informacoesFinanceira={"valor_parcela": 300}),
+    ],
+    ids=["dois_itens", "prazo_bool", "parcela_texto", "nao_e_lista"],
+)
+def test_corpo_malformado_422(api: TestClient, fabrica: Any, estragar: Any) -> None:
+    token, corpo = _ate_simulacao(api, fabrica)
+    estragar(corpo)
+    assert api.post(f"{PROXY}/propostas", json=corpo, headers=token).status_code == 422
+
+
+def test_prazo_como_texto_de_digitos_vale(api: TestClient, fabrica: Any) -> None:
+    token, corpo = _ate_simulacao(api, fabrica)
+    corpo["informacoesFinanceira"][0]["numero_parcelas"] = "36"
+    assert api.post(f"{PROXY}/propostas", json=corpo, headers=token).status_code == 200
+
+
+def test_proposta_sem_seguro_nao_casa_com_simulacao_com_seguro(
+    api: TestClient, fabrica: Any
+) -> None:
+    token, corpo = _ate_simulacao(api, fabrica)
+    del corpo["informacaoDeSeguros"]
+    assert api.post(f"{PROXY}/propostas", json=corpo, headers=token).status_code == 422
+
+
+def test_termo_com_outro_cpf_recusado(api: TestClient, fabrica: Any) -> None:
+    token = _token(api, fabrica, "operacoes")
+    consulta = _abrir(api, token)
+    corpo = {
+        **CLIENTE,
+        "cpf": "11144477735",
+        "email": "a@exemplo.test",
+        "id_consulta": consulta["id"],
+    }
+    assert api.post(f"{PROXY}/termo-consentimento", json=corpo, headers=token).status_code == 422
+
+
+def test_dois_pedidos_ao_mesmo_tempo_um_post_so(
+    api: TestClient, fabrica: Any, simulador_granatech: Any
+) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+
+    token, corpo = _ate_simulacao(api, fabrica)
+    with abrir_sessao(fabrica) as sessao:
+        consulta_id = sessao.scalars(select(ConsultaGranatech.id)).one()
+    cliente = api.app.dependency_overrides[get_granatech]()  # type: ignore[attr-defined]
+    simulador_granatech.CHAMADAS.clear()
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        ids = list(
+            pool.map(
+                lambda _i: cliente.criar_proposta(consulta_id=consulta_id, corpo=corpo), range(2)
+            )
+        )
+
+    assert ids[0] == ids[1]
+    posts = [
+        c for c in simulador_granatech.CHAMADAS if c[0] == "POST" and c[1].endswith("/propostas")
+    ]
+    assert len(posts) == 1
+
+
+def test_agente_ve_o_dono_da_consulta_do_app_mex(api: TestClient, fabrica: Any) -> None:
+    # O nó do agente faz handoff quando a consulta reaproveitada tem integração dona.
+    token = _token(api, fabrica, "operacoes")
+    _abrir(api, token)
+    cliente = api.app.dependency_overrides[get_granatech]()  # type: ignore[attr-defined]
+    aberta = cliente.abrir_consulta(CPF, "Ana Teste", "11999990000")
+    assert aberta.reaproveitada and aberta.integracao_id is not None

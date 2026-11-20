@@ -34,6 +34,7 @@ def upgrade() -> None:
         ),
         sa.Column("id_produto", sa.String(64), nullable=False),
         sa.Column("id_margem", sa.String(64), nullable=False),
+        sa.Column("seguro", sa.Boolean(), nullable=False),
         sa.Column("numero_parcelas", sa.Integer(), nullable=False),
         sa.Column("valor_parcela", sa.Numeric(12, 2), nullable=False),
         sa.Column("liberado", sa.Numeric(12, 2), nullable=False),

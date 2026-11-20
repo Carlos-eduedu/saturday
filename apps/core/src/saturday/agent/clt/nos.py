@@ -254,6 +254,10 @@ def _consultar(t: Turno, *, recontato: int | None) -> dict[str, Any]:
         return _cota_esgotada(t, recontato)
     except ErroGranatech:
         return t.handoff("granatech_indisponivel")
+    if consulta.integracao_id is not None:
+        # Consulta recente aberta pelo APP MEX (decisão 0035): o cliente está
+        # em atendimento por lá; a conversa não herda a consulta nem a proposta.
+        return t.handoff("cpf_em_outro_canal")
 
     t.clt.update(etapa="consultando", passo=None, consulta=consulta.id_externo, erros=0)
     if not consulta.reaproveitada:

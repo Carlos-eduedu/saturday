@@ -80,6 +80,8 @@ HandoffReason = Literal[
     "granatech_indisponivel",
     "sem_consentimento",
     "termo_falhou",
+    # CPF com consulta recente aberta por uma integração (decisão 0035).
+    "cpf_em_outro_canal",
     "cota_esgotada",
     "consulta_com_erro",
     "acima_do_teto",

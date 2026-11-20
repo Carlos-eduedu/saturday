@@ -121,6 +121,13 @@ def _proposta_da_integracao(
         return linha
 
 
+def _mesmo_cpf(corpo: dict[str, Any], cpf: str) -> None:
+    """O CPF do corpo é o da consulta: o termo e o tomador não trocam de cliente."""
+
+    if re.sub(r"\D", "", str(corpo.get("cpf") or "")) != cpf:
+        raise HTTPException(status_code=422, detail="cpf diferente do da consulta")
+
+
 # ------------------------------------------------------------------ consulta
 
 
@@ -184,7 +191,8 @@ def abrir_consulta(
 def assinar_termo(
     corpo: Corpo, quem: Operacoes, cliente: Granatech, fabrica: Fabrica
 ) -> JSONResponse:
-    _consulta_da_integracao(fabrica, str(corpo.get("id_consulta") or ""), quem)
+    consulta = _consulta_da_integracao(fabrica, str(corpo.get("id_consulta") or ""), quem)
+    _mesmo_cpf(corpo, consulta.cpf)
     status, resposta = _repassar(
         cliente, "POST", "/termo-consentimento", "/termo-consentimento", json=corpo
     )
@@ -194,16 +202,19 @@ def assinar_termo(
 # ------------------------------------------------------------------ simulação
 
 
-def _blocos(dados: Any) -> list[Any]:
-    """Cada resultado que veio (com e sem seguro), já lido."""
+def _blocos(dados: Any) -> list[tuple[bool, Any]]:
+    """Cada resultado que veio, já lido, com a marca de seguro."""
 
     if not isinstance(dados, dict):
         return []
     blocos = []
-    for chave in ("resultado_da_simulacao_com_seguro", "resultado_da_simulacao_sem_seguro"):
+    for chave, seguro in (
+        ("resultado_da_simulacao_com_seguro", True),
+        ("resultado_da_simulacao_sem_seguro", False),
+    ):
         bloco = dados.get(chave)
         if isinstance(bloco, dict) and bloco:
-            blocos.append(normalizar_simulacao({chave: bloco}))
+            blocos.append((seguro, normalizar_simulacao({chave: bloco})))
     return blocos
 
 
@@ -230,16 +241,17 @@ def simular(
     if not blocos:
         raise HTTPException(status_code=502, detail="simulação sem resultado")
     teto = cliente.teto
-    if any(b.liberado > teto for b in blocos):
+    if any(b.liberado > teto for _seguro, b in blocos):
         raise HTTPException(
             status_code=422,
             detail=f"liberado acima do teto de R$ {teto}: reduza a parcela ou o prazo",
         )
     with abrir_sessao(fabrica) as sessao:
-        for b in blocos:
+        for seguro, b in blocos:
             sessao.add(
                 SimulacaoIntegracao(
                     integracao_id=quem.id,
+                    seguro=seguro,
                     id_produto=id_produto,
                     id_margem=str(params.get("id_margem") or ""),
                     numero_parcelas=b.numero_parcelas,
@@ -253,27 +265,47 @@ def simular(
 # ------------------------------------------------------------------ proposta
 
 
+def _financeiro(item: Any) -> tuple[Decimal, Decimal, int]:
+    """Liberado, parcela e prazo do item; qualquer coisa fora disso é 422."""
+
+    invalido = HTTPException(
+        status_code=422,
+        detail="informacoesFinanceira sem valor_solicitado, valor_parcela ou numero_parcelas",
+    )
+    if not isinstance(item, dict):
+        raise invalido
+    valores = (item.get("valor_solicitado"), item.get("valor_parcela"))
+    prazo = item.get("numero_parcelas")
+    # `bool` é `int` em Python: `true` não pode valer como prazo.
+    if any(isinstance(v, bool) for v in (*valores, prazo)):
+        raise invalido
+    try:
+        liberado, parcela = (decimal_ou_none(v) for v in valores)
+    except (ValueError, ArithmeticError) as exc:
+        raise invalido from exc
+    if isinstance(prazo, str) and prazo.isdigit():
+        prazo = int(prazo)
+    if liberado is None or parcela is None or not isinstance(prazo, int):
+        raise invalido
+    return liberado, parcela, prazo
+
+
 def conferir_simulada(
     sessao: Session, quem: IntegracaoLogada, corpo: dict[str, Any], teto: Decimal
 ) -> None:
     """A proposta tem de repetir uma simulação repassada a esta integração."""
 
-    financeiro = (corpo.get("informacoesFinanceira") or [{}])[0]
-    if not isinstance(financeiro, dict):
-        raise HTTPException(status_code=422, detail="informacoesFinanceira inválido")
-    liberado = decimal_ou_none(financeiro.get("valor_solicitado"))
-    parcela = decimal_ou_none(financeiro.get("valor_parcela"))
-    prazo = financeiro.get("numero_parcelas")
-    if liberado is None or parcela is None or not isinstance(prazo, int):
-        raise HTTPException(
-            status_code=422,
-            detail="informacoesFinanceira sem valor_solicitado, valor_parcela ou numero_parcelas",
-        )
+    financeiros = corpo.get("informacoesFinanceira")
+    # Um item só: o corpo vai inteiro à Granatech, e um segundo passaria sem conferir.
+    if not isinstance(financeiros, list) or len(financeiros) != 1:
+        raise HTTPException(status_code=422, detail="informacoesFinanceira precisa de um item")
+    liberado, parcela, prazo = _financeiro(financeiros[0])
     if liberado > teto:
         raise HTTPException(status_code=422, detail=f"liberado acima do teto de R$ {teto}")
     conhecida = sessao.scalar(
         select(SimulacaoIntegracao.id).where(
             SimulacaoIntegracao.integracao_id == quem.id,
+            SimulacaoIntegracao.seguro.is_(bool(corpo.get("informacaoDeSeguros"))),
             SimulacaoIntegracao.id_produto == str(corpo.get("id_produto") or ""),
             SimulacaoIntegracao.id_margem == str(corpo.get("id_margem") or ""),
             SimulacaoIntegracao.numero_parcelas == prazo,
@@ -336,7 +368,12 @@ def criar_proposta(
 def dados_tomador(
     id_proposta: Id, corpo: Corpo, quem: Operacoes, cliente: Granatech, fabrica: Fabrica
 ) -> JSONResponse:
-    _proposta_da_integracao(fabrica, id_proposta, quem)
+    proposta = _proposta_da_integracao(fabrica, id_proposta, quem)
+    with abrir_sessao(fabrica) as sessao:
+        cpf = sessao.scalar(
+            select(ConsultaGranatech.cpf).where(ConsultaGranatech.id == proposta.consulta_id)
+        )
+    _mesmo_cpf(corpo, cpf or "")
     status, resposta = _repassar(
         cliente,
         "POST",

@@ -46,6 +46,7 @@ from saturday.bancos.granatech.teto import MAX_NOVAS_SIMULACOES, proxima_parcela
 from saturday.dados import cota
 from saturday.dados.modelos import ChamadaExterna, ConsultaGranatech, PropostaGranatech
 from saturday.dados.sessao import sessao as abrir_sessao
+from saturday.dados.trava import travar
 from saturday.metrics import registrar_chamada
 from saturday.settings import (
     GRANATECH_ESPERA_RETRY_S,
@@ -249,6 +250,7 @@ class ClienteGranatech:
         params: dict[str, Any] | httpx.QueryParams | None = None,
         json: dict[str, Any] | None = None,
         conversa_id: Any = None,
+        repetir: bool = True,
     ) -> Any:
         renovou = False
         repetiu = False
@@ -272,7 +274,7 @@ class ClienteGranatech:
                     self._token_valido(renovar=True)
                     continue
                 transitorio = erro.status is None or erro.status >= 500
-                if metodo == "GET" and transitorio and not repetiu:
+                if metodo == "GET" and repetir and transitorio and not repetiu:
                     repetiu = True
                     self._dormir(GRANATECH_ESPERA_RETRY_S)
                     continue
@@ -329,6 +331,21 @@ class ClienteGranatech:
         que o membro testador escolheu, e pede uma consulta nova.
         """
 
+        # Uma abertura por CPF de cada vez: a segunda espera e reaproveita a
+        # primeira, em vez de gastar cota de novo (o agente e o proxy disputam).
+        with abrir_sessao(self._fabrica) as trava:
+            travar(trava, f"granatech:{self._parceiro}:cpf:{cpf}")
+            return self._abrir_consulta(cpf, nome, telefone, conversa_id, cenario, integracao_id)
+
+    def _abrir_consulta(
+        self,
+        cpf: str,
+        nome: str,
+        telefone: str,
+        conversa_id: Any,
+        cenario: str | None,
+        integracao_id: Any,
+    ) -> ConsultaAberta:
         if not (self.teste and cenario):
             reaproveitada = self._consulta_local(cpf) or self._consulta_remota(
                 cpf, conversa_id, integracao_id
@@ -356,6 +373,8 @@ class ClienteGranatech:
                 params={"cpf": cpf, "nome": nome, "telefone": telefone}
                 | ({"cenario": cenario or "sucesso"} if self.teste else {}),
                 conversa_id=conversa_id,
+                # Este GET abre a consulta: repetir num timeout abriria duas.
+                repetir=False,
             )
         except ErroGranatech as erro:
             if erro.status is not None and 400 <= erro.status < 500 and erro.status != 401:
@@ -702,6 +721,9 @@ class ClienteGranatech:
             raise ValueError("corpo sem valor_parcela ou numero_parcelas")
 
         with abrir_sessao(self._fabrica) as sessao:
+            # Sem linha ainda, o `FOR UPDATE` não trava nada: dois pedidos da mesma
+            # consulta inseririam duas intenções e fariam dois POST (regra 4).
+            travar(sessao, f"granatech:proposta:consulta:{consulta_id}")
             anterior = sessao.scalars(
                 select(PropostaGranatech)
                 .where(
