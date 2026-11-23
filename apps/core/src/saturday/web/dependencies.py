@@ -196,6 +196,8 @@ def integracao(escopo: str) -> Callable[..., IntegracaoLogada]:
                 linha = integracoes.autenticar(sessao, token.strip(), escopo, datetime.now(UTC))
             except integracoes.IntegracaoRecusada as exc:
                 raise HTTPException(status_code=exc.status, detail=exc.detalhe) from exc
+            # Lido pelo `RegistroDeChamadas`, que grava a chamada no Histórico.
+            request.state.integracao_id = linha.id
             return IntegracaoLogada(id=linha.id, nome=linha.nome)
 
     return conferir

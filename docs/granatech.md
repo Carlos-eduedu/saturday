@@ -204,6 +204,13 @@ cota e teto continuam do Saturday.
   (`/admin/gestao/integracoes`). O token (`sat_...`) aparece uma vez; o banco
   guarda o sha256. Escopos: `leitura`, `revelar`, `acoes`, `operacoes`,
   `homologacao`. Criar e revogar vão para a auditoria.
+- **Histórico do token:** cada chamada autenticada ao proxy (`/integracao/...`)
+  vira uma linha em `integracao_chamadas` (molde da rota, IDs do caminho,
+  status e tempo; nada da query nem do corpo), gravada por um middleware depois
+  da resposta. Chamada sem token válido não tem dono e não entra. O worker apaga
+  o que passa de 180 dias. O painel mostra as chamadas junto da gestão do token
+  (criar, webhook, segredo, revogar) em `GET /admin/gestao/integracoes/{id}/historico`,
+  as 200 mais novas, no menu Ações de cada linha (Histórico, Webhook, Revogar).
 - **Chamada:** `Authorization: Bearer sat_...`. Sem token ou revogado: 401; sem
   o escopo: 403; Granatech desligada: 503; falha de rede ou 5xx dela: 502.
 - **Proxy (fase 1, só leitura, escopo `leitura`)**, em

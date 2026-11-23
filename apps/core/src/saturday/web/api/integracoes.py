@@ -144,3 +144,14 @@ def entregas(integracao_id: uuid.UUID, _usuario: Gestor, fabrica: Fabrica) -> li
             }
             for e in integracoes.entregas(sessao, integracao_id)
         ]
+
+
+# ------------------------------------------------------------------ histórico
+
+
+@router.get("/{integracao_id}/historico")
+def historico(integracao_id: uuid.UUID, _usuario: Gestor, fabrica: Fabrica) -> list[dict[str, Any]]:
+    with abrir_sessao(fabrica) as sessao:
+        if sessao.get(Integracao, integracao_id) is None:
+            raise HTTPException(status_code=404, detail="integração não encontrada")
+        return integracoes.historico(sessao, integracao_id)

@@ -6,6 +6,7 @@ Postgres real, simulador da Granatech em processo e a API por cima.
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
@@ -16,8 +17,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.bancos.granatech.cliente import ClienteGranatech
-from saturday.dados.modelos import Auditoria, ConsultaGranatech, Integracao
+from saturday.dados.modelos import Auditoria, ChamadaIntegracao, ConsultaGranatech, Integracao
 from saturday.dados.sessao import sessao as abrir_sessao
+from saturday.painel import integracoes
 from saturday.web.api.integracao_granatech import get_granatech
 
 pytestmark = pytest.mark.filterwarnings("ignore:You should not use the 'timeout' argument")
@@ -266,3 +268,55 @@ def test_id_que_sairia_da_lista_e_recusado(client_pg: TestClient, fabrica: Any) 
     assert client_pg.get(f"{PROXY}/propostas/x%3Fa%3Db", headers=token).status_code == 422
     assert client_pg.get(f"{PROXY}/consulta-saldo/a.b", headers=token).status_code == 422
     assert pedidos == []
+
+
+# ------------------------------------------------------------------ histórico
+
+
+def test_historico_tem_as_chamadas_e_a_gestao_do_token(api: TestClient, fabrica: Any) -> None:
+    token = _token(api, fabrica, "leitura")
+    assert api.get("/integracao/cota", headers=token).status_code == 200
+    assert api.get(f"{PROXY}/propostas/123", headers=token).status_code in (200, 404)
+    api.get("/integracao/cota")  # sem token: não tem dono, não entra
+
+    csrf = entrar_como(api, fabrica, "gestor")
+    integracao_id = api.get(PAINEL).json()[0]["id"]
+    assert api.post(f"{PAINEL}/{integracao_id}/revogar", headers=csrf).status_code == 204
+    historico = api.get(f"{PAINEL}/{integracao_id}/historico").json()
+
+    assert [(h["tipo"], h.get("acao") or h["rota"]) for h in historico] == [
+        ("gestao", "integracao_revogar"),
+        ("chamada", f"{PROXY}/propostas/{{id_proposta}}"),
+        ("chamada", "/integracao/cota"),
+        ("gestao", "integracao_criar"),
+    ]
+    assert historico[1]["ids"] == {"id_proposta": "123"}
+    assert historico[2]["metodo"] == "GET" and historico[2]["status"] == 200
+    assert historico[0]["por"]
+
+
+def test_historico_so_para_gestor(api: TestClient, fabrica: Any) -> None:
+    _token(api, fabrica, "leitura")
+    entrar_como(api, fabrica, "gestor")
+    integracao_id = api.get(PAINEL).json()[0]["id"]
+    entrar_como(api, fabrica, "atendente")
+    assert api.get(f"{PAINEL}/{integracao_id}/historico").status_code == 403
+
+
+def test_poda_apaga_so_o_que_passou_do_prazo(api: TestClient, fabrica: Any) -> None:
+    token = _token(api, fabrica, "leitura")
+    api.get("/integracao/cota", headers=token)
+    with abrir_sessao(fabrica) as sessao:
+        integracoes.podar_chamadas(sessao, datetime.now(UTC))
+        assert sessao.scalars(select(ChamadaIntegracao)).one()
+        integracoes.podar_chamadas(sessao, datetime.now(UTC) + timedelta(days=181))
+        assert sessao.scalars(select(ChamadaIntegracao)).all() == []
+
+
+def test_historico_nao_grava_id_fora_do_formato(api: TestClient, fabrica: Any) -> None:
+    token = _token(api, fabrica, "leitura")
+    assert api.get(f"{PROXY}/consulta-saldo/123.456.789-01", headers=token).status_code == 422
+
+    with abrir_sessao(fabrica) as sessao:
+        chamada = sessao.scalars(select(ChamadaIntegracao)).one()
+        assert (chamada.status, chamada.ids) == (422, {"id_consulta": "?"})

@@ -34,6 +34,7 @@ from saturday.web.api import (
     webhooks,
     whatsapp,
 )
+from saturday.web.chamadas import RegistroDeChamadas
 from saturday.web.lifespan import criar_lifespan
 from saturday.web.limites import LimiteDeCorpo
 
@@ -56,6 +57,8 @@ def get_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     # Recusa corpo acima de 20 MB antes de qualquer leitura de schema.
     app.add_middleware(LimiteDeCorpo)
+    # Histórico do token: cada chamada autenticada ao proxy de integração.
+    app.add_middleware(RegistroDeChamadas)
     app.include_router(monitoring.router)
     app.include_router(chat.router)
     app.include_router(conversas.router)

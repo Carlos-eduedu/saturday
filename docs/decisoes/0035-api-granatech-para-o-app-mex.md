@@ -48,6 +48,8 @@ MEX dos status exige chamá-lo.
   vez, só o hash no banco), dá nome e escopos (`leitura`, `revelar`, `acoes`,
   `operacoes`, `homologacao`), revoga. Criação e revogação na auditoria; ações
   da integração com `usuario_id` nulo e `detalhe.origem = "integracao"`.
+  Cada chamada do token fica 180 dias no Histórico (`integracao_chamadas`, só
+  metadados), para o gestor ver o que o sistema de fora fez com ele.
 - **Webhook de saída.** Cada token tem um endpoint. Evento da Granatech de item
   da integração é tratado como hoje e repassado cru, assinado com HMAC-SHA256
   por um segredo do endpoint (mostrado uma vez), pelo outbox (canal `integracao`,

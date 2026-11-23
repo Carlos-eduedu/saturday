@@ -11,11 +11,14 @@ import logging
 import signal
 import threading
 import time
+from datetime import UTC, datetime
 
 import httpx
+from sqlalchemy.orm import Session, sessionmaker
 
 from saturday.conhecimento import Conhecimento
 from saturday.dados.sessao import criar_engine, criar_factory
+from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.health import registrar_batimento
 from saturday.jobs import alertas, recontatos
 from saturday.jobs import icred as eventos_icred
@@ -29,6 +32,7 @@ from saturday.jobs.outbox import (
     drenar,
 )
 from saturday.log import configurar_logging
+from saturday.painel import integracoes
 from saturday.settings import Settings, get_settings
 from saturday.storage.base import criar_storage
 from saturday.web.composicao import (
@@ -52,6 +56,16 @@ def _parar_em(parar: threading.Event) -> None:
 
     signal.signal(signal.SIGTERM, ao_sinal)
     signal.signal(signal.SIGINT, ao_sinal)
+
+
+def _podar_historico(fabrica: sessionmaker[Session]) -> None:
+    """Falha da poda não pode adiar alertas e recontatos para a volta seguinte."""
+
+    try:
+        with abrir_sessao(fabrica) as sessao:
+            integracoes.podar_chamadas(sessao, datetime.now(UTC))
+    except Exception:
+        logger.exception("worker_poda_historico_falhou")
 
 
 def rodar(settings: Settings, parar: threading.Event) -> None:
@@ -107,6 +121,7 @@ def rodar(settings: Settings, parar: threading.Event) -> None:
                     if servico.context.icred is not None:
                         eventos_icred.verificar_prazo(fabrica, servico.context.icred, servico)
                     recontatos.disparar(fabrica, servico)
+                    _podar_historico(fabrica)
                     proxima_verificacao = time.monotonic() + alertas.INTERVALO_S
             except Exception:
                 logger.exception("worker_erro_no_lote")

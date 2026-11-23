@@ -311,6 +311,32 @@ class Integracao(Base):
     webhook_segredo: Mapped[str | None] = mapped_column(String(80))
 
 
+class ChamadaIntegracao(Base):
+    """Uma chamada de uma integração ao proxy, para o Histórico do token.
+
+    Só metadados (regra 9): o molde da rota, os IDs do caminho, status e tempo.
+    Nada da query nem do corpo, onde pode vir CPF.
+    """
+
+    __tablename__ = "integracao_chamadas"
+    __table_args__ = (
+        Index("ix_integracao_chamadas_busca", "integracao_id", "criada_em"),
+        # A poda do worker apaga por data, sem integração.
+        Index("ix_integracao_chamadas_criada_em", "criada_em"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    integracao_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("integracoes.id", ondelete="CASCADE"), nullable=False
+    )
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=AGORA)
+    metodo: Mapped[str] = mapped_column(String(8), nullable=False)
+    rota: Mapped[str] = mapped_column(String(200), nullable=False)
+    ids: Mapped[dict[str, str]] = mapped_column(JSONB, nullable=False, default=dict)
+    status: Mapped[int] = mapped_column(Integer, nullable=False)
+    duracao_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
 class SimulacaoIntegracao(Base):
     """Simulação repassada a uma integração (decisão 0035, fase 3).
 
