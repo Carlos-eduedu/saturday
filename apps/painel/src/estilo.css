@@ -498,6 +498,8 @@ main {
   border-radius: 999px;
   box-shadow: var(--sombra-alta);
 }
+/* A Notificacao abre como popover: tira o centro e a moldura que o navegador põe. */
+.aviso-flutuante[popover] { inset: auto auto max(1rem, env(safe-area-inset-bottom)) 50%; margin: 0; border: 0; overflow: visible; }
 .aviso-flutuante span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .aviso-flutuante button { flex: none; min-height: var(--alvo); padding: 0 0.75rem; border-radius: 999px; background: transparent; color: inherit; border: none; font-weight: 600; }
 .aviso-flutuante button:hover:not(:disabled) { background: color-mix(in srgb, var(--fundo) 15%, transparent); box-shadow: none; }
@@ -1806,8 +1808,6 @@ small.dado { font-size: 0.8rem; }
   .disponibilidade button { flex: 1; }
 }
 
-.voce { display: flex; flex-direction: column; gap: 1rem; }
-.voce h2 { margin: 0; }
 .voce__foto { display: flex; align-items: center; gap: 1rem; }
 .voce__foto-acoes { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; }
 .voce__foto-acoes .nota { flex-basis: 100%; margin: 0; }
@@ -1817,7 +1817,6 @@ small.dado { font-size: 0.8rem; }
 .cabeca-secao { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; }
 .cabeca-secao h2 { margin: 0; }
 .pessoa { display: inline-flex; align-items: center; gap: 0.6rem; }
-.voce .form-usuario > .voce__fixos { grid-column: 1 / -1; }
 
 /* Página do membro: Perfil e Acesso abrem em modal; "Dados sem máscara" é um
    interruptor (aria-pressed) com o estado escrito, nunca só a cor. */
@@ -1829,12 +1828,11 @@ small.dado { font-size: 0.8rem; }
 .membro-mascara[aria-pressed="true"] { border-color: var(--texto); }
 .membro-mascara[aria-pressed="true"] svg,
 .membro-mascara[aria-pressed="true"] .membro-mascara__estado { color: var(--texto); }
-.dialogo .voce .form-usuario,
 .dialogo .form-usuario { margin-top: 0; }
+.membro-form-acoes { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .dialogo .form-usuario + .form-usuario,
-.dialogo .voce + .form-usuario,
 .dialogo .membro-fixos + .form-usuario,
-.dialogo .membro-fixos + .voce,
+.dialogo .membro-fixos + .voce__foto,
 .dialogo .membro-bloco { padding-top: 1rem; border-top: 1px solid var(--borda); }
 .membro-bloco { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; }
 .membro-bloco h3, .membro-bloco .nota { margin: 0; }

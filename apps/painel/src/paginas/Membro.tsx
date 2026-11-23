@@ -13,6 +13,7 @@ import { useConfirmar } from "../componentes/Confirmar";
 import { Dialogo } from "../componentes/Dialogo";
 import { EstadoDoMembro } from "../componentes/EstadoDoMembro";
 import { Falha } from "../componentes/Falha";
+import { Notificacao } from "../componentes/Notificacao";
 import { api, enviarFoto, type Eu, type Membro, type Perfil, mensagemDeFalha } from "../api";
 import { TrocarSenha } from "../componentes/TrocarSenha";
 import { conversas, ROTULO_PERFIL, rotuloDaAcao, SENHA_MINIMA } from "../membros";
@@ -33,7 +34,7 @@ const dataHora = (iso: string) =>
   });
 
 type Agir = (acao: () => Promise<unknown>, feito: string) => Promise<boolean>;
-type Modal = "perfil" | "acesso" | null;
+type Modal = "perfil" | "senha" | "acesso" | "redefinir" | null;
 
 export function PaginaDoMembro({ eu, atualizarEu }: { eu: Eu; atualizarEu: (eu: Eu) => void }) {
   const { id = "" } = useParams();
@@ -41,6 +42,7 @@ export function PaginaDoMembro({ eu, atualizarEu }: { eu: Eu; atualizarEu: (eu: 
   const [modal, setModal] = useState<Modal>(null);
   const confirmar = useConfirmar();
   const { agir, erro, aviso, setErro, setAviso } = useAcao(() => carregar());
+  const fecharAviso = useCallback(() => setAviso(""), [setAviso]);
 
   const carregar = useCallback(() => {
     api
@@ -80,7 +82,7 @@ export function PaginaDoMembro({ eu, atualizarEu }: { eu: Eu; atualizarEu: (eu: 
   // Contato e acesso vêm só para a própria pessoa e para o gestor.
   const ve = membro.email !== undefined;
   const semMascara = membro.ve_dados_completos ?? false;
-  // Ação feita dentro de um modal: deu certo, ele fecha e o aviso fica na página.
+  // Ação feita dentro de um modal: deu certo, ele fecha e o aviso sai em notificação.
   const agirEFechar: Agir = async (acao, feito) => {
     const ok = await agir(acao, feito);
     if (ok) setModal(null);
@@ -111,6 +113,13 @@ export function PaginaDoMembro({ eu, atualizarEu }: { eu: Eu; atualizarEu: (eu: 
       ligar ? `${m.nome} vê os dados sem máscara.` : `Os dados voltam mascarados para ${m.nome}.`,
     );
   }
+
+  // Com um modal aberto, a recusa aparece nele: a página fica atrás do fundo.
+  const erroNoModal = erro && (
+    <p className="erro" role="alert">
+      {erro}
+    </p>
+  );
 
   return (
     <div className="canais membro">
@@ -174,16 +183,8 @@ export function PaginaDoMembro({ eu, atualizarEu }: { eu: Eu; atualizarEu: (eu: 
         </div>
       )}
 
-      {erro && (
-        <p className="erro" role="alert">
-          {erro}
-        </p>
-      )}
-      {aviso && (
-        <p className="confere" role="status">
-          {aviso}
-        </p>
-      )}
+      {!modal && erroNoModal}
+      {aviso && <Notificacao texto={aviso} aoFechar={fecharAviso} />}
 
       <section aria-labelledby="membro-atividade">
         <h2 id="membro-atividade">Atividade</h2>
@@ -246,9 +247,42 @@ export function PaginaDoMembro({ eu, atualizarEu }: { eu: Eu; atualizarEu: (eu: 
           titulo={membro.voce ? "Seu perfil" : `Perfil de ${membro.nome}`}
           aoFechar={() => setModal(null)}
         >
+          {erroNoModal}
           <Fixos membro={membro} gestor={gestor} />
-          {membro.voce && <SeuPerfil eu={eu} atualizarEu={atualizarEu} recarregar={carregar} />}
-          {gestor && <Cadastro membro={membro} agir={agirEFechar} />}
+          <Perfil
+            membro={membro}
+            eu={eu}
+            gestor={gestor}
+            atualizarEu={atualizarEu}
+            agir={agir}
+            agirEFechar={agirEFechar}
+            trocarSenha={() => setModal("senha")}
+          />
+        </Dialogo>
+      )}
+      {modal === "redefinir" && (
+        <Dialogo titulo={`Redefinir a senha de ${membro.nome}`} aoFechar={() => setModal(null)}>
+          {erroNoModal}
+          <RedefinirSenha membro={membro} agir={agirEFechar} />
+        </Dialogo>
+      )}
+      {modal === "senha" && (
+        <Dialogo titulo="Trocar senha" aoFechar={() => setModal(null)}>
+          <TrocarSenha
+            className="form-usuario"
+            email={eu.email}
+            cabecalho={
+              <p className="nota">
+                Pelo menos {SENHA_MINIMA} caracteres. As suas outras sessões abertas são
+                encerradas; esta continua.
+              </p>
+            }
+            aoTrocar={() => {
+              setModal(null);
+              setAviso("Senha trocada. As suas outras sessões foram encerradas.");
+              carregar();
+            }}
+          />
         </Dialogo>
       )}
       {modal === "acesso" && (
@@ -256,8 +290,14 @@ export function PaginaDoMembro({ eu, atualizarEu }: { eu: Eu; atualizarEu: (eu: 
           titulo={membro.voce ? "Seu acesso" : `Acesso de ${membro.nome}`}
           aoFechar={() => setModal(null)}
         >
+          {erroNoModal}
           {gestor ? (
-            <Acesso membro={membro} agir={agir} agirEFechar={agirEFechar} />
+            <Acesso
+              membro={membro}
+              agir={agir}
+              agirEFechar={agirEFechar}
+              redefinirSenha={() => setModal("redefinir")}
+            />
           ) : (
             <Permissoes membro={membro} />
           )}
@@ -298,147 +338,176 @@ function formatarTelefone(digitos: string | null): string {
 const FOTO_MAX = 10 * 1024 * 1024;
 const FOTO_TIPOS = ["image/jpeg", "image/png", "image/webp"];
 
-// O que a própria pessoa troca: foto, nome de exibição e telefone. E-mail,
-// função e perfil só o gestor troca: o e-mail é o login.
-function SeuPerfil({
+// Um formulário, um Salvar: a própria pessoa troca nome de exibição e
+// telefone (`/eu`); o gestor troca nome, e-mail (o login), função e
+// observação (`/gestao/usuarios`). O que mudou vai para a rota de quem pode.
+// A foto troca na hora, fora do Salvar; a senha tem modal próprio.
+function Perfil({
+  membro,
   eu,
+  gestor,
   atualizarEu,
-  recarregar,
+  agir,
+  agirEFechar,
+  trocarSenha,
 }: {
+  membro: Membro;
   eu: Eu;
+  gestor: boolean;
   atualizarEu: (eu: Eu) => void;
-  recarregar: () => void;
+  agir: Agir;
+  agirEFechar: Agir;
+  trocarSenha: () => void;
 }) {
-  const [nome, setNome] = useState(eu.nome);
+  const voce = membro.voce;
+  const [nome, setNome] = useState(voce ? eu.nome : membro.nome);
   const [telefone, setTelefone] = useState(formatarTelefone(eu.telefone));
-  const [erro, setErro] = useState("");
-  const [aviso, setAviso] = useState("");
-  const [ocupado, setOcupado] = useState(false);
+  const [email, setEmail] = useState(membro.email ?? "");
+  const [cargo, setCargo] = useState(membro.cargo ?? "");
+  const [observacao, setObservacao] = useState(membro.observacao ?? "");
+  const [erroFoto, setErroFoto] = useState("");
   const arquivo = useRef<HTMLInputElement>(null);
-  const mudou = nome.trim() !== eu.nome || telefone.replace(/\D/g, "") !== (eu.telefone ?? "");
 
-  async function executar(acao: () => Promise<Eu>, feito: string) {
-    setErro("");
-    setAviso("");
-    setOcupado(true);
-    try {
-      const novo = await acao();
-      atualizarEu(novo);
-      setNome(novo.nome);
-      setTelefone(formatarTelefone(novo.telefone));
-      setAviso(feito);
-      recarregar();
-    } catch (e) {
-      setErro(mensagemDeFalha(e));
-    } finally {
-      setOcupado(false);
-    }
+  const mudouProprio =
+    voce && (nome.trim() !== eu.nome || telefone.replace(/\D/g, "") !== (eu.telefone ?? ""));
+  const mudouCadastro =
+    gestor &&
+    ((!voce && nome !== membro.nome) ||
+      email !== (membro.email ?? "") ||
+      cargo !== (membro.cargo ?? "") ||
+      observacao !== (membro.observacao ?? ""));
+
+  function salvar(evento: FormEvent) {
+    evento.preventDefault();
+    agirEFechar(async () => {
+      if (mudouProprio) atualizarEu(await api.atualizarPerfil(nome.trim(), telefone));
+      if (mudouCadastro)
+        await api.editarUsuario(membro.id, {
+          ...(voce ? {} : { nome }),
+          email,
+          cargo,
+          observacao,
+        });
+    }, "Perfil salvo.");
   }
 
   function escolherFoto(evento: ChangeEvent<HTMLInputElement>) {
     const foto = evento.target.files?.[0];
     evento.target.value = "";
+    setErroFoto("");
     if (!foto) return;
-    if (!FOTO_TIPOS.includes(foto.type)) return setErro("A foto precisa ser JPG, PNG ou WebP.");
-    if (foto.size > FOTO_MAX) return setErro("A foto passa de 10 MB. Escolha uma menor.");
-    executar(() => enviarFoto(foto), "Foto trocada.");
+    if (!FOTO_TIPOS.includes(foto.type)) return setErroFoto("A foto precisa ser JPG, PNG ou WebP.");
+    if (foto.size > FOTO_MAX) return setErroFoto("A foto passa de 10 MB. Escolha uma menor.");
+    agir(async () => atualizarEu(await enviarFoto(foto)), "Foto trocada.");
   }
 
   return (
-    <div className="voce">
-      <div className="voce__foto">
-        <Avatar nome={eu.nome} foto={eu.foto} tamanho={56} />
-        <div className="voce__foto-acoes">
-          <button type="button" onClick={() => arquivo.current?.click()} disabled={ocupado}>
-            {eu.foto ? "Trocar foto" : "Pôr foto"}
-          </button>
-          {eu.foto && (
-            <button
-              type="button"
-              className="link"
-              onClick={() => executar(api.removerFoto, "Foto removida.")}
-              disabled={ocupado}
-            >
-              Remover
+    <>
+      {voce && (
+        <div className="voce__foto">
+          <Avatar nome={eu.nome} foto={eu.foto} tamanho={56} />
+          <div className="voce__foto-acoes">
+            <button type="button" onClick={() => arquivo.current?.click()}>
+              {eu.foto ? "Trocar foto" : "Pôr foto"}
             </button>
-          )}
-          <span className="nota">JPG, PNG ou WebP, até 10 MB.</span>
+            {eu.foto && (
+              <button
+                type="button"
+                className="link"
+                onClick={() => agir(async () => atualizarEu(await api.removerFoto()), "Foto removida.")}
+              >
+                Remover
+              </button>
+            )}
+            <span className="nota">JPG, PNG ou WebP, até 10 MB.</span>
+          </div>
+          <input
+            ref={arquivo}
+            type="file"
+            accept={FOTO_TIPOS.join(",")}
+            onChange={escolherFoto}
+            hidden
+          />
         </div>
-        <input
-          ref={arquivo}
-          type="file"
-          accept={FOTO_TIPOS.join(",")}
-          onChange={escolherFoto}
-          hidden
-        />
-      </div>
-      <form
-        className="form-usuario"
-        onSubmit={(e: FormEvent) => {
-          e.preventDefault();
-          executar(() => api.atualizarPerfil(nome.trim(), telefone), "Perfil salvo.");
-        }}
-      >
+      )}
+      {erroFoto && (
+        <p className="erro" role="alert">
+          {erroFoto}
+        </p>
+      )}
+      <form className="form-usuario" onSubmit={salvar}>
         <label>
-          Nome de exibição
+          {voce ? "Nome de exibição" : "Nome"}
           <input
             value={nome}
             onChange={(e) => setNome(e.target.value)}
             minLength={2}
             maxLength={80}
-            autoComplete="name"
+            autoComplete={voce ? "name" : "off"}
             required
           />
         </label>
-        <label>
-          Telefone de contato
-          <input
-            type="tel"
-            inputMode="tel"
-            value={telefone}
-            onChange={(e) => setTelefone(e.target.value)}
-            placeholder="DDD e número"
-            maxLength={30}
-            autoComplete="tel-national"
-          />
-        </label>
-        <p className="nota">E-mail, função e perfil só o gestor troca.</p>
-        {eu.pode_testar_fluxos && (
+        {voce && (
+          <label>
+            Telefone de contato
+            <input
+              type="tel"
+              inputMode="tel"
+              value={telefone}
+              onChange={(e) => setTelefone(e.target.value)}
+              placeholder="DDD e número"
+              maxLength={30}
+              autoComplete="tel-national"
+            />
+          </label>
+        )}
+        {gestor && (
+          <>
+            <label>
+              E-mail (login)
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            </label>
+            <label>
+              Função
+              <input
+                value={cargo}
+                onChange={(e) => setCargo(e.target.value)}
+                maxLength={60}
+                placeholder="Ex.: Atendente CLT"
+              />
+            </label>
+            <label className="largo">
+              Observação
+              <textarea
+                value={observacao}
+                onChange={(e) => setObservacao(e.target.value)}
+                maxLength={500}
+                rows={3}
+              />
+              <small>Só gestores leem. Não escreva aqui dados de clientes.</small>
+            </label>
+          </>
+        )}
+        {!gestor && <p className="nota">E-mail, função e perfil só o gestor troca.</p>}
+        {voce && eu.pode_testar_fluxos && (
           <p className="nota voce__teste">
             {eu.telefone
               ? "Você testa fluxos: as conversas deste telefone no WhatsApp são de teste."
               : "Você testa fluxos: ponha o telefone acima para as suas conversas virarem teste."}
           </p>
         )}
-        <button type="submit" disabled={!mudou || ocupado}>
-          Salvar
-        </button>
+        <div className="membro-form-acoes">
+          <button type="submit" disabled={!mudouProprio && !mudouCadastro}>
+            Salvar
+          </button>
+          {voce && (
+            <button type="button" onClick={trocarSenha}>
+              Trocar senha
+            </button>
+          )}
+        </div>
       </form>
-      {erro && (
-        <p className="erro" role="alert">
-          {erro}
-        </p>
-      )}
-      {aviso && (
-        <p className="confere" role="status">
-          {aviso}
-        </p>
-      )}
-      <TrocarSenha
-        className="form-usuario"
-        email={eu.email}
-        cabecalho={
-          <>
-            <h3 id="senha-titulo">Trocar senha</h3>
-            <p className="nota">
-              Pelo menos {SENHA_MINIMA} caracteres. As suas outras sessões abertas são encerradas;
-              esta continua.
-            </p>
-          </>
-        }
-        aoTrocar={recarregar}
-      />
-    </div>
+    </>
   );
 }
 
@@ -503,73 +572,21 @@ function Permissoes({ membro }: { membro: Membro }) {
   );
 }
 
-// Só o gestor: nome, e-mail (o login), função e observação.
-function Cadastro({ membro, agir }: { membro: Membro; agir: Agir }) {
-  const [nome, setNome] = useState(membro.nome);
-  const [email, setEmail] = useState(membro.email ?? "");
-  const [cargo, setCargo] = useState(membro.cargo ?? "");
-  const [observacao, setObservacao] = useState(membro.observacao ?? "");
-  const mudou =
-    nome !== membro.nome ||
-    email !== (membro.email ?? "") ||
-    cargo !== (membro.cargo ?? "") ||
-    observacao !== (membro.observacao ?? "");
-
-  return (
-    <form
-      className="form-usuario"
-      onSubmit={(e: FormEvent) => {
-        e.preventDefault();
-        agir(
-          () => api.editarUsuario(membro.id, { nome, email, cargo, observacao }),
-          "Alterações salvas.",
-        );
-      }}
-    >
-      <h3>Cadastro</h3>
-      {/* O próprio nome a pessoa troca logo acima, no perfil dela. */}
-      {!membro.voce && (
-        <label>
-          Nome
-          <input value={nome} onChange={(e) => setNome(e.target.value)} maxLength={80} required />
-        </label>
-      )}
-      <label>
-        E-mail (login)
-        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-      </label>
-      <label>
-        Função
-        <input
-          value={cargo}
-          onChange={(e) => setCargo(e.target.value)}
-          maxLength={60}
-          placeholder="Ex.: Atendente CLT"
-        />
-      </label>
-      <label className="largo">
-        Observação
-        <textarea
-          value={observacao}
-          onChange={(e) => setObservacao(e.target.value)}
-          maxLength={500}
-          rows={3}
-        />
-        <small>Só gestores leem. Não escreva aqui dados de clientes.</small>
-      </label>
-      <button type="submit" disabled={!mudou}>
-        Salvar cadastro
-      </button>
-    </form>
-  );
-}
-
 // Só o gestor: perfil, permissões, senha e bloqueio.
-function Acesso({ membro, agir, agirEFechar }: { membro: Membro; agir: Agir; agirEFechar: Agir }) {
+function Acesso({
+  membro,
+  agir,
+  agirEFechar,
+  redefinirSenha,
+}: {
+  membro: Membro;
+  agir: Agir;
+  agirEFechar: Agir;
+  redefinirSenha: () => void;
+}) {
   const [perfil, setPerfil] = useState<Perfil>(membro.perfil);
   const [editaAgente, setEditaAgente] = useState(membro.pode_editar_agente ?? false);
   const [testaFluxos, setTestaFluxos] = useState(membro.pode_testar_fluxos ?? false);
-  const [senha, setSenha] = useState("");
   const desativado = membro.situacao === "desativado";
   const mudou =
     perfil !== membro.perfil ||
@@ -587,15 +604,6 @@ function Acesso({ membro, agir, agirEFechar }: { membro: Membro; agir: Agir; agi
         }),
       "Acesso salvo.",
     );
-  }
-
-  async function trocarSenha(evento: FormEvent) {
-    evento.preventDefault();
-    const ok = await agirEFechar(
-      () => api.redefinirSenha(membro.id, senha),
-      `Senha de ${membro.nome} redefinida; as sessões abertas dela foram encerradas, e ela escolhe outra ao entrar.`,
-    );
-    if (ok) setSenha("");
   }
 
   return (
@@ -634,39 +642,23 @@ function Acesso({ membro, agir, agirEFechar }: { membro: Membro; agir: Agir; agi
           Dados sem máscara se liga no botão da página, com confirmação: hoje está{" "}
           {membro.ve_dados_completos ? "ligado" : "desligado"}.
         </p>
-        <button type="submit" disabled={!mudou}>
-          Salvar acesso
-        </button>
-      </form>
-
-      {/* A própria senha o gestor troca em "Seu perfil", informando a atual; a API recusa aqui. */}
-      {!desativado && !membro.voce && (
-        <form onSubmit={trocarSenha} className="form-usuario">
-          <h3>Redefinir senha</h3>
-          <p className="nota">
-            Encerra as sessões abertas da pessoa e desfaz o bloqueio. Ela escolhe outra senha ao
-            entrar.
+        {membro.trocar_senha && (
+          <p className="nota situacao-pendente">
+            Troca de senha pendente: a pessoa ainda não trocou a senha definida pelo gestor.
           </p>
-          {membro.trocar_senha && (
-            <p className="nota situacao-pendente">
-              Troca de senha pendente: a pessoa ainda não trocou a senha definida pelo gestor.
-            </p>
+        )}
+        <div className="membro-form-acoes">
+          <button type="submit" disabled={!mudou}>
+            Salvar acesso
+          </button>
+          {/* A própria senha o gestor troca em "Seu perfil", informando a atual; a API recusa aqui. */}
+          {!desativado && !membro.voce && (
+            <button type="button" onClick={redefinirSenha}>
+              Redefinir senha
+            </button>
           )}
-          <label>
-            Nova senha
-            <input
-              type="password"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-              minLength={SENHA_MINIMA}
-              placeholder={`Pelo menos ${SENHA_MINIMA} caracteres`}
-              autoComplete="new-password"
-              required
-            />
-          </label>
-          <button type="submit">Redefinir senha</button>
-        </form>
-      )}
+        </div>
+      </form>
 
       {membro.situacao === "bloqueado" && membro.bloqueado_ate && (
         <div className="membro-bloco">
@@ -690,6 +682,40 @@ function Acesso({ membro, agir, agirEFechar }: { membro: Membro; agir: Agir; agi
         </div>
       )}
     </>
+  );
+}
+
+// Só o gestor, para outra pessoa: a senha nova encerra as sessões dela.
+function RedefinirSenha({ membro, agir }: { membro: Membro; agir: Agir }) {
+  const [senha, setSenha] = useState("");
+  return (
+    <form
+      className="form-usuario"
+      onSubmit={(e: FormEvent) => {
+        e.preventDefault();
+        agir(
+          () => api.redefinirSenha(membro.id, senha),
+          `Senha de ${membro.nome} redefinida; as sessões abertas dela foram encerradas, e ela escolhe outra ao entrar.`,
+        );
+      }}
+    >
+      <p className="nota">
+        Encerra as sessões abertas da pessoa e desfaz o bloqueio. Ela escolhe outra senha ao entrar.
+      </p>
+      <label>
+        Nova senha
+        <input
+          type="password"
+          value={senha}
+          onChange={(e) => setSenha(e.target.value)}
+          minLength={SENHA_MINIMA}
+          placeholder={`Pelo menos ${SENHA_MINIMA} caracteres`}
+          autoComplete="new-password"
+          required
+        />
+      </label>
+      <button type="submit">Redefinir senha</button>
+    </form>
   );
 }
 
