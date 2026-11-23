@@ -195,7 +195,16 @@ def fala_da_ia(
     etapa do turno é o que diz o público da conversa ao funil (decisão 0031).
     """
 
-    chamadas = [] if chave else [{"nome": "llm", "latencia_ms": 900, "status": "ok"}]
+    # Mesmas chaves que `TurnMetrics.resumo` grava: o painel conta com todas elas.
+    llm = {
+        "nome": "llm",
+        "latencia_ms": 900,
+        "custo_usd": None,
+        "status": "ok",
+        "tokens_entrada": None,
+        "tokens_saida": None,
+    }
+    chamadas = [] if chave else [llm]
     turno = Turno(
         conversa_id=conversa.id,
         caminho=["__start__", *caminho],
