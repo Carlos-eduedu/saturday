@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import replace
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 from zoneinfo import ZoneInfo
@@ -35,6 +35,7 @@ from saturday.canais.whatsapp.telefone import normalizar_telefone
 from saturday.dados import repositorios
 from saturday.dados.modelos import (
     Alerta,
+    Auditoria,
     Consentimento,
     ConsultaIcred,
     Conversa,
@@ -52,7 +53,7 @@ from saturday.painel.funil import Periodo, funil
 from saturday.painel.midia import mime_base
 from saturday.painel.produtos import produtos
 from saturday.portabilidade.mensagem import resumo_da_oferta
-from saturday.privacidade import MASCARAS
+from saturday.privacidade import exibir
 from saturday.settings import TZ_OPERACAO, Settings
 from saturday.web.api.canais import Gestor
 from saturday.web.api.granatech_admin import Conta
@@ -176,6 +177,7 @@ def _eu(request: Request, usuario: UsuarioLogado) -> dict[str, Any]:
         "cargo": usuario.cargo,
         "disponivel": usuario.disponivel,
         "trocar_senha": usuario.trocar_senha,
+        "ve_dados_completos": usuario.ve_dados_completos,
         "csrf": sessoes.token_csrf(segredo, usuario.token),
     }
 
@@ -451,7 +453,7 @@ def usuarios(_usuario: Logado, fabrica: Fabrica) -> list[dict[str, Any]]:
 # ------------------------------------------------------------------ conversas
 
 
-def _resumo(conversa: Conversa, agora: datetime) -> dict[str, Any]:
+def _resumo(conversa: Conversa, agora: datetime, inteiro: bool) -> dict[str, Any]:
     entrada = conversa.ultima_entrada_em
     canal = permitido(conversa.canal, entrada, agora, instancia=conversa.phone_number_id)
     return {
@@ -459,7 +461,7 @@ def _resumo(conversa: Conversa, agora: datetime) -> dict[str, Any]:
         "canal": conversa.canal,
         "atendimento": conversa.atendimento,
         "atendente_id": str(conversa.atendente_id) if conversa.atendente_id else None,
-        "telefone": MASCARAS["telefone"](conversa.telefone) if conversa.telefone else None,
+        "telefone": exibir("telefone", conversa.telefone, inteiro) if conversa.telefone else None,
         "ultima_entrada_em": entrada,
         "nao_lida": entrada is not None
         and (conversa.vista_em is None or entrada > conversa.vista_em),
@@ -502,7 +504,7 @@ def listar_conversas(
             ultima = extra["ultima_mensagem"]
             resumos.append(
                 {
-                    **_resumo(conversa, agora),
+                    **_resumo(conversa, agora, usuario.ve_dados_completos),
                     **extra,
                     "ultima_atividade": ultima["em"] if ultima else conversa.criada_em,
                 }
@@ -519,7 +521,7 @@ def contar_conversas(usuario: Logado, fabrica: Fabrica) -> dict[str, int]:
 
 
 @router.get("/conversas/{conversa_id}")
-def ver_conversa(conversa_id: uuid.UUID, _usuario: Logado, fabrica: Fabrica) -> dict[str, Any]:
+def ver_conversa(conversa_id: uuid.UUID, usuario: Logado, fabrica: Fabrica) -> dict[str, Any]:
     with abrir_sessao(fabrica) as sessao:
         conversa = sessao.get(Conversa, conversa_id)
         if conversa is None:
@@ -531,7 +533,7 @@ def ver_conversa(conversa_id: uuid.UUID, _usuario: Logado, fabrica: Fabrica) -> 
         ).all()
         agora = datetime.now(UTC)
         resumo = {
-            **_resumo(conversa, agora),
+            **_resumo(conversa, agora, usuario.ve_dados_completos),
             **supervisao.supervisao(sessao, [conversa], agora)[conversa.id],
         }
         historico = [
@@ -694,14 +696,16 @@ def _dados_sensiveis(conversa: Conversa, jornada: Jornada) -> dict[str, str]:
     return {campo: str(valor) for campo, valor in valores.items() if valor}
 
 
-def _ficha(conversa: Conversa, jornada: Jornada) -> dict[str, Any]:
-    """A ficha como a tela e a exportação a mostram: só com dado mascarado."""
+def _ficha(conversa: Conversa, jornada: Jornada, inteiro: bool = False) -> dict[str, Any]:
+    """A ficha como a tela e a exportação a mostram: com dado mascarado, ou
+    inteiro na tela de quem vê dados sem máscara (decisão 0037). A exportação
+    sai sempre mascarada."""
 
     dados = jornada.ficha
     sensiveis = _dados_sensiveis(conversa, jornada)
     return {
         "nome": dados.get("nome"),
-        "dados": {campo: MASCARAS[campo](valor) for campo, valor in sensiveis.items()},
+        "dados": {campo: exibir(campo, valor, inteiro) for campo, valor in sensiveis.items()},
         "uf": dados.get("uf"),
         "publico": jornada.publico,
         "handoff_reason": jornada.motivo_do_handoff,
@@ -711,14 +715,41 @@ def _ficha(conversa: Conversa, jornada: Jornada) -> dict[str, Any]:
 
 @router.get("/conversas/{conversa_id}/ficha")
 def ficha(
-    conversa_id: uuid.UUID, _usuario: Logado, fabrica: Fabrica, service: Servico
+    conversa_id: uuid.UUID, usuario: Logado, fabrica: Fabrica, service: Servico
 ) -> dict[str, Any]:
     with abrir_sessao(fabrica) as sessao:
         conversa = sessao.get(Conversa, conversa_id)
         if conversa is None:
             raise HTTPException(status_code=404, detail="conversa não encontrada")
         jornada = service.jornada(conversa.conversation_id)
-        return {**_ficha(conversa, jornada), **_acompanhamento(sessao, conversa, jornada)}
+        inteiro = usuario.ve_dados_completos
+        retrato = _ficha(conversa, jornada, inteiro)
+        if inteiro and retrato["dados"] and not _vista_ha_pouco(sessao, usuario.id, conversa_id):
+            # Como no Revelar: sem a linha de auditoria, o dado inteiro não sai.
+            auditar(sessao, usuario.id, "ver_sem_mascara", str(conversa_id))
+        # A tela decide pelo que veio, não pelo /eu da entrada: a permissão
+        # pode mudar com a sessão aberta.
+        return {**retrato, "sem_mascara": inteiro, **_acompanhamento(sessao, conversa, jornada)}
+
+
+# A ficha recarrega a cada aviso da conversa: uma linha por abertura, não por recarga.
+JANELA_DA_VISTA = timedelta(minutes=10)
+
+
+def _vista_ha_pouco(sessao: Session, usuario_id: uuid.UUID, conversa_id: uuid.UUID) -> bool:
+    return (
+        sessao.scalar(
+            select(Auditoria.id)
+            .where(
+                Auditoria.usuario_id == usuario_id,
+                Auditoria.acao == "ver_sem_mascara",
+                Auditoria.alvo == str(conversa_id),
+                Auditoria.criada_em > func.now() - JANELA_DA_VISTA,
+            )
+            .limit(1)
+        )
+        is not None
+    )
 
 
 # O que a oferta guardada no checkpoint mostra na ficha: só valores, nenhum ID.

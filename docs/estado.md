@@ -44,6 +44,9 @@ uma entrega fora das fases.
   Aba Membros para todos: lista da equipe e página do membro
   (`/membros/:id`) com estado, carga, atividade de 7 dias, últimas ações e a
   gestão do gestor; o servidor decide o que cada um vê (docs/decisoes/0023).
+  Perfil e Acesso do membro abrem em modal; o gestor liga para um membro os
+  dados sem máscara em todo o painel, com auditoria por ficha aberta
+  (docs/decisoes/0037).
   Aba Operação com o funil para o gestor (`GET /admin/funil`): por produto,
   as conversas iniciadas no período que chegaram a cada etapa (iniciadas, SIM,
   oferta, aceite, proposta criada, pago), com a taxa de passagem calculada no

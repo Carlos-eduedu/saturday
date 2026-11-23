@@ -304,3 +304,31 @@ def test_foto_do_perfil_vai_para_o_storage_e_so_logado_ve(
     assert not [k for k in storage._objetos if k.startswith("painel/usuarios/")]
     assert client_pg.get(segunda).status_code == 404
     assert _auditoria(fabrica, "perfil_foto_remover")
+
+
+def test_gestor_liga_e_desliga_dados_sem_mascara_com_auditoria(
+    client_pg: TestClient, fabrica: sessionmaker[Session]
+) -> None:
+    gestor_id, cabecalhos = _gestor(client_pg, fabrica)
+    ana = _usuario(fabrica, "ana@exemplo.test")
+
+    for valor in (True, False):
+        resposta = client_pg.patch(
+            f"{ROTA}/{ana}", json={"ve_dados_completos": valor}, headers=cabecalhos
+        )
+        assert resposta.status_code == 204
+    assert _auditoria(fabrica, "usuario_editar") == [
+        {"ve_dados_completos": True},
+        {"ve_dados_completos": False},
+    ]
+    # O gestor liga também para si mesmo (decisão 0037).
+    proprio = client_pg.patch(
+        f"{ROTA}/{gestor_id}", json={"ve_dados_completos": True}, headers=cabecalhos
+    )
+    assert proprio.status_code == 204
+    assert client_pg.get("/admin/eu").json()["ve_dados_completos"] is True
+
+    atendente = entrar(client_pg, "ana@exemplo.test")
+    recusa = client_pg.patch(f"{ROTA}/{ana}", json={"ve_dados_completos": True}, headers=atendente)
+    assert recusa.status_code == 403
+    assert client_pg.get("/admin/eu").json()["ve_dados_completos"] is False

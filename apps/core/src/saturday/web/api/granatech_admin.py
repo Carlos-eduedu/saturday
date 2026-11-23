@@ -44,7 +44,7 @@ from saturday.dados.trava import tentar_trava
 from saturday.jobs.granatech import aplicar_status_da_consulta
 from saturday.painel import acoes
 from saturday.painel.auditoria import auditar
-from saturday.privacidade import MASCARAS
+from saturday.privacidade import exibir
 from saturday.settings import TZ_OPERACAO, Settings
 from saturday.web.dependencies import (
     UsuarioLogado,
@@ -208,7 +208,7 @@ def _exigir(motivos: dict[str, str | None], acao: str) -> None:
 
 @router.get("/consultas")
 def listar_consultas(
-    _usuario: Logado,
+    usuario: Logado,
     fabrica: Fabrica,
     status: str | None = None,
     desde: date | None = None,
@@ -232,14 +232,15 @@ def listar_consultas(
     if (digitos := _cpf(cpf)) is not None:
         filtro = filtro.where(ConsultaGranatech.cpf == digitos)
     with abrir_sessao(fabrica) as sessao:
-        return [_linha_consulta(c) for c in sessao.scalars(filtro).all()]
+        inteiro = usuario.ve_dados_completos
+        return [_linha_consulta(c, inteiro) for c in sessao.scalars(filtro).all()]
 
 
-def _linha_consulta(c: ConsultaGranatech) -> dict[str, Any]:
+def _linha_consulta(c: ConsultaGranatech, inteiro: bool) -> dict[str, Any]:
     return {
         "id": c.id,
         "id_externo": c.id_externo,
-        "cpf": MASCARAS["cpf"](c.cpf),
+        "cpf": exibir("cpf", c.cpf, inteiro),
         "status": c.status,
         "conversa_id": str(c.conversa_id) if c.conversa_id else None,
         "tem_detalhe": c.detalhe is not None,
@@ -250,7 +251,7 @@ def _linha_consulta(c: ConsultaGranatech) -> dict[str, Any]:
 
 @router.get("/propostas")
 def listar_propostas(
-    _usuario: Logado,
+    usuario: Logado,
     fabrica: Fabrica,
     status: str | None = None,
     desde: date | None = None,
@@ -274,15 +275,16 @@ def listar_propostas(
     if (digitos := _cpf(cpf)) is not None:
         filtro = filtro.where(ConsultaGranatech.cpf == digitos)
     with abrir_sessao(fabrica) as sessao:
-        return [_linha_proposta(p, c) for p, c in sessao.execute(filtro).all()]
+        inteiro = usuario.ve_dados_completos
+        return [_linha_proposta(p, c, inteiro) for p, c in sessao.execute(filtro).all()]
 
 
-def _linha_proposta(p: PropostaGranatech, cpf: str) -> dict[str, Any]:
+def _linha_proposta(p: PropostaGranatech, cpf: str, inteiro: bool) -> dict[str, Any]:
     return {
         "id": p.id,
         "id_externo": p.id_externo,
         "consulta_id": p.consulta_id,
-        "cpf": MASCARAS["cpf"](cpf),
+        "cpf": exibir("cpf", cpf, inteiro),
         "estado_envio": p.estado_envio,
         "status": p.status,
         "tipo_notificacao": p.tipo_notificacao,
@@ -296,7 +298,7 @@ def _linha_proposta(p: PropostaGranatech, cpf: str) -> dict[str, Any]:
 
 @router.get("/consultas/{consulta_id}")
 def ver_consulta(
-    consulta_id: int, _usuario: Logado, fabrica: Fabrica, service: Servico
+    consulta_id: int, usuario: Logado, fabrica: Fabrica, service: Servico
 ) -> dict[str, Any]:
     with abrir_sessao(fabrica) as sessao:
         linha = sessao.get(ConsultaGranatech, consulta_id)
@@ -311,7 +313,7 @@ def ver_consulta(
         # Da pessoa só idade e sexo: nome, mãe e endereço ficam fora do painel.
         pessoa = detalhe.get("pessoa_natural") or {}
         return {
-            **_linha_consulta(linha),
+            **_linha_consulta(linha, usuario.ve_dados_completos),
             "historico": linha.historico,
             "vinculos": detalhe.get("margens") or [],
             "idade": pessoa.get("age"),
@@ -324,7 +326,7 @@ def ver_consulta(
 
 @router.get("/propostas/{proposta_id}")
 def ver_proposta(
-    proposta_id: int, request: Request, _usuario: Logado, fabrica: Fabrica, service: Servico
+    proposta_id: int, request: Request, usuario: Logado, fabrica: Fabrica, service: Servico
 ) -> dict[str, Any]:
     conta_ativa = get_settings(request).granatech_dados_bancarios_ativo
     with abrir_sessao(fabrica) as sessao:
@@ -337,7 +339,7 @@ def ver_proposta(
         conversation_id = repositorios.conversation_id_de(sessao, linha.conversa_id)
         jornada = _jornada(service, conversation_id)
         return {
-            **_linha_proposta(linha, cpf or ""),
+            **_linha_proposta(linha, cpf or "", usuario.ve_dados_completos),
             "historico": linha.historico,
             "etapa": jornada.etapa_clt if jornada else None,
             # Propostas antigas não guardam as condições: só a oferta do checkpoint,

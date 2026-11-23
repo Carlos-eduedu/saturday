@@ -32,13 +32,13 @@ As decisões que importam (triagem, consentimento, regras do banco, cálculos, t
   - O mesmo celular em dois canais são duas conversas.
 - **Tempo real:** o painel recebe os avisos por SSE (mensagens, mudanças de atendimento, alertas).
 - **Alertas:** handoff novo, erro interno, envio que desistiu, cliente sem resposta, cota a 80%, consulta Granatech parada e instância da Evolution caída ou reconectada com outro celular.
-- **Ficha do cliente:** dados mascarados. Revelar um dado fica gravado na auditoria.
+- **Ficha do cliente:** dados mascarados. Revelar um dado fica gravado na auditoria. O gestor pode liberar a um membro os dados sem máscara em todo o painel; cada ficha aberta assim também fica na auditoria (decisão 0037).
 
 ## Capabilities and Constraints
 
 - **Perfis:** atendente (conversas) e gestor (tudo, inclusive canais).
 - **Login e sessão:** e-mail e senha (argon2id), bloqueio depois de 5 tentativas, sessão de 8 h, CSRF em toda ação, auditoria de toda ação.
-- **Dados pessoais:** CPF, telefone, e-mail, nome da mãe e endereço aparecem mascarados por padrão.
+- **Dados pessoais:** CPF, telefone, e-mail, nome da mãe e endereço aparecem mascarados por padrão; sem máscara só para quem o gestor liberou (decisão 0037). Exportação e logs saem sempre mascarados.
 - **Consentimento:** nenhuma consulta ou proposta sem o "SIM" do próprio cliente, com prova gravada. O painel não pode criar atalhos que contornem isso.
 - **Idioma:** português do Brasil em toda a interface.
 - **Contrato do repositório:** as regras inegociáveis estão no `AGENTS.md`, e as decisões registradas em `docs/decisoes/`.
@@ -58,5 +58,5 @@ As decisões que importam (triagem, consentimento, regras do banco, cálculos, t
 
 1. **Supervisão antes de tudo.** O painel mostra o que a IA está fazendo e onde ela pode errar, e deixa a equipe intervir sem atrito.
 2. **Dois aparelhos, mesma capacidade.** Toda ação importante (assumir, responder, devolver, resolver alerta) funciona tão bem no celular quanto no desktop.
-3. **Dados pessoais protegidos por padrão.** Mascarar é a regra, e revelar é exceção auditada.
+3. **Dados pessoais protegidos por padrão.** Mascarar é a regra; revelar, ou ver sem máscara por permissão do gestor, é exceção auditada.
 4. **A interface não decide pelo código.** O painel nunca toma decisões que o contrato reserva ao código determinístico (consentimento, valores, propostas).

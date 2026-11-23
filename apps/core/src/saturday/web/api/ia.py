@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from saturday.dados import repositorios
 from saturday.dados.modelos import Conversa, Turno
 from saturday.dados.sessao import sessao as abrir_sessao
-from saturday.privacidade import MASCARAS
+from saturday.privacidade import exibir
 from saturday.settings import TZ_OPERACAO
 from saturday.web.api.canais import Gestor
 from saturday.web.dependencies import UsuarioLogado, get_fabrica, usuario_logado
@@ -84,7 +84,7 @@ def turno_json(t: Turno, gestor: bool) -> dict[str, Any]:
 
 @router.get("/custos")
 def custos(
-    _usuario: Gestor,
+    usuario: Gestor,
     fabrica: Fabrica,
     de: Annotated[date | None, Query()] = None,
     ate: Annotated[date | None, Query()] = None,
@@ -148,7 +148,7 @@ def custos(
         "conversas_mais_caras": [
             {
                 "id": str(cid),
-                "telefone": MASCARAS["telefone"](tel) if tel else None,
+                "telefone": exibir("telefone", tel, usuario.ve_dados_completos) if tel else None,
                 "canal": canal,
                 "custo_usd": float(custo or 0),
             }

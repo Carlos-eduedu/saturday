@@ -31,6 +31,7 @@ _ACOES_DE_CONVERSA = frozenset(
         "enviar_mensagem",
         "enviar_anexo",
         "conversa:editar_ficha",
+        "ver_sem_mascara",
     }
 )
 _CONTADAS = {"assumir": "assumidas", "devolver": "devolvidas", "transferir": "transferidas"}

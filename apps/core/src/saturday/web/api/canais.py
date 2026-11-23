@@ -32,7 +32,7 @@ from saturday.dados import instancias
 from saturday.dados.modelos import Conversa
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.painel.auditoria import auditar
-from saturday.privacidade import mascarar_telefone
+from saturday.privacidade import exibir
 from saturday.settings import Settings
 from saturday.web.dependencies import (
     UsuarioLogado,
@@ -137,7 +137,8 @@ def _leitura_da_meta(request: Request, settings: Settings, phone_number_id: str)
     else:
         exibido = numero.numero_exibido
         leitura = {
-            "numero_exibido": mascarar_telefone(normalizar_telefone(exibido)) if exibido else "",
+            # Guardado inteiro; a máscara sai na resposta, conforme quem pede.
+            "numero_exibido": normalizar_telefone(exibido) if exibido else "",
             "qualidade": numero.qualidade,
             "erro": None,
         }
@@ -146,16 +147,21 @@ def _leitura_da_meta(request: Request, settings: Settings, phone_number_id: str)
 
 
 @router.get("")
-def listar(request: Request, _usuario: Gestor, fabrica: Fabrica) -> dict[str, Any]:
+def listar(request: Request, usuario: Gestor, fabrica: Fabrica) -> dict[str, Any]:
     settings = get_settings(request)
-    meta = [
-        {
-            "phone_number_id": numero,
-            "rotulo": settings.whatsapp_rotulos.get(numero),
-            **_leitura_da_meta(request, settings, numero),
-        }
-        for numero in settings.whatsapp_numeros
-    ]
+    inteiro = usuario.ve_dados_completos
+    meta = []
+    for numero in settings.whatsapp_numeros:
+        leitura = _leitura_da_meta(request, settings, numero)
+        exibido = leitura["numero_exibido"]
+        meta.append(
+            {
+                "phone_number_id": numero,
+                "rotulo": settings.whatsapp_rotulos.get(numero),
+                **leitura,
+                "numero_exibido": exibir("telefone", exibido, inteiro) if exibido else "",
+            }
+        )
     resposta: dict[str, Any] = {
         "meta": meta,
         "evolution": {"ativo": settings.evolution_ativo, "instancias": [], "erro": None},
@@ -177,7 +183,7 @@ def listar(request: Request, _usuario: Gestor, fabrica: Fabrica) -> dict[str, An
         {
             "nome": e.nome,
             "estado": e.estado,
-            "telefone": mascarar_telefone(e.telefone or fixados.get(e.nome, "")),
+            "telefone": exibir("telefone", e.telefone or fixados.get(e.nome, ""), inteiro),
             "conversas_7_dias": recentes.get(e.nome, 0),
         }
         for e in sorted(estados, key=lambda e: e.nome)

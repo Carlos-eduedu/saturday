@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from typing import Any
 
 from saturday.canais.base import CANAIS_WHATSAPP
@@ -63,6 +64,50 @@ MASCARAS = {
     "telefone": mascarar_telefone,
     "data_nascimento": mascarar_data,
 }
+
+
+def formatar_cpf(cpf: str) -> str:
+    """`00189004967` → `001.890.049-67`; fora do tamanho, passa como veio."""
+
+    d = _digitos(cpf)
+    return f"{d[:3]}.{d[3:6]}.{d[6:9]}-{d[9:]}" if len(d) == 11 else cpf
+
+
+def formatar_telefone(telefone: str) -> str:
+    """`5511987654321` → `+55 (11) 98765-4321`; `1133334444` → `(11) 3333-4444`."""
+
+    d = _digitos(telefone)
+    pais = ""
+    if len(d) in (12, 13) and d.startswith("55"):
+        pais, d = "+55 ", d[2:]
+    if len(d) not in (10, 11):
+        return telefone
+    return f"{pais}({d[:2]}) {d[2:-4]}-{d[-4:]}"
+
+
+def formatar_data(data: str) -> str:
+    """`1990-05-15` → `15/05/1990`."""
+
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", data):
+        return data
+    ano, mes, dia = data.split("-")
+    return f"{dia}/{mes}/{ano}"
+
+
+FORMATOS: dict[str, Callable[[str], str]] = {
+    "cpf": formatar_cpf,
+    "email": str.strip,
+    "telefone": formatar_telefone,
+    "data_nascimento": formatar_data,
+}
+
+
+def exibir(campo: str, valor: str, inteiro: bool) -> str:
+    """O dado como o painel mostra: mascarado, ou inteiro e formatado para quem
+    tem a permissão de ver dados sem máscara (decisão 0037). Log e exportação
+    não passam por aqui: continuam sempre mascarados."""
+
+    return FORMATOS[campo](valor) if inteiro else MASCARAS[campo](valor)
 
 
 # Onde a Granatech põe o CPF: `cpf` (listas, propostas) e `pessoa_natural.document`.

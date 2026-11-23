@@ -76,6 +76,8 @@ class UsuarioLogado:
     disponivel: bool = True
     # Troca de senha obrigatória pendente (decisão 0030).
     trocar_senha: bool = False
+    # Dados pessoais sem máscara no painel (decisão 0037).
+    ve_dados_completos: bool = False
 
     @property
     def gestor(self) -> bool:
@@ -112,6 +114,7 @@ def sessao_aberta(
             usuario.cargo,
             usuario.disponivel,
             usuario.trocar_senha,
+            usuario.ve_dados_completos,
         )
 
 

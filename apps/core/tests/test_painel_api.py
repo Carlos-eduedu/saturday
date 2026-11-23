@@ -20,6 +20,7 @@ from saturday.dados.modelos import (
     Mensagem,
     Outbox,
     PropostaGranatech,
+    UsuarioPainel,
 )
 from saturday.dados.sessao import sessao as abrir
 from saturday.painel import acoes, sessoes
@@ -466,6 +467,35 @@ def test_revelar_cpf_grava_auditoria(client_pg, service_pg, fabrica, ana, conver
         assert registro.acao == "revelar:cpf"
         assert registro.alvo == alvo
         assert str(registro.usuario_id) == ana
+
+
+def test_quem_ve_dados_sem_mascara_le_a_ficha_inteira_com_auditoria(
+    client_pg, service_pg, fabrica, ana, conversa
+):
+    _cliente_escreve(service_pg, conversa, "oi")
+    service_pg.graph.update_state(service_pg.config(conversa), {"cliente": {"cpf": "00189004967"}})
+    alvo = _conversa_id(fabrica, conversa)
+    with abrir(fabrica) as s:
+        s.execute(update(UsuarioPainel).values(ve_dados_completos=True))
+    entrar(client_pg, "ana@exemplo.test")
+
+    ficha = client_pg.get(f"/admin/conversas/{alvo}/ficha").json()
+    assert ficha["dados"]["cpf"] == "001.890.049-67"
+    assert ficha["dados"]["telefone"] == "(11) 98765-4321"
+    assert ficha["sem_mascara"] is True
+    # Recarregar (aviso de tempo real) não grava de novo.
+    client_pg.get(f"/admin/conversas/{alvo}/ficha")
+    [resumo] = client_pg.get("/admin/conversas").json()
+    assert resumo["telefone"] == "(11) 98765-4321"
+    with abrir(fabrica) as s:
+        # Uma linha por ficha aberta; a lista não grava (decisão 0037).
+        [registro] = s.scalars(select(Auditoria)).all()
+        assert (registro.acao, registro.alvo) == ("ver_sem_mascara", alvo)
+        assert str(registro.usuario_id) == ana
+
+    # A exportação sai mascarada mesmo para quem vê sem máscara.
+    texto = client_pg.get(f"/admin/conversas/{alvo}/exportar").text
+    assert "00189004967" not in texto
 
 
 def test_revelar_exige_csrf(client_pg, service_pg, fabrica, ana, conversa):

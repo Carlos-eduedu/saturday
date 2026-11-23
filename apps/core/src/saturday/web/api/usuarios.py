@@ -21,7 +21,7 @@ from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.painel import usuarios as regras
 from saturday.painel.acoes import AcaoRecusada
 from saturday.painel.sessoes import agora
-from saturday.privacidade import MASCARAS
+from saturday.privacidade import exibir
 from saturday.web.api.admin import url_foto
 from saturday.web.dependencies import (
     UsuarioLogado,
@@ -50,6 +50,7 @@ class Edicao(BaseModel):
     perfil: str | None = None
     pode_editar_agente: bool | None = None
     pode_testar_fluxos: bool | None = None
+    ve_dados_completos: bool | None = None
     cargo: str | None = None
     observacao: str | None = None
 
@@ -66,7 +67,7 @@ def _executar(fabrica: sessionmaker[Session], acao: Callable[[Session], Any]) ->
         raise HTTPException(status_code=exc.status, detail=exc.detalhe) from exc
 
 
-def _linha(usuario: UsuarioPainel, assumidas: int) -> dict[str, Any]:
+def _linha(usuario: UsuarioPainel, assumidas: int, inteiro: bool) -> dict[str, Any]:
     ate = usuario.bloqueado_ate
     if ate is not None and ate <= agora():
         ate = None
@@ -78,8 +79,9 @@ def _linha(usuario: UsuarioPainel, assumidas: int) -> dict[str, Any]:
         "perfil": usuario.perfil,
         "pode_editar_agente": usuario.pode_editar_agente,
         "pode_testar_fluxos": usuario.pode_testar_fluxos,
+        "ve_dados_completos": usuario.ve_dados_completos,
         # Na lista da equipe o telefone vai mascarado, como os outros dados pessoais.
-        "telefone": MASCARAS["telefone"](usuario.telefone) if usuario.telefone else None,
+        "telefone": exibir("telefone", usuario.telefone, inteiro) if usuario.telefone else None,
         "foto": url_foto(usuario.id, usuario.foto_chave),
         "situacao": situacao,
         "bloqueado_ate": ate.isoformat() if ate else None,
@@ -89,7 +91,7 @@ def _linha(usuario: UsuarioPainel, assumidas: int) -> dict[str, Any]:
 
 
 @router.get("")
-def listar(_usuario: Gestor, fabrica: Fabrica) -> list[dict[str, Any]]:
+def listar(usuario: Gestor, fabrica: Fabrica) -> list[dict[str, Any]]:
     """Ativos primeiro, por nome; desativados no fim."""
 
     with abrir_sessao(fabrica) as sessao:
@@ -103,7 +105,8 @@ def listar(_usuario: Gestor, fabrica: Fabrica) -> list[dict[str, Any]]:
                 .group_by(Conversa.atendente_id)
             ).all()
         )
-        return [_linha(u, int(assumidas.get(u.id, 0))) for u in usuarios]
+        inteiro = usuario.ve_dados_completos
+        return [_linha(u, int(assumidas.get(u.id, 0)), inteiro) for u in usuarios]
 
 
 @router.post("", status_code=201)
@@ -128,6 +131,7 @@ def editar(usuario_id: uuid.UUID, dados: Edicao, usuario: GestorCsrf, fabrica: F
             perfil=dados.perfil,
             pode_editar_agente=dados.pode_editar_agente,
             pode_testar_fluxos=dados.pode_testar_fluxos,
+            ve_dados_completos=dados.ve_dados_completos,
             cargo=dados.cargo,
             observacao=dados.observacao,
         ),

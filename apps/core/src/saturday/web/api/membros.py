@@ -20,7 +20,7 @@ from saturday.dados.modelos import Conversa, UsuarioPainel
 from saturday.dados.sessao import sessao as abrir_sessao
 from saturday.painel import membros as regras
 from saturday.painel.sessoes import agora as hora_atual
-from saturday.privacidade import MASCARAS
+from saturday.privacidade import exibir
 from saturday.web.api.admin import url_foto
 from saturday.web.dependencies import UsuarioLogado, get_fabrica, usuario_logado
 
@@ -50,9 +50,12 @@ def _membro(
     acesso = usuario.ultimo_acesso_em
     linha |= {
         "email": usuario.email,
-        "telefone": MASCARAS["telefone"](usuario.telefone) if usuario.telefone else None,
+        "telefone": exibir("telefone", usuario.telefone, quem.ve_dados_completos)
+        if usuario.telefone
+        else None,
         "pode_editar_agente": usuario.pode_editar_agente,
         "pode_testar_fluxos": usuario.pode_testar_fluxos,
+        "ve_dados_completos": usuario.ve_dados_completos,
         "ultimo_acesso_em": acesso.isoformat() if acesso else None,
         "criado_em": usuario.criado_em.isoformat(),
     }

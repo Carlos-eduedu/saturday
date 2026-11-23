@@ -24,7 +24,7 @@ from saturday.agent.service import AgentService
 from saturday.dados import repositorios
 from saturday.dados.modelos import Conversa, Turno
 from saturday.dados.sessao import sessao as abrir_sessao
-from saturday.privacidade import MASCARAS
+from saturday.privacidade import exibir
 from saturday.settings import get_settings
 from saturday.web.api.ia import turno_json
 from saturday.web.dependencies import (
@@ -171,7 +171,9 @@ def execucoes(
             {
                 **turno_json(turno, usuario.gestor),
                 "conversa_id": str(turno.conversa_id),
-                "telefone": MASCARAS["telefone"](telefone) if telefone else None,
+                "telefone": exibir("telefone", telefone, usuario.ve_dados_completos)
+                if telefone
+                else None,
                 "canal": canal,
                 "membro": membros.get(telefone) if telefone else None,
             }

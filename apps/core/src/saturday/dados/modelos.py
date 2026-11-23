@@ -261,6 +261,10 @@ class UsuarioPainel(Base):
     pode_testar_fluxos: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=sa_false()
     )
+    # Vê CPF, telefone e e-mail sem máscara em todo o painel (decisão 0037).
+    ve_dados_completos: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=sa_false()
+    )
     # Página do membro (decisão 0023). Função e observação são do gestor; a
     # observação só ele lê. Disponível é a própria pessoa quem marca.
     cargo: Mapped[str | None] = mapped_column(String(60))

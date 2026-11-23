@@ -149,6 +149,7 @@ def editar(
     perfil: str | None = None,
     pode_editar_agente: bool | None = None,
     pode_testar_fluxos: bool | None = None,
+    ve_dados_completos: bool | None = None,
     cargo: str | None = None,
     observacao: str | None = None,
 ) -> None:
@@ -165,6 +166,9 @@ def editar(
         usuario.observacao = nova
     if pode_testar_fluxos is not None and pode_testar_fluxos != usuario.pode_testar_fluxos:
         mudancas["pode_testar_fluxos"] = pode_testar_fluxos
+    # Concessão e retirada ficam na auditoria como qualquer mudança (decisão 0037).
+    if ve_dados_completos is not None and ve_dados_completos != usuario.ve_dados_completos:
+        mudancas["ve_dados_completos"] = ve_dados_completos
     if pode_editar_agente is not None and pode_editar_agente != usuario.pode_editar_agente:
         mudancas["pode_editar_agente"] = pode_editar_agente
     if nome is not None and _validar_nome(nome) != usuario.nome:
