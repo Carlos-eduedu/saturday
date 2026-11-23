@@ -713,7 +713,7 @@ function FichaCliente({
                 <dt>{CAMPOS[campo]}</dt>
                 <dd>
                   {revelados[campo] ?? ficha.dados[campo]}
-                  {revelados[campo] ? (
+                  {ficha.sem_mascara ? null : revelados[campo] ? (
                     <button
                       type="button"
                       className="link alvo"
@@ -761,8 +761,9 @@ function FichaCliente({
           </p>
         )}
         <p className="nota" id="aviso-auditoria">
-          Revelar um dado fica registrado na auditoria, em seu nome, e ele volta a ser mascarado em
-          1 minuto.
+          {ficha.sem_mascara
+            ? "Você vê os dados sem máscara: abrir a ficha fica registrado na auditoria, em seu nome."
+            : "Revelar um dado fica registrado na auditoria, em seu nome, e ele volta a ser mascarado em 1 minuto."}
         </p>
       </div>
     </>

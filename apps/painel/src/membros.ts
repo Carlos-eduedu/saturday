@@ -19,6 +19,7 @@ const ACOES: Record<string, string> = {
   "conversa:editar_ficha": "Editou a ficha do cliente",
   resolver_alerta: "Resolveu um alerta",
   exportar: "Exportou uma conversa",
+  ver_sem_mascara: "Abriu a ficha de um cliente sem máscara",
   perfil_editar: "Editou o próprio perfil",
   perfil_foto: "Trocou a própria foto",
   perfil_foto_remover: "Removeu a própria foto",

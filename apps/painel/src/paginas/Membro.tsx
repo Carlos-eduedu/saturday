@@ -1,9 +1,16 @@
 import { type ChangeEvent, type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
-import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
+import {
+  ArrowLeft01Icon,
+  SecurityLockIcon,
+  UserEdit01Icon,
+  ViewIcon,
+  ViewOffIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Avatar } from "../componentes/Avatar";
 import { useConfirmar } from "../componentes/Confirmar";
+import { Dialogo } from "../componentes/Dialogo";
 import { EstadoDoMembro } from "../componentes/EstadoDoMembro";
 import { Falha } from "../componentes/Falha";
 import { api, enviarFoto, type Eu, type Membro, type Perfil, mensagemDeFalha } from "../api";
@@ -16,16 +23,23 @@ import { useAcao } from "../useAcao";
 // ver: do colega, quem é, o estado e a carga; da própria pessoa e para o
 // gestor, também contato, acesso e atividade; só para o gestor, a gestão. As
 // travas (não desativar a si mesmo, nunca ficar sem gestor) são da API; a tela
-// só esconde o que já sabe que vai ser recusado.
+// só esconde o que já sabe que vai ser recusado. Ver e editar ficam em dois
+// modais (Perfil e Acesso); a página guarda a atividade e o que é irreversível.
 
 const dataHora = (iso: string) =>
-  new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+  new Date(iso).toLocaleString("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
 
 type Agir = (acao: () => Promise<unknown>, feito: string) => Promise<boolean>;
+type Modal = "perfil" | "acesso" | null;
 
 export function PaginaDoMembro({ eu, atualizarEu }: { eu: Eu; atualizarEu: (eu: Eu) => void }) {
   const { id = "" } = useParams();
   const [membro, setMembro] = useState<Membro | null>(null);
+  const [modal, setModal] = useState<Modal>(null);
+  const confirmar = useConfirmar();
   const { agir, erro, aviso, setErro, setAviso } = useAcao(() => carregar());
 
   const carregar = useCallback(() => {
@@ -36,6 +50,7 @@ export function PaginaDoMembro({ eu, atualizarEu }: { eu: Eu; atualizarEu: (eu: 
   }, [id, setErro]);
   useEffect(() => {
     setMembro(null);
+    setModal(null);
     setErro("");
     setAviso("");
     carregar();
@@ -62,6 +77,40 @@ export function PaginaDoMembro({ eu, atualizarEu }: { eu: Eu; atualizarEu: (eu: 
 
   const desativado = membro.situacao === "desativado";
   const gestor = membro.nivel === "gestor";
+  // Contato e acesso vêm só para a própria pessoa e para o gestor.
+  const ve = membro.email !== undefined;
+  const semMascara = membro.ve_dados_completos ?? false;
+  // Ação feita dentro de um modal: deu certo, ele fecha e o aviso fica na página.
+  const agirEFechar: Agir = async (acao, feito) => {
+    const ok = await agir(acao, feito);
+    if (ok) setModal(null);
+    return ok;
+  };
+
+  async function alternarMascara(m: Membro) {
+    const ligar = !semMascara;
+    const ok = await confirmar(
+      ligar
+        ? {
+            titulo: `Mostrar dados sem máscara para ${m.nome}?`,
+            texto: `${m.voce ? "Você passa" : `${m.nome} passa`} a ver CPF, telefone, e-mail e nascimento inteiros em todo o painel. Cada ficha de cliente aberta assim fica na auditoria. A exportação continua mascarada.`,
+            acao: "Mostrar sem máscara",
+          }
+        : {
+            titulo: `Voltar a mascarar os dados para ${m.nome}?`,
+            texto: "Os dados pessoais voltam a aparecer mascarados, com o Revelar auditado.",
+            acao: "Mascarar",
+          },
+    );
+    if (!ok) return;
+    agir(
+      async () => {
+        await api.editarUsuario(m.id, { ve_dados_completos: ligar });
+        if (m.voce) atualizarEu(await api.eu());
+      },
+      ligar ? `${m.nome} vê os dados sem máscara.` : `Os dados voltam mascarados para ${m.nome}.`,
+    );
+  }
 
   return (
     <div className="canais membro">
@@ -94,6 +143,36 @@ export function PaginaDoMembro({ eu, atualizarEu }: { eu: Eu; atualizarEu: (eu: 
           />
         )}
       </header>
+
+      {ve && (
+        <div className="membro-botoes">
+          <button type="button" onClick={() => setModal("perfil")}>
+            <HugeiconsIcon icon={UserEdit01Icon} size={18} strokeWidth={2} aria-hidden="true" />
+            Perfil
+          </button>
+          <button type="button" onClick={() => setModal("acesso")}>
+            <HugeiconsIcon icon={SecurityLockIcon} size={18} strokeWidth={2} aria-hidden="true" />
+            Acesso
+          </button>
+          {gestor && (
+            <button
+              type="button"
+              className="membro-mascara"
+              aria-pressed={semMascara}
+              onClick={() => alternarMascara(membro)}
+            >
+              <HugeiconsIcon
+                icon={semMascara ? ViewIcon : ViewOffIcon}
+                size={18}
+                strokeWidth={2}
+                aria-hidden="true"
+              />
+              Dados sem máscara
+              <span className="membro-mascara__estado">{semMascara ? "ligado" : "desligado"}</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {erro && (
         <p className="erro" role="alert">
@@ -160,54 +239,30 @@ export function PaginaDoMembro({ eu, atualizarEu }: { eu: Eu; atualizarEu: (eu: 
         </section>
       )}
 
-      {membro.email !== undefined && (
-        <section aria-labelledby="membro-contato">
-          <h2 id="membro-contato">Contato e acesso</h2>
-          <dl className="voce__fixos">
-            <div>
-              <dt>E-mail (login)</dt>
-              <dd>{membro.email}</dd>
-            </div>
-            <div>
-              <dt>Telefone</dt>
-              <dd className={membro.telefone ? "dado" : undefined}>{membro.telefone ?? "Não informado"}</dd>
-            </div>
-            <div>
-              <dt>Último acesso</dt>
-              <dd className={membro.ultimo_acesso_em ? "dado" : undefined}>
-                {membro.ultimo_acesso_em ? dataHora(membro.ultimo_acesso_em) : "Nunca entrou"}
-              </dd>
-            </div>
-            {membro.criado_em && (
-              <div>
-                <dt>Cadastro</dt>
-                <dd className="dado">{new Date(membro.criado_em).toLocaleDateString("pt-BR")}</dd>
-              </div>
-            )}
-            <div>
-              <dt>Permissões</dt>
-              <dd>
-                {[
-                  membro.pode_editar_agente && "Edita o agente",
-                  membro.pode_testar_fluxos && "Testa fluxos",
-                ]
-                  .filter(Boolean)
-                  .join(" · ") || "Só as do perfil"}
-              </dd>
-            </div>
-            {gestor && (membro.tentativas_falhas ?? 0) > 0 && (
-              <div>
-                <dt>Senhas erradas seguidas</dt>
-                <dd className="dado">{membro.tentativas_falhas}</dd>
-              </div>
-            )}
-          </dl>
-        </section>
+      {gestor && <Situacao membro={membro} agir={agir} />}
+
+      {modal === "perfil" && (
+        <Dialogo
+          titulo={membro.voce ? "Seu perfil" : `Perfil de ${membro.nome}`}
+          aoFechar={() => setModal(null)}
+        >
+          <Fixos membro={membro} gestor={gestor} />
+          {membro.voce && <SeuPerfil eu={eu} atualizarEu={atualizarEu} recarregar={carregar} />}
+          {gestor && <Cadastro membro={membro} agir={agirEFechar} />}
+        </Dialogo>
       )}
-
-      {membro.voce && <SeuPerfil eu={eu} atualizarEu={atualizarEu} recarregar={carregar} />}
-
-      {gestor && <Gestao key={membro.id} membro={membro} agir={agir} />}
+      {modal === "acesso" && (
+        <Dialogo
+          titulo={membro.voce ? "Seu acesso" : `Acesso de ${membro.nome}`}
+          aoFechar={() => setModal(null)}
+        >
+          {gestor ? (
+            <Acesso membro={membro} agir={agir} agirEFechar={agirEFechar} />
+          ) : (
+            <Permissoes membro={membro} />
+          )}
+        </Dialogo>
+      )}
     </div>
   );
 }
@@ -290,8 +345,7 @@ function SeuPerfil({
   }
 
   return (
-    <section className="voce" aria-labelledby="voce-titulo">
-      <h2 id="voce-titulo">Seu perfil</h2>
+    <div className="voce">
       <div className="voce__foto">
         <Avatar nome={eu.nome} foto={eu.foto} tamanho={56} />
         <div className="voce__foto-acoes">
@@ -310,7 +364,13 @@ function SeuPerfil({
           )}
           <span className="nota">JPG, PNG ou WebP, até 10 MB.</span>
         </div>
-        <input ref={arquivo} type="file" accept={FOTO_TIPOS.join(",")} onChange={escolherFoto} hidden />
+        <input
+          ref={arquivo}
+          type="file"
+          accept={FOTO_TIPOS.join(",")}
+          onChange={escolherFoto}
+          hidden
+        />
       </div>
       <form
         className="form-usuario"
@@ -378,97 +438,169 @@ function SeuPerfil({
         }
         aoTrocar={recarregar}
       />
-    </section>
+    </div>
   );
 }
 
-// Só o gestor: cadastro, permissões, senha, bloqueio e desativar (decisão 0012:
-// nunca apagar, a auditoria continua dizendo quem fez o quê).
-function Gestao({ membro, agir }: { membro: Membro; agir: Agir }) {
-  const confirmar = useConfirmar();
+const PERMISSOES: [keyof Membro, string][] = [
+  ["pode_editar_agente", "Edita o agente"],
+  ["pode_testar_fluxos", "Testa fluxos"],
+  ["ve_dados_completos", "Vê dados sem máscara"],
+];
+
+// O que ninguém edita neste modal: quando entrou, quando apareceu, e o que só
+// outra pessoa troca (o telefone é do próprio membro; o e-mail, do gestor).
+function Fixos({ membro, gestor }: { membro: Membro; gestor: boolean }) {
+  return (
+    <dl className="voce__fixos membro-fixos">
+      {!gestor && (
+        <div>
+          <dt>E-mail (login)</dt>
+          <dd>{membro.email}</dd>
+        </div>
+      )}
+      {!membro.voce && (
+        <div>
+          <dt>Telefone</dt>
+          <dd className={membro.telefone ? "dado" : undefined}>
+            {membro.telefone ?? "Não informado"}
+          </dd>
+        </div>
+      )}
+      <div>
+        <dt>Último acesso</dt>
+        <dd className={membro.ultimo_acesso_em ? "dado" : undefined}>
+          {membro.ultimo_acesso_em ? dataHora(membro.ultimo_acesso_em) : "Nunca entrou"}
+        </dd>
+      </div>
+      {membro.criado_em && (
+        <div>
+          <dt>Cadastro</dt>
+          <dd className="dado">{new Date(membro.criado_em).toLocaleDateString("pt-BR")}</dd>
+        </div>
+      )}
+    </dl>
+  );
+}
+
+// A própria pessoa (atendente) vê o acesso, sem mexer: só o gestor troca.
+function Permissoes({ membro }: { membro: Membro }) {
+  const ligadas = PERMISSOES.filter(([campo]) => membro[campo]).map(([, rotulo]) => rotulo);
+  return (
+    <>
+      <dl className="voce__fixos">
+        <div>
+          <dt>Perfil</dt>
+          <dd>{ROTULO_PERFIL[membro.perfil]}</dd>
+        </div>
+        <div>
+          <dt>Permissões</dt>
+          <dd>{ligadas.join(" · ") || "Só as do perfil"}</dd>
+        </div>
+      </dl>
+      <p className="nota">Perfil e permissões só o gestor troca.</p>
+    </>
+  );
+}
+
+// Só o gestor: nome, e-mail (o login), função e observação.
+function Cadastro({ membro, agir }: { membro: Membro; agir: Agir }) {
   const [nome, setNome] = useState(membro.nome);
   const [email, setEmail] = useState(membro.email ?? "");
   const [cargo, setCargo] = useState(membro.cargo ?? "");
-  const [perfil, setPerfil] = useState<Perfil>(membro.perfil);
-  const [editaAgente, setEditaAgente] = useState(membro.pode_editar_agente ?? false);
-  const [testaFluxos, setTestaFluxos] = useState(membro.pode_testar_fluxos ?? false);
   const [observacao, setObservacao] = useState(membro.observacao ?? "");
-  const [senha, setSenha] = useState("");
-  const desativado = membro.situacao === "desativado";
   const mudou =
     nome !== membro.nome ||
     email !== (membro.email ?? "") ||
     cargo !== (membro.cargo ?? "") ||
+    observacao !== (membro.observacao ?? "");
+
+  return (
+    <form
+      className="form-usuario"
+      onSubmit={(e: FormEvent) => {
+        e.preventDefault();
+        agir(
+          () => api.editarUsuario(membro.id, { nome, email, cargo, observacao }),
+          "Alterações salvas.",
+        );
+      }}
+    >
+      <h3>Cadastro</h3>
+      {/* O próprio nome a pessoa troca logo acima, no perfil dela. */}
+      {!membro.voce && (
+        <label>
+          Nome
+          <input value={nome} onChange={(e) => setNome(e.target.value)} maxLength={80} required />
+        </label>
+      )}
+      <label>
+        E-mail (login)
+        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+      </label>
+      <label>
+        Função
+        <input
+          value={cargo}
+          onChange={(e) => setCargo(e.target.value)}
+          maxLength={60}
+          placeholder="Ex.: Atendente CLT"
+        />
+      </label>
+      <label className="largo">
+        Observação
+        <textarea
+          value={observacao}
+          onChange={(e) => setObservacao(e.target.value)}
+          maxLength={500}
+          rows={3}
+        />
+        <small>Só gestores leem. Não escreva aqui dados de clientes.</small>
+      </label>
+      <button type="submit" disabled={!mudou}>
+        Salvar cadastro
+      </button>
+    </form>
+  );
+}
+
+// Só o gestor: perfil, permissões, senha e bloqueio.
+function Acesso({ membro, agir, agirEFechar }: { membro: Membro; agir: Agir; agirEFechar: Agir }) {
+  const [perfil, setPerfil] = useState<Perfil>(membro.perfil);
+  const [editaAgente, setEditaAgente] = useState(membro.pode_editar_agente ?? false);
+  const [testaFluxos, setTestaFluxos] = useState(membro.pode_testar_fluxos ?? false);
+  const [senha, setSenha] = useState("");
+  const desativado = membro.situacao === "desativado";
+  const mudou =
     perfil !== membro.perfil ||
     editaAgente !== (membro.pode_editar_agente ?? false) ||
-    testaFluxos !== (membro.pode_testar_fluxos ?? false) ||
-    observacao !== (membro.observacao ?? "");
+    testaFluxos !== (membro.pode_testar_fluxos ?? false);
 
   function salvar(evento: FormEvent) {
     evento.preventDefault();
-    agir(
+    agirEFechar(
       () =>
         api.editarUsuario(membro.id, {
-          nome,
-          email,
           perfil,
           pode_editar_agente: editaAgente,
           pode_testar_fluxos: testaFluxos,
-          cargo,
-          observacao,
         }),
-      "Alterações salvas.",
+      "Acesso salvo.",
     );
   }
 
   async function trocarSenha(evento: FormEvent) {
     evento.preventDefault();
-    const ok = await agir(
+    const ok = await agirEFechar(
       () => api.redefinirSenha(membro.id, senha),
       `Senha de ${membro.nome} redefinida; as sessões abertas dela foram encerradas, e ela escolhe outra ao entrar.`,
     );
     if (ok) setSenha("");
   }
 
-  async function desativar() {
-    const voltam =
-      membro.conversas_assumidas > 0
-        ? ` ${conversas(membro.conversas_assumidas)} de ${membro.nome} ${membro.conversas_assumidas === 1 ? "volta" : "voltam"} para "aguardando humano".`
-        : "";
-    const ok = await confirmar({
-      titulo: `Desativar ${membro.nome}?`,
-      texto: `A pessoa sai do painel na hora e não entra mais.${voltam}`,
-      acao: "Desativar",
-      perigo: true,
-    });
-    if (ok) agir(() => api.desativarUsuario(membro.id), `${membro.nome} desativado.`);
-  }
-
   return (
-    <section className="edicao-usuario" aria-labelledby="membro-gestao">
-      <h2 id="membro-gestao">Gestão</h2>
-
-      <form onSubmit={salvar} className="form-usuario">
-        {/* O próprio nome a pessoa troca em "Seu perfil", logo acima. */}
-        {!membro.voce && (
-          <label>
-            Nome
-            <input value={nome} onChange={(e) => setNome(e.target.value)} maxLength={80} required />
-          </label>
-        )}
-        <label>
-          E-mail (login)
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        </label>
-        <label>
-          Função
-          <input
-            value={cargo}
-            onChange={(e) => setCargo(e.target.value)}
-            maxLength={60}
-            placeholder="Ex.: Atendente CLT"
-          />
-        </label>
+    <>
+      <form onSubmit={salvar} className="form-usuario membro-form-acesso">
         <label>
           Perfil
           <select
@@ -481,7 +613,7 @@ function Gestao({ membro, agir }: { membro: Membro; agir: Agir }) {
           </select>
           {membro.voce && <small>Você não pode tirar o seu próprio perfil de gestor.</small>}
         </label>
-        <label className="opcao">
+        <label className="opcao largo">
           <input
             type="checkbox"
             checked={editaAgente}
@@ -489,7 +621,7 @@ function Gestao({ membro, agir }: { membro: Membro; agir: Agir }) {
           />
           Pode editar o agente (modelos, base de conhecimento, voltar versão)
         </label>
-        <label className="opcao">
+        <label className="opcao largo">
           <input
             type="checkbox"
             checked={testaFluxos}
@@ -498,18 +630,12 @@ function Gestao({ membro, agir }: { membro: Membro; agir: Agir }) {
           Testa fluxos pelo WhatsApp: conversas do telefone do perfil viram teste
           {!membro.telefone && <small> (a pessoa ainda não pôs telefone no perfil)</small>}
         </label>
-        <label className="largo">
-          Observação
-          <textarea
-            value={observacao}
-            onChange={(e) => setObservacao(e.target.value)}
-            maxLength={500}
-            rows={3}
-          />
-          <small>Só gestores leem. Não escreva aqui dados de clientes.</small>
-        </label>
+        <p className="nota">
+          Dados sem máscara se liga no botão da página, com confirmação: hoje está{" "}
+          {membro.ve_dados_completos ? "ligado" : "desligado"}.
+        </p>
         <button type="submit" disabled={!mudou}>
-          Salvar
+          Salvar acesso
         </button>
       </form>
 
@@ -543,7 +669,7 @@ function Gestao({ membro, agir }: { membro: Membro; agir: Agir }) {
       )}
 
       {membro.situacao === "bloqueado" && membro.bloqueado_ate && (
-        <div>
+        <div className="membro-bloco">
           <h3>Bloqueio</h3>
           <p className="nota">
             Bloqueado até{" "}
@@ -555,34 +681,64 @@ function Gestao({ membro, agir }: { membro: Membro; agir: Agir }) {
           </p>
           <button
             type="button"
-            onClick={() => agir(() => api.desbloquearUsuario(membro.id), `${membro.nome} desbloqueado.`)}
+            onClick={() =>
+              agir(() => api.desbloquearUsuario(membro.id), `${membro.nome} desbloqueado.`)
+            }
           >
             Desbloquear agora
           </button>
         </div>
       )}
+    </>
+  );
+}
 
+// Só o gestor, fora dos modais: desativar e reativar (decisão 0012: nunca
+// apagar, a auditoria continua dizendo quem fez o quê).
+function Situacao({ membro, agir }: { membro: Membro; agir: Agir }) {
+  const confirmar = useConfirmar();
+  const desativado = membro.situacao === "desativado";
+  if (membro.voce && !desativado) return null;
+
+  async function desativar() {
+    const voltam =
+      membro.conversas_assumidas > 0
+        ? ` ${conversas(membro.conversas_assumidas)} de ${membro.nome} ${membro.conversas_assumidas === 1 ? "volta" : "voltam"} para "aguardando humano".`
+        : "";
+    const ok = await confirmar({
+      titulo: `Desativar ${membro.nome}?`,
+      texto: `A pessoa sai do painel na hora e não entra mais.${voltam}`,
+      acao: "Desativar",
+      perigo: true,
+    });
+    if (ok) agir(() => api.desativarUsuario(membro.id), `${membro.nome} desativado.`);
+  }
+
+  return (
+    <section className="membro-situacao" aria-labelledby="membro-situacao">
       {desativado ? (
-        <div>
-          <h3>Reativar</h3>
-          <p className="nota">A pessoa volta a entrar com o mesmo e-mail e a mesma senha.</p>
+        <>
+          <div>
+            <h2 id="membro-situacao">Reativar</h2>
+            <p className="nota">A pessoa volta a entrar com o mesmo e-mail e a mesma senha.</p>
+          </div>
           <button
             type="button"
             onClick={() => agir(() => api.reativarUsuario(membro.id), `${membro.nome} reativado.`)}
           >
             Reativar
           </button>
-        </div>
+        </>
       ) : (
-        !membro.voce && (
+        <>
           <div>
-            <h3>Desativar</h3>
+            <h2 id="membro-situacao">Desativar</h2>
             <p className="nota">A pessoa sai do painel e não entra mais. Nada é apagado.</p>
-            <button type="button" className="perigo" onClick={desativar}>
-              Desativar {membro.nome}
-            </button>
           </div>
-        )
+          <button type="button" className="perigo" onClick={desativar}>
+            Desativar {membro.nome}
+          </button>
+        </>
       )}
     </section>
   );

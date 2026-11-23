@@ -20,6 +20,8 @@ export interface Eu {
   disponivel: boolean;
   // Senha definida pelo gestor: até trocar, a API só deixa trocar a senha e sair.
   trocar_senha: boolean;
+  // Vê CPF, telefone e e-mail sem máscara em todo o painel (decisão 0037).
+  ve_dados_completos: boolean;
   csrf: string;
 }
 
@@ -83,6 +85,8 @@ export interface Detalhe extends Resumo {
 export interface Ficha {
   nome: string | null;
   dados: Partial<Record<CampoSensivel, string>>;
+  // Os dados vieram inteiros: quem lê tem "Dados sem máscara" (decisão 0037).
+  sem_mascara: boolean;
   uf: string | null;
   publico: string | null;
   handoff_reason: string | null;
@@ -225,6 +229,7 @@ export interface Membro {
   telefone?: string | null;
   pode_editar_agente?: boolean;
   pode_testar_fluxos?: boolean;
+  ve_dados_completos?: boolean;
   ultimo_acesso_em?: string | null;
   criado_em?: string;
   // Só o gestor.
@@ -884,15 +889,17 @@ export const api = {
     chamar<ItemHistorico[]>("GET", `/gestao/integracoes/${id}/historico`),
   editarUsuario: (
     id: string,
-    dados: {
+    // Só o que muda: o servidor deixa o resto como está.
+    dados: Partial<{
       nome: string;
       email: string;
       perfil: Perfil;
       pode_editar_agente: boolean;
       pode_testar_fluxos: boolean;
+      ve_dados_completos: boolean;
       cargo: string;
       observacao: string;
-    },
+    }>,
   ) =>
     chamar<void>("PATCH", `/gestao/usuarios/${id}`, dados),
   redefinirSenha: (id: string, senha: string) =>
