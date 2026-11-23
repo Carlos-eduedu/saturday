@@ -15,6 +15,8 @@ from saturday.settings import Settings
 if TYPE_CHECKING:
     from sentry_sdk._types import Breadcrumb, BreadcrumbHint, Event, Hint
 
+logger = logging.getLogger(__name__)
+
 # A query da consulta da Granatech leva CPF, nome e telefone (como no access log).
 # Vale para URL inteira e caminho relativo.
 _QUERY_DE_URL = re.compile(r"(/[^\s?#\"']*)\?[^\s#\"']*")
@@ -54,6 +56,8 @@ def iniciar_sentry(settings: Settings) -> bool:
         before_send=limpar_evento,
         before_breadcrumb=_limpar_breadcrumb,
     )
+    # Prova no log de que o DSN chegou, sem mostrá-lo (decisão 0005).
+    logger.info("sentry_ligado ambiente=%s", settings.environment)
     return True
 
 

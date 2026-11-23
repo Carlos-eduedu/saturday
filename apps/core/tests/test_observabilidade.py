@@ -95,8 +95,13 @@ def captura(monkeypatch: pytest.MonkeyPatch) -> Iterator[_Captura]:
     sentry_sdk.get_isolation_scope().clear()
 
 
-def test_logger_error_vira_evento_mascarado_e_sem_variaveis(captura: _Captura) -> None:
+def test_logger_error_vira_evento_mascarado_e_sem_variaveis(
+    captura: _Captura, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.INFO, logger="saturday.observabilidade")
     assert iniciar_sentry(Settings(environment="dev", sentry_dsn=DSN))
+    assert "sentry_ligado ambiente=dev" in caplog.text
+    assert "chave" not in caplog.text and "ingest" not in caplog.text
 
     cpf = "12345678901"
     logging.getLogger("saturday.teste").info("so_breadcrumb_nao cpf=%s", cpf)
