@@ -334,6 +334,25 @@ export interface EntregaIntegracao {
   motivo: string | null;
 }
 
+// Histórico do token: chamadas ao proxy e o que o gestor fez com ele.
+export type ItemHistorico =
+  | {
+      tipo: "chamada";
+      em: string;
+      metodo: string;
+      rota: string;
+      ids: Record<string, string>;
+      status: number;
+      duracao_ms: number;
+    }
+  | {
+      tipo: "gestao";
+      em: string;
+      acao: string;
+      por: string | null;
+      detalhe: Record<string, unknown> | null;
+    };
+
 export interface Qr {
   qr: string | null;
   estado: string;
@@ -861,6 +880,8 @@ export const api = {
     chamar<{ segredo: string }>("POST", `/gestao/integracoes/${id}/webhook/segredo`),
   entregasIntegracao: (id: string) =>
     chamar<EntregaIntegracao[]>("GET", `/gestao/integracoes/${id}/webhook/entregas`),
+  historicoIntegracao: (id: string) =>
+    chamar<ItemHistorico[]>("GET", `/gestao/integracoes/${id}/historico`),
   editarUsuario: (
     id: string,
     dados: {

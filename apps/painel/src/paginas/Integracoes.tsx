@@ -5,6 +5,7 @@ import {
   type EntregaIntegracao,
   type EscopoIntegracao,
   type Integracao,
+  type ItemHistorico,
   mensagemDeFalha,
   type Parceiro,
 } from "../api";
@@ -12,6 +13,7 @@ import { Abas, idAba } from "../componentes/Abas";
 import { useConfirmar } from "../componentes/Confirmar";
 import { Dialogo } from "../componentes/Dialogo";
 import { Falha } from "../componentes/Falha";
+import GlideSelect from "../componentes/GlideSelect";
 import { Vazio } from "../componentes/Vazio";
 import { relativo, rotulo, SITUACAO_DA_CONSULTA, SITUACAO_DA_PROPOSTA } from "../rotulos";
 import { useAcao } from "../useAcao";
@@ -23,7 +25,9 @@ import { useAcao } from "../useAcao";
 //   proxy da Granatech. O token aparece uma vez, logo depois de criado; o
 //   servidor guarda só o hash. Revogar é para sempre. Cada token pode ter um
 //   webhook, que recebe o status novo das consultas e propostas que ele abriu,
-//   assinado com um segredo que também aparece uma vez.
+//   assinado com um segredo que também aparece uma vez. O menu de cada linha
+//   abre o Histórico (cada chamada do token e o que o gestor fez com ele), o
+//   webhook e o revogar.
 
 const ABAS: ["parceiros" | "tokens", string][] = [
   ["parceiros", "Parceiros"],
@@ -132,7 +136,7 @@ function Parceiros() {
 function Tokens() {
   const [lista, setLista] = useState<Integracao[] | null>(null);
   const [criando, setCriando] = useState(false);
-  const [webhookDe, setWebhookDe] = useState<string | null>(null);
+  const [aberto, setAberto] = useState<{ id: string; painel: Painel } | null>(null);
   const { agir, erro, setErro } = useAcao(() => carregar());
   const carregar = useCallback(() => {
     api
@@ -149,7 +153,11 @@ function Tokens() {
       <p className="centro">Carregando…</p>
     );
 
-  const comWebhook = lista.find((i) => i.id === webhookDe && !i.revogada_em);
+  const doPainel = (painel: Painel) =>
+    aberto?.painel === painel ? lista.find((i) => i.id === aberto.id) : undefined;
+  const comWebhook = doPainel("webhook");
+  const comHistorico = doPainel("historico");
+  const fechar = () => setAberto(null);
   return (
     <>
       <div className="cabeca-secao">
@@ -167,20 +175,36 @@ function Tokens() {
         </p>
       )}
       <section>
-        <TabelaIntegracoes lista={lista} agir={agir} abrir={setWebhookDe} />
+        <TabelaIntegracoes
+          lista={lista}
+          agir={agir}
+          abrir={(id, painel) => setAberto({ id, painel })}
+        />
       </section>
       {criando && <NovaIntegracao recarregar={carregar} fechar={() => setCriando(false)} />}
-      {comWebhook && (
+      {comWebhook && !comWebhook.revogada_em && (
         <PainelWebhook
           key={comWebhook.id}
           integracao={comWebhook}
           recarregar={carregar}
-          fechar={() => setWebhookDe(null)}
+          fechar={fechar}
         />
+      )}
+      {comHistorico && (
+        <PainelHistorico key={comHistorico.id} integracao={comHistorico} fechar={fechar} />
       )}
     </>
   );
 }
+
+type Painel = "webhook" | "historico";
+
+const OPCOES_ATIVA = [
+  { value: "historico", label: "Histórico" },
+  { value: "webhook", label: "Webhook" },
+  { value: "revogar", label: <span className="opcao-perigo">Revogar</span> },
+];
+const OPCOES_REVOGADA = OPCOES_ATIVA.slice(0, 1);
 
 function TabelaIntegracoes({
   lista,
@@ -189,7 +213,7 @@ function TabelaIntegracoes({
 }: {
   lista: Integracao[];
   agir: (acao: () => Promise<unknown>) => Promise<unknown>;
-  abrir: (id: string) => void;
+  abrir: (id: string, painel: Painel) => void;
 }) {
   const confirmar = useConfirmar();
   if (lista.length === 0)
@@ -222,29 +246,30 @@ function TabelaIntegracoes({
             </td>
             <td data-rotulo="Webhook">{i.webhook_url ? hostDe(i.webhook_url) : "—"}</td>
             <td className="acoes">
-              {!i.revogada_em && (
-                <button type="button" onClick={() => abrir(i.id)}>
-                  Webhook
-                </button>
-              )}
-              {!i.revogada_em && (
-                <button
-                  type="button"
-                  className="perigo"
-                  onClick={async () =>
-                    (await confirmar({
+              {/* Menu de ações: escolher age e o chip volta a "Ações". */}
+              <GlideSelect
+                className="menu-acoes"
+                options={i.revogada_em ? OPCOES_REVOGADA : OPCOES_ATIVA}
+                value=""
+                placeholder="Ações"
+                ariaLabel={`Ações do token ${i.nome}`}
+                align="right"
+                menuWidth={168}
+                onChange={async (acao) => {
+                  if (acao !== "revogar") return abrir(i.id, acao as Painel);
+                  if (
+                    await confirmar({
                       titulo: `Revogar o token ${i.nome}?`,
                       texto:
                         "O sistema que usa este token para de acessar na hora. Não dá para desfazer: " +
                         "para voltar, crie um token novo.",
                       acao: "Revogar",
                       perigo: true,
-                    })) && agir(() => api.revogarIntegracao(i.id))
-                  }
-                >
-                  Revogar
-                </button>
-              )}
+                    })
+                  )
+                    agir(() => api.revogarIntegracao(i.id));
+                }}
+              />
             </td>
           </tr>
         ))}
@@ -502,6 +527,115 @@ function PainelWebhook({
                 {e.tentativas} tentativa{e.tentativas === 1 ? "" : "s"}
                 {e.motivo && ` · ${e.motivo}`}
               </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Dialogo>
+  );
+}
+
+// ------------------------------------------------------------------ histórico
+
+// Chamadas ao proxy pelo molde da rota (o servidor manda o molde, não a URL).
+const PROXY = "/integracao/granatech/api-consignado/v1";
+const ROTAS: Record<string, string> = {
+  [`GET ${PROXY}/consulta-saldo`]: "Abriu consulta de saldo",
+  [`GET ${PROXY}/consulta-saldo/usuario`]: "Listou as consultas",
+  [`GET ${PROXY}/consulta-saldo/{id_consulta}`]: "Leu a consulta",
+  [`POST ${PROXY}/termo-consentimento`]: "Assinou o termo de consentimento",
+  [`GET ${PROXY}/simulacao/{id_produto}`]: "Simulou",
+  [`POST ${PROXY}/propostas`]: "Criou proposta",
+  [`GET ${PROXY}/propostas/lista`]: "Listou as propostas",
+  [`GET ${PROXY}/propostas/{id_proposta}`]: "Leu a proposta",
+  [`POST ${PROXY}/propostas/{id_proposta}/dados-tomador`]: "Corrigiu os dados do tomador",
+  [`POST ${PROXY}/propostas/{id_proposta}/cancelar`]: "Cancelou a proposta",
+  [`PATCH ${PROXY}/propostas/{id_proposta}/dados-bancarios`]: "Corrigiu a conta",
+  [`GET ${PROXY}/bancos`]: "Listou os bancos",
+  "GET /integracao/cota": "Leu a cota",
+  "POST /integracao/consultas/{id_consulta}/revelar": "Revelou o CPF",
+  "GET /integracao/homologacao": "Listou as rodadas de homologação",
+  "POST /integracao/homologacao": "Abriu rodada de homologação",
+  "GET /integracao/homologacao/{rodada_id}": "Leu a rodada de homologação",
+  "GET /integracao/homologacao/{rodada_id}/zip": "Baixou o pacote da rodada",
+};
+
+const NOME_DO_ID: Record<string, string> = {
+  id_consulta: "consulta",
+  id_proposta: "proposta",
+  id_produto: "produto",
+  rodada_id: "rodada",
+};
+
+const GESTAO: Record<string, string> = {
+  integracao_criar: "Token criado",
+  integracao_webhook: "Webhook alterado",
+  integracao_segredo: "Segredo do webhook gerado",
+  integracao_revogar: "Token revogado",
+};
+
+function PainelHistorico({ integracao, fechar }: { integracao: Integracao; fechar: () => void }) {
+  const [itens, setItens] = useState<ItemHistorico[] | null>(null);
+  const [erro, setErro] = useState("");
+  const carregar = useCallback(() => {
+    setErro("");
+    api
+      .historicoIntegracao(integracao.id)
+      .then(setItens)
+      .catch((e: unknown) => setErro(mensagemDeFalha(e)));
+  }, [integracao.id]);
+  useEffect(carregar, [carregar]);
+
+  const agora = Date.now();
+  return (
+    <Dialogo titulo={`Histórico de ${integracao.nome}`} aoFechar={fechar} largo>
+      <p className="nota">
+        Cada chamada deste token ao proxy e o que a gestão fez com ele, do mais novo ao mais
+        velho. Ficam 180 dias. Um ID fora do formato aparece como “?”.
+      </p>
+      {erro ? (
+        <Falha titulo="Não deu para carregar o histórico." texto={erro} aoTentar={carregar} />
+      ) : itens === null ? (
+        <p className="nota">Carregando…</p>
+      ) : itens.length === 0 ? (
+        <p className="vazio">Nenhuma ação ainda.</p>
+      ) : (
+        <ul className="lista-numeros historico-token">
+          {itens.map((h, n) => (
+            <li key={`${h.em}-${n}`}>
+              <time className="dado" dateTime={h.em} title={new Date(h.em).toLocaleString("pt-BR")}>
+                {relativo(h.em, agora)}
+              </time>
+              {h.tipo === "chamada" ? (
+                <>
+                  <span>
+                    {ROTAS[`${h.metodo} ${h.rota}`] ?? (
+                      <code className="dado">
+                        {h.metodo} {h.rota}
+                      </code>
+                    )}
+                    {Object.entries(h.ids).map(([chave, id]) => (
+                      <span key={chave} className="nota">
+                        {" "}
+                        · {NOME_DO_ID[chave] ?? chave} <code className="dado">{id}</code>
+                      </span>
+                    ))}
+                  </span>
+                  <span className={`dado ${h.status >= 400 ? "status-falhou" : "nota"}`}>
+                    {h.status >= 500
+                      ? `falhou · ${h.status}`
+                      : h.status >= 400
+                        ? `recusada · ${h.status}`
+                        : h.status}
+                  </span>
+                  <span className="dado nota">{h.duracao_ms} ms</span>
+                </>
+              ) : (
+                <>
+                  <span>{GESTAO[h.acao] ?? h.acao}</span>
+                  <span className="nota">{h.por ? `por ${h.por}` : "—"}</span>
+                </>
+              )}
             </li>
           ))}
         </ul>
