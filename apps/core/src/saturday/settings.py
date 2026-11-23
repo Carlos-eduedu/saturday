@@ -28,6 +28,8 @@ class Settings(BaseSettings):
 
     environment: Literal["dev", "homolog", "prod", "pytest"] = "dev"
     log_level: str = "INFO"
+    # Vazio, o Sentry fica desligado (decisão 0038).
+    sentry_dsn: SecretStr = SecretStr("")
     api_key: SecretStr = SecretStr("")
     openrouter_api_key: SecretStr = SecretStr("")
     llm_model: str = ""

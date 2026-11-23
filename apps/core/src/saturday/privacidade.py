@@ -50,12 +50,30 @@ def mascarar_conversation_id(conversation_id: str) -> str:
     # `canal:telefone`, montado por `prefixo_do_canal`.
     if separador and canal in CANAIS_WHATSAPP:
         return f"{canal}:{mascarar_telefone(resto)}"
-    # Sequência isolada: dígitos no meio de um id hexadecimal não são telefone.
-    return re.sub(
-        r"(?<![A-Za-z0-9])\d{10,}(?![A-Za-z0-9])",
-        lambda achado: mascarar_telefone(achado.group()),
-        conversation_id,
-    )
+    return _DIGITOS_LONGOS.sub(lambda achado: mascarar_telefone(achado.group()), conversation_id)
+
+
+# Sequência isolada: dígitos no meio de um id hexadecimal não são telefone.
+_DIGITOS_LONGOS = re.compile(r"(?<![A-Za-z0-9])\d{10,}(?![A-Za-z0-9])")
+# No texto livre, letra colada não protege: `cpf12345678901` também é CPF.
+_CPF_NO_TEXTO = re.compile(r"(?<!\d)\d{3}\.?\d{3}\.?\d{3}-?\d{2}(?!\d)")
+_EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
+# DDD obrigatório: sem ele, `2025-2026` vira telefone.
+_TELEFONE_NO_TEXTO = re.compile(r"(?<!\d)(?:\+?55[\s-]?)?\(?\d{2}\)?[\s-]?9?\d{4}[\s-]?\d{4}(?!\d)")
+_NUMERO_LONGO = re.compile(r"(?<!\d)\d{10,}(?!\d)")
+
+
+def mascarar_texto(texto: str) -> str:
+    """CPF, e-mail e telefone mascarados no meio de um texto livre (decisão 0038).
+
+    O que sobra com 10 dígitos seguidos ou mais vira `***`, mesmo dentro de um
+    id: pode ser documento, e um id truncado no erro custa menos.
+    """
+
+    texto = _CPF_NO_TEXTO.sub(lambda achado: mascarar_cpf(achado.group()), texto)
+    texto = _EMAIL.sub(lambda achado: mascarar_email(achado.group()), texto)
+    texto = _TELEFONE_NO_TEXTO.sub(lambda achado: mascarar_telefone(achado.group()), texto)
+    return _NUMERO_LONGO.sub("***", texto)
 
 
 MASCARAS = {

@@ -90,6 +90,11 @@ quebra a URL. Em `development` e `homolog`,
 `SATURDAY_GRANATECH_PROPOSTA_ATIVA=false` e o WhatsApp nunca aponta para número
 real de cliente.
 
+`SATURDAY_SENTRY_DSN` liga o envio de erros da API e do worker ao projeto
+`saturday` do Sentry (organização `mex-promotora`), com a tag `environment` do
+`SATURDAY_ENVIRONMENT`. Vazia, nada sai. O que é enviado e o que fica de fora
+está na decisão 0038.
+
 ## Ordem de um deploy
 
 1. Postgres do ambiente criado, ligado à rede de dados e com o host interno em

@@ -10,11 +10,13 @@ def main() -> None:
     import uvicorn
 
     from saturday.log import configurar_logging
+    from saturday.observabilidade import iniciar_sentry
     from saturday.settings import get_settings
 
     settings = get_settings()
     configurar_logging(settings.log_level)
     settings.validar_para_subir()
+    iniciar_sentry(settings)
 
     # Um processo por padrão. A partir da Fase 1 o estado vive no Postgres e o
     # turno é serializado por `pg_advisory_xact_lock`, então subir mais de um

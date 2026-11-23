@@ -56,6 +56,10 @@ uma entrega fora das fases.
   `/humano`, `/devolver` e, só com a Granatech simulada, `/ir` e `/cenario`; o
   simulador manda sozinho o resultado da consulta aberta com cenário
   (docs/decisoes/0024).
+- **Sentry nos erros do backend:** API e worker mandam ao projeto `saturday`
+  todo `logger.error`/`exception`, mascarado e sem variáveis locais, corpos,
+  integrações de IA nem tracing; liga com `SATURDAY_SENTRY_DSN`
+  (docs/decisoes/0038).
 - **Fase 4 concluída:** cliente Granatech em `bancos/granatech/` (token em cache,
   retry só em GET, normalização em `Decimal`, teto, proposta única com
   reconciliação pela listagem), cota com trava e alerta a 80%, reaproveitamento

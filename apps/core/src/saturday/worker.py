@@ -32,6 +32,7 @@ from saturday.jobs.outbox import (
     drenar,
 )
 from saturday.log import configurar_logging
+from saturday.observabilidade import iniciar_sentry
 from saturday.painel import integracoes
 from saturday.settings import Settings, get_settings
 from saturday.storage.base import criar_storage
@@ -140,6 +141,7 @@ def main() -> None:
     settings = get_settings()
     configurar_logging(settings.log_level)
     settings.validar_para_subir()
+    iniciar_sentry(settings)
 
     parar = threading.Event()
     _parar_em(parar)
