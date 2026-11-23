@@ -80,9 +80,8 @@ services:
     image: saturday-painel:${SATURDAY_IMAGEM_TAG:-local}
     build:
       context: apps/painel
-    depends_on:
-      api:
-        condition: service_started
+    # Sem `depends_on: api`: com ele, o painel novo esperava o `migrate` acabar
+    # e o domínio dava 404 nesse tempo. O nginx resolve a `api` a cada pedido.
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
       interval: 30s
