@@ -52,6 +52,9 @@ services:
       start_period: 60s
       start_interval: 2s
       retries: 3
+    # O SSE do painel segurava a api velha até o SIGKILL (10 s), e o Compose só
+    # liga os containers novos depois de parar todos os velhos.
+    stop_grace_period: 3s
     restart: unless-stopped
     mem_limit: 1g
     cpus: 1.0
