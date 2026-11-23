@@ -91,6 +91,10 @@ services:
       start_period: 30s
       start_interval: 1s
       retries: 3
+    # O nginx sai esperando as conexões abertas, e o SSE de `/admin/eventos`
+    # segurava o container velho até o SIGKILL (10 s de 502 no deploy). O
+    # navegador reconecta o SSE sozinho.
+    stop_grace_period: 2s
     restart: unless-stopped
     mem_limit: 128m
     cpus: 0.25
