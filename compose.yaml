@@ -47,7 +47,10 @@ services:
       test: ["CMD", "saturday-health", "api"]
       interval: 30s
       timeout: 5s
-      start_period: 10s
+      # O Traefik não roteia container em `starting`: sem `start_interval`, o
+      # primeiro teste só vinha após 30 s e o domínio dava 404 a cada deploy.
+      start_period: 60s
+      start_interval: 2s
       retries: 3
     restart: unless-stopped
     mem_limit: 1g
@@ -84,6 +87,9 @@ services:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
       interval: 30s
       timeout: 5s
+      # Mesmo motivo da `api`: sai de `starting` em ~1 s, não em 30 s.
+      start_period: 30s
+      start_interval: 1s
       retries: 3
     restart: unless-stopped
     mem_limit: 128m
