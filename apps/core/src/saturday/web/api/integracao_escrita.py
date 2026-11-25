@@ -174,6 +174,9 @@ def abrir_consulta(
     except ErroGranatech as exc:
         if exc.status is not None and 400 <= exc.status < 500 and exc.status not in (401, 403):
             return _resposta(exc.status, exc.corpo)
+        if exc.status == 200:
+            # Respondeu sem abrir a consulta: o APP MEX vê o motivo que veio.
+            return _resposta(422, exc.corpo)
         raise HTTPException(status_code=502, detail="Granatech indisponível") from exc
     conferir_reaproveitada(aberta, quem)
     return _resposta(

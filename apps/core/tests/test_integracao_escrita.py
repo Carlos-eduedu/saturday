@@ -140,6 +140,36 @@ def test_consulta_recente_de_outro_dono_nao_volta(api: TestClient, fabrica: Any)
     assert resposta.status_code == 409
 
 
+def test_consulta_sem_id_volta_422_com_o_corpo(
+    client_pg: TestClient,
+    http_granatech: TestClient,
+    fabrica: Any,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # Visto em produção: a Granatech responde 200 sem abrir a consulta.
+    def responder(pedido: httpx.Request) -> httpx.Response:
+        if pedido.url.path.endswith("/consulta-saldo"):
+            return httpx.Response(200, json={"cpf": CPF, "mensagem": "recusado"})
+        resposta = http_granatech.request(
+            pedido.method, pedido.url.path, content=pedido.content, headers=dict(pedido.headers)
+        )
+        return httpx.Response(
+            resposta.status_code, content=resposta.content, headers=resposta.headers
+        )
+
+    http = httpx.Client(transport=httpx.MockTransport(responder), base_url="http://granatech")
+    api = _com_granatech(client_pg, http, fabrica)
+    token = _token(api, fabrica, "operacoes")
+
+    resposta = api.get(f"{PROXY}/consulta-saldo", params=CLIENTE, headers=token)
+
+    assert resposta.status_code == 422
+    assert CPF not in resposta.text and "mensagem" in resposta.json()
+    assert _cota_usada(fabrica) == 1  # a cota fica gasta (decisão do gestor)
+    assert "granatech_consulta_sem_id chaves=['cpf', 'mensagem']" in caplog.text
+    assert CPF not in caplog.text
+
+
 def test_cpf_e_telefone_validados(api: TestClient, fabrica: Any) -> None:
     token = _token(api, fabrica, "operacoes")
     ruim = {**CLIENTE, "cpf": "123"}

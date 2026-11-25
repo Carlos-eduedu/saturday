@@ -263,7 +263,7 @@ cota e teto continuam do Saturday.
 
   | Rota | Escopo | O que o Saturday confere |
   | --- | --- | --- |
-  | `GET consulta-saldo?cpf&nome&telefone` | `operacoes` | Reaproveita a consulta recente do CPF sem gastar cota (`reaproveitada: true`); senão reserva cota (sem cota: 429) e abre. A consulta fica com a integração dona. Recente de outro dono: 409. Resposta: `{id, status, link_termo_consentimento, reaproveitada}`. |
+  | `GET consulta-saldo?cpf&nome&telefone` | `operacoes` | Reaproveita a consulta recente do CPF sem gastar cota (`reaproveitada: true`); senão reserva cota (sem cota: 429) e abre. A consulta fica com a integração dona. Recente de outro dono: 409. Resposta: `{id, status, link_termo_consentimento, reaproveitada}`. Granatech com 200 sem `id` (visto em produção em 24/11/2026): 422 com o corpo dela, a cota fica gasta e o log grava só os nomes dos campos. |
   | `POST termo-consentimento` | `operacoes` | `id_consulta` da integração. |
   | `GET simulacao/{id_produto}` | `operacoes` | Liberado de algum bloco acima do teto: 422, sem a simulação. As outras ficam guardadas por 24 h. |
   | `POST propostas` | `operacoes` | Só com `SATURDAY_GRANATECH_PROPOSTA_ATIVA` (503). `id_consulta` da integração; `informacoesFinanceira[0]` repete uma simulação guardada (`id_produto`, `id_margem`, `numero_parcelas`, `valor_parcela`, `valor_solicitado`) e está no teto (422). Intenção gravada antes, sem retry. Resposta `{id, reaproveitada}`; repetir devolve a mesma, sem novo POST. Incerta: 202 `{situacao: "incerta", ...}` — consulte `propostas/lista` antes de repetir. |

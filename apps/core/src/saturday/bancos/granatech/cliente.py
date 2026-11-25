@@ -381,9 +381,13 @@ class ClienteGranatech:
                 self._devolver_cota(hoje)
             raise
 
-        id_externo = str(dados.get("id") or "")
+        id_externo = str(dados.get("id") or "") if isinstance(dados, dict) else ""
         if not id_externo:
-            raise ErroGranatech("consulta sem id")
+            # 200 sem id: a Granatech respondeu, mas não abriu. Só os nomes dos
+            # campos vão ao log (regra 9); a cota fica gasta, como do lado dela.
+            chaves = sorted(dados) if isinstance(dados, dict) else type(dados).__name__
+            logger.warning("granatech_consulta_sem_id chaves=%s", chaves)
+            raise ErroGranatech("consulta sem id", status=200, corpo=dados)
         return self._gravar_consulta(
             id_externo=id_externo,
             cpf=cpf,
